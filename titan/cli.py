@@ -20,15 +20,15 @@ def entrypoint():
 @entrypoint.command()
 def run(file):
     print(LOGO, flush=True)
-    print(file)
+
+    # Load the module that CLI args point at
     module_name = inspect.getmodulename(file)
-    print(module_name)
     spec = importlib.util.spec_from_file_location(module_name, file)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
-    print(module)
-    app = module.pipeline()
-    print(app, flush=True)
-    app.create()
-    print("DONE")
+
+    # module should have something called `app` in it
+    # TODO: expand support
+    app = module.app
+    app.run()
