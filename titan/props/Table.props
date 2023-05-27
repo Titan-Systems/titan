@@ -1,0 +1,12 @@
+[ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
+[ STAGE_FILE_FORMAT = ( { FORMAT_NAME = '<file_format_name>'
+                         | TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ] } ) ]
+[ STAGE_COPY_OPTIONS = ( copyOptions ) ]
+[ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
+[ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
+[ CHANGE_TRACKING = { TRUE | FALSE } ]
+[ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
+[ COPY GRANTS ]
+[ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
+[ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+[ COMMENT = '<string_literal>' ]

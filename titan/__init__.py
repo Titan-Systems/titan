@@ -1,6 +1,7 @@
 from titan import entity as ent
 from titan.app import App
 from titan.client import conn
+from titan import props
 
 
 __version__ = "0.0.1"

@@ -80,7 +80,7 @@ class App:
         # BUGFIX: There's an issue where I have generated 2 entities with the same name
 
         # print("*CATALOG*", catalog)
-        entity_list_sorted = self.entities.sorted()
+        entity_list_sorted = [ent for ent in self.entities.sorted() if not ent.implicit]
         print("entity_list_sorted", entity_list_sorted)
         for entity in entity_list_sorted:
             # Some entities are front-loaded, so skip any that have been processed
@@ -112,13 +112,14 @@ class App:
 
         return inner
 
-    def table(self):
+    def table(self, **table_kwargs):
         def inner(func):
             def wrapper(*args, **kwargs):
                 print("decorated table func called")
                 res = func(*args, **kwargs)
                 if type(res) is str:
-                    table = ent.Table.sql(res)
+                    table = ent.Table.sql(res, **table_kwargs)
+                    # Needs to be migrated to entitygraph probably
                     self._add_to_active_schema(table)
                     self.entities.add(table)
                     return table
@@ -132,13 +133,11 @@ class App:
     def view(self):
         def inner(func):
             def wrapper(*args, **kwargs):
-                res = func(*args, **kwargs)
-                if type(res) is str:
+                with self._entities.capture_refs() as ctx:
+                    res = func(*args, **kwargs)
                     view = ent.View.sql(res)
-                    self.entities.add(view)
+                    ctx.add(view)
                     return view
-                else:
-                    raise NotImplementedError
 
             return wrapper
 
@@ -147,9 +146,16 @@ class App:
     def sproc(self):
         def inner(func):
             def wrapper(*args, **kwargs):
-                sp = ent.Sproc(func)
-                self.entities.add(sp)
-                return sp
+                with self._entities.capture_refs() as ctx:
+                    res = func(*args, **kwargs)
+                    if type(res) is str:
+                        sproc = ent.Sproc.sql(res)
+                    # elif callable(res):
+                    #     sproc = ent.Sproc.func(res)
+                    else:
+                        raise NotImplementedError
+                    ctx.add(sproc)
+                    return sproc
 
             return wrapper
 

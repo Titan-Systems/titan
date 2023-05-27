@@ -3,7 +3,6 @@ import snowflake.snowpark
 
 def on_file_added_factory(_stage, _hook):
     _hook.__module__ = "__main__"
-    # hook = cloudpickle.dumps(_hook)
 
     def sproc(session: snowflake.snowpark.session.Session) -> dict:
         import snowflake.snowpark
