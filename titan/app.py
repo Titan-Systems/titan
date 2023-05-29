@@ -7,12 +7,15 @@ import sqlglot
 
 from titan.client import get_session
 from titan import ent
+from titan.table import Table
+from titan.share import Share
+from titan.catalog import Catalog
 
 # import snowflake.connector
 
 
 class App:
-    def __init__(self, database, schema=None):
+    def __init__(self, database, schema=None, warehouse=None):
         self._session = get_session()
         self._entities = ent.EntityGraph()
 
@@ -50,7 +53,7 @@ class App:
 
         processed = set()
 
-        catalog = ent.EntityCatalog(self.session)
+        catalog = Catalog(self.session)
         if self._database not in catalog:
             self._database.create(self.session)
             processed.add(self._database)
@@ -82,26 +85,28 @@ class App:
         # print("*CATALOG*", catalog)
         entity_list_sorted = [ent for ent in self.entities.sorted() if not ent.implicit]
         print("entity_list_sorted", entity_list_sorted)
-        for entity in entity_list_sorted:
-            # Some entities are front-loaded, so skip any that have been processed
-            if entity in processed:
-                continue
 
-            print(">>>>> Creating", type(entity).__name__, entity.name, flush=True)
-            if entity not in catalog:
-                entity.create(self._session)
-            else:
-                print("... skipped")
-            processed.add(entity)
+        deploy = False
+        if deploy:
+            for entity in entity_list_sorted:
+                # Some entities are front-loaded, so skip any that have been processed
+                if entity in processed:
+                    continue
+
+                print(">>>>> Creating", type(entity).__name__, entity.name, flush=True)
+                if entity not in catalog:
+                    entity.create(self._session)
+                else:
+                    print("... skipped")
+                processed.add(entity)
         self.session.sql("SELECT '[Titan run=0xD34DB33F] end'").collect()
 
     def stage(self):
         def inner(func):
             def wrapper(*args, **kwargs):
-                print("decorated stage func called")
                 res = func(*args, **kwargs)
                 if type(res) is str:
-                    stage = ent.Stage.sql(res)
+                    stage = ent.Stage.from_sql(res)
                     self._add_to_active_schema(stage)
                     self.entities.add(stage)
                     return stage
@@ -115,10 +120,9 @@ class App:
     def table(self, **table_kwargs):
         def inner(func):
             def wrapper(*args, **kwargs):
-                print("decorated table func called")
                 res = func(*args, **kwargs)
                 if type(res) is str:
-                    table = ent.Table.sql(res, **table_kwargs)
+                    table = Table.from_sql(res, **table_kwargs)
                     # Needs to be migrated to entitygraph probably
                     self._add_to_active_schema(table)
                     self.entities.add(table)
@@ -135,7 +139,7 @@ class App:
             def wrapper(*args, **kwargs):
                 with self._entities.capture_refs() as ctx:
                     res = func(*args, **kwargs)
-                    view = ent.View.sql(res)
+                    view = ent.View.from_sql(res)
                     ctx.add(view)
                     return view
 
@@ -149,7 +153,7 @@ class App:
                 with self._entities.capture_refs() as ctx:
                     res = func(*args, **kwargs)
                     if type(res) is str:
-                        sproc = ent.Sproc.sql(res)
+                        sproc = ent.Sproc.from_sql(res)
                     # elif callable(res):
                     #     sproc = ent.Sproc.func(res)
                     else:
@@ -165,7 +169,7 @@ class App:
     # entity using a decorator or a factory function
     # Since shares dont have a well definied SQL interface, only factory makes sense
     def share(self, *args, **kwargs):
-        _share = ent.Share(*args, **kwargs)
+        _share = Share(*args, **kwargs)
         self.entities.add(_share)
         return _share
 

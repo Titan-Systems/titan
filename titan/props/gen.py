@@ -31,10 +31,13 @@ pipe = pp.Suppress("|")
 prop_name = pp.Word(pp.alphas + "_", pp.alphanums + "_")
 identifier = pp.Word(pp.alphas + "_", pp.alphanums + "_")
 
-int_value = pp.Literal("<integer>").setParseAction(pp.replaceWith(int))
-string_value = (pp.Suppress("'<") + identifier + pp.Suppress(">'")).setParseAction(pp.replaceWith(str))
-bool_value = pp.Literal("{ TRUE | FALSE }").setParseAction(pp.replaceWith(bool))
-prop_value = int_value | string_value | bool_value
+enum = pp.Word(pp.alphas.upper() + "-_")
+
+int_value = (pp.Literal("<integer>") | pp.Literal("<num>")).set_parse_action(pp.replaceWith(int))
+string_value = (pp.Suppress("'<") + identifier + pp.Suppress(">'")).set_parse_action(pp.replaceWith(str))
+bool_value = (pp.Literal("{ TRUE | FALSE }") | pp.Literal("TRUE | FALSE")).set_parse_action(pp.replaceWith(bool))
+# enum_value = pp.delimitedList(enum, delim="|").set_parse_action(...)
+prop_value = int_value | string_value | bool_value  # | enum_value
 
 
 simple_kv_prop = prop_name + equals + prop_value + pp.StringEnd()
@@ -74,12 +77,14 @@ def gen_props(props_str):
 
         def_is_complete = len(OPEN_BRACKET.findall(prop_def)) == len(CLOSE_BRACKET.findall(prop_def))
         if def_is_complete:
+            print("prop_def:", prop_def)
             prop = parse_prop(prop_def[2:-2])
             if prop:
                 props.append(prop)
             prop_def = None
 
-    for prop in props:
-        print(prop)
+    # This just needs to be test cases
+    # for prop in props:
+    #     print(prop)
 
     return dict([(prop.name.lower(), prop) for prop in props])

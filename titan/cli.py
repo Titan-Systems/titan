@@ -20,6 +20,7 @@ def entrypoint():
 @entrypoint.command()
 def run(file):
     print(LOGO, flush=True)
+    print(f"      Titan v{__version__}\n")
 
     # Load the module that CLI args point at
     module_name = inspect.getmodulename(file)

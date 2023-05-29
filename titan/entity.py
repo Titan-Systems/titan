@@ -9,15 +9,31 @@ from enum import Enum, auto
 from titan.parser import parse_names
 from titan.hooks import on_file_added_factory
 
-from titan.props import PROPS
+# from titan.props import PROPS
+
+
+class Prop:
+    def __init__(self, equals=True):
+        self.equals = equals
+
+    def raise_if_invalid(self, prop_value):
+        raise NotImplementedError
+
+
+class EnumProp(Prop):
+    def __init__(self, *args, **kwargs):
+        super().__init__(**kwargs)
+        self.values = args
+
+    def raise_if_invalid(self, prop_value):
+        if prop_value not in self.values:
+            raise ValueError(f"{prop_value} is not a valid value for {self}")
 
 
 class Entity:
     # __slots__ = ("sql", "name", "state", "_dependencies")
 
-    PROPS = {}
-
-    def __init__(self, name: str, query_text=None, implicit=False, **props_kwargs):
+    def __init__(self, name: str, query_text=None, implicit=False):  # , **props_kwargs
         self.dependencies = []
         self.graph = None
         self.state = {}
@@ -25,10 +41,10 @@ class Entity:
         self.name = name
         self.query_text = query_text
         self.implicit = implicit
-        for k, v in props_kwargs.items():
-            if k.lower() not in self.PROPS:
-                raise TypeError(f"__init__() got an unexpected keyword argument '{k}'")
-            setattr(self, k, v)
+        # for k, v in props_kwargs.items():
+        #     if k.lower() not in self.PROPS:
+        #         raise TypeError(f"__init__() got an unexpected keyword argument '{k}'")
+        #     setattr(self, k, v)
 
     def __format__(self, format_spec):
         # IDEA: Maybe titan should support some format_spec options like mytable:qualified
@@ -66,6 +82,23 @@ class Entity:
 
     def fully_qualified_name(self):
         raise NotImplementedError
+
+    def equals_prop(self, prop_name):
+        prop_value = getattr(self, prop_name)
+        if prop_value is None:
+            return ""
+        if type(prop_value) is str:
+            prop_value = f"'{prop_value}'"
+        elif type(prop_value) is bool:
+            prop_value = "TRUE" if prop_value else "FALSE"
+        return f"{prop_name.upper()} = {prop_value}"
+
+    def flag_prop(self, prop_name, flag_name=None):
+        prop_value = getattr(self, prop_name)
+        if prop_value:
+            return flag_name or prop_name.upper()
+        else:
+            return ""
 
 
 class AccountLevelEntity(Entity):
@@ -111,7 +144,7 @@ class SchemaLevelEntity(Entity):
         self.schema = schema
 
     @classmethod
-    def sql(cls, query_text: str, **kwargs):
+    def from_sql(cls, query_text: str, **kwargs):
         # There needs to be conflict resolution here
         database, schema, name = parse_names(query_text)
         return cls(name=name, query_text=query_text, database=database, schema=schema, **kwargs)
@@ -167,57 +200,6 @@ class Database(AccountLevelEntity):
 
 class Schema(DatabaseLevelEntity):
     pass
-
-
-class Table(SchemaLevelEntity):
-    # PROPS = """
-    #   [ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
-    #   [ STAGE_FILE_FORMAT = ( { FORMAT_NAME = '<file_format_name>'
-    #                            | TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ] } ) ]
-    #   [ STAGE_COPY_OPTIONS = ( copyOptions ) ]
-    #   [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
-    #   [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
-    #   [ CHANGE_TRACKING = { TRUE | FALSE } ]
-    #   [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
-    #   [ COPY GRANTS ]
-    #   [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
-    #   [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-    #   [ COMMENT = '<string_literal>' ]
-    # """
-
-    PROPS = PROPS["Table"]
-
-    def __init__(self, *args, autoload=False, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # TODO: make this a changeable property that registers/deregisters the pipe when the flag is flipped
-        self.autoload = autoload
-        self.table_stage = Stage(name=f"@%{self.name}", implicit=True)
-        self.table_stage.depends_on(self)
-
-    # def create(self, session):
-    #     super().create(session)
-    #     if self.autoload:
-    #         raise NotImplementedError
-    # Needs a refactor via dependencies
-    # # Does this need to be a pipe we refresh, or should we just call the COPY INTO command each time?
-    # pipe = Pipe(
-    #     sql=rf"""
-    #     CREATE PIPE {self.name}_autoload_pipe
-    #         AS
-    #         COPY INTO {self.name}
-    #         FROM {self.table_stage}
-    #         FILE_FORMAT = (
-    #             TYPE = CSV
-    #             SKIP_HEADER = 1
-    #             COMPRESSION = GZIP
-    #             FIELD_OPTIONALLY_ENCLOSED_BY = '\042'
-    #             NULL_IF = '\N'
-    #             NULL_IF = 'NULL'
-    #         )
-    #     """,
-    # )
-    # pipe.create(session)
 
 
 class View(SchemaLevelEntity):
@@ -296,48 +278,6 @@ class FileFormat(SchemaLevelEntity):
     pass
 
 
-class Share(AccountLevelEntity):
-    """
-    CREATE DATABASE
-        IDENTIFIER('SNOWPARK_FOR_PYTHON__HANDSONLAB__WEATHER_DATA')
-    FROM SHARE
-        IDENTIFIER('WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"');
-    """
-
-    def __init__(self, listing, name, accept_terms=False):
-        super().__init__(name=name)
-        self.listing = listing
-        self.accept_terms = accept_terms
-        self.database_share = 'WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"'
-        self.implicit_schema = Schema(name="ONPOINT_ID", database=self, implicit=True)
-
-        # SHOW OBJECTS IN DATABASE WEATHER_NYC
-
-    def create(self, session):
-        # Punting for now. Not sure if this is better represented as a dependency in the entity graph
-        if self.accept_terms:
-            session.sql(f"CALL SYSTEM$ACCEPT_LEGAL_TERMS('DATA_EXCHANGE_LISTING', '{self.listing}');").collect()
-        session.sql(
-            f"""
-            CREATE DATABASE {self.name}
-            FROM SHARE {self.database_share}
-            """
-        ).collect()
-
-    def table(self, tablename):
-        table = Table(name=tablename, database=self, schema=self.implicit_schema, implicit=True)
-
-        # TODO: there needs to be a way for share to bring its ridealongs
-        if self.graph:
-            self.graph.add(table)
-
-        return table
-
-    @classmethod
-    def show(cls, session):
-        return [row.listing_global_name for row in session.sql("SHOW SHARES").collect()]
-
-
 class EntityPointer(Entity):
     @classmethod
     def show(cls, session):
@@ -404,10 +344,10 @@ class EntityGraph:
     def add(self, *entities: Entity):
         for entity in entities:
             if entity in self._graph:
-                print("Graph > ~", entity.__repr__())
+                # print("Graph > ~", entity.__repr__())
                 return
             else:
-                print("Graph > +", entity.__repr__())
+                # print("Graph > +", entity.__repr__())
                 # self.root.add(entity)
                 self._graph[entity] = set()
                 self._in_degree[entity] = 0
@@ -504,19 +444,3 @@ class EntityGraph:
         if self._ref_listener is not None:
             print(">&>&> entity ref added")
             self._ref_listener.add(entity)
-
-
-# NOTE: Catalog should probably crawl a share and add all its tables and views into the catalog
-class EntityCatalog:
-    def __init__(self, session):
-        self._catalog = {}
-        self._session = session
-
-    def __contains__(self, entity):
-        entity_cls = type(entity)
-        if entity_cls not in self._catalog:
-            self._catalog[entity_cls] = entity_cls.show(self._session)
-        entity_identifier = entity.name
-        if entity_cls is Share:
-            entity_identifier = entity.listing
-        return entity_identifier in self._catalog[entity_cls]
