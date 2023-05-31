@@ -77,7 +77,7 @@ def gen_props(props_str):
 
         def_is_complete = len(OPEN_BRACKET.findall(prop_def)) == len(CLOSE_BRACKET.findall(prop_def))
         if def_is_complete:
-            print("prop_def:", prop_def)
+            # print("prop_def:", prop_def)
             prop = parse_prop(prop_def[2:-2])
             if prop:
                 props.append(prop)

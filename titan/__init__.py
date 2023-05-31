@@ -1,12 +1,16 @@
 from titan import entity as ent
 from titan.app import App
-from titan.client import conn
+
+# from titan.client import conn
 
 # from titan.entity import Warehouse
-from titan import props
+# from titan import props
 
+from .database import Database
+from .role import Role
 from .table import Table
 from .warehouse import Warehouse
+from .user import User
 
 
 __version__ = "0.0.1"

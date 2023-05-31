@@ -1,12 +1,14 @@
 import os
 
-import snowflake.connector
+
+# import snowflake.connector
+# conn = snowflake.connector.connect(**connection_params)
+
+
 from snowflake.snowpark import Session
 
 connection_params = {}
 
-conn = snowflake.connector.connect(**connection_params)
 
-
-def get_session():
-    return Session.builder.configs(connection_params).create()
+def get_session(account):
+    return Session.builder.configs(account=account, **connection_params).create()

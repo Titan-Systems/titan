@@ -1,32 +1,46 @@
 import inspect
 
+
+from typing import List
+
 import sqlglot
 
 # import snowflake.snowpark.functions as sf
 # from snowflake.snowpark.stored_procedure import StoredProcedureRegistration
 
-from titan.client import get_session
+# from titan.client import get_session
 from titan import ent
-from titan.table import Table
-from titan.share import Share
-from titan.catalog import Catalog
+
+from .entity import Entity
+
+from .database import Database
+from .schema import Schema
+
+from .table import Table
+from .share import Share
+from .catalog import Catalog
 
 # import snowflake.connector
 
 
 class App:
-    def __init__(self, database, schema=None, warehouse=None):
-        self._session = get_session()
+    def __init__(self, account="uj63311.us-central1.gcp", database=None, schema=None, warehouse=None, role=None):
+        self.account = account
+        # Probably need an Account resource that has implicit roles for accountadmin, sysadmin, etc
+
+        self._session = None  # get_session()
         self._entities = ent.EntityGraph()
 
-        self._database = ent.Database(name=database)
+        self._database = Database(name=database)
         if schema:
-            self._active_schema = ent.Schema(name=schema, database=self._database)
+            self._active_schema = Schema(name=schema, database=self._database)
         else:
             self._active_schema = self._database.schema("PUBLIC")
         self.entities.add(self._database, self._active_schema)
 
-        self._entrypoints = []
+        self._entrypoint = None
+        self._auto_register = False
+        Entity.on_init = self.entities.add
 
     @property
     def entities(self):
@@ -41,11 +55,17 @@ class App:
         entity.schema = self._active_schema
 
     def build(self):
-        f = self._entrypoints[0]
-        f()
+        if self._entrypoint is None:
+            raise Exception("No app entrypoint is defined")
+        self._auto_register = True
+        self._entrypoint()
+        self._auto_register = False
 
     def run(self):
         self.build()
+
+        print(self.entities.sorted())
+        return
 
         # TODO: I need to do catalog building hand-in-hand with this
         self.session.query_tag = "titan:run::0xD34DB33F"
@@ -92,6 +112,13 @@ class App:
                 # Some entities are front-loaded, so skip any that have been processed
                 if entity in processed:
                     continue
+
+                # We need to decide which ROLE will be used to create a particular entity.
+                # There are two reasons for this:
+                #
+                # 1. Ownership: the role that creates is the defactor owner. However, some folks
+                #      may decide that a role can own things but not create them
+                # 2. Some entities can only be created by specific defaults roles like ACCOUNTADMIN
 
                 print(">>>>> Creating", type(entity).__name__, entity.name, flush=True)
                 if entity not in catalog:
@@ -173,17 +200,9 @@ class App:
         self.entities.add(_share)
         return _share
 
-    def entrypoint(self):
-        print("entrypoint decorator called")
-
+    def entrypoint(self, tags: List[str] = None):
         def inner(func):
-            self._entrypoints.append(func)
+            self._entrypoint = func
             return func
 
         return inner
-
-        # def decorate(func):
-        #     func.is_entrypoint = True
-        #     return func
-
-        # return decorate

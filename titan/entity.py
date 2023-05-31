@@ -12,28 +12,12 @@ from titan.hooks import on_file_added_factory
 # from titan.props import PROPS
 
 
-class Prop:
-    def __init__(self, equals=True):
-        self.equals = equals
-
-    def raise_if_invalid(self, prop_value):
-        raise NotImplementedError
-
-
-class EnumProp(Prop):
-    def __init__(self, *args, **kwargs):
-        super().__init__(**kwargs)
-        self.values = args
-
-    def raise_if_invalid(self, prop_value):
-        if prop_value not in self.values:
-            raise ValueError(f"{prop_value} is not a valid value for {self}")
-
-
 class Entity:
     # __slots__ = ("sql", "name", "state", "_dependencies")
 
-    def __init__(self, name: str, query_text=None, implicit=False):  # , **props_kwargs
+    on_init = None
+
+    def __init__(self, name: str, query_text=None, implicit=False, owner=None):
         self.dependencies = []
         self.graph = None
         self.state = {}
@@ -41,10 +25,11 @@ class Entity:
         self.name = name
         self.query_text = query_text
         self.implicit = implicit
-        # for k, v in props_kwargs.items():
-        #     if k.lower() not in self.PROPS:
-        #         raise TypeError(f"__init__() got an unexpected keyword argument '{k}'")
-        #     setattr(self, k, v)
+
+        self.owner = owner
+
+        if self.on_init:
+            self.on_init(self)
 
     def __format__(self, format_spec):
         # IDEA: Maybe titan should support some format_spec options like mytable:qualified
@@ -83,22 +68,9 @@ class Entity:
     def fully_qualified_name(self):
         raise NotImplementedError
 
-    def equals_prop(self, prop_name):
-        prop_value = getattr(self, prop_name)
-        if prop_value is None:
-            return ""
-        if type(prop_value) is str:
-            prop_value = f"'{prop_value}'"
-        elif type(prop_value) is bool:
-            prop_value = "TRUE" if prop_value else "FALSE"
-        return f"{prop_name.upper()} = {prop_value}"
 
-    def flag_prop(self, prop_name, flag_name=None):
-        prop_value = getattr(self, prop_name)
-        if prop_value:
-            return flag_name or prop_name.upper()
-        else:
-            return ""
+class OrganizationLevelEntity(Entity):
+    pass
 
 
 class AccountLevelEntity(Entity):
@@ -174,32 +146,6 @@ class SchemaLevelEntity(Entity):
         schema = self.schema.name if self.schema else "[SCHEMA]"
         name = self.name.upper()
         return f"{database}.{schema}.{name}"
-
-
-class Database(AccountLevelEntity):
-    def __init__(self, name, query_text=None, implicit=False):
-        query_text = query_text or f"CREATE DATABASE {name.upper()}"
-        super().__init__(name=name, query_text=query_text)
-
-    def schema(self, schemaname):
-        # table = Table(name=tablename, database=self, schema=self.implicit_schema, implicit=True)
-        if schemaname != "PUBLIC":
-            raise NotImplementedError
-        public_schema = Schema(name=schemaname, database=self, implicit=True)
-
-        # TODO: there needs to be a way for share to bring its ridealongs
-        if self.graph:
-            self.graph.add(public_schema)
-
-        return public_schema
-
-    def fully_qualified_name(self):
-        name = self.name.upper()
-        return name
-
-
-class Schema(DatabaseLevelEntity):
-    pass
 
 
 class View(SchemaLevelEntity):
