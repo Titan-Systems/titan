@@ -2,12 +2,12 @@ from enum import Enum
 
 from typing import Union, Optional
 
-from .entity import OrganizationLevelEntity
+from .resource import OrganizationLevelResource
 
 from .role import Role
 
 
-class Account(OrganizationLevelEntity):
+class Account(OrganizationLevelResource):
     """ """
 
     def __init__(

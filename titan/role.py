@@ -1,13 +1,13 @@
 from typing import Union, Optional
 
-from .entity import AccountLevelEntity
+from .resource import AccountLevelResource
 
 from .grant import UsageGrant
 
 # from .helpers import ParsableEnum
 
 
-class Role(AccountLevelEntity):
+class Role(AccountLevelResource):
     """ """
 
     def __init__(
@@ -20,13 +20,13 @@ class Role(AccountLevelEntity):
         # self.default_ddl_collation = default_ddl_collation
         # self.comment = comment
 
-    def uses(self, *entities):
+    def uses(self, *resources):
         grants = []
-        for ent in entities:
-            grant = UsageGrant(self, ent)
+        for res in resources:
+            grant = UsageGrant(self, res)
             grants.append(grant)
         return grants
 
-    def owns(self, *entities):
-        for ent in entities:
-            ent.owner = self
+    def owns(self, *resources):
+        for res in resources:
+            res.owner = self

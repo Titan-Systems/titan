@@ -45,23 +45,23 @@ simple_kv_prop = prop_name + equals + prop_value + pp.StringEnd()
 flag_prop = pp.OneOrMore(pp.Word(pp.alphas)) + pp.StringEnd()
 
 
-class EntityProp:
+class ResourceProp:
     def __init__(self, name, prop_type):
         self.name = name
         self.prop_type = prop_type
 
     def __repr__(self):
-        return f"<EntityProp {self.name} = {self.prop_type.__name__}>"
+        return f"<ResourceProp {self.name} = {self.prop_type.__name__}>"
 
 
 def parse_prop(prop):
     matches = simple_kv_prop.searchString(prop)
     if matches and matches[0]:
-        return EntityProp(*matches[0])
+        return ResourceProp(*matches[0])
 
     matches = flag_prop.searchString(prop)
     if matches and matches[0]:
-        return EntityProp("_".join(matches[0]), prop_type=bool)
+        return ResourceProp("_".join(matches[0]), prop_type=bool)
 
 
 def gen_props(props_str):

@@ -1,10 +1,10 @@
 from typing import List, Tuple
 
-from .entity import Stage, SchemaLevelEntity
+from .resource import Stage, SchemaLevelResource
 from .generator import EqualsProp, FlagProp
 
 
-class Table(SchemaLevelEntity):
+class Table(SchemaLevelResource):
     """
     CREATE [ OR REPLACE ]
       [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE | TRANSIENT } ]

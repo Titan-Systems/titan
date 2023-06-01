@@ -7,11 +7,11 @@ class Catalog:
         self._catalog = {}
         self._session = session
 
-    def __contains__(self, entity):
-        entity_cls = type(entity)
-        if entity_cls not in self._catalog:
-            self._catalog[entity_cls] = entity_cls.show(self._session)
-        entity_identifier = entity.name
-        if entity_cls is Share:
-            entity_identifier = entity.listing
-        return entity_identifier in self._catalog[entity_cls]
+    def __contains__(self, resource):
+        resource_cls = type(resource)
+        if resource_cls not in self._catalog:
+            self._catalog[resource_cls] = resource_cls.show(self._session)
+        resource_identifier = resource.name
+        if resource_cls is Share:
+            resource_identifier = resource.listing
+        return resource_identifier in self._catalog[resource_cls]

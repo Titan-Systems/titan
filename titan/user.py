@@ -1,9 +1,9 @@
 from typing import Union, Optional
 
-from .entity import AccountLevelEntity
+from .resource import AccountLevelResource
 
 
-class User(AccountLevelEntity):
+class User(AccountLevelResource):
     """ """
 
     def __init__(

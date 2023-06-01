@@ -1,6 +1,6 @@
 from typing import Union, Optional
 
-from .entity import AccountLevelEntity, Entity
+from .resource import AccountLevelResource, Resource
 
 # from .user import User
 # from .role import Role
@@ -8,7 +8,7 @@ from .entity import AccountLevelEntity, Entity
 Role = "Role"
 
 
-class Grant(AccountLevelEntity):
+class Grant(AccountLevelResource):
     pass
 
 
@@ -18,7 +18,7 @@ class UsageGrant(Grant):
                -needs-> resource
     """
 
-    def __init__(self, user_or_role: Role, resource: Entity, **kwargs):
+    def __init__(self, user_or_role: Role, resource: Resource, **kwargs):
         super().__init__(name="this name intentionally blank", **kwargs)
         self.grantee = user_or_role
         self.resource = resource

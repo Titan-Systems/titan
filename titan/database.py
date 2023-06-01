@@ -2,7 +2,7 @@ from enum import Enum
 
 from typing import Union, Optional
 
-from .entity import AccountLevelEntity
+from .resource import AccountLevelResource
 
 from .helpers import ParsableEnum
 
@@ -33,7 +33,7 @@ from .schema import Schema
 # WAREHOUSE_SIZE_T = Union[None, str, WarehouseSize]
 
 
-class Database(AccountLevelEntity):
+class Database(AccountLevelResource):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
         [ CLONE <source_db>

@@ -12,10 +12,11 @@ from titan.hooks import on_file_added_factory
 # from titan.props import PROPS
 
 
-class Entity:
+class Resource:
     # __slots__ = ("sql", "name", "state", "_dependencies")
 
     on_init = None
+    level = -1
 
     def __init__(self, name: str, query_text=None, implicit=False, owner=None):
         self.dependencies = []
@@ -34,10 +35,10 @@ class Entity:
     def __format__(self, format_spec):
         # IDEA: Maybe titan should support some format_spec options like mytable:qualified
         # print("__format__", self.__class__, format_spec, self.name, self.graph is None)
-        # print("^^^^^", inspect.currentframe().f_back.f_back.f_code.entity_cls)
+        # print("^^^^^", inspect.currentframe().f_back.f_back.f_code.resource_cls)
 
         if self.graph and format_spec != "raw":
-            self.graph.entity_referenced(self)
+            self.graph.resource_referenced(self)
 
         return self.fully_qualified_name()
 
@@ -59,21 +60,30 @@ class Entity:
         else:
             print("!!!!! Creation Failed, no SQL to run", self.name)
 
-    def depends_on(self, *entities):
-        for entity in entities:
-            if not isinstance(entity, Entity):
-                raise Exception(f"[{entity}:{type(entity)}] is not an Entity")
-            self.dependencies.append(entity)
+    def depends_on(self, *resources):
+        for resource in resources:
+            if not isinstance(resource, Resource):
+                raise Exception(f"[{resource}:{type(resource)}] is not an Resource")
+            self.dependencies.append(resource)
 
     def fully_qualified_name(self):
         raise NotImplementedError
 
+    # def add(self, other_resource):
+    #     if self.level >= other_resource.level:
+    #         raise Exception(f"{other_resource.__repr__()} can't be added to {self.__repr__()} ")
+    #     # If self has already been registered in a graph, the graph owns this responsibility
+    #     if self.graph:
+    #         self.graph.
 
-class OrganizationLevelEntity(Entity):
-    pass
+
+class OrganizationLevelResource(Resource):
+    level = 1
 
 
-class AccountLevelEntity(Entity):
+class AccountLevelResource(Resource):
+    level = 2
+
     @classmethod
     def sql(cls, query_text: str):
         _, _, name = parse_names(query_text)
@@ -83,7 +93,9 @@ class AccountLevelEntity(Entity):
         return self.name.upper()
 
 
-class DatabaseLevelEntity(Entity):
+class DatabaseLevelResource(Resource):
+    level = 3
+
     def __init__(self, *args, database=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.database = database
@@ -109,7 +121,9 @@ class DatabaseLevelEntity(Entity):
         return f"{database}.{name}"
 
 
-class SchemaLevelEntity(Entity):
+class SchemaLevelResource(Resource):
+    level = 4
+
     def __init__(self, database=None, schema=None, **kwargs):
         super().__init__(**kwargs)
         self.database = database
@@ -147,12 +161,15 @@ class SchemaLevelEntity(Entity):
         name = self.name.upper()
         return f"{database}.{schema}.{name}"
 
+    def add(self, other_resource):
+        raise Exception(f"{self.__repr__()} can't add other resources")
 
-class View(SchemaLevelEntity):
+
+class View(SchemaLevelResource):
     pass
 
 
-class Sproc(SchemaLevelEntity):
+class Sproc(SchemaLevelResource):
     pass
     # @classmethod
     # def func(cls, func_):
@@ -160,7 +177,7 @@ class Sproc(SchemaLevelEntity):
     #     return cls(name=name, query_text=query_text)
 
 
-class Stage(SchemaLevelEntity):
+class Stage(SchemaLevelResource):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hooks = {"on_file_added": None}
@@ -171,7 +188,7 @@ class Stage(SchemaLevelEntity):
 
     @on_file_added.setter
     def on_file_added(self, hook):
-        # TODO: This needs to be refactored to be wrapped in a Sproc entity and for dependencies to be implicitly tracked
+        # TODO: This needs to be refactored to be wrapped in a Sproc resource and for dependencies to be implicitly tracked
         self.hooks["on_file_added"] = on_file_added_factory("ZIPPED_TRIPS", hook)
         self.state["on_file_added:last_checked"] = State(key="last_checked", value="'1900-01-01'::DATETIME")
         # print("on_file_added")
@@ -196,7 +213,7 @@ class Stage(SchemaLevelEntity):
             )
 
 
-class Function(SchemaLevelEntity):
+class Function(SchemaLevelResource):
     pass
 
 
@@ -216,36 +233,33 @@ class State(Function):
         """
 
 
-class Pipe(SchemaLevelEntity):
+class Pipe(SchemaLevelResource):
     pass
 
 
-class FileFormat(SchemaLevelEntity):
+class FileFormat(SchemaLevelResource):
     pass
 
 
-class EntityPointer(Entity):
-    @classmethod
-    def show(cls, session):
-        return []
+# class ResourcePointer(Resource):
+#     @classmethod
+#     def show(cls, session):
+#         return []
 
-    def create(self, session):
-        return
-
-    # def fully_qualified_name(self):
-    #     return self.name
+#     def create(self, session):
+#         return
 
 
-class NullEntity(Entity):
-    def __init__(self):
-        pass
+# class NullResource(Resource):
+#     def __init__(self):
+#         pass
 
 
-class EntityGraph:
+class ResourceGraph:
     """
-    The EntityGraph is a DAG that manages dependent relationships between Titan entities.
+    The ResourceGraph is a DAG that manages dependent relationships between Titan resources.
 
-    For example: a table, like most entities, must have a schema and database. The entity graph
+    For example: a table, like most resources, must have a schema and database. The resource graph
     represents this as
     [table] -needs-> [schema] -needs-> [database]
 
@@ -268,8 +282,6 @@ class EntityGraph:
 
     """
 
-    ROOT = NullEntity()
-
     def __init__(self):
         self._graph = {}
         self._in_degree = {}
@@ -280,50 +292,85 @@ class EntityGraph:
         return len(self._graph.keys())
 
     @property
-    def all(self) -> t.List[Entity]:
+    def all(self) -> t.List[Resource]:
         return list(self._graph.keys())
 
-        # While func is executed, the __format__ function for one or more entities may be called
-        # we need to find a way to bubble that up so that this View entity is dependent on those
-        # other entities
+        # While func is executed, the __format__ function for one or more resources may be called
+        # we need to find a way to bubble that up so that this View resource is dependent on those
+        # other resources
 
-    def add(self, *entities: Entity):
-        for entity in entities:
-            if entity in self._graph:
-                # print("Graph > ~", entity.__repr__())
+    def add(self, *resources: Resource):
+        """
+
+        There are many ways that resource relationships can be captured, both explicitly and implicitly.
+
+
+        # Direct approach
+        app = titan.App(database="RAW")
+        t = titan.Table(name="foo", columns=[...])
+        app.add(t)
+
+        # Function Decorator
+        app = titan.App(database="RAW")
+        @app.table()
+        def t():
+            return "CREATE TABLE foo (...)"
+
+        # Ridealong
+        d = titan.Database(name="RAW")
+        t = titan.Table(name="foo", columns=[...])
+        d.add(t)
+        app.add(d)
+
+        # Interpolated
+        @app.view()
+        def v(t):
+            return "CREATE VIEW bar AS SELECT * FROM {t}"
+
+
+        # Session context
+        app.from_sql(`
+            CREATE DATABASE RAW;
+            CREATE TABLE foo (...);
+        `)
+
+
+
+        """
+
+        for resource in resources:
+            if resource in self._graph:
                 return
-            else:
-                # print("Graph > +", entity.__repr__())
-                # self.root.add(entity)
-                self._graph[entity] = set()
-                self._in_degree[entity] = 0
-                entity.graph = self
 
-                if self._ref_listener:
-                    for ref in self._ref_listener:
-                        self.add_dependency(entity, ref)
+            self._graph[resource] = set()
+            self._in_degree[resource] = 0
+            resource.graph = self
 
-                for dep in entity.dependencies:
-                    self.add_dependency(entity, dep)
+            if self._ref_listener:
+                for ref in self._ref_listener:
+                    self.add_dependency(resource, ref)
 
-    def add_dependency(self, entity, dependency):
-        # [entity] -needs-> [dependency]
+            for dep in resource.dependencies:
+                self.add_dependency(resource, dep)
 
-        # I'm trying to figure out if EntityPointers make sense in this system, and if there
+    def add_dependency(self, resource, dependency):
+        # [resource] -needs-> [dependency]
+
+        # I'm trying to figure out if ResourcePointers make sense in this system, and if there
         # should exist a way where they start as pointers but get resolved into objects.
         # This is common for DBs and schemas that might live in existing code
 
         self.add(dependency)
-        if dependency not in self._graph[entity]:
-            self._graph[entity].add(dependency)
+        if dependency not in self._graph[resource]:
+            self._graph[resource].add(dependency)
             self._in_degree[dependency] += 1
 
-    def notify(self, entity):
+    def notify(self, resource):
         """
-        An entity has just notified us that it is being interpolated. Add it to a list of items to
+        An resource has just notified us that it is being interpolated. Add it to a list of items to
         tack on as dependencies
         """
-        # self.pending_refs.append(entity)
+        # self.pending_refs.append(resource)
         pass
 
     def sorted(self):
@@ -385,8 +432,8 @@ class EntityGraph:
         self._ref_listener = None
         print(">&>&> ended listening")
 
-    def entity_referenced(self, entity):
-        print(">&>&> entity referenced")
+    def resource_referenced(self, resource):
+        print(">&>&> resource referenced")
         if self._ref_listener is not None:
-            print(">&>&> entity ref added")
-            self._ref_listener.add(entity)
+            print(">&>&> resource ref added")
+            self._ref_listener.add(resource)

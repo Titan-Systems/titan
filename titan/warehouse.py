@@ -2,7 +2,7 @@ from enum import Enum
 
 from typing import Union, Optional
 
-from .entity import AccountLevelEntity
+from .resource import AccountLevelResource
 from .helpers import ParsableEnum
 
 
@@ -30,7 +30,7 @@ class WarehouseSize(ParsableEnum):
 WAREHOUSE_SIZE_T = Union[str, WarehouseSize]
 
 
-class Warehouse(AccountLevelEntity):
+class Warehouse(AccountLevelResource):
     """
     CREATE [ OR REPLACE ] WAREHOUSE [ IF NOT EXISTS ] <name>
             [ [ WITH ] objectProperties ]

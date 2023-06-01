@@ -6,6 +6,6 @@ PROPS_FILES = [file for file in os.listdir(os.path.dirname(__file__)) if file.en
 PROPS = {}
 
 for filename in PROPS_FILES:
-    entity, _ = filename.split(".")
+    resource, _ = filename.split(".")
     file = os.path.join(os.path.dirname(__file__), filename)
-    PROPS[entity] = gen_props(open(file, "r").read())
+    PROPS[resource] = gen_props(open(file, "r").read())

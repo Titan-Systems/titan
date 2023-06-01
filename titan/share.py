@@ -1,9 +1,9 @@
-from .entity import AccountLevelEntity
+from .resource import AccountLevelResource
 from .schema import Schema
 from .table import Table
 
 
-class Share(AccountLevelEntity):
+class Share(AccountLevelResource):
     """
     CREATE DATABASE
         IDENTIFIER('SNOWPARK_FOR_PYTHON__HANDSONLAB__WEATHER_DATA')
@@ -21,7 +21,7 @@ class Share(AccountLevelEntity):
         # SHOW OBJECTS IN DATABASE WEATHER_NYC
 
     def create(self, session):
-        # Punting for now. Not sure if this is better represented as a dependency in the entity graph
+        # Punting for now. Not sure if this is better represented as a dependency in the resource graph
         if self.accept_terms:
             session.sql(f"CALL SYSTEM$ACCEPT_LEGAL_TERMS('DATA_EXCHANGE_LISTING', '{self.listing}');").collect()
         session.sql(

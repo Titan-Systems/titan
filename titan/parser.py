@@ -17,8 +17,8 @@ def parse_names(sql) -> t.Tuple[str, str, str]:
 
     identifier = Word(alphas, alphanums + "_")
     qualified_name = delimitedList(identifier, ".", combine=True)
-    entity_type = (STAGE | Token.FILE_FORMAT | PIPE | SHARE | DATABASE | SCHEMA | Token.TABLE | Token.VIEW)(
-        "entity_type"
+    resource_type = (STAGE | Token.FILE_FORMAT | PIPE | SHARE | DATABASE | SCHEMA | Token.TABLE | Token.VIEW)(
+        "resource_type"
     )
 
     # Statement syntax
@@ -26,7 +26,7 @@ def parse_names(sql) -> t.Tuple[str, str, str]:
         CREATE
         + Optional(OR + REPLACE)("or_replace")
         + Optional(TEMPORARY)("temporary")
-        + entity_type
+        + resource_type
         + Optional(IF + NOT + EXISTS)("if_not_exists")
         + qualified_name("qualified_name")
     )
@@ -36,9 +36,9 @@ def parse_names(sql) -> t.Tuple[str, str, str]:
         res = stmt.parse_string(sql)
         name_parts = res.qualified_name.split(".")
         name = name_parts[-1]
-        if res.entity_type == DATABASE:
+        if res.resource_type == DATABASE:
             return (None, None, name)
-        elif res.entity_type == SCHEMA:
+        elif res.resource_type == SCHEMA:
             return (name_parts[0], None, name_parts[1])
         else:
             return [None] * (3 - len(name_parts)) + name_parts
