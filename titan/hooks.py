@@ -1,4 +1,4 @@
-import snowflake.snowpark
+import snowflake.snowpark  # type: ignore
 
 
 def on_file_added_factory(_stage, _hook):

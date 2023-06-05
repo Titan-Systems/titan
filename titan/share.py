@@ -11,12 +11,13 @@ class Share(AccountLevelResource):
         IDENTIFIER('WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"');
     """
 
-    def __init__(self, listing, name, accept_terms=False):
-        super().__init__(name=name)
+    def __init__(self, listing: str, accept_terms: bool = False, **kwargs):
+        super().__init__(**kwargs)
         self.listing = listing
         self.accept_terms = accept_terms
-        self.database_share = 'WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"'
-        self.implicit_schema = Schema(name="ONPOINT_ID", database=self, implicit=True)
+        self.database_share: str = 'WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"'
+        # This is a bug, Shares need to have a model of all the entities that will be created
+        self.implicit_schema: Schema = Schema(name="ONPOINT_ID", database=self, implicit=True)
 
         # SHOW OBJECTS IN DATABASE WEATHER_NYC
 

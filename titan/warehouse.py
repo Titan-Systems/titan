@@ -1,6 +1,9 @@
-from enum import Enum
+import re
 
-from typing import Union, Optional
+from enum import Enum
+from typing import Union, Optional, List
+
+from sqlglot import exp
 
 from .resource import AccountLevelResource
 from .helpers import ParsableEnum
@@ -57,23 +60,30 @@ class Warehouse(AccountLevelResource):
       [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
     """
 
+    props = {
+        "warehouse_type": WarehouseType,
+        "warehouse_size": WarehouseSize,
+        "max_cluster_count": int,
+        "min_cluster_count": int,
+    }
+
     def __init__(
         self,
         warehouse_type: Optional[WAREHOUSE_TYPE_T] = WarehouseType.STANDARD,
         warehouse_size: Optional[WAREHOUSE_SIZE_T] = WarehouseSize.XSMALL,
-        max_cluster_count: int = None,
-        min_cluster_count: int = None,
-        scaling_policy: str = None,
-        auto_suspend: int = None,
-        auto_resume: bool = None,
-        initially_suspended: bool = None,
+        max_cluster_count: Optional[int] = None,
+        min_cluster_count: Optional[int] = None,
+        scaling_policy: Optional[str] = None,
+        auto_suspend: Optional[int] = None,
+        auto_resume: Optional[bool] = None,
+        initially_suspended: Optional[bool] = None,
         # resource_monitor=None,
-        comment: str = None,
-        enable_query_acceleration: bool = None,
-        query_acceleration_max_scale_factor: int = None,
-        max_concurrency_level: int = None,
-        statement_queued_timeout_in_seconds: int = None,
-        statement_timeout_in_seconds: int = None,
+        comment: Optional[str] = None,
+        enable_query_acceleration: Optional[bool] = None,
+        query_acceleration_max_scale_factor: Optional[int] = None,
+        max_concurrency_level: Optional[int] = None,
+        statement_queued_timeout_in_seconds: Optional[int] = None,
+        statement_timeout_in_seconds: Optional[int] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -92,6 +102,43 @@ class Warehouse(AccountLevelResource):
         self.max_concurrency_level = max_concurrency_level
         self.statement_queued_timeout_in_seconds = statement_queued_timeout_in_seconds
         self.statement_timeout_in_seconds = statement_timeout_in_seconds
+
+    @classmethod
+    def parse_props(cls, sql: str):
+        found_props = {}
+
+        for prop_name, prop_type in cls.props.items():
+            pattern = rf"{prop_name}\s*=\s*'?(\w+)'?"
+            match = re.search(pattern, sql, re.IGNORECASE)
+            if match:
+                prop_value = match.group(1)
+                if issubclass(prop_type, ParsableEnum):
+                    prop_value = prop_type.parse(prop_value)
+                elif prop_type == int:
+                    prop_value = int(prop_value)
+                found_props[prop_name] = prop_value
+
+        return found_props
+
+    @classmethod
+    def from_expression(cls, expression: exp.Command):
+        """
+        (COMMAND
+            this: CREATE,
+            expression:  WAREHOUSE DATA_APPS_ADHOC WITH WAREHOUSE_SIZE='small')
+        """
+
+        sql = expression.args["expression"]
+
+        identifier = re.compile(r"WAREHOUSE\s+([A-Z][A-Z0-9_]*)", re.IGNORECASE)
+        match = re.search(identifier, sql)
+
+        if match is None:
+            raise Exception
+        name = match.group(1)
+        props = cls.parse_props(sql[match.end() :])
+
+        return cls(name=name, **props)
 
 
 # WAREHOUSE_T = Union[str, Warehouse]

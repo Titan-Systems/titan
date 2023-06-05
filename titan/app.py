@@ -1,39 +1,56 @@
+from __future__ import annotations
+
 import inspect
 
-
-from typing import List
+from typing import List, Union
 
 import sqlglot
+
+from sqlglot import exp
 
 # import snowflake.snowpark.functions as sf
 # from snowflake.snowpark.stored_procedure import StoredProcedureRegistration
 
-from .resource import Resource, ResourceGraph
+from .parser import parse
+from .resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource
+from .resource_graph import ResourceGraph
 
-from .database import Database
-from .schema import Schema
-
-from .table import Table
-from .share import Share
+from .account import Account
 from .catalog import Catalog
-
-# import snowflake.connector
+from .database import Database, parse_database
+from .role import Role
+from .schema import Schema, parse_schema
+from .share import Share
+from .sproc import Sproc
+from .stage import Stage
+from .table import Table
+from .view import View
+from .warehouse import Warehouse
 
 
 class App:
-    def __init__(self, account="uj63311.us-central1.gcp", database=None, schema=None, warehouse=None, role=None):
-        self.account = account
-        # Probably need an Account resource that has implicit roles for accountadmin, sysadmin, etc
-
-        self._session = None  # get_session()
+    def __init__(
+        self,
+        # TODO: Support inferring account from connection string
+        account: Union[str, Account] = "uj63311.us-central1.gcp",
+        database: Union[None, str, Database] = None,
+        schema: Union[None, str, Schema] = None,
+        warehouse: Union[None, str, Warehouse] = None,
+        # TODO: implement me.  Maybe this is owner role?
+        role: Union[None, str, Role] = None,
+    ):
+        self._session = get_session()
         self._resources = ResourceGraph()
+        self.account = account if isinstance(account, Account) else Account(name=account)
 
-        self._database = Database(name=database)
-        if schema:
-            self._active_schema = Schema(name=schema, database=self._database)
-        else:
-            self._active_schema = self._database.schema("PUBLIC")
-        self.resources.add(self._database, self._active_schema)
+        database = parse_database(database)
+        if database is not None:
+            self.resources.add(database)
+
+        schema = parse_schema(schema)
+        if schema is not None:
+            schema.database = database
+            self.resources.add(schema)
 
         self._entrypoint = None
         self._auto_register = False
@@ -47,10 +64,6 @@ class App:
     def session(self):
         return self._session
 
-    def _add_to_active_schema(self, resource):
-        resource.database = self._database
-        resource.schema = self._active_schema
-
     def build(self):
         if self._entrypoint is None:
             raise Exception("No app entrypoint is defined")
@@ -59,10 +72,10 @@ class App:
         self._auto_register = False
 
     def run(self):
-        self.build()
+        # self.build()
 
-        print(self.resources.sorted())
-        return
+        # print(self.resources.sorted())
+        # return
 
         # TODO: I need to do catalog building hand-in-hand with this
         self.session.query_tag = "titan:run::0xD34DB33F"
@@ -71,10 +84,10 @@ class App:
         processed = set()
 
         catalog = Catalog(self.session)
-        if self._database not in catalog:
-            self._database.create(self.session)
-            processed.add(self._database)
-        self.session.use_database(self._database.name)
+        if self.database not in catalog:
+            self.database.create(self.session)
+            processed.add(self.database)
+        self.session.use_database(self.database.name)
 
         # # One day this should be abstracted in a way that supports multiple sessions, with a nice context manager
         # # so I can write code like
@@ -101,7 +114,7 @@ class App:
 
         # print("*CATALOG*", catalog)
         resource_list_sorted = [res for res in self.resources.sorted() if not res.implicit]
-        print("resource_list_sorted", resource_list_sorted)
+        # print("resource_list_sorted", resource_list_sorted)
 
         deploy = False
         if deploy:
@@ -126,11 +139,42 @@ class App:
         self.session.sql("SELECT '[Titan run=0xD34DB33F] end'").collect()
 
     def from_sql(self, sql_blob):
-        stmts = sqlglot.parse(sql_blob)
+        stmts = sqlglot.parse(sql_blob, read="snowflake")
         local_state = {}
         for i, stmt in enumerate(stmts):
-            print(i, type(stmt), "^" * 80)
-            print(stmt)
+            # print(repr(stmt))
+            if isinstance(stmt, exp.Create):
+                create_kind = stmt.args["kind"].lower()
+                if create_kind == "database":
+                    self.resources.add(Database.from_expression(stmt))
+                elif create_kind == "table":
+                    self.resources.add(Table.from_expression(stmt))
+            elif isinstance(stmt, exp.Command) and stmt.this.lower() == "create":
+                create_kind = stmt.args["expression"].strip().split(" ")[0].lower()
+                if create_kind == "warehouse":
+                    self.resources.add(Warehouse.from_expression(stmt))
+                elif create_kind == "stage":
+                    self.resources.add(Stage.from_expression(stmt))
+                elif create_kind == "role":
+                    pass
+            elif isinstance(stmt, exp.Command) and stmt.this.lower() == "grant":
+                pass
+
+    def tree(self):
+        from treelib import Node, Tree
+
+        t = Tree()
+        t.create_node("Account " + self.account.name, self.account.name)
+        for res in self.resources.all:
+            if isinstance(res, AccountLevelResource):
+                t.create_node(type(res).__name__ + " " + res.name, repr(res), parent=self.account.name)
+        for res in self.resources.all:
+            if isinstance(res, DatabaseLevelResource):
+                t.create_node(type(res).__name__ + " " + res.name, repr(res), parent=repr(res.database))
+        for res in self.resources.all:
+            if isinstance(res, SchemaLevelResource):
+                t.create_node(type(res).__name__ + " " + res.name, repr(res), parent=repr(res.schema))
+        t.show()
 
     def stage(self):
         def inner(func):
@@ -138,7 +182,6 @@ class App:
                 res = func(*args, **kwargs)
                 if type(res) is str:
                     stage = Stage.from_sql(res)
-                    self._add_to_active_schema(stage)
                     self.resources.add(stage)
                     return stage
                 else:
@@ -154,8 +197,6 @@ class App:
                 res = func(*args, **kwargs)
                 if type(res) is str:
                     table = Table.from_sql(res, **table_kwargs)
-                    # Needs to be migrated to resourcegraph probably
-                    self._add_to_active_schema(table)
                     self.resources.add(table)
                     return table
                 else:
@@ -204,7 +245,7 @@ class App:
         self.resources.add(_share)
         return _share
 
-    def entrypoint(self, tags: List[str] = None):
+    def entrypoint(self, tags: List[str] = []):
         def inner(func):
             self._entrypoint = func
             return func

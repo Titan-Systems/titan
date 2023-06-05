@@ -1,11 +1,12 @@
-from typing import Union, Optional
+from __future__ import annotations
+
+from typing import Union, Optional, TYPE_CHECKING
 
 from .resource import AccountLevelResource, Resource
 
-# from .user import User
-# from .role import Role
-
-Role = "Role"
+if TYPE_CHECKING:
+    from .user import User
+    from .role import Role
 
 
 class Grant(AccountLevelResource):
@@ -22,7 +23,7 @@ class UsageGrant(Grant):
         super().__init__(name="this name intentionally blank", **kwargs)
         self.grantee = user_or_role
         self.resource = resource
-        self.depends_on(self.grantee, self.resource)
+        self.requires(self.grantee, self.resource)
 
 
 # class RoleGrant(Grant):

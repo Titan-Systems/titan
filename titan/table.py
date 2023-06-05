@@ -1,6 +1,10 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
-from .resource import Stage, SchemaLevelResource
+from sqlglot import exp
+
+from .resource import SchemaLevelResource
+from .schema import Schema
+from .stage import Stage
 from .generator import EqualsProp, FlagProp
 
 
@@ -53,14 +57,14 @@ class Table(SchemaLevelResource):
 
     def __init__(
         self,
-        autoload: bool = False,
-        data_retention_time_in_days: int = None,
-        max_data_extension_time_in_days: int = None,
-        change_tracking: bool = None,
-        default_ddl_collation: str = None,
-        copy_grants: bool = None,
+        autoload: Optional[bool] = False,
+        data_retention_time_in_days: Optional[int] = None,
+        max_data_extension_time_in_days: Optional[int] = None,
+        change_tracking: Optional[bool] = None,
+        default_ddl_collation: Optional[str] = None,
+        copy_grants: Optional[bool] = None,
         tags: List[Tuple[str, str]] = [],
-        comment: str = None,
+        comment: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -79,7 +83,22 @@ class Table(SchemaLevelResource):
         self.comment = comment
 
         self.table_stage = Stage(name=f"@%{self.name}", implicit=True)
-        self.table_stage.depends_on(self)
+        self.table_stage.requires(self)
+        if self.schema:
+            self.table_stage.schema = self.schema
+
+    @classmethod
+    def from_expression(cls, expression: exp.Create):
+        # name = expression.this.this.this
+        name = list(expression.find_all(exp.Identifier))[0].this
+
+        # if "properties" in expression.args and expression.args["properties"] is not None:
+        #     for prop in expression.args["properties"].expressions:
+        #         print("> ", type(prop), prop)
+
+        return cls(
+            name=name,
+        )
 
     @property
     def sql(self):
@@ -100,6 +119,14 @@ class Table(SchemaLevelResource):
         #     + self.equals_prop("data_retention_time_in_days")
         #     + self.flag_prop("copy_grants", "COPY GRANTS")
         # )
+
+    # https://github.com/python/mypy/issues/5936
+    @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]
+    def schema(self, schema_: Optional[Schema]):
+        self._schema = schema_
+        if self._schema is not None:
+            self.requires(self._schema)
+            self.table_stage.schema = self._schema
 
     # def create(self, session):
     #     super().create(session)

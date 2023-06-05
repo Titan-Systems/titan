@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 from enum import Enum
 
 
 class ParsableEnum(Enum):
     @classmethod
-    def parse(cls, value) -> "ParsableEnum":
+    def parse(cls, value) -> ParsableEnum:
         if isinstance(value, cls):
             return value.value
         try:
