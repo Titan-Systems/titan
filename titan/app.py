@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import inspect
+# import inspect
+import re
 
-from typing import List, Union
+from typing import Optional, Dict, List, Union
 
 import sqlglot
 
@@ -11,19 +12,21 @@ from sqlglot import exp
 # import snowflake.snowpark.functions as sf
 # from snowflake.snowpark.stored_procedure import StoredProcedureRegistration
 
-from .parser import parse
-from .resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource
+# from .props import Identifier
+from .resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource, T_Resource
 from .resource_graph import ResourceGraph
 
 from .account import Account
 from .catalog import Catalog
-from .database import Database, parse_database
+from .database import Database
 from .role import Role
-from .schema import Schema, parse_schema
+from .grants import RoleGrant, PrivGrant
+from .schema import Schema
 from .share import Share
 from .sproc import Sproc
 from .stage import Stage
 from .table import Table
+from .user import User
 from .view import View
 from .warehouse import Warehouse
 
@@ -39,22 +42,25 @@ class App:
         # TODO: implement me.  Maybe this is owner role?
         role: Union[None, str, Role] = None,
     ):
-        self._session = get_session()
+        # self._session = get_session()
         self._resources = ResourceGraph()
         self.account = account if isinstance(account, Account) else Account(name=account)
 
-        database = parse_database(database)
-        if database is not None:
-            self.resources.add(database)
+        database_ = Database.all[database]
+        if database_:
+            self.resources.add(database_)
 
-        schema = parse_schema(schema)
         if schema is not None:
-            schema.database = database
-            self.resources.add(schema)
+            if database_ is None:
+                # TODO: infer database from connection and config
+                raise Exception("Cant have schema without database")
+            schema_ = database_.schemas[schema]
+            schema.database = database_
+            self.resources.add(schema_)
 
         self._entrypoint = None
         self._auto_register = False
-        Resource.on_init = self.resources.add
+        # Resource.on_init = self.resources.add
 
     @property
     def resources(self):
@@ -84,10 +90,10 @@ class App:
         processed = set()
 
         catalog = Catalog(self.session)
-        if self.database not in catalog:
-            self.database.create(self.session)
-            processed.add(self.database)
-        self.session.use_database(self.database.name)
+        # if self.database not in catalog:
+        #     self.database.create(self.session)
+        #     processed.add(self.database)
+        # self.session.use_database(self.database.name)
 
         # # One day this should be abstracted in a way that supports multiple sessions, with a nice context manager
         # # so I can write code like
@@ -138,29 +144,99 @@ class App:
                 processed.add(resource)
         self.session.sql("SELECT '[Titan run=0xD34DB33F] end'").collect()
 
-    def from_sql(self, sql_blob):
+    def parse_sql(self, sql_blob: str) -> None:
         stmts = sqlglot.parse(sql_blob, read="snowflake")
-        local_state = {}
+        # I tried T_Resource here but there's some issue with binding that I dont understand
+        local_state: Dict[str, Optional[Resource]] = {
+            "active_role": None,
+            "active_database": None,
+            "active_schema": None,
+        }
+
+        extract_create_kind = re.compile(
+            r"""
+            CREATE\s+
+            (?:OR\s+REPLACE\s+)?
+            (?:TRANSIENT\s+)?
+            (?:TEMPORARY\s+)?
+            (?:TEMP\s+)?
+            (?P<create_kind>(WAREHOUSE|STAGE|ROLE|USER|DATABASE|TABLE))
+        """,
+            re.VERBOSE | re.IGNORECASE,
+        )
+
         for i, stmt in enumerate(stmts):
-            # print(repr(stmt))
+            if stmt is None:
+                continue
+            sql = stmt.sql(dialect="snowflake")
+
+            new_resource: Optional[Resource] = None
             if isinstance(stmt, exp.Create):
                 create_kind = stmt.args["kind"].lower()
                 if create_kind == "database":
-                    self.resources.add(Database.from_expression(stmt))
+                    new_resource = Database.from_sql(sql)
+                    local_state["active_database"] = new_resource
+                    local_state["active_schema"] = new_resource.schemas["PUBLIC"]
                 elif create_kind == "table":
-                    self.resources.add(Table.from_expression(stmt))
+                    new_resource = Table.from_sql(sql)
+                elif create_kind == "schema":
+                    new_resource = Schema.from_sql(sql)
+                    local_state["active_schema"] = new_resource
+                    if new_resource.database is None:
+                        if local_state["active_database"]:
+                            new_resource.database = local_state["active_database"]
+                        else:
+                            raise Exception("Schema specified without database")
             elif isinstance(stmt, exp.Command) and stmt.this.lower() == "create":
-                create_kind = stmt.args["expression"].strip().split(" ")[0].lower()
+                create_kind = extract_create_kind.search(sql).groupdict()["create_kind"].lower()
                 if create_kind == "warehouse":
-                    self.resources.add(Warehouse.from_expression(stmt))
+                    new_resource = Warehouse.from_sql(sql)
                 elif create_kind == "stage":
-                    self.resources.add(Stage.from_expression(stmt))
+                    new_resource = Stage.from_sql(sql)
                 elif create_kind == "role":
                     pass
+                elif create_kind == "user":
+                    new_resource = User.from_sql(sql)
             elif isinstance(stmt, exp.Command) and stmt.this.lower() == "grant":
-                pass
+                grant_tokens = stmt.expression.this.strip().split()
+                grant_kind = grant_tokens[0].lower()
+                if grant_kind == "role":
+                    new_resource = RoleGrant.from_sql(sql)
+                elif grant_kind == "ownership":
+                    # GRANT OWNERSHIP
+                    pass
+                elif grant_kind == "database" and grant_tokens[1].lower() == "role":
+                    # GRANT DATABASE ROLE
+                    pass
+                else:
+                    new_resource = PrivGrant.from_sql(sql)
+            elif isinstance(stmt, exp.Use):
+                use_kind = stmt.args["kind"].this.lower()
+                name = stmt.this.this.this
+                # USE ROLE SECURITYADMIN;
+                if use_kind == "role":
+                    local_state["active_role"] = Role.all[name]
+                elif use_kind == "database":
+                    local_state["active_database"] = Database.all[name]
+                # elif use_kind == "schema":
+                # local_state["active_schema"] = Schema.all[stmt.this.this.this]
+
+            if new_resource:
+                if new_resource.ownable and local_state["active_role"]:
+                    new_resource.owner = local_state["active_role"]
+                if isinstance(new_resource, DatabaseLevelResource) and local_state["active_database"]:
+                    new_resource.database = local_state["active_database"]
+                if isinstance(new_resource, SchemaLevelResource) and local_state["active_schema"]:
+                    new_resource.schema = local_state["active_schema"]
+                self.resources.add(new_resource)
+            else:
+                print(repr(stmt))
+                print(sql)
+                print("...")
+                # raise Exception
 
     def tree(self):
+        raise Exception("This is broken")
         from treelib import Node, Tree
 
         t = Tree()
@@ -176,78 +252,78 @@ class App:
                 t.create_node(type(res).__name__ + " " + res.name, repr(res), parent=repr(res.schema))
         t.show()
 
-    def stage(self):
-        def inner(func):
-            def wrapper(*args, **kwargs):
-                res = func(*args, **kwargs)
-                if type(res) is str:
-                    stage = Stage.from_sql(res)
-                    self.resources.add(stage)
-                    return stage
-                else:
-                    raise NotImplementedError
+    # def stage(self):
+    #     def inner(func):
+    #         def wrapper(*args, **kwargs):
+    #             res = func(*args, **kwargs)
+    #             if type(res) is str:
+    #                 stage = Stage.from_sql(res)
+    #                 self.resources.add(stage)
+    #                 return stage
+    #             else:
+    #                 raise NotImplementedError
 
-            return wrapper
+    #         return wrapper
 
-        return inner
+    #     return inner
 
-    def table(self, **table_kwargs):
-        def inner(func):
-            def wrapper(*args, **kwargs):
-                res = func(*args, **kwargs)
-                if type(res) is str:
-                    table = Table.from_sql(res, **table_kwargs)
-                    self.resources.add(table)
-                    return table
-                else:
-                    raise NotImplementedError
+    # def table(self, **table_kwargs):
+    #     def inner(func):
+    #         def wrapper(*args, **kwargs):
+    #             res = func(*args, **kwargs)
+    #             if type(res) is str:
+    #                 table = Table.from_sql(res, **table_kwargs)
+    #                 self.resources.add(table)
+    #                 return table
+    #             else:
+    #                 raise NotImplementedError
 
-            return wrapper
+    #         return wrapper
 
-        return inner
+    #     return inner
 
-    def view(self):
-        def inner(func):
-            def wrapper(*args, **kwargs):
-                with self._resources.capture_refs() as ctx:
-                    res = func(*args, **kwargs)
-                    view = View.from_sql(res)
-                    ctx.add(view)
-                    return view
+    # def view(self):
+    #     def inner(func):
+    #         def wrapper(*args, **kwargs):
+    #             with self._resources.capture_refs() as ctx:
+    #                 res = func(*args, **kwargs)
+    #                 view = View.from_sql(res)
+    #                 ctx.add(view)
+    #                 return view
 
-            return wrapper
+    #         return wrapper
 
-        return inner
+    #     return inner
 
-    def sproc(self):
-        def inner(func):
-            def wrapper(*args, **kwargs):
-                with self._resources.capture_refs() as ctx:
-                    res = func(*args, **kwargs)
-                    if type(res) is str:
-                        sproc = Sproc.from_sql(res)
-                    # elif callable(res):
-                    #     sproc = Sproc.func(res)
-                    else:
-                        raise NotImplementedError
-                    ctx.add(sproc)
-                    return sproc
+    # def sproc(self):
+    #     def inner(func):
+    #         def wrapper(*args, **kwargs):
+    #             with self._resources.capture_refs() as ctx:
+    #                 res = func(*args, **kwargs)
+    #                 if type(res) is str:
+    #                     sproc = Sproc.from_sql(res)
+    #                 # elif callable(res):
+    #                 #     sproc = Sproc.func(res)
+    #                 else:
+    #                     raise NotImplementedError
+    #                 ctx.add(sproc)
+    #                 return sproc
 
-            return wrapper
+    #         return wrapper
 
-        return inner
+    #     return inner
 
-    # TODO: There should be a unified interface where I can initialize any app
-    # resource using a decorator or a factory function
-    # Since shares dont have a well definied SQL interface, only factory makes sense
-    def share(self, *args, **kwargs):
-        _share = Share(*args, **kwargs)
-        self.resources.add(_share)
-        return _share
+    # # TODO: There should be a unified interface where I can initialize any app
+    # # resource using a decorator or a factory function
+    # # Since shares dont have a well definied SQL interface, only factory makes sense
+    # def share(self, *args, **kwargs):
+    #     _share = Share(*args, **kwargs)
+    #     self.resources.add(_share)
+    #     return _share
 
-    def entrypoint(self, tags: List[str] = []):
-        def inner(func):
-            self._entrypoint = func
-            return func
+    # def entrypoint(self, tags: List[str] = []):
+    #     def inner(func):
+    #         self._entrypoint = func
+    #         return func
 
-        return inner
+    #     return inner

@@ -12,3 +12,6 @@ extend-exclude = '''
 pythonVersion = '3.9'
 venvPath = ''
 venv = ''
+
+[tool.ruff]
+line-length = 120

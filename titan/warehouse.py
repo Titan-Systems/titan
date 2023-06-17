@@ -1,20 +1,23 @@
 import re
 
-from enum import Enum
-from typing import Union, Optional, List
+# from enum import Enum
+from typing import Union, Optional
 
-from sqlglot import exp
+# from sqlglot import exp
 
 from .resource import AccountLevelResource
-from .helpers import ParsableEnum
+
+# from .helpers import ParsableEnum
+from .props import EnumProp, ParsableEnum, StringProp, Identifier, IntProp, TagsProp
+
+
+# class WarehouseType(EnumProp):
+#     values =
 
 
 class WarehouseType(ParsableEnum):
     STANDARD = "STANDARD"
     SNOWPARK_OPTIMIZED = "SNOWPARK-OPTIMIZED"
-
-
-WAREHOUSE_TYPE_T = Union[str, WarehouseType]
 
 
 class WarehouseSize(ParsableEnum):
@@ -30,47 +33,63 @@ class WarehouseSize(ParsableEnum):
     X6LARGE = "X6LARGE"
 
 
-WAREHOUSE_SIZE_T = Union[str, WarehouseSize]
-
-
 class Warehouse(AccountLevelResource):
     """
     CREATE [ OR REPLACE ] WAREHOUSE [ IF NOT EXISTS ] <name>
-            [ [ WITH ] objectProperties ]
-            [ objectParams ]
+        [ [ WITH ] objectProperties ]
+        [ objectParams ]
 
     objectProperties ::=
-      WAREHOUSE_TYPE = STANDARD | SNOWPARK-OPTIMIZED
-      WAREHOUSE_SIZE = XSMALL | SMALL | MEDIUM | LARGE | XLARGE | XXLARGE | XXXLARGE | X4LARGE | X5LARGE | X6LARGE
-      MAX_CLUSTER_COUNT = <num>
-      MIN_CLUSTER_COUNT = <num>
-      SCALING_POLICY = STANDARD | ECONOMY
-      AUTO_SUSPEND = <num> | NULL
-      AUTO_RESUME = TRUE | FALSE
-      INITIALLY_SUSPENDED = TRUE | FALSE
-      RESOURCE_MONITOR = <monitor_name>
-      COMMENT = '<string_literal>'
-      ENABLE_QUERY_ACCELERATION = TRUE | FALSE
-      QUERY_ACCELERATION_MAX_SCALE_FACTOR = <num>
+        WAREHOUSE_TYPE = STANDARD | SNOWPARK-OPTIMIZED
+        WAREHOUSE_SIZE = XSMALL | SMALL | MEDIUM | LARGE | XLARGE | XXLARGE | XXXLARGE | X4LARGE | X5LARGE | X6LARGE
+        MAX_CLUSTER_COUNT = <num>
+        MIN_CLUSTER_COUNT = <num>
+        SCALING_POLICY = STANDARD | ECONOMY
+        AUTO_SUSPEND = <num> | NULL
+        AUTO_RESUME = TRUE | FALSE
+        INITIALLY_SUSPENDED = TRUE | FALSE
+        RESOURCE_MONITOR = <monitor_name>
+        COMMENT = '<string_literal>'
+        ENABLE_QUERY_ACCELERATION = TRUE | FALSE
+        QUERY_ACCELERATION_MAX_SCALE_FACTOR = <num>
 
     objectParams ::=
-      MAX_CONCURRENCY_LEVEL = <num>
-      STATEMENT_QUEUED_TIMEOUT_IN_SECONDS = <num>
-      STATEMENT_TIMEOUT_IN_SECONDS = <num>
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+        MAX_CONCURRENCY_LEVEL = <num>
+        STATEMENT_QUEUED_TIMEOUT_IN_SECONDS = <num>
+        STATEMENT_TIMEOUT_IN_SECONDS = <num>
+        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
     """
 
     props = {
-        "warehouse_type": WarehouseType,
-        "warehouse_size": WarehouseSize,
-        "max_cluster_count": int,
-        "min_cluster_count": int,
+        "WAREHOUSE_TYPE": EnumProp("WAREHOUSE_TYPE", WarehouseType),
+        "WAREHOUSE_SIZE": EnumProp("WAREHOUSE_SIZE", WarehouseSize),
+        "MAX_CLUSTER_COUNT": IntProp("MAX_CLUSTER_COUNT"),
+        "MIN_CLUSTER_COUNT": IntProp("MIN_CLUSTER_COUNT"),
+        "SCALING_POLICY": StringProp("SCALING_POLICY"),
+        "AUTO_SUSPEND": IntProp("AUTO_SUSPEND"),  # TODO: find some way to make this nullable
+        "AUTO_RESUME": StringProp("AUTO_RESUME"),
+        "INITIALLY_SUSPENDED": StringProp("INITIALLY_SUSPENDED"),
+        # "RESOURCE_MONITOR": StringProp("RESOURCE_MONITOR"),
+        "COMMENT": StringProp("COMMENT"),
+        "ENABLE_QUERY_ACCELERATION": StringProp("ENABLE_QUERY_ACCELERATION"),
+        "QUERY_ACCELERATION_MAX_SCALE_FACTOR": IntProp("QUERY_ACCELERATION_MAX_SCALE_FACTOR"),
+        "MAX_CONCURRENCY_LEVEL": IntProp("MAX_CONCURRENCY_LEVEL"),
+        "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS": IntProp("STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"),
+        "STATEMENT_TIMEOUT_IN_SECONDS": IntProp("STATEMENT_TIMEOUT_IN_SECONDS"),
+        "TAGS": TagsProp(),
     }
+
+    create_statement = re.compile(
+        rf"CREATE\s+(?:OR\s+REPLACE\s+)?WAREHOUSE\s+(?:IF\s+NOT\s+EXISTS\s+)?({Identifier.pattern})",
+        re.IGNORECASE,
+    )
+
+    ownable = True
 
     def __init__(
         self,
-        warehouse_type: Optional[WAREHOUSE_TYPE_T] = WarehouseType.STANDARD,
-        warehouse_size: Optional[WAREHOUSE_SIZE_T] = WarehouseSize.XSMALL,
+        warehouse_type: Union[None, str, WarehouseType] = None,
+        warehouse_size: Union[None, str, WarehouseSize] = None,
         max_cluster_count: Optional[int] = None,
         min_cluster_count: Optional[int] = None,
         scaling_policy: Optional[str] = None,
@@ -87,8 +106,8 @@ class Warehouse(AccountLevelResource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.warehouse_type = WarehouseType.parse(warehouse_type)
-        self.warehouse_size = WarehouseSize.parse(warehouse_size)
+        self.warehouse_type = WarehouseType.parse(warehouse_type) if warehouse_type else WarehouseType.STANDARD
+        self.warehouse_size = WarehouseSize.parse(warehouse_size) if warehouse_size else WarehouseSize.XSMALL
         self.max_cluster_count = max_cluster_count
         self.min_cluster_count = min_cluster_count
         self.scaling_policy = scaling_policy
@@ -102,47 +121,3 @@ class Warehouse(AccountLevelResource):
         self.max_concurrency_level = max_concurrency_level
         self.statement_queued_timeout_in_seconds = statement_queued_timeout_in_seconds
         self.statement_timeout_in_seconds = statement_timeout_in_seconds
-
-    @classmethod
-    def parse_props(cls, sql: str):
-        found_props = {}
-
-        for prop_name, prop_type in cls.props.items():
-            pattern = rf"{prop_name}\s*=\s*'?(\w+)'?"
-            match = re.search(pattern, sql, re.IGNORECASE)
-            if match:
-                prop_value = match.group(1)
-                if issubclass(prop_type, ParsableEnum):
-                    prop_value = prop_type.parse(prop_value)
-                elif prop_type == int:
-                    prop_value = int(prop_value)
-                found_props[prop_name] = prop_value
-
-        return found_props
-
-    @classmethod
-    def from_expression(cls, expression: exp.Command):
-        """
-        (COMMAND
-            this: CREATE,
-            expression:  WAREHOUSE DATA_APPS_ADHOC WITH WAREHOUSE_SIZE='small')
-        """
-
-        sql = expression.args["expression"]
-
-        identifier = re.compile(r"WAREHOUSE\s+([A-Z][A-Z0-9_]*)", re.IGNORECASE)
-        match = re.search(identifier, sql)
-
-        if match is None:
-            raise Exception
-        name = match.group(1)
-        props = cls.parse_props(sql[match.end() :])
-
-        return cls(name=name, **props)
-
-
-# WAREHOUSE_T = Union[str, Warehouse]
-
-
-# def parse_warehouse(value: WAREHOUSE_T) -> Warehouse:
-#     if isinstance(value, str):

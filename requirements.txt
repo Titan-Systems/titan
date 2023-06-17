@@ -4,3 +4,5 @@ snowflake-connector-python
 snowflake-snowpark-python
 pyparsing
 treelib
+pyyaml
+pytest

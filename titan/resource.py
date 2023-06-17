@@ -1,28 +1,66 @@
 from __future__ import annotations
 
 import inspect
+import re
 
 from collections import defaultdict
 from enum import Enum, auto
-from typing import TypeVar, Optional, List, Type, Set, TYPE_CHECKING
+from typing import TypeVar, Optional, Dict, List, Type, Set, TYPE_CHECKING
 
-from .parser import parse_names
-from .hooks import on_file_added_factory
+
+# from .hooks import on_file_added_factory
 
 if TYPE_CHECKING:
     from .account import Account
     from .database import Database
     from .schema import Schema
     from .resource_graph import ResourceGraph
+    from .props import Prop
+
+T_Resource = TypeVar("T_Resource", bound="Resource")
+
+
+class ResourceDB:
+    def __init__(self, cls: Type[T_Resource]):
+        self.resource_class = cls
+        self._db: Dict[str, T_Resource] = {}
+
+    def __getitem__(self, key):
+        if key is None:
+            return None
+        if key not in self._db:
+            self._db[key] = self.resource_class(name=key, implicit=True)
+        return self._db[key]
+
+    def __setitem__(self, key, value):
+        if key is None:
+            raise Exception
+        # if key not in self._db:
+        # self._db[key] = self.resource_class(name=key, implicit=True)
+        # return self._db[key]
+        self._db[key] = value
+
+
+class ResourceWithDB(type):
+    all: ResourceDB
+
+    def __new__(cls, name, bases, attrs):
+        # Custom logic for creating classes
+        # Modify or add attributes as needed
+        attrs["all"] = ResourceDB(bases[0])
+        return super().__new__(cls, name, bases, attrs)
 
 
 class Resource:
     # __slots__ = ("sql", "name", "state", "_dependencies")
 
-    on_init = None
+    # on_init = None
     level = -1
+    ownable = True
+    props: Dict[str, Prop] = {}
+    create_statement: Optional[re.Pattern] = None
 
-    def __init__(self, name: str, query_text=None, implicit=False, owner=None):
+    def __init__(self, name: str, implicit: Optional[bool] = False, owner: Optional[str] = None):
         if name is None:
             raise Exception
         self.requirements: Set[Resource] = set()
@@ -30,7 +68,6 @@ class Resource:
         self.graph: Optional[ResourceGraph] = None
 
         self.name = name
-        self.query_text = query_text
         self.implicit = implicit
 
         self.owner = owner
@@ -49,13 +86,28 @@ class Resource:
 
         return self.fully_qualified_name()
 
+    # @classmethod
+    # def from_sql(cls, sql: str) -> T_Resource:
+    #     raise NotImplementedError
+
     @classmethod
     def show(cls, session):
         q = f"SHOW {cls.__name__.upper()}S"
         return [row.name for row in session.sql(q).collect()]
 
+    @classmethod
+    def parse_props(cls, sql: str):
+        found_props = {}  # Dict[str, Any]
+
+        for prop_name, prop in cls.props.items():
+            match = prop.search(sql)
+            if match is not None:
+                found_props[prop_name.lower()] = match
+
+        return found_props
+
     def __repr__(self):
-        return f"{type(self).__name__}:{self.name}"
+        return f"<{type(self).__name__}:{self.name}>"
 
     @property
     def connections(self):
@@ -94,18 +146,29 @@ class OrganizationLevelResource(Resource):
     level = 1
 
 
-class AccountLevelResource(Resource):
+T_AccountLevelResource = TypeVar("T_AccountLevelResource", bound="AccountLevelResource")
+
+
+class AccountLevelResource(Resource, metaclass=ResourceWithDB):
     # __slots__ = ("_account")
     level = 2
 
-    def __init__(self, account: Optional[Account] = None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, account: Optional[Account] = None, **kwargs):
+        super().__init__(*args, **kwargs)
         self.account = account
 
     @classmethod
-    def sql(cls, query_text: str):
-        _, _, name = parse_names(query_text)
-        return cls(name=name, query_text=query_text)
+    def from_sql(cls: Type[T_AccountLevelResource], sql: str) -> T_AccountLevelResource:
+        if not cls.create_statement:
+            raise Exception(f"{cls.__name__} does not have a create_statement")
+        match = re.search(cls.create_statement, sql)
+
+        if match is None:
+            raise Exception
+        name = match.group(1)
+        props = cls.parse_props(sql[match.end() :])
+
+        return cls(name=name, **props)
 
     @property
     def account(self):
@@ -121,6 +184,9 @@ class AccountLevelResource(Resource):
         return self.name.upper()
 
 
+T_DatabaseLevelResource = TypeVar("T_DatabaseLevelResource", bound="DatabaseLevelResource")
+
+
 class DatabaseLevelResource(Resource):
     # __slots__ = ("_database")
     level = 3
@@ -129,10 +195,22 @@ class DatabaseLevelResource(Resource):
         super().__init__(**kwargs)
         self.database = database
 
+    def __repr__(self):
+        db = self.database.name if self.database else ""
+        return f"<{type(self).__name__}:{db}.{self.name}>"
+
     @classmethod
-    def sql(cls, query_text: str):
-        database, _, name = parse_names(query_text)
-        return cls(name=name, query_text=query_text)
+    def from_sql(cls: Type[T_DatabaseLevelResource], sql: str) -> T_DatabaseLevelResource:
+        if not cls.create_statement:
+            raise Exception(f"{cls.__name__} does not have a create_statement")
+        # There needs to be conflict resolution here
+        match = re.search(cls.create_statement, sql)
+
+        if match is None:
+            raise Exception
+        name = match.group(1)
+        props = cls.parse_props(sql[match.end() :])
+        return cls(name=name, **props)
 
     @property
     def database(self) -> Optional[Database]:
@@ -150,6 +228,9 @@ class DatabaseLevelResource(Resource):
         return f"{database}.{name}"
 
 
+T_SchemaLevelResource = TypeVar("T_SchemaLevelResource", bound="SchemaLevelResource")
+
+
 class SchemaLevelResource(Resource):
     # __slots__ = ("_schema")
     level = 4
@@ -158,16 +239,32 @@ class SchemaLevelResource(Resource):
         super().__init__(**kwargs)
         self.schema = schema
 
+    def __repr__(self):
+        db, schema = "", ""
+        if self.schema:
+            schema = self.schema.name
+            if self.schema.database:
+                db = self.schema.database.name
+        return f"<{type(self).__name__}:{db}.{schema}.{self.name}>"
+
     @classmethod
-    def from_sql(cls, query_text: str, **kwargs):
+    def from_sql(cls: Type[T_SchemaLevelResource], sql: str) -> T_SchemaLevelResource:
+        if not cls.create_statement:
+            raise Exception(f"{cls.__name__} does not have a create_statement")
         # There needs to be conflict resolution here
-        database, schema, name = parse_names(query_text)
-        return cls(name=name, query_text=query_text, database=database, schema=schema, **kwargs)
+        match = re.search(cls.create_statement, sql)
+
+        if match is None:
+            raise Exception
+        name = match.group(1)
+        props = cls.parse_props(sql[match.end() :])
+        return cls(name=name, **props)
 
     @property
     def database(self) -> Optional[Database]:
         if self.schema is not None:
             return self.schema.database
+        return None
 
     @database.setter
     def database(self, database_):

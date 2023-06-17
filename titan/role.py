@@ -2,7 +2,7 @@ from typing import Union, Optional
 
 from .resource import AccountLevelResource
 
-from .grant import UsageGrant
+# from .grant import UsageGrant
 
 # from .helpers import ParsableEnum
 
@@ -20,12 +20,12 @@ class Role(AccountLevelResource):
         # self.default_ddl_collation = default_ddl_collation
         # self.comment = comment
 
-    def uses(self, *resources):
-        grants = []
-        for res in resources:
-            grant = UsageGrant(self, res)
-            grants.append(grant)
-        return grants
+    # def uses(self, *resources):
+    #     grants = []
+    #     for res in resources:
+    #         grant = UsageGrant(self, res)
+    #         grants.append(grant)
+    #     return grants
 
     def owns(self, *resources):
         for res in resources:

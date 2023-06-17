@@ -1,11 +1,13 @@
+import re
+
 from typing import List, Tuple, Optional
 
 from sqlglot import exp
 
+from .props import BoolProp, StringProp, TagsProp, IntProp, FlagProp, Identifier
 from .resource import SchemaLevelResource
 from .schema import Schema
 from .stage import Stage
-from .generator import EqualsProp, FlagProp
 
 
 class Table(SchemaLevelResource):
@@ -55,9 +57,33 @@ class Table(SchemaLevelResource):
 
     """
 
+    props = {
+        "DATA_RETENTION_TIME_IN_DAYS": IntProp("DATA_RETENTION_TIME_IN_DAYS"),
+        "MAX_DATA_EXTENSION_TIME_IN_DAYS": IntProp("MAX_DATA_EXTENSION_TIME_IN_DAYS"),
+        "CHANGE_TRACKING": BoolProp("CHANGE_TRACKING"),
+        "DEFAULT_DDL_COLLATION": StringProp("DEFAULT_DDL_COLLATION"),
+        "COPY_GRANTS": FlagProp("COPY GRANTS"),
+        "TAGS": TagsProp(),
+        "COMMENT": StringProp("COMMENT"),
+    }
+
+    create_statement = re.compile(
+        rf"""
+            CREATE\s+
+            (?:OR\s+REPLACE\s+)?
+            (?:(?:LOCAL|GLOBAL)\s+)?
+            (?:(?:TEMP|TEMPORARY|VOLATILE|TRANSIENT)\s+)?
+            TABLE\s+
+            (?:IF\s+NOT\s+EXISTS\s+)?
+            ({Identifier.pattern})
+        """,
+        re.VERBOSE | re.IGNORECASE,
+    )
+
+    ownable = True
+
     def __init__(
         self,
-        autoload: Optional[bool] = False,
         data_retention_time_in_days: Optional[int] = None,
         max_data_extension_time_in_days: Optional[int] = None,
         change_tracking: Optional[bool] = None,
@@ -65,14 +91,10 @@ class Table(SchemaLevelResource):
         copy_grants: Optional[bool] = None,
         tags: List[Tuple[str, str]] = [],
         comment: Optional[str] = None,
+        autoload: Optional[bool] = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
-
-        # name: str, query_text=None, implicit=False
-
-        # TODO: make this a changeable property that registers/deregisters the pipe when the flag is flipped
-        self.autoload = autoload
 
         self.data_retention_time_in_days = data_retention_time_in_days
         self.max_data_extension_time_in_days = max_data_extension_time_in_days
@@ -81,6 +103,9 @@ class Table(SchemaLevelResource):
         self.copy_grants = copy_grants
         self.tags = tags
         self.comment = comment
+
+        # TODO: make this a changeable property that registers/deregisters the pipe when the flag is flipped
+        self.autoload = autoload
 
         self.table_stage = Stage(name=f"@%{self.name}", implicit=True)
         self.table_stage.requires(self)
@@ -100,25 +125,25 @@ class Table(SchemaLevelResource):
             name=name,
         )
 
-    @property
-    def sql(self):
-        return f"""
-            CREATE TABLE
-                { self.fully_qualified_name() }
-                { EqualsProp("DATA_RETENTION_TIME_IN_DAYS", self.data_retention_time_in_days) }
-                { EqualsProp("MAX_DATA_EXTENSION_TIME_IN_DAYS", self.max_data_extension_time_in_days) }
-                { EqualsProp("CHANGE_TRACKING", self.change_tracking) }
-                { EqualsProp("DEFAULT_DDL_COLLATION", self.default_ddl_collation) }
-                { FlagProp("COPY GRANTS", self.copy_grants) }
-                { "TagsProp(self.tags)" }
-                { EqualsProp("COMMENT", self.comment) }
-        """
-        # return (
-        #     "CREATE TABLE "
-        #     + self.fully_qualified_name()
-        #     + self.equals_prop("data_retention_time_in_days")
-        #     + self.flag_prop("copy_grants", "COPY GRANTS")
-        # )
+    # @property
+    # def sql(self):
+    #     return f"""
+    #         CREATE TABLE
+    #             { self.fully_qualified_name() }
+    #             { EqualsProp("DATA_RETENTION_TIME_IN_DAYS", self.data_retention_time_in_days) }
+    #             { EqualsProp("MAX_DATA_EXTENSION_TIME_IN_DAYS", self.max_data_extension_time_in_days) }
+    #             { EqualsProp("CHANGE_TRACKING", self.change_tracking) }
+    #             { EqualsProp("DEFAULT_DDL_COLLATION", self.default_ddl_collation) }
+    #             { FlagProp("COPY GRANTS", self.copy_grants) }
+    #             { "TagsProp(self.tags)" }
+    #             { EqualsProp("COMMENT", self.comment) }
+    #     """
+    # return (
+    #     "CREATE TABLE "
+    #     + self.fully_qualified_name()
+    #     + self.equals_prop("data_retention_time_in_days")
+    #     + self.flag_prop("copy_grants", "COPY GRANTS")
+    # )
 
     # https://github.com/python/mypy/issues/5936
     @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]
