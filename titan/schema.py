@@ -63,3 +63,15 @@ class Schema(DatabaseLevelResource):
         # self.tables
         # self.schemas = ResourceDB(Schema)
         # self.schemas["PUBLIC"] = Schema(name="PUBLIC", database=self, implicit=True)
+
+    @property
+    def sql(self):
+        return f"""
+            CREATE SCHEMA {self.fully_qualified_name}
+            {self.props["WITH_MANAGED_ACCESS"].render(self.with_managed_access)}
+            {self.props["DATA_RETENTION_TIME_IN_DAYS"].render(self.data_retention_time_in_days)}
+            {self.props["MAX_DATA_EXTENSION_TIME_IN_DAYS"].render(self.max_data_extension_time_in_days)}
+            {self.props["DEFAULT_DDL_COLLATION"].render(self.default_ddl_collation)}
+            {self.props["TAGS"].render(self.tags)}
+            {self.props["COMMENT"].render(self.comment)}
+        """.strip()

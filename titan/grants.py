@@ -36,7 +36,7 @@ class RoleGrant(AccountLevelResource):
         role: Union[str, Role],
         grantee: Union[Role, User],
     ):
-        name = ":".join((role, grantee.name))
+        name = ":".join((str(role), grantee.name))
         super().__init__(name)
         self.role = role if isinstance(role, Role) else Role.all[role]
         if isinstance(grantee, str):
@@ -54,6 +54,16 @@ class RoleGrant(AccountLevelResource):
         role = parsed["role"]
         grantee = Role.all[parsed["grantee_role"]] or User.all[parsed["grantee_user"]]
         return cls(role, grantee)
+
+    @property
+    def sql(self):
+        return f"""
+        GRANT ROLE
+            {self.role.name}
+        TO
+            {"ROLE" if isinstance(self.grantee, Role) else "USER"}
+            {self.grantee.name}
+        """
 
 
 class GlobalPrivs(ParsableEnum):
@@ -223,7 +233,13 @@ class PrivGrant(AccountLevelResource):
             )?
             (?:
                 (?P<account_object>
-                    USER | RESOURCE\ MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER\ GROUP | REPLICATION\ GROUP
+                    USER |
+                    RESOURCE\s+MONITOR |
+                    WAREHOUSE |
+                    DATABASE |
+                    INTEGRATION |
+                    FAILOVER\s+GROUP |
+                    REPLICATION\s+GROUP
                 )
                 \s+
                 (?P<object_name>{Identifier.pattern})
@@ -255,7 +271,7 @@ class PrivGrant(AccountLevelResource):
         grantee: Union[str, Role],
     ):
         grantee_ = grantee if isinstance(grantee, Role) else Role.all[grantee]
-        name = ":".join([",".join([str(p) for p in privs]), grantee_.name])
+        name = ":".join([",".join([str(p) for p in privs]), on.name if on else "account", grantee_.name])
         super().__init__(name)
         self.privs = privs
         self.on = on
@@ -285,7 +301,6 @@ class PrivGrant(AccountLevelResource):
         if match is None:
             raise Exception
         parsed = match.groupdict()
-        print(parsed)
         if parsed["global"]:
             # This is like implied account?
             return (GlobalPrivs, None)
@@ -306,3 +321,16 @@ class PrivGrant(AccountLevelResource):
         #     print(privs_stmt)
         #     raise Exception
         return [on_type.parse(priv) for priv in privs]
+
+    @property
+    def sql(self):
+        privs = ", ".join([str(p) for p in self.privs])
+        return f"""
+GRANT
+    {privs}
+ON
+    {type(self.on).__name__.upper() if self.on else "ACCOUNT"}
+    {self.on.name if self.on else ""}
+TO
+    ROLE {self.grantee.name}
+        """

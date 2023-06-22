@@ -150,5 +150,28 @@ class User(AccountLevelResource):
         self.network_policy = network_policy
         super().__init__(**kwargs)
 
-    def __repr__(self):
-        return f"<{type(self).__name__}:{self.name}>"
+    @property
+    def sql(self):
+        return f"""
+            CREATE USER {self.fully_qualified_name}
+            {self.props["PASSWORD"].render(self.password)}
+            {self.props["LOGIN_NAME"].render(self.login_name)}
+            {self.props["DISPLAY_NAME"].render(self.display_name)}
+            {self.props["FIRST_NAME"].render(self.first_name)}
+            {self.props["MIDDLE_NAME"].render(self.middle_name)}
+            {self.props["LAST_NAME"].render(self.last_name)}
+            {self.props["EMAIL"].render(self.email)}
+            {self.props["MUST_CHANGE_PASSWORD"].render(self.must_change_password)}
+            {self.props["DISABLED"].render(self.disabled)}
+            {self.props["DAYS_TO_EXPIRY"].render(self.days_to_expiry)}
+            {self.props["MINS_TO_UNLOCK"].render(self.mins_to_unlock)}
+            {self.props["DEFAULT_WAREHOUSE"].render(self.default_warehouse)}
+            {self.props["DEFAULT_NAMESPACE"].render(self.default_namespace)}
+            {self.props["DEFAULT_ROLE"].render(self.default_role)}
+            {self.props["DEFAULT_SECONDARY_ROLES"].render(self.default_secondary_roles)}
+            {self.props["MINS_TO_BYPASS_MFA"].render(self.mins_to_bypass_mfa)}
+            {self.props["RSA_PUBLIC_KEY"].render(self.rsa_public_key)}
+            {self.props["RSA_PUBLIC_KEY_2"].render(self.rsa_public_key_2)}
+            {self.props["COMMENT"].render(self.comment)}
+            {self.props["NETWORK_POLICY"].render(self.network_policy)}
+        """.strip()

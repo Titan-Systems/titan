@@ -112,38 +112,18 @@ class Table(SchemaLevelResource):
         if self.schema:
             self.table_stage.schema = self.schema
 
-    @classmethod
-    def from_expression(cls, expression: exp.Create):
-        # name = expression.this.this.this
-        name = list(expression.find_all(exp.Identifier))[0].this
-
-        # if "properties" in expression.args and expression.args["properties"] is not None:
-        #     for prop in expression.args["properties"].expressions:
-        #         print("> ", type(prop), prop)
-
-        return cls(
-            name=name,
-        )
-
-    # @property
-    # def sql(self):
-    #     return f"""
-    #         CREATE TABLE
-    #             { self.fully_qualified_name() }
-    #             { EqualsProp("DATA_RETENTION_TIME_IN_DAYS", self.data_retention_time_in_days) }
-    #             { EqualsProp("MAX_DATA_EXTENSION_TIME_IN_DAYS", self.max_data_extension_time_in_days) }
-    #             { EqualsProp("CHANGE_TRACKING", self.change_tracking) }
-    #             { EqualsProp("DEFAULT_DDL_COLLATION", self.default_ddl_collation) }
-    #             { FlagProp("COPY GRANTS", self.copy_grants) }
-    #             { "TagsProp(self.tags)" }
-    #             { EqualsProp("COMMENT", self.comment) }
-    #     """
-    # return (
-    #     "CREATE TABLE "
-    #     + self.fully_qualified_name()
-    #     + self.equals_prop("data_retention_time_in_days")
-    #     + self.flag_prop("copy_grants", "COPY GRANTS")
-    # )
+    @property
+    def sql(self):
+        return f"""
+            CREATE TABLE {self.fully_qualified_name} ()
+            {self.props["DATA_RETENTION_TIME_IN_DAYS"].render(self.data_retention_time_in_days)}
+            {self.props["MAX_DATA_EXTENSION_TIME_IN_DAYS"].render(self.max_data_extension_time_in_days)}
+            {self.props["CHANGE_TRACKING"].render(self.change_tracking)}
+            {self.props["DEFAULT_DDL_COLLATION"].render(self.default_ddl_collation)}
+            {self.props["COPY_GRANTS"].render(self.copy_grants)}
+            {self.props["TAGS"].render(self.tags)}
+            {self.props["COMMENT"].render(self.comment)}
+        """.strip()
 
     # https://github.com/python/mypy/issues/5936
     @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]

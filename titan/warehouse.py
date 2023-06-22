@@ -1,18 +1,11 @@
 import re
 
-# from enum import Enum
-from typing import Union, Optional
-
-# from sqlglot import exp
+from typing import Union, Optional, List, Tuple
 
 from .resource import AccountLevelResource
+from .resource_monitor import ResourceMonitor
 
-# from .helpers import ParsableEnum
-from .props import EnumProp, ParsableEnum, StringProp, Identifier, IntProp, TagsProp
-
-
-# class WarehouseType(EnumProp):
-#     values =
+from .props import Identifier, BoolProp, EnumProp, ParsableEnum, StringProp, IntProp, TagsProp, IdentifierProp
 
 
 class WarehouseType(ParsableEnum):
@@ -33,7 +26,12 @@ class WarehouseSize(ParsableEnum):
     X6LARGE = "X6LARGE"
 
 
-class Warehouse(AccountLevelResource):
+class WarehouseScalingPolicy(ParsableEnum):
+    STANDARD = "STANDARD"
+    ECONOMY = "ECONOMY"
+
+
+class Warehouse(AccountLevelResource):  #
     """
     CREATE [ OR REPLACE ] WAREHOUSE [ IF NOT EXISTS ] <name>
         [ [ WITH ] objectProperties ]
@@ -65,13 +63,13 @@ class Warehouse(AccountLevelResource):
         "WAREHOUSE_SIZE": EnumProp("WAREHOUSE_SIZE", WarehouseSize),
         "MAX_CLUSTER_COUNT": IntProp("MAX_CLUSTER_COUNT"),
         "MIN_CLUSTER_COUNT": IntProp("MIN_CLUSTER_COUNT"),
-        "SCALING_POLICY": StringProp("SCALING_POLICY"),
+        "SCALING_POLICY": EnumProp("SCALING_POLICY", WarehouseScalingPolicy),
         "AUTO_SUSPEND": IntProp("AUTO_SUSPEND"),  # TODO: find some way to make this nullable
-        "AUTO_RESUME": StringProp("AUTO_RESUME"),
-        "INITIALLY_SUSPENDED": StringProp("INITIALLY_SUSPENDED"),
-        # "RESOURCE_MONITOR": StringProp("RESOURCE_MONITOR"),
+        "AUTO_RESUME": BoolProp("AUTO_RESUME"),
+        "INITIALLY_SUSPENDED": BoolProp("INITIALLY_SUSPENDED"),
+        "RESOURCE_MONITOR": IdentifierProp("RESOURCE_MONITOR"),
         "COMMENT": StringProp("COMMENT"),
-        "ENABLE_QUERY_ACCELERATION": StringProp("ENABLE_QUERY_ACCELERATION"),
+        "ENABLE_QUERY_ACCELERATION": BoolProp("ENABLE_QUERY_ACCELERATION"),
         "QUERY_ACCELERATION_MAX_SCALE_FACTOR": IntProp("QUERY_ACCELERATION_MAX_SCALE_FACTOR"),
         "MAX_CONCURRENCY_LEVEL": IntProp("MAX_CONCURRENCY_LEVEL"),
         "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS": IntProp("STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"),
@@ -80,8 +78,15 @@ class Warehouse(AccountLevelResource):
     }
 
     create_statement = re.compile(
-        rf"CREATE\s+(?:OR\s+REPLACE\s+)?WAREHOUSE\s+(?:IF\s+NOT\s+EXISTS\s+)?({Identifier.pattern})",
-        re.IGNORECASE,
+        rf"""
+            CREATE\s+
+            (?:OR\s+REPLACE\s+)?
+            WAREHOUSE\s+
+            (?:IF\s+NOT\s+EXISTS\s+)?
+            ({Identifier.pattern})\s+
+            (?:WITH)?
+            """,
+        re.IGNORECASE | re.VERBOSE,
     )
 
     ownable = True
@@ -96,13 +101,14 @@ class Warehouse(AccountLevelResource):
         auto_suspend: Optional[int] = None,
         auto_resume: Optional[bool] = None,
         initially_suspended: Optional[bool] = None,
-        # resource_monitor=None,
+        resource_monitor: Union[None, str, ResourceMonitor] = None,
         comment: Optional[str] = None,
         enable_query_acceleration: Optional[bool] = None,
         query_acceleration_max_scale_factor: Optional[int] = None,
         max_concurrency_level: Optional[int] = None,
         statement_queued_timeout_in_seconds: Optional[int] = None,
         statement_timeout_in_seconds: Optional[int] = None,
+        tags: List[Tuple[str, str]] = [],
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -114,10 +120,35 @@ class Warehouse(AccountLevelResource):
         self.auto_suspend = auto_suspend
         self.auto_resume = auto_resume
         self.initially_suspended = initially_suspended
-        # self.resource_monitor = resource_monitor
+        self.resource_monitor = (
+            ResourceMonitor.all[resource_monitor] if isinstance(resource_monitor, str) else resource_monitor
+        )
         self.comment = comment
         self.enable_query_acceleration = enable_query_acceleration
         self.query_acceleration_max_scale_factor = query_acceleration_max_scale_factor
         self.max_concurrency_level = max_concurrency_level
         self.statement_queued_timeout_in_seconds = statement_queued_timeout_in_seconds
         self.statement_timeout_in_seconds = statement_timeout_in_seconds
+        self.tags = tags
+        self.requires(self.resource_monitor)
+
+    @property
+    def sql(self):
+        return f"""
+            CREATE WAREHOUSE {self.fully_qualified_name}
+            {self.props["WAREHOUSE_TYPE"].render(self.warehouse_type)}
+            {self.props["WAREHOUSE_SIZE"].render(self.warehouse_size)}
+            {self.props["MAX_CLUSTER_COUNT"].render(self.max_cluster_count)}
+            {self.props["MIN_CLUSTER_COUNT"].render(self.min_cluster_count)}
+            {self.props["SCALING_POLICY"].render(self.scaling_policy)}
+            {self.props["AUTO_SUSPEND"].render(self.auto_suspend)}
+            {self.props["AUTO_RESUME"].render(self.auto_resume)}
+            {self.props["INITIALLY_SUSPENDED"].render(self.initially_suspended)}
+            {self.props["COMMENT"].render(self.comment)}
+            {self.props["ENABLE_QUERY_ACCELERATION"].render(self.enable_query_acceleration)}
+            {self.props["QUERY_ACCELERATION_MAX_SCALE_FACTOR"].render(self.query_acceleration_max_scale_factor)}
+            {self.props["MAX_CONCURRENCY_LEVEL"].render(self.max_concurrency_level)}
+            {self.props["STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"].render(self.statement_queued_timeout_in_seconds)}
+            {self.props["STATEMENT_TIMEOUT_IN_SECONDS"].render(self.statement_timeout_in_seconds)}
+            {self.props["TAGS"].render(self.tags)}
+        """.strip()

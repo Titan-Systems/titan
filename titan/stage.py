@@ -85,6 +85,15 @@ class Stage(SchemaLevelResource):
         self.stage_type = "EXTERNAL" if url else "INTERNAL"
         self.hooks = {"on_file_added": None}
 
+    @property
+    def sql(self):
+        return f"""
+            CREATE STAGE {self.fully_qualified_name}
+            {self.props["URL"].render(self.url)}
+            {self.props["TAGS"].render(self.tags)}
+            {self.props["COMMENT"].render(self.comment)}
+        """.strip()
+
     # @property
     # def on_file_added(self):
     #     return self.hooks["on_file_added"]

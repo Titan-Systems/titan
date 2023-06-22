@@ -39,10 +39,6 @@ class ResourceGraph:
     def __init__(self):
         self._members: Set[Resource] = set()
 
-        self._active_account: Optional[Account] = None
-        self._active_database: Optional[Database] = None
-        self._active_schema: Optional[Schema] = None
-
         self._ref_listener = None
 
     def __len__(self):
@@ -91,8 +87,6 @@ class ResourceGraph:
             CREATE TABLE foo (...);
         `)
 
-
-
         """
 
         for resource in resources:
@@ -102,22 +96,11 @@ class ResourceGraph:
             if resource in self._members:
                 return
 
+            if resource.stub:
+                return
+
             if resource.graph:
                 raise Exception(f"Resource {repr(resource)} has existing graph pointer")
-
-            if isinstance(resource, Account):
-                self._active_account = resource
-            elif isinstance(resource, Database):
-                self._active_database = resource
-            elif isinstance(resource, Schema):
-                self._active_schema = resource
-
-            if isinstance(resource, AccountLevelResource) and resource.account is None:
-                resource.account = self._active_account
-            elif isinstance(resource, DatabaseLevelResource) and resource.database is None:
-                resource.database = self._active_database
-            elif isinstance(resource, SchemaLevelResource) and resource.schema is None:
-                resource.schema = self._active_schema
 
             self._members.add(resource)
             resource.graph = self
@@ -143,6 +126,10 @@ class ResourceGraph:
     def sorted(self):
         # Kahn's algorithm
 
+        for node in self._members:
+            node.finalize()
+            print(repr(node), "\n\t->", node.requirements)
+
         # Compute in-degree (# of inbound edges) for each node
         in_degrees = dict([(node, len(node.required_by)) for node in self._members])
         neighbors = dict([(node, node.connections.copy()) for node in self._members])
@@ -162,6 +149,9 @@ class ResourceGraph:
             # For each of node's outgoing edges
             empty_neighbors = set()
             for neighbor in neighbors[node]:
+                if neighbor.stub:
+                    nodes.append(neighbor)
+                    continue
                 in_degrees[neighbor] -= 1
                 if in_degrees[neighbor] == 0:
                     queue.put(neighbor)

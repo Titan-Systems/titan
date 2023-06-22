@@ -11,7 +11,7 @@
             "module": "titan",
             "args": [
                 "plan",
-                "/Users/teej/Code/titan-examples/sfguide-citibike-ml"
+                "/Users/teej/Code/titan-examples/tests"
             ],
             "justMyCode": true
         }

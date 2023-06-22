@@ -58,9 +58,15 @@ def plan(path: str):
     # app.build()
     # app.tree()
     # app.run()
-    for res in app.resources.sorted():
-        if not res.implicit:
-            print(res)
+    resources = app.resources.sorted()
+    print(resources)
+    for res in resources:
+        # if not res.implicit:
+        # print("^" * 120)
+        print(repr(res), flush=True)
+        # if not res.implicit and not res.stub:
+        #     print(res.sql)
+    # app.tree()
 
 
 @entrypoint.command()

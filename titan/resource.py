@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-import inspect
 import re
 
-from collections import defaultdict
-from enum import Enum, auto
-from typing import TypeVar, Optional, Dict, List, Type, Set, TYPE_CHECKING
+from typing import TypeVar, Optional, Dict, Type, Set, TYPE_CHECKING
 
 
 # from .hooks import on_file_added_factory
@@ -29,12 +26,17 @@ class ResourceDB:
         if key is None:
             return None
         if key not in self._db:
-            self._db[key] = self.resource_class(name=key, implicit=True)
+            self._db[key] = self.resource_class(name=key, stub=True)
         return self._db[key]
 
     def __setitem__(self, key, value):
         if key is None:
             raise Exception
+        if key in self._db:
+            if self._db[key].stub:
+                self._db[key] = value
+            else:
+                raise Exception
         # if key not in self._db:
         # self._db[key] = self.resource_class(name=key, implicit=True)
         # return self._db[key]
@@ -45,10 +47,9 @@ class ResourceWithDB(type):
     all: ResourceDB
 
     def __new__(cls, name, bases, attrs):
-        # Custom logic for creating classes
-        # Modify or add attributes as needed
-        attrs["all"] = ResourceDB(bases[0])
-        return super().__new__(cls, name, bases, attrs)
+        new_cls = super().__new__(cls, name, bases, attrs)
+        new_cls.all = ResourceDB(new_cls)
+        return new_cls
 
 
 class Resource:
@@ -60,7 +61,13 @@ class Resource:
     props: Dict[str, Prop] = {}
     create_statement: Optional[re.Pattern] = None
 
-    def __init__(self, name: str, implicit: Optional[bool] = False, owner: Optional[str] = None):
+    def __init__(
+        self,
+        name: str,
+        owner: Optional[str] = None,
+        implicit: Optional[bool] = False,
+        stub: Optional[bool] = False,
+    ):
         if name is None:
             raise Exception
         self.requirements: Set[Resource] = set()
@@ -69,6 +76,7 @@ class Resource:
 
         self.name = name
         self.implicit = implicit
+        self.stub = stub
 
         self.owner = owner
 
@@ -86,9 +94,11 @@ class Resource:
 
         return self.fully_qualified_name()
 
-    # @classmethod
-    # def from_sql(cls, sql: str) -> T_Resource:
-    #     raise NotImplementedError
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__}:{self.name}>"
+
+    def __str__(self) -> str:
+        return self.name
 
     @classmethod
     def show(cls, session):
@@ -102,12 +112,11 @@ class Resource:
         for prop_name, prop in cls.props.items():
             match = prop.search(sql)
             if match is not None:
+                sql = re.sub(prop.pattern, "", sql)
                 found_props[prop_name.lower()] = match
-
+        if len(sql.strip()) > 0:
+            raise Exception(f"Failed to parse props: {sql}")
         return found_props
-
-    def __repr__(self):
-        return f"<{type(self).__name__}:{self.name}>"
 
     @property
     def connections(self):
@@ -125,6 +134,9 @@ class Resource:
         #     print("!!!!! Creation Failed, no SQL to run", self.name)
 
     def requires(self, *resources: Resource):
+        if self.stub:
+            raise Exception(f"{repr(self)} is a stub and can't require other resources")
+
         for resource in resources:
             if not isinstance(resource, Resource):
                 raise Exception(f"[{resource}:{type(resource)}] is not an Resource")
@@ -141,9 +153,25 @@ class Resource:
         if self.level >= other_resource.level:
             raise Exception(f"{repr(other_resource)} can't be added to {repr(self)} ")
 
+    def finalize(self):
+        for res in self.requirements:
+            if res.stub:
+                ResourceClass = res.__class__
+                new_res = ResourceClass.all[res.name]
+                if not new_res.stub:
+                    self.requirements.remove(res)
+                    self.requirements.add(new_res)
+
+
+# class Ref(Resource):
+#     def __init__(self, name, resource_class):
+#         self.name = name
+#         self.resource_class = resource_class
+
 
 class OrganizationLevelResource(Resource):
     level = 1
+    ownable = False
 
 
 T_AccountLevelResource = TypeVar("T_AccountLevelResource", bound="AccountLevelResource")
@@ -156,6 +184,12 @@ class AccountLevelResource(Resource, metaclass=ResourceWithDB):
     def __init__(self, *args, account: Optional[Account] = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.account = account
+        self.all[self.name] = self
+
+    def __repr__(self):
+        i = "🔗" if self.stub else ""
+        i = "👻" if self.implicit else i
+        return f"<{i}{type(self).__name__}:{self.name}>"
 
     @classmethod
     def from_sql(cls: Type[T_AccountLevelResource], sql: str) -> T_AccountLevelResource:
@@ -180,6 +214,7 @@ class AccountLevelResource(Resource, metaclass=ResourceWithDB):
         if self._account is not None:
             self.requires(self._account)
 
+    @property
     def fully_qualified_name(self):
         return self.name.upper()
 
@@ -222,6 +257,7 @@ class DatabaseLevelResource(Resource):
         if self._database is not None:
             self.requires(self._database)
 
+    @property
     def fully_qualified_name(self):
         database = self.database.name if self.database else "[ NULL ]"
         name = self.name.upper()
@@ -280,6 +316,7 @@ class SchemaLevelResource(Resource):
         if self._schema is not None:
             self.requires(self._schema)
 
+    @property
     def fully_qualified_name(self):
         database = self.database.name if self.database else "[DB]"
         schema = self.schema.name if self.schema else "[SCHEMA]"

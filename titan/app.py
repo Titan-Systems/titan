@@ -3,7 +3,7 @@ from __future__ import annotations
 # import inspect
 import re
 
-from typing import Optional, Dict, List, Union
+from typing import Optional, Dict, List, Union, Type
 
 import sqlglot
 
@@ -21,6 +21,7 @@ from .catalog import Catalog
 from .database import Database
 from .role import Role
 from .grants import RoleGrant, PrivGrant
+from .resource_monitor import ResourceMonitor
 from .schema import Schema
 from .share import Share
 from .sproc import Sproc
@@ -45,6 +46,7 @@ class App:
         # self._session = get_session()
         self._resources = ResourceGraph()
         self.account = account if isinstance(account, Account) else Account(name=account)
+        self.resources.add(self.account)
 
         database_ = Database.all[database]
         if database_:
@@ -70,12 +72,18 @@ class App:
     def session(self):
         return self._session
 
+    # def build(self):
+    #     if self._entrypoint is None:
+    #         raise Exception("No app entrypoint is defined")
+    #     self._auto_register = True
+    #     self._entrypoint()
+    #     self._auto_register = False
+
     def build(self):
-        if self._entrypoint is None:
-            raise Exception("No app entrypoint is defined")
-        self._auto_register = True
-        self._entrypoint()
-        self._auto_register = False
+        """
+        Resolve stub references
+        """
+        pass
 
     def run(self):
         # self.build()
@@ -147,8 +155,10 @@ class App:
     def parse_sql(self, sql_blob: str) -> None:
         stmts = sqlglot.parse(sql_blob, read="snowflake")
         # I tried T_Resource here but there's some issue with binding that I dont understand
-        local_state: Dict[str, Optional[Resource]] = {
+        # Dict[str, Optional[Resource]]
+        local_state = {
             "active_role": None,
+            "active_account": self.account,
             "active_database": None,
             "active_schema": None,
         }
@@ -160,7 +170,15 @@ class App:
             (?:TRANSIENT\s+)?
             (?:TEMPORARY\s+)?
             (?:TEMP\s+)?
-            (?P<create_kind>(WAREHOUSE|STAGE|ROLE|USER|DATABASE|TABLE))
+            (?P<create_kind>(
+                WAREHOUSE|
+                STAGE|
+                ROLE|
+                USER|
+                DATABASE|
+                TABLE|
+                RESOURCE\s+MONITOR
+            ))
         """,
             re.VERBOSE | re.IGNORECASE,
         )
@@ -169,8 +187,8 @@ class App:
             if stmt is None:
                 continue
             sql = stmt.sql(dialect="snowflake")
-
             new_resource: Optional[Resource] = None
+
             if isinstance(stmt, exp.Create):
                 create_kind = stmt.args["kind"].lower()
                 if create_kind == "database":
@@ -197,6 +215,8 @@ class App:
                     pass
                 elif create_kind == "user":
                     new_resource = User.from_sql(sql)
+                elif create_kind == "resource monitor":
+                    new_resource = ResourceMonitor.from_sql(sql)
             elif isinstance(stmt, exp.Command) and stmt.this.lower() == "grant":
                 grant_tokens = stmt.expression.this.strip().split()
                 grant_kind = grant_tokens[0].lower()
@@ -215,19 +235,24 @@ class App:
                 name = stmt.this.this.this
                 # USE ROLE SECURITYADMIN;
                 if use_kind == "role":
-                    local_state["active_role"] = Role.all[name]
+                    new_resource = Role.all[name]
+                    local_state["active_role"] = new_resource
                 elif use_kind == "database":
-                    local_state["active_database"] = Database.all[name]
+                    new_resource = Database.all[name]
+                    local_state["active_database"] = new_resource
                 # elif use_kind == "schema":
                 # local_state["active_schema"] = Schema.all[stmt.this.this.this]
 
             if new_resource:
                 if new_resource.ownable and local_state["active_role"]:
                     new_resource.owner = local_state["active_role"]
-                if isinstance(new_resource, DatabaseLevelResource) and local_state["active_database"]:
+                if isinstance(new_resource, AccountLevelResource) and local_state["active_account"]:
+                    new_resource.account = local_state["active_account"]
+                elif isinstance(new_resource, DatabaseLevelResource) and local_state["active_database"]:
                     new_resource.database = local_state["active_database"]
-                if isinstance(new_resource, SchemaLevelResource) and local_state["active_schema"]:
+                elif isinstance(new_resource, SchemaLevelResource) and local_state["active_schema"]:
                     new_resource.schema = local_state["active_schema"]
+                # print(">>>>> Creating", type(new_resource).__name__, new_resource.name, flush=True)
                 self.resources.add(new_resource)
             else:
                 print(repr(stmt))
@@ -236,7 +261,7 @@ class App:
                 # raise Exception
 
     def tree(self):
-        raise Exception("This is broken")
+        # raise Exception("This is broken")
         from treelib import Node, Tree
 
         t = Tree()
