@@ -6,7 +6,9 @@ from typing import Optional, Union, List, TypeVar, Type
 
 from .props import Identifier, ParsableEnum, FlagProp
 from .resource import AccountLevelResource, Resource
+from .database import Database
 from .role import Role
+from .schema import Schema
 from .user import User
 from .warehouse import Warehouse
 
@@ -104,6 +106,32 @@ class DatabasePrivs(ParsableEnum):
     CREATE_DATABASE_ROLE = "CREATE DATABASE ROLE"
     CREATE_SCHEMA = "CREATE SCHEMA"
     IMPORTED_PRIVILEGES = "IMPORTED PRIVILEGES"
+    MODIFY = "MODIFY"
+    MONITOR = "MONITOR"
+    USAGE = "USAGE"
+
+
+class SchemaPrivs(ParsableEnum):
+    ADD_SEARCH_OPTIMIZATION = "ADD SEARCH OPTIMIZATION"
+    CREATE_ALERT = "CREATE ALERT"
+    CREATE_EXTERNAL_TABLE = "CREATE EXTERNAL TABLE"
+    CREATE_FILE_FORMAT = "CREATE FILE FORMAT"
+    CREATE_FUNCTION = "CREATE FUNCTION"
+    CREATE_MATERIALIZED_VIEW = "CREATE MATERIALIZED VIEW"
+    CREATE_PIPE = "CREATE PIPE"
+    CREATE_PROCEDURE = "CREATE PROCEDURE"
+    CREATE_MASKING_POLICY = "CREATE MASKING POLICY"
+    CREATE_PASSWORD_POLICY = "CREATE PASSWORD POLICY"
+    CREATE_ROW_ACCESS_POLICY = "CREATE ROW ACCESS POLICY"
+    CREATE_SESSION_POLICY = "CREATE SESSION POLICY"
+    CREATE_SECRET = "CREATE SECRET"
+    CREATE_SEQUENCE = "CREATE SEQUENCE"
+    CREATE_STAGE = "CREATE STAGE"
+    CREATE_STREAM = "CREATE STREAM"
+    CREATE_TAG = "CREATE TAG"
+    CREATE_TABLE = "CREATE TABLE"
+    CREATE_TASK = "CREATE TASK"
+    CREATE_VIEW = "CREATE VIEW"
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
     USAGE = "USAGE"
@@ -242,10 +270,14 @@ class PrivGrant(AccountLevelResource):
                     REPLICATION\s+GROUP
                 )
                 \s+
-                (?P<object_name>{Identifier.pattern})
+                (?P<account_object_name>{Identifier.pattern})
             )?
             (?P<schema_object>
-                SCHEMA | ALL\ SCHEMAS\ IN\ DATABASE
+                SCHEMA\s+
+                 (?P<schema_object_name>{Identifier.pattern})
+            )?
+            (?P<schema_object_plural>
+             ALL\ SCHEMAS\ IN\ DATABASE
             )?
             (?P<future_schema_object>
                 FUTURE\ SCHEMAS\ IN\ DATABASE
@@ -307,7 +339,11 @@ class PrivGrant(AccountLevelResource):
         elif parsed["account_object"]:
             account_object = parsed["account_object"].lower()
             if account_object == "warehouse":
-                return (WarehousePrivs, Warehouse.all[parsed["object_name"]])
+                return (WarehousePrivs, Warehouse.all[parsed["account_object_name"]])
+            elif account_object == "database":
+                return (DatabasePrivs, Database.all[parsed["account_object_name"]])
+        elif parsed["schema_object"]:
+            return (SchemaPrivs, Schema.all[parsed["schema_object_name"]])
         else:
             print(parsed)
         raise Exception(f"Not implemented for {on_stmt}")

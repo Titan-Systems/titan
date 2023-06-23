@@ -126,10 +126,6 @@ class ResourceGraph:
     def sorted(self):
         # Kahn's algorithm
 
-        for node in self._members:
-            node.finalize()
-            print(repr(node), "\n\t->", node.requirements)
-
         # Compute in-degree (# of inbound edges) for each node
         in_degrees = dict([(node, len(node.required_by)) for node in self._members])
         neighbors = dict([(node, node.connections.copy()) for node in self._members])

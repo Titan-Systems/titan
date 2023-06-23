@@ -1,6 +1,10 @@
-from typing import Union, Optional
+import re
+
+from typing import List, Tuple, Optional
 
 from .resource import AccountLevelResource
+
+from .props import Identifier, StringProp, TagsProp
 
 # from .grant import UsageGrant
 
@@ -8,17 +12,37 @@ from .resource import AccountLevelResource
 
 
 class Role(AccountLevelResource):
-    """ """
+    """
+    CREATE [ OR REPLACE ] ROLE [ IF NOT EXISTS ] <name>
+      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+      [ COMMENT = '<string_literal>' ]
+    """
+
+    props = {
+        "TAG": TagsProp(),
+        "COMMENT": StringProp("COMMENT"),
+    }
+
+    create_statement = re.compile(
+        rf"""
+            CREATE\s+
+            (?:OR\s+REPLACE\s+)?
+            ROLE\s+
+            (?:IF\s+NOT\s+EXISTS\s+)?
+            ({Identifier.pattern})
+            """,
+        re.IGNORECASE | re.VERBOSE,
+    )
 
     def __init__(
         self,
+        tags: List[Tuple[str, str]] = [],
+        comment: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        # self.data_retention_time_in_days = data_retention_time_in_days
-        # self.max_data_extension_time_in_days = max_data_extension_time_in_days
-        # self.default_ddl_collation = default_ddl_collation
-        # self.comment = comment
+        self.tags = tags
+        self.comment = comment
 
     # def uses(self, *resources):
     #     grants = []

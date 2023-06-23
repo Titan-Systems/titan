@@ -79,6 +79,7 @@ class Resource:
         self.stub = stub
 
         self.owner = owner
+        self.violates_policy = False
 
         # FIXME: This is halfway through object initialization
         # if self.on_init:
@@ -133,7 +134,10 @@ class Resource:
         # else:
         #     print("!!!!! Creation Failed, no SQL to run", self.name)
 
-    def requires(self, *resources: Resource):
+    def requires(self, *resources: Optional[Resource]):
+        # This allows None resources but that would be a type violation
+        if not any(resources):
+            return
         if self.stub:
             raise Exception(f"{repr(self)} is a stub and can't require other resources")
 
@@ -211,7 +215,7 @@ class AccountLevelResource(Resource, metaclass=ResourceWithDB):
     @account.setter
     def account(self, account_: Optional[Account]):
         self._account = account_
-        if self._account is not None:
+        if self._account is not None and not self.stub:
             self.requires(self._account)
 
     @property
@@ -222,7 +226,7 @@ class AccountLevelResource(Resource, metaclass=ResourceWithDB):
 T_DatabaseLevelResource = TypeVar("T_DatabaseLevelResource", bound="DatabaseLevelResource")
 
 
-class DatabaseLevelResource(Resource):
+class DatabaseLevelResource(Resource, metaclass=ResourceWithDB):
     # __slots__ = ("_database")
     level = 3
 
@@ -345,25 +349,3 @@ class State(Function):
         SELECT {value}
         $$;
         """
-
-
-class Pipe(SchemaLevelResource):
-    pass
-
-
-class FileFormat(SchemaLevelResource):
-    pass
-
-
-# class ResourcePointer(Resource):
-#     @classmethod
-#     def show(cls, session):
-#         return []
-
-#     def create(self, session):
-#         return
-
-
-# class NullResource(Resource):
-#     def __init__(self):
-#         pass

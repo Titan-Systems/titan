@@ -19,9 +19,11 @@ from .resource_graph import ResourceGraph
 from .account import Account
 from .catalog import Catalog
 from .database import Database
-from .role import Role
+from .file_format import FileFormat
 from .grants import RoleGrant, PrivGrant
+from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
+from .role import Role
 from .schema import Schema
 from .share import Share
 from .sproc import Sproc
@@ -30,6 +32,8 @@ from .table import Table
 from .user import User
 from .view import View
 from .warehouse import Warehouse
+
+from .policy import Policy, PolicyPack
 
 
 class App:
@@ -42,6 +46,7 @@ class App:
         warehouse: Union[None, str, Warehouse] = None,
         # TODO: implement me.  Maybe this is owner role?
         role: Union[None, str, Role] = None,
+        policy: Optional[Union[Policy, PolicyPack]] = None,
     ):
         # self._session = get_session()
         self._resources = ResourceGraph()
@@ -56,9 +61,11 @@ class App:
             if database_ is None:
                 # TODO: infer database from connection and config
                 raise Exception("Cant have schema without database")
-            schema_ = database_.schemas[schema]
-            schema.database = database_
+            schema_ = Schema.all[schema]
+            schema_.database = database_
             self.resources.add(schema_)
+
+        self.policy = policy
 
         self._entrypoint = None
         self._auto_register = False
@@ -79,11 +86,47 @@ class App:
     #     self._entrypoint()
     #     self._auto_register = False
 
+    def check_policies(self):
+        if self.policy is None:
+            return
+
+        violations = []
+
+        def report_violation(violation: str):
+            violations.append(violation)
+
+        if isinstance(self.policy, Policy):
+            policies = [self.policy]
+        elif isinstance(self.policy, PolicyPack):
+            policies = self.policy.policies
+
+        for policy in policies:
+            for resource in self.resources.all:
+                if (
+                    isinstance(
+                        resource,
+                        (
+                            User,
+                            Role,
+                        ),
+                    )
+                    and not resource.stub
+                    and not resource.implicit
+                ):
+                    policy.validate(resource, report_violation)
+        return violations
+
     def build(self):
         """
         Resolve stub references
         """
-        pass
+        for resource in self.resources.all:
+            resource.finalize()
+            print(repr(resource), "\n\t->", resource.requirements)
+        policy_violations = self.check_policies()
+        if policy_violations:
+            for pv in policy_violations:
+                print(pv)
 
     def run(self):
         # self.build()
@@ -156,7 +199,7 @@ class App:
         stmts = sqlglot.parse(sql_blob, read="snowflake")
         # I tried T_Resource here but there's some issue with binding that I dont understand
         # Dict[str, Optional[Resource]]
-        local_state = {
+        local_state: Dict[str, Optional[Resource]] = {
             "active_role": None,
             "active_account": self.account,
             "active_database": None,
@@ -171,13 +214,15 @@ class App:
             (?:TEMPORARY\s+)?
             (?:TEMP\s+)?
             (?P<create_kind>(
-                WAREHOUSE|
-                STAGE|
-                ROLE|
-                USER|
-                DATABASE|
-                TABLE|
-                RESOURCE\s+MONITOR
+                DATABASE |
+                FILE\s+FORMAT |
+                PIPE |
+                RESOURCE\s+MONITOR |
+                ROLE |
+                STAGE |
+                TABLE |
+                USER |
+                WAREHOUSE |
             ))
         """,
             re.VERBOSE | re.IGNORECASE,
@@ -207,16 +252,26 @@ class App:
                             raise Exception("Schema specified without database")
             elif isinstance(stmt, exp.Command) and stmt.this.lower() == "create":
                 create_kind = extract_create_kind.search(sql).groupdict()["create_kind"].lower()
+
+                if create_kind == "":
+                    raise Exception(f"Create kind not found {sql}")
+
                 if create_kind == "warehouse":
                     new_resource = Warehouse.from_sql(sql)
                 elif create_kind == "stage":
                     new_resource = Stage.from_sql(sql)
                 elif create_kind == "role":
-                    pass
+                    new_resource = Role.from_sql(sql)
                 elif create_kind == "user":
                     new_resource = User.from_sql(sql)
                 elif create_kind == "resource monitor":
                     new_resource = ResourceMonitor.from_sql(sql)
+                elif create_kind == "file format":
+                    new_resource = FileFormat.from_sql(sql)
+                elif create_kind == "pipe":
+                    new_resource = Pipe.from_sql(sql)
+                else:
+                    raise Exception(f"Unknown create kind {create_kind}")
             elif isinstance(stmt, exp.Command) and stmt.this.lower() == "grant":
                 grant_tokens = stmt.expression.this.strip().split()
                 grant_kind = grant_tokens[0].lower()

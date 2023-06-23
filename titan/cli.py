@@ -12,6 +12,7 @@ import sys
 from . import __version__, LOGO
 
 from .app import App
+from .policies.titan_standard import titan_standard
 
 import click
 import yaml
@@ -39,7 +40,7 @@ def plan(path: str):
     # Look for titan config file
     cfg = open_config(path) or {}
 
-    app = App()
+    app = App(policy=titan_standard)
     for file in os.listdir(path):
         if file.endswith(".sql"):
             print("^" * 80, file)
@@ -55,7 +56,7 @@ def plan(path: str):
             # sys.modules[module_name] = module
             # spec.loader.exec_module(module)
 
-    # app.build()
+    app.build()
     # app.tree()
     # app.run()
     resources = app.resources.sorted()
