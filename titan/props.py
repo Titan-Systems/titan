@@ -159,6 +159,20 @@ class EnumProp(Prop):
         return f"{self.name} = {value.value}"
 
 
+class PropList(Prop):
+    def __init__(self, name, expected_props) -> None:
+        super().__init__(name, rf"\s+{name}\s*=\s*\((.*)\)")
+        self.expected_props = expected_props
+
+    def normalize(self, value: str) -> Any:
+        normalized = {}
+        for name, prop in self.expected_props.items():
+            match = prop.search(value)
+            if match:
+                normalized[name] = prop.normalize(match)
+        return normalized
+
+
 class TagsProp(Prop):
     """
     [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]

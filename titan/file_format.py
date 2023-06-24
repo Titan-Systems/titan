@@ -1,6 +1,6 @@
 import re
 
-from typing import Union, Optional, List, Type
+from typing import Optional, Type
 
 from .resource import SchemaLevelResource
 from .props import Identifier, BoolProp, EnumProp, ParsableEnum, StringProp, IntProp, StringListProp

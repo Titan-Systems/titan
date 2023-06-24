@@ -2,9 +2,8 @@ import re
 
 from typing import List, Tuple, Optional
 
-from sqlglot import exp
 
-from .props import BoolProp, StringProp, TagsProp, IntProp, FlagProp, Identifier
+from .props import BoolProp, StringProp, TagsProp, IntProp, FlagProp, IdentifierListProp, Identifier
 from .resource import SchemaLevelResource
 from .schema import Schema
 from .stage import Stage
@@ -58,6 +57,7 @@ class Table(SchemaLevelResource):
     """
 
     props = {
+        "CLUSTER_BY": IdentifierListProp("CLUSTER BY"),
         "DATA_RETENTION_TIME_IN_DAYS": IntProp("DATA_RETENTION_TIME_IN_DAYS"),
         "MAX_DATA_EXTENSION_TIME_IN_DAYS": IntProp("MAX_DATA_EXTENSION_TIME_IN_DAYS"),
         "CHANGE_TRACKING": BoolProp("CHANGE_TRACKING"),
@@ -75,7 +75,8 @@ class Table(SchemaLevelResource):
             (?:(?:TEMP|TEMPORARY|VOLATILE|TRANSIENT)\s+)?
             TABLE\s+
             (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
+            ({Identifier.pattern})\s*
+            \([\S\s]*\)
         """,
         re.VERBOSE | re.IGNORECASE,
     )
@@ -84,6 +85,7 @@ class Table(SchemaLevelResource):
 
     def __init__(
         self,
+        cluster_by: List[str] = [],
         data_retention_time_in_days: Optional[int] = None,
         max_data_extension_time_in_days: Optional[int] = None,
         change_tracking: Optional[bool] = None,
@@ -96,6 +98,7 @@ class Table(SchemaLevelResource):
     ):
         super().__init__(**kwargs)
 
+        self.cluster_by = cluster_by
         self.data_retention_time_in_days = data_retention_time_in_days
         self.max_data_extension_time_in_days = max_data_extension_time_in_days
         self.change_tracking = change_tracking

@@ -3,7 +3,7 @@ from __future__ import annotations
 # import inspect
 import re
 
-from typing import Optional, Dict, List, Union, Type
+from typing import Optional, Dict, Union
 
 import sqlglot
 
@@ -13,7 +13,7 @@ from sqlglot import exp
 # from snowflake.snowpark.stored_procedure import StoredProcedureRegistration
 
 # from .props import Identifier
-from .resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource, T_Resource
+from .resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource
 from .resource_graph import ResourceGraph
 
 from .account import Account
@@ -25,12 +25,14 @@ from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
 from .role import Role
 from .schema import Schema
-from .share import Share
-from .sproc import Sproc
+
+# from .share import Share
+# from .sproc import Sproc
 from .stage import Stage
 from .table import Table
 from .user import User
-from .view import View
+
+# from .view import View
 from .warehouse import Warehouse
 
 from .policy import Policy, PolicyPack
@@ -317,7 +319,7 @@ class App:
 
     def tree(self):
         # raise Exception("This is broken")
-        from treelib import Node, Tree
+        from treelib import Tree
 
         t = Tree()
         t.create_node("Account " + self.account.name, self.account.name)

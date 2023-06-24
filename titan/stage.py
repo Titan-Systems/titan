@@ -2,8 +2,24 @@ import re
 
 from typing import List, Optional, Tuple
 
-from .props import StringProp, TagsProp, Identifier
+from .props import StringProp, TagsProp, Identifier, ParsableEnum, EnumProp, PropList
 from .resource import SchemaLevelResource
+
+
+class StageType(ParsableEnum):
+    INTERNAL = "INTERNAL"
+    EXTERNAL = "EXTERNAL"
+
+
+class Encryption(ParsableEnum):
+    SNOWFLAKE_FULL = "SNOWFLAKE_FULL"
+    SNOWFLAKE_SSE = "SNOWFLAKE_SSE"
+    AWS_CSE = "AWS_CSE"
+    AWS_SSE_S3 = "AWS_SSE_S3"
+    AWS_SSE_KMS = "AWS_SSE_KMS"
+    GCS_SSE_KMS = "GCS_SSE_KMS"
+    AZURE_CSE = "AZURE_CSE"
+    NONE = "NONE"
 
 
 class Stage(SchemaLevelResource):
@@ -55,12 +71,6 @@ class Stage(SchemaLevelResource):
 
     """
 
-    props = {
-        "URL": StringProp("URL"),
-        "TAGS": TagsProp(),
-        "COMMENT": StringProp("COMMENT"),
-    }
-
     create_statement = re.compile(
         rf"""
             CREATE\s+
@@ -75,15 +85,40 @@ class Stage(SchemaLevelResource):
 
     ownable = True
 
-    def __init__(
-        self, url: Optional[str] = None, tags: List[Tuple[str, str]] = [], comment: Optional[str] = None, **kwargs
-    ):
+    # def __init__(
+    #     self, url: Optional[str] = None, tags: List[Tuple[str, str]] = [], comment: Optional[str] = None, **kwargs
+    # ):
+    #     super().__init__(**kwargs)
+    #     self.url = url
+    #     self.tags = tags
+    #     self.comment = comment
+    #     self.stage_type = StageType.EXTERNAL if url else StageType.INTERNAL
+    #     self.hooks = {"on_file_added": None}
+
+    def __init__(self, stage_type: Optional[StageType] = None, **kwargs):
+        # if type(self) == FileFormat:
+        #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
+        self.stage_type = stage_type or StageType.INTERNAL
         super().__init__(**kwargs)
-        self.url = url
-        self.tags = tags
-        self.comment = comment
-        self.stage_type = "EXTERNAL" if url else "INTERNAL"
-        self.hooks = {"on_file_added": None}
+
+    @classmethod
+    def from_sql(cls, sql: str):
+        match = re.search(cls.create_statement, sql)
+
+        if match is None:
+            raise Exception
+        name = match.group(1)
+        stage_type = StageType.INTERNAL
+        url = StringProp("URL").search(sql[match.end() :])
+        if url:
+            stage_type = StageType.EXTERNAL
+
+        if stage_type == StageType.INTERNAL:
+            props = InternalStage.parse_props(sql[match.end() :])
+            return InternalStage(name, **props)
+        else:
+            props = ExternalStage.parse_props(sql[match.end() :])
+            return ExternalStage(name, **props)
 
     @property
     def sql(self):
@@ -123,3 +158,27 @@ class Stage(SchemaLevelResource):
     #             stage_location="@sprocs",
     #             execute_as="caller",
     #         )
+
+
+class InternalStage(Stage):
+    props = {
+        "ENCRYPTION": PropList(
+            "ENCRYPTION", {"TYPE": EnumProp("TYPE", [Encryption.SNOWFLAKE_FULL, Encryption.SNOWFLAKE_SSE])}
+        ),
+        "TAGS": TagsProp(),
+        "COMMENT": StringProp("COMMENT"),
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(stage_type=StageType.INTERNAL, **kwargs)
+
+
+class ExternalStage(Stage):
+    props = {
+        "URL": StringProp("URL"),
+        "TAGS": TagsProp(),
+        "COMMENT": StringProp("COMMENT"),
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(stage_type=StageType.INTERNAL, **kwargs)
