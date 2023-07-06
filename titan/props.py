@@ -1,59 +1,159 @@
-from __future__ import annotations
-
+# Legacy
 import re
 
-from enum import Enum
-from typing import Union, List, Optional, Any, Type, TypeVar
-
-
 Identifier = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
-QuotedString = r"'[^']*'"
+# end legacy
+
+
+import pyparsing as pp
+from pyparsing import common
+
+# from pyparsing.common import convert_to_integer
+
+Keyword = pp.CaselessKeyword
+Literal = pp.CaselessLiteral
+
+_Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
+
+Eq = Literal("=").suppress()
+Lparen = Literal("(").suppress()
+Rparen = Literal(")").suppress()
+
+WITH = Keyword("WITH").suppress()
+TAG = Keyword("TAG").suppress()
+AS = Keyword("AS").suppress()
+
+Boolean = Keyword("TRUE") | Keyword("FALSE")
+Integer = pp.Word(pp.nums)
+
+# Any = Keyword(pp.alphas)  # .set_results_name("any")
+Any = pp.Word(pp.srange("[a-zA-Z0-9_]"))  # pp.srange("[a-zA-Z_]"),
+
+
+def parens(expr):
+    return Lparen + expr + Rparen
+
+
+def strip_quotes(tokens):
+    return [tok.strip("'") for tok in tokens]
 
 
 class Prop:
-    def __init__(self, name, pattern) -> None:
+    def __init__(self, name, expression, value=None, valid_tokens=[]):
         self.name = name
-        self.pattern = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
+        self.expression = expression
+        self.value = value
+        self.valid_tokens = valid_tokens
+        self.expression  # .add_parse_action(self.validate)
 
-    def search(self, sql: str):
-        match = re.search(self.pattern, sql)
-        if match:
-            return self.normalize(match.group(1))
-        return None
+    # TODO: investigate if this needs to exist or if add_condition is sufficient
+    def validate(self, tokens):
+        prop_value = tokens[0]
+        if self.value is None:
+            return prop_value
+        if not isinstance(prop_value, str):
+            print("bad")
+        res = self.value.parse_string(prop_value, parse_all=True)
+        return res
 
-    def normalize(self, value: str) -> Any:
-        return value
-
-    def render(self, value: Optional[Any]) -> str:
+    def render(self, value):
         if value is None:
             return ""
         return f"{self.name} = {value}"
 
 
+class BoolProp(Prop):
+    def __init__(self, name):
+        expression = Keyword(name).suppress() + Eq + Any
+        # This code fails if using add_parse_action because the parse action is applied every time a BoolProp is
+        # initialized. This needs to be replaced with something safer
+        # value = Boolean.set_parse_action(lambda toks: toks[0].upper() == "TRUE")
+        value = (Keyword("TRUE") | Keyword("FALSE")).set_parse_action(lambda toks: toks[0].upper() == "TRUE")
+        super().__init__(name, expression, value)
+
+    # def validate(self, tokens):
+    #     return super().validate(tokens)
+
+    def render(self, value):
+        if value is None:
+            return ""
+        return f"{self.name} = {str(value).upper()}"
+
+
+class IntProp(Prop):
+    def __init__(self, name):
+        expression = Keyword(name).suppress() + Eq + Any  # pp.Word(pp.nums)
+        # replace with common.integer
+        value = Integer.add_parse_action(common.convert_to_integer)
+        super().__init__(name, expression, value)
+
+
 class StringProp(Prop):
-    def __init__(self, name, alt_tokens: List[str] = []) -> None:
-        string_types = "|".join([r"[\w\d_]+", QuotedString] + alt_tokens)
-        pattern = rf"\s+{name}\s*=\s*({string_types})"
-        super().__init__(name, pattern)
+    def __init__(self, name, valid_values=[], alt_tokens=[]):
+        expression = Keyword(name).suppress() + Eq + pp.quoted_string  # .add_parse_action(pp.remove_quotes)
+        value = None
+        super().__init__(name, expression, value)
+        # self.valid_values = valid_values
 
-    def normalize(self, value: str) -> str:
-        return value.strip("'")
+    # def normalize(self, value):
+    #     return value.strip("'")
 
-    def render(self, value: Optional[str]) -> str:
+    def render(self, value):
         if value is None:
             return ""
         return f"{self.name} = '{value}'"
 
 
+class FlagProp(Prop):
+    def __init__(self, name):
+        expression = Keyword(name)
+        super().__init__(name, expression)
+
+    def validate(self, _):
+        return True
+
+    def render(self, value):
+        return self.name.upper() if value else ""
+
+
+class IdentifierProp(Prop):
+    def __init__(self, name):
+        expression = Keyword(name).suppress() + Eq + _Identifier
+        super().__init__(name, expression)
+
+    def render(self, value):
+        if value is None:
+            return ""
+        return f"{self.name} = {value.fully_qualified_name}"
+
+
+# class ResourceProp(Prop):
+#     def __init__(self, name, resource_class):
+#         pattern = Keyword(name).suppress() + Eq + _Identifier
+#         super().__init__(name, pattern)
+#         self.resource_class = resource_class
+
+#     def validate(self, tokens):
+#         return self.resource_class.all[tokens[-1]]
+
+#     def render(self, value):
+#         if value is None:
+#             return ""
+#         return f"{self.name} = {value.fully_qualified_name}"
+
+
 class StringListProp(Prop):
-    def __init__(self, name) -> None:
-        super().__init__(name, rf"\s+{name}\s*=\s*\((?P<strings>.*)\)")
+    def __init__(self, name):
+        expression = (
+            Keyword(name).suppress() + Eq + parens(common.comma_separated_list).add_parse_action(pp.remove_quotes)
+        )
+        super().__init__(name, expression)
 
-    def normalize(self, value: str) -> Any:
-        matches = re.findall(QuotedString, value)
-        return [match.strip("'") for match in matches]
+    def validate(self, tokens):
+        # return [tok.strip("'") for tok in tokens]
+        return tokens
 
-    def render(self, values: Optional[List[Any]]) -> str:
+    def render(self, values):
         if values:
             strings = ", ".join([f"'{item}'" for item in values])
             return f"{self.name} = ({strings})"
@@ -61,116 +161,47 @@ class StringListProp(Prop):
             return ""
 
 
-class BoolProp(Prop):
-    def __init__(self, name) -> None:
-        super().__init__(name, rf"\s+{name}\s*=\s*(TRUE|FALSE)")
+# "DIRECTORY": PropList(
+#     "DIRECTORY", {"ENABLE": BoolProp("ENABLE"), "REFRESH_ON_CREATE": BoolProp("REFRESH_ON_CREATE")}
+# ),
 
-    def normalize(self, value: str) -> bool:
-        return value.upper() == "TRUE"
-
-    def render(self, value: Optional[bool]) -> str:
-        if value is None:
-            return ""
-        return f"{self.name} = {str(value).upper()}"
-
-
-class FlagProp(Prop):
-    def __init__(self, name) -> None:
-        super().__init__(name, rf"\s+{name}")
-
-    def search(self, sql: str) -> bool:
-        match = re.search(self.pattern, sql)
-        return match is not None
-
-    def render(self, value: Optional[bool]) -> str:
-        if value is None:
-            return ""
-        return self.name.upper() if value else ""
-
-
-class IntProp(Prop):
-    def __init__(self, name) -> None:
-        super().__init__(name, rf"\s+{name}\s*=\s*(\d+)")
-
-    def normalize(self, value: str) -> int:
-        return int(value)
-
-
-class IdentifierProp(Prop):
-    def __init__(self, name, pattern=None) -> None:
-        super().__init__(name, pattern or rf"\s+{name}\s*=\s*({Identifier.pattern})")
-
-    def render(self, value: Optional["Resource"]) -> str:  # type: ignore
-        if value is None:
-            return ""
-        return f"{self.name} = {value.fully_qualified_name}"
-
-
-class IdentifierListProp(Prop):
-    def __init__(self, name) -> None:
-        super().__init__(name, rf"\s+{name}\s*=\s*\((?P<identifiers>.*)\)")
-
-    def normalize(self, value: str) -> Any:
-        identifier_matches = re.findall(Identifier.pattern, value)
-        return [match for match in identifier_matches]
-
-    def render(self, value: Any) -> str:
-        if value:
-            tag_kv_pairs = ", ".join([f"{key} = '{value}'" for key, value in value.items()])
-            # TODO: wtf is this
-            return f"WITH TAG ({tag_kv_pairs})"
-        else:
-            return ""
-
-
-T_ParseableEnum = TypeVar("T_ParseableEnum", bound="ParsableEnum")
-
-
-class ParsableEnum(Enum):
-    @classmethod
-    def parse(cls: Type[T_ParseableEnum], value: Union[str, T_ParseableEnum]) -> T_ParseableEnum:
-        if isinstance(value, cls):
-            return value
-        elif isinstance(value, str):
-            try:
-                parsed = cls[value.upper().replace("-", "_").replace(" ", "_")]
-            except KeyError:
-                raise ValueError(f"Invalid {cls.__name__} value: {value}. Must be one of {[e.value for e in cls]}")
-            return parsed
-        else:
-            raise ValueError(f"Invalid {cls.__name__} value: {value}")
-
-    def __str__(self) -> str:
-        return self.value
-
-
-class EnumProp(Prop):
-    def __init__(self, name, enum_: Union[Type[ParsableEnum], List[ParsableEnum]]) -> None:
-        valid_values = set(enum_)
-        value_pattern = "|".join([e.value for e in valid_values] + [f"'{e.value}'" for e in valid_values])
-        super().__init__(name, rf"\s+{name}\s*=\s*({value_pattern})")
-
-    def normalize(self, value: str) -> str:
-        return value.strip("'").upper()
-
-    def render(self, value: Optional[ParsableEnum]) -> str:
-        if value is None:
-            return ""
-        return f"{self.name} = {value.value}"
+# directoryTableParams (for internal stages) ::=
+#   [ DIRECTORY = ( ENABLE = { TRUE | FALSE }
+#                   [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
 
 
 class PropList(Prop):
-    def __init__(self, name, expected_props) -> None:
-        super().__init__(name, rf"\s+{name}\s*=\s*\((.*)\)")
+    def __init__(self, name, expected_props):
+        # super().__init__(name, rf"{name}\s*=\s*\((.*)\)")
         self.expected_props = expected_props
+        props = [prop.expression for prop in expected_props.values()]
+        # expression = Keyword(name).suppress() + Eq + pp.nested_expr(content=pp.OneOrMore(props))
+        # expression = Keyword(name).suppress() + Eq + pp.nested_expr(content=pp.one_of(props, caseless=True, as_keyword=True))
+        # expression = Any
+        expression = Keyword(name).suppress() + Eq + parens(Any)
+        super().__init__(name, expression)
 
-    def normalize(self, value: str) -> Any:
-        normalized = {}
+    # def validate(self, tokens):
+    #     # return [tok.strip("'") for tok in tokens]
+    #     raise NotImplementedError
+
+    # def normalize(self, value: str) -> Any:
+    #     normalized = {}
+    #     for name, prop in self.expected_props.items():
+    #         match = prop.search(value)
+    #         if match:
+    #             normalized[name.lower()] = match
+    #     return normalized if normalized else None
+
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return ""
+        kv_pairs = []
         for name, prop in self.expected_props.items():
-            match = prop.search(value)
-            if match:
-                normalized[name] = prop.normalize(match)
-        return normalized
+            if name.lower() in values:
+                kv_pairs.append(prop.render(values[name.lower()]))
+
+        return f"{self.name} = ({', '.join(kv_pairs)})"
 
 
 class TagsProp(Prop):
@@ -178,14 +209,18 @@ class TagsProp(Prop):
     [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
     """
 
-    tag_pattern = rf"(?P<key>{Identifier.pattern})\s*=\s*'(?P<value>[^']*)'"
+    def __init__(self):
+        name = "TAGS"
+        expression = WITH + TAG + pp.nested_expr(content=pp.delimited_list(_Identifier + Eq + pp.sgl_quoted_string))
+        value = None
+        super().__init__(name, expression, value)
 
-    def __init__(self) -> None:
-        super().__init__("TAGS", r"\s+(?:WITH)?\s+TAG\s*\((?P<tags>.*)\)")
+    def validate(self, tokens):
+        raise NotImplementedError
 
-    def normalize(self, value: str) -> Any:
-        tag_matches = re.findall(self.tag_pattern, value)
-        return {key: value for key, value in tag_matches}
+    # def normalize(self, value: str) -> Any:
+    #     tag_matches = re.findall(self.tag_pattern, value)
+    #     return {key: value for key, value in tag_matches}
 
     def render(self, value: Any) -> str:
         if value:
@@ -195,14 +230,61 @@ class TagsProp(Prop):
             return ""
 
 
+class IdentifierListProp(Prop):
+    def __init__(self, name):
+        # pp.nested_expr(content=_Identifier)
+        # parens(common.comma_separated_list)
+        expression = Keyword(name).suppress() + Eq + parens(pp.Group(pp.delimited_list(_Identifier)))
+        value = None  # TODO: validate function should turn identifiers into objects
+        super().__init__(name, expression, value)
+
+    # def normalize(self, value):
+    #     identifier_matches = re.findall(Identifier.pattern, value)
+    #     return [match for match in identifier_matches]
+
+    def validate(self, tokens):
+        return tokens.as_list()
+        # return super().validate(tokens)
+
+    def render(self, value):
+        if value:
+            # tag_kv_pairs = ", ".join([f"{key} = '{value}'" for key, value in value.items()])
+            # TODO: wtf is this
+            identifiers = ", ".join([str(id) for id in value])
+            return f"{self.name} = ({identifiers})"
+        else:
+            return ""
+
+
+class EnumProp(Prop):
+    def __init__(self, name, enum_or_list):
+        # enum_or_list: a single enum class or a list of valid enum values
+        valid_values = set(enum_or_list)
+        # (Any | pp.sgl_quoted_string).add_parse_action(pp.remove_quotes)
+        expression = Keyword(name).suppress() + Eq + (Any | pp.sgl_quoted_string).add_parse_action(strip_quotes)
+        value = pp.one_of([e.value for e in valid_values], caseless=True, as_keyword=True)
+        super().__init__(name, expression, value)
+        self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
+        # self.valid_values = set(self.enum_type)
+
+    def validate(self, tokens):
+        return self.enum_type.parse(tokens[0])
+
+    def render(self, value):
+        if value is None:
+            return ""
+        return f"{self.name} = {value.value}"
+
+
 class QueryProp(Prop):
-    def __init__(self, name) -> None:
-        super().__init__(name, rf"\s+{name}\s+([^;]*)")
+    def __init__(self, name):
+        expression = AS + pp.Word(pp.printables + " \n")
+        super().__init__(name, expression)
 
     # def normalize(self, value: str) -> str:
     #     return value.strip("'").upper()
 
-    def render(self, value: Optional[str]) -> str:
+    def render(self, value):
         if value is None:
             return ""
         return f"{self.name} {value}"

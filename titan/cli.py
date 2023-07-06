@@ -63,8 +63,14 @@ def plan(path: str):
     print(resources)
     for res in resources:
         # if not res.implicit:
-        # print("^" * 120)
+        print("^" * 120, flush=True)
         print(repr(res), flush=True)
+        if res.stub:
+            print("--stub--", flush=True)
+        elif res.implicit:
+            pass
+        else:
+            print(res.sql, flush=True)
         # if not res.implicit and not res.stub:
         #     print(res.sql)
     # app.tree()

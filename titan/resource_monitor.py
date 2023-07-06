@@ -4,10 +4,11 @@ from typing import Union, Optional, List
 
 from .resource import AccountLevelResource
 from .user import User
-from .props import Identifier, EnumProp, ParsableEnum, StringProp, IntProp, IdentifierListProp
+from .parseable_enum import ParseableEnum
+from .props import Identifier, EnumProp, StringProp, IntProp, IdentifierListProp
 
 
-class ResourceMonitorFrequency(ParsableEnum):
+class ResourceMonitorFrequency(ParseableEnum):
     MONTHLY = "MONTHLY"
     DAILY = "DAILY"
     WEEKLY = "WEEKLY"
@@ -28,6 +29,8 @@ class ResourceMonitor(AccountLevelResource):  #
     triggerDefinition ::=
         ON <threshold> PERCENT DO { SUSPEND | SUSPEND_IMMEDIATE | NOTIFY }
     """
+
+    resource_name = "RESOURCE MONITOR"
 
     props = {
         "CREDIT_QUOTA": IntProp("CREDIT_QUOTA"),
@@ -69,12 +72,5 @@ class ResourceMonitor(AccountLevelResource):  #
 
     @property
     def sql(self):
-        return f"""
-            CREATE RESOURCE MONITOR {self.fully_qualified_name}
-                WITH
-                {self.props["CREDIT_QUOTA"].render(self.credit_quota)}
-                {self.props["FREQUENCY"].render(self.frequency)}
-                {self.props["START_TIMESTAMP"].render(self.start_timestamp)}
-                {self.props["END_TIMESTAMP"].render(self.end_timestamp)}
-                {self.props["NOTIFY_USERS"].render(self.notify_users)}
-        """.strip()
+        props = self.props_sql()
+        return f"CREATE RESOURCE MONITOR {self.fully_qualified_name} WITH {props}"

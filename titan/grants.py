@@ -4,7 +4,8 @@ import re
 
 from typing import Optional, Union, List, TypeVar, Type
 
-from .props import Identifier, ParsableEnum, FlagProp
+from .parseable_enum import ParseableEnum
+from .props import Identifier, FlagProp
 from .resource import AccountLevelResource, Resource
 from .database import Database
 from .role import Role
@@ -59,16 +60,11 @@ class RoleGrant(AccountLevelResource):
 
     @property
     def sql(self):
-        return f"""
-        GRANT ROLE
-            {self.role.name}
-        TO
-            {"ROLE" if isinstance(self.grantee, Role) else "USER"}
-            {self.grantee.name}
-        """
+        grantee_type = "ROLE" if isinstance(self.grantee, Role) else "USER"
+        return f"GRANT ROLE {self.role.name} TO {grantee_type} {self.grantee.name}"
 
 
-class GlobalPrivs(ParsableEnum):
+class GlobalPrivs(ParseableEnum):
     CREATE_ACCOUNT = "CREATE ACCOUNT"
     CREATE_DATA_EXCHANGE_LISTING = "CREATE DATA EXCHANGE LISTING"
     CREATE_DATABASE = "CREATE DATABASE"
@@ -102,7 +98,7 @@ class GlobalPrivs(ParsableEnum):
     RESOLVE_ALL = "RESOLVE ALL"
 
 
-class DatabasePrivs(ParsableEnum):
+class DatabasePrivs(ParseableEnum):
     CREATE_DATABASE_ROLE = "CREATE DATABASE ROLE"
     CREATE_SCHEMA = "CREATE SCHEMA"
     IMPORTED_PRIVILEGES = "IMPORTED PRIVILEGES"
@@ -111,7 +107,7 @@ class DatabasePrivs(ParsableEnum):
     USAGE = "USAGE"
 
 
-class SchemaPrivs(ParsableEnum):
+class SchemaPrivs(ParseableEnum):
     ADD_SEARCH_OPTIMIZATION = "ADD SEARCH OPTIMIZATION"
     CREATE_ALERT = "CREATE ALERT"
     CREATE_EXTERNAL_TABLE = "CREATE EXTERNAL TABLE"
@@ -137,7 +133,7 @@ class SchemaPrivs(ParsableEnum):
     USAGE = "USAGE"
 
 
-class WarehousePrivs(ParsableEnum):
+class WarehousePrivs(ParseableEnum):
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
     USAGE = "USAGE"
@@ -361,12 +357,7 @@ class PrivGrant(AccountLevelResource):
     @property
     def sql(self):
         privs = ", ".join([str(p) for p in self.privs])
-        return f"""
-GRANT
-    {privs}
-ON
-    {type(self.on).__name__.upper() if self.on else "ACCOUNT"}
-    {self.on.name if self.on else ""}
-TO
-    ROLE {self.grantee.name}
-        """
+        return (
+            f"GRANT {privs} ON {type(self.on).__name__.upper() if self.on else 'ACCOUNT'}"
+            + f" {self.on.name if self.on else ''} TO ROLE {self.grantee.name}"
+        )

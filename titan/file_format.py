@@ -2,11 +2,12 @@ import re
 
 from typing import Optional, Type
 
-from .resource import SchemaLevelResource
-from .props import Identifier, BoolProp, EnumProp, ParsableEnum, StringProp, IntProp, StringListProp
+from .resource import SchemaLevelResource, ResourceWithDB
+from .parseable_enum import ParseableEnum
+from .props import Identifier, BoolProp, EnumProp, StringProp, IntProp, StringListProp, Prop
 
 
-class FileType(ParsableEnum):
+class FileType(ParseableEnum):
     CSV = "CSV"
     JSON = "JSON"
     AVRO = "AVRO"
@@ -15,7 +16,7 @@ class FileType(ParsableEnum):
     XML = "XML"
 
 
-class Compression(ParsableEnum):
+class Compression(ParseableEnum):
     AUTO = "AUTO"
     GZIP = "GZIP"
     BZ2 = "BZ2"
@@ -28,13 +29,13 @@ class Compression(ParsableEnum):
     NONE = "NONE"
 
 
-class BinaryFormat(ParsableEnum):
+class BinaryFormat(ParseableEnum):
     HEX = "HEX"
     BASE64 = "BASE64"
     UTF8 = "UTF8"
 
 
-class FileFormat(SchemaLevelResource):
+class FileFormat(SchemaLevelResource, metaclass=ResourceWithDB):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ]
@@ -120,11 +121,17 @@ class FileFormat(SchemaLevelResource):
 
     ownable = True
 
-    def __init__(self, file_type: FileType, **kwargs):
-        if type(self) == FileFormat:
-            raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
-        self.file_type = FileType.parse(file_type)
-        super().__init__(**kwargs)
+    def __init__(self, file_type: Optional[FileType] = None, name=None, anonymous: bool = False, **kwargs):
+        # if type(self) == FileFormat:
+        #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
+        if all([name, anonymous]):
+            raise Exception("Anonymous file formats cannot be named")
+        name = name or "__anon__"
+        super().__init__(name=name, **kwargs)
+        if self.stub and file_type is not None:
+            raise Exception("Cannot specify file type for stubbed file format")
+        self.file_type = FileType.parse(file_type) if isinstance(file_type, str) else file_type
+        self.anonymous = anonymous
 
     @classmethod
     def from_sql(cls, sql: str):
@@ -132,29 +139,22 @@ class FileFormat(SchemaLevelResource):
 
         if match is None:
             raise Exception
-        name = match.group(1)
-        file_type = EnumProp("TYPE", FileType).search(sql[match.end() :])
-        file_format_class: Optional[Type[FileFormat]] = None
-        if file_type is None:
-            raise Exception("No type specified for CREATE FILE FORMAT statement")
-        elif file_type == "CSV":
-            file_format_class = CSVFileFormat
-        elif file_type == "JSON":
-            file_format_class = JSONFileFormat
-        elif file_type == "AVRO":
-            file_format_class = AvroFileFormat
-        elif file_type == "ORC":
-            file_format_class = OrcFileFormat
-        elif file_type == "PARQUET":
-            file_format_class = ParquetFileFormat
-        elif file_type == "XML":
-            file_format_class = XMLFileFormat
-        else:
-            raise Exception(f"Unknown file format type {file_type}")
 
-        props = file_format_class.parse_props(sql[match.end() :])
-        del props["type"]
+        name = match.group(1)
+        file_format_class, props = cls.parse_anonymous_file_format(sql[match.end() :])
         return file_format_class(name=name, **props)
+
+    @classmethod
+    def parse_anonymous_file_format(cls, sql: str):
+        file_type = EnumProp("TYPE", FileType).search(sql)
+
+        if file_type is None:
+            raise ValueError("No type specified for FILE FORMAT statement")
+
+        file_format_class = FileTypeMap[FileType.parse(file_type)]
+        props = file_format_class.parse_props(sql)
+        del props["type"]
+        return (file_format_class, props)
 
     @property
     def sql(self):
@@ -399,3 +399,50 @@ class XMLFileFormat(FileFormat):
         self.disable_auto_convert = disable_auto_convert
         self.replace_invalid_characters = replace_invalid_characters
         self.skip_byte_order_mark = skip_byte_order_mark
+
+
+FileTypeMap = {
+    FileType.CSV: CSVFileFormat,
+    FileType.JSON: JSONFileFormat,
+    FileType.AVRO: AvroFileFormat,
+    FileType.ORC: OrcFileFormat,
+    FileType.PARQUET: ParquetFileFormat,
+    FileType.XML: XMLFileFormat,
+}
+
+
+# class AnonFileFormatProp(Prop):
+#     def __init__(self, name) -> None:
+#         super().__init__(name, rf"{name}\s*=\s*\((.*)\)")
+
+#     def normalize(self, value: str) -> FileFormat:
+#         try:
+#             file_format_class, props = FileFormat.parse_anonymous_file_format(value)
+#             return file_format_class(anonymous=True, **props)
+#         except ValueError:
+#             return None
+
+#     def render(self, value: Optional[FileFormat]) -> str:
+#         if value is None:
+#             return ""
+#         return f"{self.name} = ({value.sql})"
+
+
+class AnonFileFormatProp(Prop):
+    def __init__(self, name):
+        # super().__init__(name, rf"{name}\s*=\s*\((.*)\)")
+        expression = None
+        value = None
+        super().__init__(name, expression, value)
+
+    # def normalize(self, value: str) -> FileFormat:
+    #     try:
+    #         file_format_class, props = FileFormat.parse_anonymous_file_format(value)
+    #         return file_format_class(anonymous=True, **props)
+    #     except ValueError:
+    #         return None
+
+    def render(self, value):
+        if value is None:
+            return ""
+        return f"{self.name} = ({value.sql})"

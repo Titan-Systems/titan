@@ -8,6 +8,8 @@ from .role import Role
 
 
 class Account(OrganizationLevelResource):
+    resource_name = "ACCOUNT"
+
     def __init__(
         self,
         **kwargs,

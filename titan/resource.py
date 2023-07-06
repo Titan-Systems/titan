@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import re
 
-from typing import TypeVar, Optional, Dict, Type, Set, TYPE_CHECKING
+from typing import TypeVar, Optional, Dict, Type, Set, Union, List, TYPE_CHECKING
 
+from .props import Prop, PropList
 
 # from .hooks import on_file_added_factory
 
@@ -57,9 +58,10 @@ class Resource:
 
     # on_init = None
     level = -1
+    resource_name: Optional[str] = None
     ownable = True
-    props: Dict[str, Prop] = {}
     create_statement: Optional[re.Pattern] = None
+    props: Dict[str, Union[Prop, List[Prop]]] = {}
 
     def __init__(
         self,
@@ -110,18 +112,93 @@ class Resource:
     def parse_props(cls, sql: str):
         found_props = {}  # Dict[str, Any]
 
-        for prop_name, prop in cls.props.items():
-            match = prop.search(sql)
-            if match is not None:
-                sql = re.sub(prop.pattern, "", sql)
-                found_props[prop_name.lower()] = match
-        if len(sql.strip()) > 0:
-            raise Exception(f"Failed to parse props: {sql}")
+        # remainder_sql = sql
+        # for prop_name, prop_or_list in cls.props.items():
+        #     props = prop_or_list if isinstance(prop_or_list, list) else [prop_or_list]
+        #     for prop in props:
+        #         # print(sql)
+        #         match = prop.search(remainder_sql)
+        #         if match is not None:
+        #             remainder_sql = re.sub(prop.pattern, "", remainder_sql)
+        #             found_props[prop_name.lower()] = match
+        #             break
+
+        import pyparsing as pp
+
+        lexicon = []
+        for prop_kwarg, prop_or_list in cls.props.items():
+            if isinstance(prop_or_list, list):
+                prop_list = prop_or_list
+            else:
+                prop_list = [prop_or_list]
+            for prop in prop_list:
+                # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
+                named_marker = pp.Empty().set_parse_action(lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc))
+                lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)  #
+
+        remainder_sql = sql
+        parser = pp.MatchFirst(lexicon)
+        ppt = pp.testing
+        print(">", cls.__name__)
+        print("-" * 80)
+        print(ppt.with_line_numbers(sql))
+        print("-" * 80)
+        print(parser)
+        while True:
+            try:
+                tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
+            except pp.ParseException:
+                print(remainder_sql)
+                raise Exception(f"Failed to parse props: {remainder_sql}")
+            except Exception:
+                print("wtf")
+            found_props[prop_kwarg] = tokens
+            print(prop_kwarg, "->", repr(tokens))
+            remainder_sql = remainder_sql[end_index:]
+            if remainder_sql.strip() == "":
+                break
+
+        if sql == " ENCRYPTION = (TYPE = 'SNOWFLAKE_FULL')":
+            print(sql)
+
+        if "comment" in found_props:
+            print(found_props)
+
+        # if len(sql.strip()) > 0:
+        if len(remainder_sql.strip()) > 0:
+            raise Exception(f"Failed to parse props: {remainder_sql}")
         return found_props
 
     @property
     def connections(self):
         return self.requirements | self.required_by
+
+    @property
+    def sql(self):
+        if self.name == "my_int_stage_2":
+            print("")
+        props = self.props_sql()
+        return f"CREATE {self.resource_name} {self.fully_qualified_name} {props}"
+
+    def props_sql(self):
+        return self._props_sql(self.props)
+
+    def _props_sql(self, props: Dict[str, Prop]):
+        sql = []
+        for prop_name, prop in props.items():
+            # props = prop_or_list if isinstance(prop_or_list, list) else [prop_or_list]
+            # if isinstance(prop_or_list, list):
+            #     raise Exception("list of props must be handled in child class")
+            # prop = prop_or_list
+
+            value = getattr(self, prop_name.lower())
+            if value is None:
+                continue
+            rendered = prop.render(value)
+            if rendered:
+                sql.append(rendered)
+
+        return " ".join(sql)
 
     def create(self, session):
         raise NotImplementedError
@@ -165,6 +242,9 @@ class Resource:
                 if not new_res.stub:
                     self.requirements.remove(res)
                     self.requirements.add(new_res)
+
+    def describe_sql(self):
+        return f"DESCRIBE {self.resource_name} {self.fully_qualified_name()}"
 
 
 # class Ref(Resource):
@@ -235,8 +315,10 @@ class DatabaseLevelResource(Resource, metaclass=ResourceWithDB):
         self.database = database
 
     def __repr__(self):
+        i = "🔗" if self.stub else ""
+        i = "👻" if self.implicit else i
         db = self.database.name if self.database else ""
-        return f"<{type(self).__name__}:{db}.{self.name}>"
+        return f"<{i}{type(self).__name__}:{db}.{self.name}>"
 
     @classmethod
     def from_sql(cls: Type[T_DatabaseLevelResource], sql: str) -> T_DatabaseLevelResource:
@@ -280,12 +362,14 @@ class SchemaLevelResource(Resource):
         self.schema = schema
 
     def __repr__(self):
+        i = "🔗" if self.stub else ""
+        i = "👻" if self.implicit else i
         db, schema = "", ""
         if self.schema:
             schema = self.schema.name
             if self.schema.database:
                 db = self.schema.database.name
-        return f"<{type(self).__name__}:{db}.{schema}.{self.name}>"
+        return f"<{i}{type(self).__name__}:{db}.{schema}.{self.name}>"
 
     @classmethod
     def from_sql(cls: Type[T_SchemaLevelResource], sql: str) -> T_SchemaLevelResource:

@@ -19,20 +19,16 @@ from .resource_graph import ResourceGraph
 from .account import Account
 from .catalog import Catalog
 from .database import Database
+from .dynamic_table import DynamicTable
 from .file_format import FileFormat
 from .grants import RoleGrant, PrivGrant
 from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
 from .role import Role
 from .schema import Schema
-
-# from .share import Share
-# from .sproc import Sproc
 from .stage import Stage
 from .table import Table
 from .user import User
-
-# from .view import View
 from .warehouse import Warehouse
 
 from .policy import Policy, PolicyPack
@@ -225,6 +221,7 @@ class App:
                 TABLE |
                 USER |
                 WAREHOUSE |
+                DYNAMIC\s+TABLE |
             ))
         """,
             re.VERBOSE | re.IGNORECASE,
@@ -272,6 +269,8 @@ class App:
                     new_resource = FileFormat.from_sql(sql)
                 elif create_kind == "pipe":
                     new_resource = Pipe.from_sql(sql)
+                elif create_kind == "dynamic table":
+                    new_resource = DynamicTable.from_sql(sql)
                 else:
                     raise Exception(f"Unknown create kind {create_kind}")
             elif isinstance(stmt, exp.Command) and stmt.this.lower() == "grant":

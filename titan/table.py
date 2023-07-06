@@ -6,7 +6,7 @@ from typing import List, Tuple, Optional
 from .props import BoolProp, StringProp, TagsProp, IntProp, FlagProp, IdentifierListProp, Identifier
 from .resource import SchemaLevelResource
 from .schema import Schema
-from .stage import Stage
+from .stage import InternalStage
 
 
 class Table(SchemaLevelResource):
@@ -110,23 +110,28 @@ class Table(SchemaLevelResource):
         # TODO: make this a changeable property that registers/deregisters the pipe when the flag is flipped
         self.autoload = autoload
 
-        self.table_stage = Stage(name=f"@%{self.name}", implicit=True)
+        self.table_stage = InternalStage(name=f"@%{self.name}", implicit=True)
         self.table_stage.requires(self)
         if self.schema:
             self.table_stage.schema = self.schema
 
     @property
     def sql(self):
-        return f"""
-            CREATE TABLE {self.fully_qualified_name} ()
-            {self.props["DATA_RETENTION_TIME_IN_DAYS"].render(self.data_retention_time_in_days)}
-            {self.props["MAX_DATA_EXTENSION_TIME_IN_DAYS"].render(self.max_data_extension_time_in_days)}
-            {self.props["CHANGE_TRACKING"].render(self.change_tracking)}
-            {self.props["DEFAULT_DDL_COLLATION"].render(self.default_ddl_collation)}
-            {self.props["COPY_GRANTS"].render(self.copy_grants)}
-            {self.props["TAGS"].render(self.tags)}
-            {self.props["COMMENT"].render(self.comment)}
-        """.strip()
+        props = self.props_sql()
+        return f"CREATE TABLE {self.fully_qualified_name} () {props}"
+
+    # @property
+    # def sql(self):
+    #     return f"""
+    #         CREATE TABLE {self.fully_qualified_name} ()
+    #         {self.props["DATA_RETENTION_TIME_IN_DAYS"].render(self.data_retention_time_in_days)}
+    #         {self.props["MAX_DATA_EXTENSION_TIME_IN_DAYS"].render(self.max_data_extension_time_in_days)}
+    #         {self.props["CHANGE_TRACKING"].render(self.change_tracking)}
+    #         {self.props["DEFAULT_DDL_COLLATION"].render(self.default_ddl_collation)}
+    #         {self.props["COPY_GRANTS"].render(self.copy_grants)}
+    #         {self.props["TAGS"].render(self.tags)}
+    #         {self.props["COMMENT"].render(self.comment)}
+    #     """.strip()
 
     # https://github.com/python/mypy/issues/5936
     @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]

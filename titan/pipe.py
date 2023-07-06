@@ -17,6 +17,8 @@ class Pipe(SchemaLevelResource):
       AS <copy_statement>
     """
 
+    resource_name = "PIPE"
+
     props = {
         "AUTO_INGEST": BoolProp("AUTO_INGEST"),
         "ERROR_INTEGRATION": IdentifierProp("ERROR_INTEGRATION"),
@@ -49,10 +51,10 @@ class Pipe(SchemaLevelResource):
         as_: Optional[str] = None,
         **kwargs,
     ):
+        super().__init__(**kwargs)
         self.auto_ingest = auto_ingest
         self.error_integration = error_integration
         self.aws_sns_topic = aws_sns_topic
         self.integration = integration
         self.comment = comment
         self.as_ = as_
-        super().__init__(**kwargs)

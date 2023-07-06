@@ -8,7 +8,7 @@ from .props import Identifier, StringProp, TagsProp
 
 # from .grant import UsageGrant
 
-# from .helpers import ParsableEnum
+# from .helpers import ParseableEnum
 
 
 class Role(AccountLevelResource):
@@ -18,8 +18,10 @@ class Role(AccountLevelResource):
       [ COMMENT = '<string_literal>' ]
     """
 
+    resource_name = "ROLE"
+
     props = {
-        "TAG": TagsProp(),
+        "TAGS": TagsProp(),
         "COMMENT": StringProp("COMMENT"),
     }
 

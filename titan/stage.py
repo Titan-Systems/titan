@@ -1,17 +1,19 @@
 import re
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
-from .props import StringProp, TagsProp, Identifier, ParsableEnum, EnumProp, PropList
+from .parseable_enum import ParseableEnum
+from .props import StringProp, TagsProp, Identifier, EnumProp, PropList, IntProp, BoolProp, IdentifierProp
 from .resource import SchemaLevelResource
+from .file_format import FileFormat  # , AnonFileFormatProp
 
 
-class StageType(ParsableEnum):
+class StageType(ParseableEnum):
     INTERNAL = "INTERNAL"
     EXTERNAL = "EXTERNAL"
 
 
-class Encryption(ParsableEnum):
+class EncryptionType(ParseableEnum):
     SNOWFLAKE_FULL = "SNOWFLAKE_FULL"
     SNOWFLAKE_SSE = "SNOWFLAKE_SSE"
     AWS_CSE = "AWS_CSE"
@@ -69,7 +71,19 @@ class Stage(SchemaLevelResource):
       ENDPOINT = '<s3_api_compatible_endpoint>'
       [ { CREDENTIALS = ( AWS_KEY_ID = '<string>' AWS_SECRET_KEY = '<string>' ) } ]
 
+    copyOptions ::=
+         ON_ERROR = { CONTINUE | SKIP_FILE | SKIP_FILE_<num> | 'SKIP_FILE_<num>%' | ABORT_STATEMENT }
+         SIZE_LIMIT = <num>
+         PURGE = TRUE | FALSE
+         RETURN_FAILED_ONLY = TRUE | FALSE
+         MATCH_BY_COLUMN_NAME = CASE_SENSITIVE | CASE_INSENSITIVE | NONE
+         ENFORCE_LENGTH = TRUE | FALSE
+         TRUNCATECOLUMNS = TRUE | FALSE
+         FORCE = TRUE | FALSE
+
     """
+
+    resource_name = "STAGE"
 
     create_statement = re.compile(
         rf"""
@@ -85,16 +99,6 @@ class Stage(SchemaLevelResource):
 
     ownable = True
 
-    # def __init__(
-    #     self, url: Optional[str] = None, tags: List[Tuple[str, str]] = [], comment: Optional[str] = None, **kwargs
-    # ):
-    #     super().__init__(**kwargs)
-    #     self.url = url
-    #     self.tags = tags
-    #     self.comment = comment
-    #     self.stage_type = StageType.EXTERNAL if url else StageType.INTERNAL
-    #     self.hooks = {"on_file_added": None}
-
     def __init__(self, stage_type: Optional[StageType] = None, **kwargs):
         # if type(self) == FileFormat:
         #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
@@ -108,26 +112,38 @@ class Stage(SchemaLevelResource):
         if match is None:
             raise Exception
         name = match.group(1)
-        stage_type = StageType.INTERNAL
-        url = StringProp("URL").search(sql[match.end() :])
-        if url:
-            stage_type = StageType.EXTERNAL
+        # url = StringProp("URL").search(sql[match.end() :])
+        # stage_type = StageType.EXTERNAL if url else StageType.INTERNAL
+        try:
+            props = InternalStage.parse_props(sql[match.end() :])
+            return InternalStage(name=name, **props)
+        except Exception:
+            props = ExternalStage.parse_props(sql[match.end() :])
+            return ExternalStage(name=name, **props)
 
         if stage_type == StageType.INTERNAL:
             props = InternalStage.parse_props(sql[match.end() :])
-            return InternalStage(name, **props)
+            return InternalStage(name=name, **props)
         else:
             props = ExternalStage.parse_props(sql[match.end() :])
-            return ExternalStage(name, **props)
+            return ExternalStage(name=name, **props)
 
-    @property
-    def sql(self):
-        return f"""
-            CREATE STAGE {self.fully_qualified_name}
-            {self.props["URL"].render(self.url)}
-            {self.props["TAGS"].render(self.tags)}
-            {self.props["COMMENT"].render(self.comment)}
-        """.strip()
+    def props_sql(self):
+        props = self.props.copy()
+        del props["FILE_FORMAT"]
+        format_sql = ""
+        if self.file_format:
+            format_sql = ""
+        return self._props_sql(props) + format_sql
+
+    # @property
+    # def sql(self):
+    #     return f"""
+    #         CREATE STAGE {self.fully_qualified_name}
+    #         {self.props["URL"].render(self.url)}
+    #         {self.props["TAGS"].render(self.tags)}
+    #         {self.props["COMMENT"].render(self.comment)}
+    #     """.strip()
 
     # @property
     # def on_file_added(self):
@@ -160,25 +176,92 @@ class Stage(SchemaLevelResource):
     #         )
 
 
+_copy_options = PropList(
+    "COPY_OPTIONS",
+    {
+        "ON_ERROR": StringProp("ON_ERROR"),
+        "SIZE_LIMIT": IntProp("SIZE_LIMIT"),
+        "PURGE": BoolProp("PURGE"),
+        "RETURN_FAILED_ONLY": BoolProp("RETURN_FAILED_ONLY"),
+        # "MATCH_BY_COLUMN_NAME": EnumProp("MATCH_BY_COLUMN_NAME", ["CASE_SENSITIVE", "CASE_INSENSITIVE", "NONE"]),
+        "ENFORCE_LENGTH": BoolProp("ENFORCE_LENGTH"),
+        "TRUNCATECOLUMNS": BoolProp("TRUNCATECOLUMNS"),
+        "FORCE": BoolProp("FORCE"),
+    },
+)
+
+
 class InternalStage(Stage):
+    """
+    directoryTableParams (for internal stages) ::=
+      [ DIRECTORY = ( ENABLE = { TRUE | FALSE }
+                      [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
+    """
+
     props = {
         "ENCRYPTION": PropList(
-            "ENCRYPTION", {"TYPE": EnumProp("TYPE", [Encryption.SNOWFLAKE_FULL, Encryption.SNOWFLAKE_SSE])}
+            "ENCRYPTION",
+            {"TYPE": StringProp("TYPE", valid_values=[EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE])},
         ),
+        "DIRECTORY": PropList(
+            "DIRECTORY", {"ENABLE": BoolProp("ENABLE"), "REFRESH_ON_CREATE": BoolProp("REFRESH_ON_CREATE")}
+        ),
+        "FILE_FORMAT": [
+            IdentifierProp("FILE_FORMAT"),
+            PropList("FILE_FORMAT", {"FORMAT_NAME": IdentifierProp("FORMAT_NAME")}),
+            # AnonFileFormatProp("FILE_FORMAT"),
+        ],
+        "COPY_OPTIONS": _copy_options,
         "TAGS": TagsProp(),
         "COMMENT": StringProp("COMMENT"),
     }
 
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        encryption: Union[None, str, dict, EncryptionType] = None,
+        directory=None,
+        file_format: Union[None, str, FileFormat] = None,
+        copy_options: Optional[dict] = None,
+        tags: List[Tuple[str, str]] = [],
+        comment: Optional[str] = None,
+        **kwargs,
+    ):
         super().__init__(stage_type=StageType.INTERNAL, **kwargs)
+
+        # Default
+        # encryption={type:"SNOWFLAKE_FULL"}
+
+        self.encryption = None
+        if isinstance(encryption, EncryptionType):
+            self.encryption = {"type": encryption}
+        if isinstance(encryption, str):
+            self.encryption = {"type": EncryptionType.parse(encryption)}
+        elif isinstance(encryption, dict):
+            self.encryption = {"type": EncryptionType.parse(encryption.get("type") or encryption.get("TYPE"))}
+
+        self.directory = directory
+        self.file_format = FileFormat.all[file_format] if isinstance(file_format, str) else file_format
+        self.copy_options = copy_options
+        self.tags = tags
+        self.comment = comment
 
 
 class ExternalStage(Stage):
     props = {
         "URL": StringProp("URL"),
+        "DIRECTORY": PropList(
+            "DIRECTORY", {"ENABLE": BoolProp("ENABLE"), "REFRESH_ON_CREATE": BoolProp("REFRESH_ON_CREATE")}
+        ),
+        "FILE_FORMAT": [
+            IdentifierProp("FILE_FORMAT"),
+            PropList("FILE_FORMAT", {"FORMAT_NAME": IdentifierProp("FORMAT_NAME")}),
+            # AnonFileFormatProp("FILE_FORMAT"),
+        ],
+        "COPY_OPTIONS": _copy_options,
         "TAGS": TagsProp(),
         "COMMENT": StringProp("COMMENT"),
     }
 
-    def __init__(self, **kwargs):
-        super().__init__(stage_type=StageType.INTERNAL, **kwargs)
+    def __init__(self, file_format: Union[None, str, FileFormat] = None, **kwargs):
+        super().__init__(stage_type=StageType.EXTERNAL, **kwargs)
+        self.file_format = FileFormat.all[file_format] if isinstance(file_format, str) else file_format

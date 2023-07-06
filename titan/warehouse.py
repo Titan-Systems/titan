@@ -4,16 +4,16 @@ from typing import Union, Optional, List, Tuple
 
 from .resource import AccountLevelResource
 from .resource_monitor import ResourceMonitor
+from .parseable_enum import ParseableEnum
+from .props import Identifier, BoolProp, EnumProp, StringProp, IntProp, TagsProp, IdentifierProp
 
-from .props import Identifier, BoolProp, EnumProp, ParsableEnum, StringProp, IntProp, TagsProp, IdentifierProp
 
-
-class WarehouseType(ParsableEnum):
+class WarehouseType(ParseableEnum):
     STANDARD = "STANDARD"
     SNOWPARK_OPTIMIZED = "SNOWPARK-OPTIMIZED"
 
 
-class WarehouseSize(ParsableEnum):
+class WarehouseSize(ParseableEnum):
     XSMALL = "XSMALL"
     SMALL = "SMALL"
     MEDIUM = "MEDIUM"
@@ -26,7 +26,7 @@ class WarehouseSize(ParsableEnum):
     X6LARGE = "X6LARGE"
 
 
-class WarehouseScalingPolicy(ParsableEnum):
+class WarehouseScalingPolicy(ParseableEnum):
     STANDARD = "STANDARD"
     ECONOMY = "ECONOMY"
 
@@ -57,6 +57,8 @@ class Warehouse(AccountLevelResource):  #
         STATEMENT_TIMEOUT_IN_SECONDS = <num>
         [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
     """
+
+    resource_name = "WAREHOUSE"
 
     props = {
         "WAREHOUSE_TYPE": EnumProp("WAREHOUSE_TYPE", WarehouseType),
@@ -131,24 +133,3 @@ class Warehouse(AccountLevelResource):  #
         self.statement_timeout_in_seconds = statement_timeout_in_seconds
         self.tags = tags
         self.requires(self.resource_monitor)
-
-    @property
-    def sql(self):
-        return f"""
-            CREATE WAREHOUSE {self.fully_qualified_name}
-            {self.props["WAREHOUSE_TYPE"].render(self.warehouse_type)}
-            {self.props["WAREHOUSE_SIZE"].render(self.warehouse_size)}
-            {self.props["MAX_CLUSTER_COUNT"].render(self.max_cluster_count)}
-            {self.props["MIN_CLUSTER_COUNT"].render(self.min_cluster_count)}
-            {self.props["SCALING_POLICY"].render(self.scaling_policy)}
-            {self.props["AUTO_SUSPEND"].render(self.auto_suspend)}
-            {self.props["AUTO_RESUME"].render(self.auto_resume)}
-            {self.props["INITIALLY_SUSPENDED"].render(self.initially_suspended)}
-            {self.props["COMMENT"].render(self.comment)}
-            {self.props["ENABLE_QUERY_ACCELERATION"].render(self.enable_query_acceleration)}
-            {self.props["QUERY_ACCELERATION_MAX_SCALE_FACTOR"].render(self.query_acceleration_max_scale_factor)}
-            {self.props["MAX_CONCURRENCY_LEVEL"].render(self.max_concurrency_level)}
-            {self.props["STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"].render(self.statement_queued_timeout_in_seconds)}
-            {self.props["STATEMENT_TIMEOUT_IN_SECONDS"].render(self.statement_timeout_in_seconds)}
-            {self.props["TAGS"].render(self.tags)}
-        """.strip()
