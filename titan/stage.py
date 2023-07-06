@@ -114,12 +114,13 @@ class Stage(SchemaLevelResource):
         name = match.group(1)
         # url = StringProp("URL").search(sql[match.end() :])
         # stage_type = StageType.EXTERNAL if url else StageType.INTERNAL
-        try:
-            props = InternalStage.parse_props(sql[match.end() :])
-            return InternalStage(name=name, **props)
-        except Exception:
-            props = ExternalStage.parse_props(sql[match.end() :])
-            return ExternalStage(name=name, **props)
+        # try:
+        props = InternalStage.parse_props(sql[match.end() :])
+        return InternalStage(name=name, **props)
+        # except Exception:
+        #     print("&" * 120)
+        #     props = ExternalStage.parse_props(sql[match.end() :])
+        #     return ExternalStage(name=name, **props)
 
         if stage_type == StageType.INTERNAL:
             props = InternalStage.parse_props(sql[match.end() :])
@@ -201,7 +202,7 @@ class InternalStage(Stage):
     props = {
         "ENCRYPTION": PropList(
             "ENCRYPTION",
-            {"TYPE": StringProp("TYPE", valid_values=[EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE])},
+            {"TYPE": EnumProp("TYPE", [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE])},
         ),
         "DIRECTORY": PropList(
             "DIRECTORY", {"ENABLE": BoolProp("ENABLE"), "REFRESH_ON_CREATE": BoolProp("REFRESH_ON_CREATE")}

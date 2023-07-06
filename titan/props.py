@@ -178,7 +178,7 @@ class PropList(Prop):
         # expression = Keyword(name).suppress() + Eq + pp.nested_expr(content=pp.OneOrMore(props))
         # expression = Keyword(name).suppress() + Eq + pp.nested_expr(content=pp.one_of(props, caseless=True, as_keyword=True))
         # expression = Any
-        expression = Keyword(name).suppress() + Eq + parens(Any)
+        expression = Keyword(name).suppress() + Eq + pp.Combine(pp.nested_expr(), adjacent=False, join_string=" ")
         super().__init__(name, expression)
 
     # def validate(self, tokens):
@@ -288,3 +288,52 @@ class QueryProp(Prop):
         if value is None:
             return ""
         return f"{self.name} {value}"
+
+
+def prop_scan(props, sql):
+    if sql.strip() == "":
+        return {}
+    lexicon = []
+    for prop_kwarg, prop_or_list in props.items():
+        if isinstance(prop_or_list, list):
+            prop_list = prop_or_list
+        else:
+            prop_list = [prop_or_list]
+        for prop in prop_list:
+            # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
+            named_marker = pp.Empty().set_parse_action(lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc))
+            lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)  #
+
+    remainder_sql = sql
+    parser = pp.MatchFirst(lexicon)
+    ppt = pp.testing
+    print("-" * 80)
+    print(ppt.with_line_numbers(sql))
+    print("-" * 80)
+    print(parser)
+
+    found_props = {}
+
+    while True:
+        try:
+            tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
+        except pp.ParseException:
+            print(remainder_sql)
+            raise Exception(f"Failed to parse props: {remainder_sql}")
+        # except Exception:
+        #     print("wtf")
+
+        if prop_kwarg == "encryption":
+            # print(prop_kwarg)
+            tokens = prop_scan(props[prop_kwarg.upper()].expected_props, tokens)
+            print(prop_kwarg)
+
+        found_props[prop_kwarg] = tokens
+        print(prop_kwarg, "->", repr(tokens))
+        remainder_sql = remainder_sql[end_index:]
+        if remainder_sql.strip() == "":
+            break
+
+    if len(remainder_sql.strip()) > 0:
+        raise Exception(f"Failed to parse props: {remainder_sql}")
+    return found_props

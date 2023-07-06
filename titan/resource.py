@@ -4,7 +4,7 @@ import re
 
 from typing import TypeVar, Optional, Dict, Type, Set, Union, List, TYPE_CHECKING
 
-from .props import Prop, PropList
+from .props import Prop, PropList, prop_scan
 
 # from .hooks import on_file_added_factory
 
@@ -110,63 +110,8 @@ class Resource:
 
     @classmethod
     def parse_props(cls, sql: str):
-        found_props = {}  # Dict[str, Any]
+        found_props = prop_scan(cls.props, sql)
 
-        # remainder_sql = sql
-        # for prop_name, prop_or_list in cls.props.items():
-        #     props = prop_or_list if isinstance(prop_or_list, list) else [prop_or_list]
-        #     for prop in props:
-        #         # print(sql)
-        #         match = prop.search(remainder_sql)
-        #         if match is not None:
-        #             remainder_sql = re.sub(prop.pattern, "", remainder_sql)
-        #             found_props[prop_name.lower()] = match
-        #             break
-
-        import pyparsing as pp
-
-        lexicon = []
-        for prop_kwarg, prop_or_list in cls.props.items():
-            if isinstance(prop_or_list, list):
-                prop_list = prop_or_list
-            else:
-                prop_list = [prop_or_list]
-            for prop in prop_list:
-                # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
-                named_marker = pp.Empty().set_parse_action(lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc))
-                lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)  #
-
-        remainder_sql = sql
-        parser = pp.MatchFirst(lexicon)
-        ppt = pp.testing
-        print(">", cls.__name__)
-        print("-" * 80)
-        print(ppt.with_line_numbers(sql))
-        print("-" * 80)
-        print(parser)
-        while True:
-            try:
-                tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
-            except pp.ParseException:
-                print(remainder_sql)
-                raise Exception(f"Failed to parse props: {remainder_sql}")
-            except Exception:
-                print("wtf")
-            found_props[prop_kwarg] = tokens
-            print(prop_kwarg, "->", repr(tokens))
-            remainder_sql = remainder_sql[end_index:]
-            if remainder_sql.strip() == "":
-                break
-
-        if sql == " ENCRYPTION = (TYPE = 'SNOWFLAKE_FULL')":
-            print(sql)
-
-        if "comment" in found_props:
-            print(found_props)
-
-        # if len(sql.strip()) > 0:
-        if len(remainder_sql.strip()) > 0:
-            raise Exception(f"Failed to parse props: {remainder_sql}")
         return found_props
 
     @property
