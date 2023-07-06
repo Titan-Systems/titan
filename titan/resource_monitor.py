@@ -35,7 +35,7 @@ class ResourceMonitor(AccountLevelResource):  #
     props = {
         "CREDIT_QUOTA": IntProp("CREDIT_QUOTA"),
         "FREQUENCY": EnumProp("FREQUENCY", ResourceMonitorFrequency),
-        "START_TIMESTAMP": StringProp("START_TIMESTAMP"),
+        "START_TIMESTAMP": StringProp("START_TIMESTAMP", alt_tokens=["IMMEDIATELY"]),
         "END_TIMESTAMP": StringProp("END_TIMESTAMP"),
         "NOTIFY_USERS": IdentifierListProp("NOTIFY_USERS"),
         # "TRIGGERS": TagsProp(),

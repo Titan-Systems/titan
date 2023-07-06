@@ -27,7 +27,7 @@ Boolean = Keyword("TRUE") | Keyword("FALSE")
 Integer = pp.Word(pp.nums)
 
 # Any = Keyword(pp.alphas)  # .set_results_name("any")
-Any = pp.Word(pp.srange("[a-zA-Z0-9_]"))  # pp.srange("[a-zA-Z_]"),
+Any = pp.Word(pp.srange("[a-zA-Z0-9_]")) | pp.sgl_quoted_string  # pp.srange("[a-zA-Z_]"),
 
 
 def parens(expr):
@@ -39,15 +39,14 @@ def strip_quotes(tokens):
 
 
 class Prop:
-    def __init__(self, name, expression, value=None, valid_tokens=[]):
+    def __init__(self, name, expression, value=None):
         self.name = name
         self.expression = expression
         self.value = value
-        self.valid_tokens = valid_tokens
-        self.expression  # .add_parse_action(self.validate)
 
     # TODO: investigate if this needs to exist or if add_condition is sufficient
     def validate(self, tokens):
+        # TODO: use set name instead of first token
         prop_value = tokens[0]
         if self.value is None:
             return prop_value
@@ -67,12 +66,8 @@ class BoolProp(Prop):
         expression = Keyword(name).suppress() + Eq + Any
         # This code fails if using add_parse_action because the parse action is applied every time a BoolProp is
         # initialized. This needs to be replaced with something safer
-        # value = Boolean.set_parse_action(lambda toks: toks[0].upper() == "TRUE")
         value = (Keyword("TRUE") | Keyword("FALSE")).set_parse_action(lambda toks: toks[0].upper() == "TRUE")
         super().__init__(name, expression, value)
-
-    # def validate(self, tokens):
-    #     return super().validate(tokens)
 
     def render(self, value):
         if value is None:
@@ -82,21 +77,18 @@ class BoolProp(Prop):
 
 class IntProp(Prop):
     def __init__(self, name):
-        expression = Keyword(name).suppress() + Eq + Any  # pp.Word(pp.nums)
+        expression = Keyword(name).suppress() + Eq + Any
         # replace with common.integer
-        value = Integer.add_parse_action(common.convert_to_integer)
+        value = Integer().add_parse_action(common.convert_to_integer)
         super().__init__(name, expression, value)
 
 
 class StringProp(Prop):
-    def __init__(self, name, valid_values=[], alt_tokens=[]):
-        expression = Keyword(name).suppress() + Eq + pp.quoted_string  # .add_parse_action(pp.remove_quotes)
-        value = None
+    def __init__(self, name, alt_tokens=[]):
+        expression = Keyword(name).suppress() + Eq + Any
+        value = pp.sgl_quoted_string | pp.one_of(alt_tokens, caseless=True, as_keyword=True)
+        value = value.set_parse_action(strip_quotes)
         super().__init__(name, expression, value)
-        # self.valid_values = valid_values
-
-    # def normalize(self, value):
-    #     return value.strip("'")
 
     def render(self, value):
         if value is None:
@@ -118,8 +110,9 @@ class FlagProp(Prop):
 
 class IdentifierProp(Prop):
     def __init__(self, name):
-        expression = Keyword(name).suppress() + Eq + _Identifier
-        super().__init__(name, expression)
+        expression = Keyword(name).suppress() + Eq + Any
+        value = _Identifier | pp.sgl_quoted_string
+        super().__init__(name, expression, value)
 
     def render(self, value):
         if value is None:
@@ -172,7 +165,6 @@ class StringListProp(Prop):
 
 class PropList(Prop):
     def __init__(self, name, expected_props):
-        # super().__init__(name, rf"{name}\s*=\s*\((.*)\)")
         self.expected_props = expected_props
         props = [prop.expression for prop in expected_props.values()]
         # expression = Keyword(name).suppress() + Eq + pp.nested_expr(content=pp.OneOrMore(props))
@@ -260,12 +252,11 @@ class EnumProp(Prop):
     def __init__(self, name, enum_or_list):
         # enum_or_list: a single enum class or a list of valid enum values
         valid_values = set(enum_or_list)
-        # (Any | pp.sgl_quoted_string).add_parse_action(pp.remove_quotes)
-        expression = Keyword(name).suppress() + Eq + (Any | pp.sgl_quoted_string).add_parse_action(strip_quotes)
+        expression = Keyword(name).suppress() + Eq + Any().add_parse_action(strip_quotes)
         value = pp.one_of([e.value for e in valid_values], caseless=True, as_keyword=True)
+
         super().__init__(name, expression, value)
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
-        # self.valid_values = set(self.enum_type)
 
     def validate(self, tokens):
         return self.enum_type.parse(tokens[0])
@@ -290,7 +281,7 @@ class QueryProp(Prop):
         return f"{self.name} {value}"
 
 
-def prop_scan(props, sql):
+def prop_scan(resource_type, props, sql):
     if sql.strip() == "":
         return {}
     lexicon = []
@@ -319,13 +310,14 @@ def prop_scan(props, sql):
             tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
         except pp.ParseException:
             print(remainder_sql)
-            raise Exception(f"Failed to parse props: {remainder_sql}")
+            raise Exception(f"Failed to parse {resource_type} props [{remainder_sql.strip().splitlines()[0]}]")
+            # raise Exception(f"Failed to parse props: {remainder_sql}")
         # except Exception:
         #     print("wtf")
 
         if prop_kwarg == "encryption":
             # print(prop_kwarg)
-            tokens = prop_scan(props[prop_kwarg.upper()].expected_props, tokens)
+            tokens = prop_scan(resource_type, props[prop_kwarg.upper()].expected_props, tokens)
             print(prop_kwarg)
 
         found_props[prop_kwarg] = tokens

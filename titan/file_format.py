@@ -146,7 +146,7 @@ class FileFormat(SchemaLevelResource, metaclass=ResourceWithDB):
 
     @classmethod
     def parse_anonymous_file_format(cls, sql: str):
-        file_type = EnumProp("TYPE", FileType).search(sql)
+        [file_type] = EnumProp("TYPE", FileType).expression.parse_string(sql)
 
         if file_type is None:
             raise ValueError("No type specified for FILE FORMAT statement")

@@ -4,7 +4,7 @@ import re
 
 from typing import Optional
 
-from .props import BoolProp, IntProp, StringProp, StringListProp, Identifier
+from .props import BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, Identifier
 from .resource import AccountLevelResource
 
 
@@ -88,9 +88,9 @@ class User(AccountLevelResource):
         "DISABLED": BoolProp("DISABLED"),
         "DAYS_TO_EXPIRY": IntProp("DAYS_TO_EXPIRY"),
         "MINS_TO_UNLOCK": IntProp("MINS_TO_UNLOCK"),
-        "DEFAULT_WAREHOUSE": StringProp("DEFAULT_WAREHOUSE"),
+        "DEFAULT_WAREHOUSE": IdentifierProp("DEFAULT_WAREHOUSE"),
         "DEFAULT_NAMESPACE": StringProp("DEFAULT_NAMESPACE"),
-        "DEFAULT_ROLE": StringProp("DEFAULT_ROLE"),
+        "DEFAULT_ROLE": IdentifierProp("DEFAULT_ROLE"),
         "DEFAULT_SECONDARY_ROLES": StringListProp("DEFAULT_SECONDARY_ROLES"),
         "MINS_TO_BYPASS_MFA": IntProp("MINS_TO_BYPASS_MFA"),
         "RSA_PUBLIC_KEY": StringProp("RSA_PUBLIC_KEY"),

@@ -110,7 +110,7 @@ class Resource:
 
     @classmethod
     def parse_props(cls, sql: str):
-        found_props = prop_scan(cls.props, sql)
+        found_props = prop_scan(cls.__name__, cls.props, sql)
 
         return found_props
 
