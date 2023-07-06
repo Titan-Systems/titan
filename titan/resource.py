@@ -95,7 +95,7 @@ class Resource:
         if self.graph and format_spec != "raw":
             self.graph.resource_referenced(self)
 
-        return self.fully_qualified_name()
+        return self.fully_qualified_name
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__}:{self.name}>"

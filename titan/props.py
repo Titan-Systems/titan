@@ -114,10 +114,13 @@ class IdentifierProp(Prop):
         value = _Identifier | pp.sgl_quoted_string
         super().__init__(name, expression, value)
 
+    # def validate(self, tokens):
+    #     return True
+
     def render(self, value):
         if value is None:
             return ""
-        return f"{self.name} = {value.fully_qualified_name}"
+        return f"{self.name} = {value}"  # .fully_qualified_name
 
 
 # class ResourceProp(Prop):
@@ -137,14 +140,8 @@ class IdentifierProp(Prop):
 
 class StringListProp(Prop):
     def __init__(self, name):
-        expression = (
-            Keyword(name).suppress() + Eq + parens(common.comma_separated_list).add_parse_action(pp.remove_quotes)
-        )
+        expression = Keyword(name).suppress() + Eq + parens(common.comma_separated_list).add_parse_action(strip_quotes)
         super().__init__(name, expression)
-
-    def validate(self, tokens):
-        # return [tok.strip("'") for tok in tokens]
-        return tokens
 
     def render(self, values):
         if values:
