@@ -1,4 +1,5 @@
 from titan.app import App
+from titan.blueprint import Blueprint
 
 from .database import Database
 from .role import Role

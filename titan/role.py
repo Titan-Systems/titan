@@ -1,12 +1,13 @@
 import re
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, TYPE_CHECKING
 
 from .resource import AccountLevelResource
 
 from .props import Identifier, StringProp, TagsProp
 
-# from .grant import UsageGrant
+if TYPE_CHECKING:
+    from .grants import PrivGrant
 
 # from .helpers import ParseableEnum
 
@@ -38,11 +39,12 @@ class Role(AccountLevelResource):
 
     def __init__(
         self,
+        name: str,
         tags: List[Tuple[str, str]] = [],
         comment: Optional[str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self.tags = tags
         self.comment = comment
 
@@ -52,6 +54,11 @@ class Role(AccountLevelResource):
     #         grant = UsageGrant(self, res)
     #         grants.append(grant)
     #     return grants
+
+    def grant(self, *grants: "PrivGrant"):
+        for grant in grants:
+            pass
+            # grant.grantee = self
 
     def owns(self, *resources):
         for res in resources:

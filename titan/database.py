@@ -4,7 +4,7 @@ import re
 
 from typing import Union, Optional, List, Tuple
 
-from .resource import AccountLevelResource, ResourceDB
+from .resource import AccountLevelResource, DatabaseLevelResource, ResourceDB
 from .schema import Schema
 from .props import IntProp, StringProp, TagsProp, Identifier
 
@@ -45,6 +45,7 @@ class Database(AccountLevelResource):
 
     def __init__(
         self,
+        name: str,
         data_retention_time_in_days: Optional[int] = None,
         max_data_extension_time_in_days: Optional[int] = None,
         default_ddl_collation: Optional[str] = None,
@@ -52,14 +53,20 @@ class Database(AccountLevelResource):
         comment: Optional[str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self.data_retention_time_in_days = data_retention_time_in_days
         self.max_data_extension_time_in_days = max_data_extension_time_in_days
         self.default_ddl_collation = default_ddl_collation
         self.tags = tags
         self.comment = comment
+
+        # self.database_roles = ResourceDB(DatabaseRole)
         self.schemas = ResourceDB(Schema)
-        self.schemas["PUBLIC"] = Schema(name="PUBLIC", database=self, implicit=True)
+
+        self.add(
+            Schema("PUBLIC", implicit=True),
+            Schema("INFORMATION_SCHEMA", implicit=True),
+        )
 
     @property
     def sql(self):
@@ -71,3 +78,33 @@ class Database(AccountLevelResource):
             {self.props["TAGS"].render(self.tags)}
             {self.props["COMMENT"].render(self.comment)}
         """.strip()
+
+    def add(self, *other_resources: DatabaseLevelResource):
+        for other_resource in other_resources:
+            if not isinstance(other_resource, DatabaseLevelResource):
+                raise TypeError(f"Cannot add {other_resource} to {self}")
+            other_resource.database = self
+            if isinstance(other_resource, Schema):
+                self.schemas[other_resource.name] = other_resource
+            # elif isinstance(other_resource, DatabaseRole):
+            #     self.database_roles[other_resource.name] = other_resource
+            else:
+                raise TypeError(f"Cannot add {other_resource} to {self}")
+
+
+# Lookup
+# db = titan.Database.all["ADMIN"]
+# db = titan.Database.all.get("ADMIN")
+# for db in titan.Database.all:
+#    ...
+
+
+# db = ...
+# db.schemas["PUBLIC"].tables["ORDERS"].columns["ORDER_ID"].grant("READ", "role:ACCOUNTADMIN")
+# db.resources["PUBLIC.ORDERS"]
+# for schema in db.schemas:
+#   ...
+
+# Create
+# db = titan.Database.from_sql("CREATE DATABASE ADMIN").create()
+# db = titan.Database(name="ADMIN").create()

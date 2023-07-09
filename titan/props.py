@@ -98,7 +98,7 @@ class StringProp(Prop):
 
 class FlagProp(Prop):
     def __init__(self, name):
-        expression = Keyword(name)
+        expression = pp.And(Keyword(part) for part in name.split(" "))
         super().__init__(name, expression)
 
     def validate(self, _):
@@ -151,24 +151,11 @@ class StringListProp(Prop):
             return ""
 
 
-# "DIRECTORY": PropList(
-#     "DIRECTORY", {"ENABLE": BoolProp("ENABLE"), "REFRESH_ON_CREATE": BoolProp("REFRESH_ON_CREATE")}
-# ),
-
-# directoryTableParams (for internal stages) ::=
-#   [ DIRECTORY = ( ENABLE = { TRUE | FALSE }
-#                   [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
-
-
-class PropList(Prop):
+class PropSet(Prop):
     def __init__(self, name, expected_props):
-        self.expected_props = expected_props
-        props = [prop.expression for prop in expected_props.values()]
-        # expression = Keyword(name).suppress() + Eq + pp.nested_expr(content=pp.OneOrMore(props))
-        # expression = Keyword(name).suppress() + Eq + pp.nested_expr(content=pp.one_of(props, caseless=True, as_keyword=True))
-        # expression = Any
         expression = Keyword(name).suppress() + Eq + pp.Combine(pp.nested_expr(), adjacent=False, join_string=" ")
         super().__init__(name, expression)
+        self.expected_props = expected_props
 
     # def validate(self, tokens):
     #     # return [tok.strip("'") for tok in tokens]
@@ -221,8 +208,6 @@ class TagsProp(Prop):
 
 class IdentifierListProp(Prop):
     def __init__(self, name):
-        # pp.nested_expr(content=_Identifier)
-        # parens(common.comma_separated_list)
         expression = Keyword(name).suppress() + Eq + parens(pp.Group(pp.delimited_list(_Identifier)))
         value = None  # TODO: validate function should turn identifiers into objects
         super().__init__(name, expression, value)
@@ -233,7 +218,6 @@ class IdentifierListProp(Prop):
 
     def validate(self, tokens):
         return tokens.as_list()
-        # return super().validate(tokens)
 
     def render(self, value):
         if value:
@@ -269,9 +253,6 @@ class QueryProp(Prop):
         expression = AS + pp.Word(pp.printables + " \n")
         super().__init__(name, expression)
 
-    # def normalize(self, value: str) -> str:
-    #     return value.strip("'").upper()
-
     def render(self, value):
         if value is None:
             return ""
@@ -284,36 +265,36 @@ def prop_scan(resource_type, props, sql):
     lexicon = []
     for prop_kwarg, prop_or_list in props.items():
         if isinstance(prop_or_list, list):
-            prop_list = prop_or_list
+            # prop_list = prop_or_list
+            raise Exception("no longer supported")
         else:
             prop_list = [prop_or_list]
         for prop in prop_list:
             # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
             named_marker = pp.Empty().set_parse_action(lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc))
-            lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)  #
+            lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)
 
-    remainder_sql = sql
     parser = pp.MatchFirst(lexicon)
     ppt = pp.testing
     print("-" * 80)
     print(ppt.with_line_numbers(sql))
     print("-" * 80)
-    print(parser)
 
     found_props = {}
-
+    remainder_sql = sql
     while True:
         try:
             tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
         except pp.ParseException:
             print(remainder_sql)
+            # TODO: better error messages
             raise Exception(f"Failed to parse {resource_type} props [{remainder_sql.strip().splitlines()[0]}]")
-            # raise Exception(f"Failed to parse props: {remainder_sql}")
-        # except Exception:
-        #     print("wtf")
 
+        # if prop_kwarg == "encryption":
+        # found_prop = props[prop_kwarg]
+        # TODO: this should be some sort of recursive/nested thing
+        # if isinstance(found_prop, PropSet):
         if prop_kwarg == "encryption":
-            # print(prop_kwarg)
             tokens = prop_scan(resource_type, props[prop_kwarg.upper()].expected_props, tokens)
             print(prop_kwarg)
 
@@ -326,3 +307,19 @@ def prop_scan(resource_type, props, sql):
     if len(remainder_sql.strip()) > 0:
         raise Exception(f"Failed to parse props: {remainder_sql}")
     return found_props
+
+
+class FileFormatProp(Prop):
+    def __init__(self, name):
+        expression = (
+            Keyword(name).suppress()
+            + Eq
+            + parens(StringProp("FORMAT_NAME").expression)  # | AnonFileFormatProp().expression)
+        )
+        value = None
+        super().__init__(name, expression, value)
+
+    def render(self, value):
+        if value is None:
+            return ""
+        return f"{self.name} = ({value.sql})"

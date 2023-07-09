@@ -270,13 +270,16 @@ class PrivGrant(AccountLevelResource):
             )?
             (?P<schema_object>
                 SCHEMA\s+
-                 (?P<schema_object_name>{Identifier.pattern})
+                (?P<schema_object_name>{Identifier.pattern})
             )?
             (?P<schema_object_plural>
-             ALL\ SCHEMAS\ IN\ DATABASE
+                ALL\ SCHEMAS\ IN\ DATABASE
             )?
             (?P<future_schema_object>
                 FUTURE\ SCHEMAS\ IN\ DATABASE
+            )?
+            (?P<class_object>
+                CLASS
             )?
         """,
         re.VERBOSE | re.IGNORECASE,
@@ -296,7 +299,7 @@ class PrivGrant(AccountLevelResource):
         self,
         privs: List[Union[str, T_Priv]],
         on: Optional[Resource],
-        grantee: Union[str, Role],
+        grantee: Union[None, str, Role],
     ):
         grantee_ = grantee if isinstance(grantee, Role) else Role.all[grantee]
         name = ":".join([",".join([str(p) for p in privs]), on.name if on else "account", grantee_.name])

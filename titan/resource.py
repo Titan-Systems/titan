@@ -4,7 +4,7 @@ import re
 
 from typing import TypeVar, Optional, Dict, Type, Set, Union, List, TYPE_CHECKING
 
-from .props import Prop, PropList, prop_scan
+from .props import prop_scan
 
 # from .hooks import on_file_added_factory
 
@@ -37,7 +37,7 @@ class ResourceDB:
             if self._db[key].stub:
                 self._db[key] = value
             else:
-                raise Exception
+                raise Exception("An object already exists with that name")
         # if key not in self._db:
         # self._db[key] = self.resource_class(name=key, implicit=True)
         # return self._db[key]
@@ -119,11 +119,23 @@ class Resource:
         return self.requirements | self.required_by
 
     @property
-    def sql(self):
-        if self.name == "my_int_stage_2":
-            print("")
+    def create_sql(self):
+        if self.resource_name is None:
+            raise Exception(f"Invalid class construction {self.__class__.__name__}")
         props = self.props_sql()
         return f"CREATE {self.resource_name} {self.fully_qualified_name} {props}"
+
+    @property
+    def describe_sql(self):
+        return f"DESCRIBE {self.resource_name} {self.fully_qualified_name}"
+
+    @property
+    def drop_sql(self):
+        return f"DROP {self.resource_name} {self.fully_qualified_name}"
+
+    @property
+    def show_parameters_sql(self):
+        return f"SHOW PARAMETERS FOR {self.resource_name} {self.fully_qualified_name}"
 
     def props_sql(self):
         return self._props_sql(self.props)
@@ -175,10 +187,6 @@ class Resource:
     def fully_qualified_name(self):
         raise NotImplementedError
 
-    def add(self, other_resource):
-        if self.level >= other_resource.level:
-            raise Exception(f"{repr(other_resource)} can't be added to {repr(self)} ")
-
     def finalize(self):
         for res in self.requirements:
             if res.stub:
@@ -190,12 +198,6 @@ class Resource:
 
     def describe_sql(self):
         return f"DESCRIBE {self.resource_name} {self.fully_qualified_name()}"
-
-
-# class Ref(Resource):
-#     def __init__(self, name, resource_class):
-#         self.name = name
-#         self.resource_class = resource_class
 
 
 class OrganizationLevelResource(Resource):
@@ -210,8 +212,8 @@ class AccountLevelResource(Resource, metaclass=ResourceWithDB):
     # __slots__ = ("_account")
     level = 2
 
-    def __init__(self, *args, account: Optional[Account] = None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, name: str, *args, account: Optional[Account] = None, **kwargs):
+        super().__init__(name, *args, **kwargs)
         self.account = account
         self.all[self.name] = self
 
@@ -238,9 +240,11 @@ class AccountLevelResource(Resource, metaclass=ResourceWithDB):
         return self._account
 
     @account.setter
-    def account(self, account_: Optional[Account]):
-        self._account = account_
-        if self._account is not None and not self.stub:
+    def account(self, account: Optional[Account]):
+        if self.stub:
+            raise Exception(f"{repr(self)} is a stub and can't be modified")
+        self._account = account
+        if self._account is not None:
             self.requires(self._account)
 
     @property
@@ -255,8 +259,8 @@ class DatabaseLevelResource(Resource, metaclass=ResourceWithDB):
     # __slots__ = ("_database")
     level = 3
 
-    def __init__(self, database: Optional[Database] = None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, name: str, database: Optional[Database] = None, **kwargs):
+        super().__init__(name, **kwargs)
         self.database = database
 
     def __repr__(self):
@@ -283,8 +287,10 @@ class DatabaseLevelResource(Resource, metaclass=ResourceWithDB):
         return self._database
 
     @database.setter
-    def database(self, database_: Optional[Database]):
-        self._database = database_
+    def database(self, database: Optional[Database]):
+        if self.stub:
+            raise Exception(f"{repr(self)} is a stub and can't be modified")
+        self._database = database
         if self._database is not None:
             self.requires(self._database)
 
@@ -344,8 +350,10 @@ class SchemaLevelResource(Resource):
         return self._schema
 
     @schema.setter
-    def schema(self, schema_: Optional[Schema]):
-        self._schema = schema_
+    def schema(self, schema: Optional[Schema]):
+        if self.stub:
+            raise Exception(f"{repr(self)} is a stub and can't be modified")
+        self._schema = schema
         if self._schema is not None:
             self.requires(self._schema)
 

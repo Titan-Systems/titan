@@ -430,7 +430,7 @@ FileTypeMap = {
 
 class AnonFileFormatProp(Prop):
     def __init__(self, name):
-        # super().__init__(name, rf"{name}\s*=\s*\((.*)\)")
+        name = "FILE_FORMAT"
         expression = None
         value = None
         super().__init__(name, expression, value)

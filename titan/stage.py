@@ -3,9 +3,20 @@ import re
 from typing import List, Optional, Tuple, Union
 
 from .parseable_enum import ParseableEnum
-from .props import StringProp, TagsProp, Identifier, EnumProp, PropList, IntProp, BoolProp, IdentifierProp
+from .props import (
+    StringProp,
+    TagsProp,
+    Identifier,
+    EnumProp,
+    PropSet,
+    IntProp,
+    BoolProp,
+    IdentifierProp,
+    # AnonFileFormatProp,
+    FileFormatProp,
+)
 from .resource import SchemaLevelResource
-from .file_format import FileFormat  # , AnonFileFormatProp
+from .file_format import FileFormat
 
 
 class StageType(ParseableEnum):
@@ -177,7 +188,7 @@ class Stage(SchemaLevelResource):
     #         )
 
 
-_copy_options = PropList(
+_copy_options = PropSet(
     "COPY_OPTIONS",
     {
         "ON_ERROR": StringProp("ON_ERROR"),
@@ -200,16 +211,16 @@ class InternalStage(Stage):
     """
 
     props = {
-        "ENCRYPTION": PropList(
+        "ENCRYPTION": PropSet(
             "ENCRYPTION",
             {"TYPE": EnumProp("TYPE", [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE])},
         ),
-        "DIRECTORY": PropList(
+        "DIRECTORY": PropSet(
             "DIRECTORY", {"ENABLE": BoolProp("ENABLE"), "REFRESH_ON_CREATE": BoolProp("REFRESH_ON_CREATE")}
         ),
         "FILE_FORMAT": [
             IdentifierProp("FILE_FORMAT"),
-            PropList("FILE_FORMAT", {"FORMAT_NAME": IdentifierProp("FORMAT_NAME")}),
+            PropSet("FILE_FORMAT", {"FORMAT_NAME": IdentifierProp("FORMAT_NAME")}),
             # AnonFileFormatProp("FILE_FORMAT"),
         ],
         "COPY_OPTIONS": _copy_options,
@@ -250,12 +261,12 @@ class InternalStage(Stage):
 class ExternalStage(Stage):
     props = {
         "URL": StringProp("URL"),
-        "DIRECTORY": PropList(
+        "DIRECTORY": PropSet(
             "DIRECTORY", {"ENABLE": BoolProp("ENABLE"), "REFRESH_ON_CREATE": BoolProp("REFRESH_ON_CREATE")}
         ),
         "FILE_FORMAT": [
             IdentifierProp("FILE_FORMAT"),
-            PropList("FILE_FORMAT", {"FORMAT_NAME": IdentifierProp("FORMAT_NAME")}),
+            PropSet("FILE_FORMAT", {"FORMAT_NAME": IdentifierProp("FORMAT_NAME")}),
             # AnonFileFormatProp("FILE_FORMAT"),
         ],
         "COPY_OPTIONS": _copy_options,

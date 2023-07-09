@@ -1,11 +1,25 @@
 import re
 
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, TYPE_CHECKING
 
-
-from .props import BoolProp, StringProp, TagsProp, IntProp, FlagProp, IdentifierListProp, Identifier
+from .parseable_enum import ParseableEnum
+from .props import (
+    BoolProp,
+    FlagProp,
+    Identifier,
+    IdentifierListProp,
+    IdentifierProp,
+    IntProp,
+    PropSet,
+    StringProp,
+    TagsProp,
+    FileFormatProp,
+)
 from .resource import SchemaLevelResource
-from .schema import Schema
+
+if TYPE_CHECKING:
+    from .schema import Schema
+
 from .stage import InternalStage
 
 
@@ -14,19 +28,9 @@ class Table(SchemaLevelResource):
     CREATE [ OR REPLACE ]
       [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE | TRANSIENT } ]
       TABLE [ IF NOT EXISTS ] <table_name>
-      ( <col_name> <col_type>
-        [ COLLATE '<collation_specification>' ]
-        [ COMMENT '<string_literal>' ]
-        [ { DEFAULT <expr>
-          | { AUTOINCREMENT | IDENTITY } [ { ( <start_num> , <step_num> ) | START <num> INCREMENT <num> } ] } ]
-        [ NOT NULL ]
-        [ [ WITH ] MASKING POLICY <policy_name> [ USING ( <col_name> , <cond_col1> , ... ) ] ]
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-        [ inlineConstraint ]
-        [ , <col_name> <col_type> [ ... ] ]
-        [ , outoflineConstraint ]
-        [ , ... ] )
+      ( ... )
           [ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
+          [ ENABLE_SCHEMA_EVOLUTION = { TRUE | FALSE } ]
           [ STAGE_FILE_FORMAT = ( { FORMAT_NAME = '<file_format_name>'
                                    | TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ] } ) ]
           [ STAGE_COPY_OPTIONS = ( copyOptions ) ]
@@ -38,33 +42,20 @@ class Table(SchemaLevelResource):
           [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
           [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
           [ COMMENT = '<string_literal>' ]
-
-    inlineConstraint ::=
-      [ CONSTRAINT <constraint_name> ]
-      { UNIQUE | PRIMARY KEY | { [ FOREIGN KEY ] REFERENCES <ref_table_name> [ ( <ref_col_name> ) ] } }
-      [ <constraint_properties> ]
-
-    outoflineConstraint ::=
-      [ CONSTRAINT <constraint_name> ]
-      {
-         UNIQUE [ ( <col_name> [ , <col_name> , ... ] ) ]
-       | PRIMARY KEY [ ( <col_name> [ , <col_name> , ... ] ) ]
-       | [ FOREIGN KEY ] [ ( <col_name> [ , <col_name> , ... ] ) ]
-                         REFERENCES <ref_table_name> [ ( <ref_col_name> [ , <ref_col_name> , ... ] ) ]
-      }
-      [ <constraint_properties> ]
-
     """
 
     props = {
-        "CLUSTER_BY": IdentifierListProp("CLUSTER BY"),
-        "DATA_RETENTION_TIME_IN_DAYS": IntProp("DATA_RETENTION_TIME_IN_DAYS"),
-        "MAX_DATA_EXTENSION_TIME_IN_DAYS": IntProp("MAX_DATA_EXTENSION_TIME_IN_DAYS"),
-        "CHANGE_TRACKING": BoolProp("CHANGE_TRACKING"),
-        "DEFAULT_DDL_COLLATION": StringProp("DEFAULT_DDL_COLLATION"),
-        "COPY_GRANTS": FlagProp("COPY GRANTS"),
-        "TAGS": TagsProp(),
-        "COMMENT": StringProp("COMMENT"),
+        "cluster_by": IdentifierListProp("CLUSTER BY"),
+        "enable_schema_evolution": BoolProp("ENABLE_SCHEMA_EVOLUTION"),
+        "stage_file_format": FileFormatProp("STAGE_FILE_FORMAT"),
+        # STAGE_COPY_OPTIONS
+        "data_retention_time_in_days": IntProp("DATA_RETENTION_TIME_IN_DAYS"),
+        "max_data_extension_time_in_days": IntProp("MAX_DATA_EXTENSION_TIME_IN_DAYS"),
+        "change_tracking": BoolProp("CHANGE_TRACKING"),
+        "default_ddl_collation": StringProp("DEFAULT_DDL_COLLATION"),
+        "copy_grants": FlagProp("COPY GRANTS"),
+        "tags": TagsProp(),
+        "comment": StringProp("COMMENT"),
     }
 
     create_statement = re.compile(
@@ -85,7 +76,9 @@ class Table(SchemaLevelResource):
 
     def __init__(
         self,
+        name: str,
         cluster_by: List[str] = [],
+        enable_schema_evolution: Optional[bool] = None,
         data_retention_time_in_days: Optional[int] = None,
         max_data_extension_time_in_days: Optional[int] = None,
         change_tracking: Optional[bool] = None,
@@ -96,9 +89,10 @@ class Table(SchemaLevelResource):
         autoload: Optional[bool] = False,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
 
         self.cluster_by = cluster_by
+        self.enable_schema_evolution = enable_schema_evolution
         self.data_retention_time_in_days = data_retention_time_in_days
         self.max_data_extension_time_in_days = max_data_extension_time_in_days
         self.change_tracking = change_tracking
@@ -116,26 +110,13 @@ class Table(SchemaLevelResource):
             self.table_stage.schema = self.schema
 
     @property
-    def sql(self):
+    def create_sql(self):
         props = self.props_sql()
         return f"CREATE TABLE {self.fully_qualified_name} () {props}"
 
-    # @property
-    # def sql(self):
-    #     return f"""
-    #         CREATE TABLE {self.fully_qualified_name} ()
-    #         {self.props["DATA_RETENTION_TIME_IN_DAYS"].render(self.data_retention_time_in_days)}
-    #         {self.props["MAX_DATA_EXTENSION_TIME_IN_DAYS"].render(self.max_data_extension_time_in_days)}
-    #         {self.props["CHANGE_TRACKING"].render(self.change_tracking)}
-    #         {self.props["DEFAULT_DDL_COLLATION"].render(self.default_ddl_collation)}
-    #         {self.props["COPY_GRANTS"].render(self.copy_grants)}
-    #         {self.props["TAGS"].render(self.tags)}
-    #         {self.props["COMMENT"].render(self.comment)}
-    #     """.strip()
-
     # https://github.com/python/mypy/issues/5936
     @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]
-    def schema(self, schema_: Optional[Schema]):
+    def schema(self, schema_: Optional["Schema"]):
         self._schema = schema_
         if self._schema is not None:
             self.requires(self._schema)
@@ -164,3 +145,106 @@ class Table(SchemaLevelResource):
     #     """,
     # )
     # pipe.create(session)
+
+
+class ColumnType(ParseableEnum):
+    NUMBER = "NUMBER"
+    DECIMAL = "DECIMAL"
+    NUMERIC = "NUMERIC"
+    INT = "INT"
+    INTEGER = "INTEGER"
+    BIGINT = "BIGINT"
+    SMALLINT = "SMALLINT"
+    TINYINT = "TINYINT"
+    BYTEINT = "BYTEINT"
+    FLOAT = "FLOAT"
+    FLOAT4 = "FLOAT4"
+    FLOAT8 = "FLOAT8"
+    DOUBLE = "DOUBLE"
+    DOUBLE_PRECISION = "DOUBLE PRECISION"
+    REAL = "REAL"
+    VARCHAR = "VARCHAR"
+    CHAR = "CHAR"
+    CHARACTER = "CHARACTER"
+    NCHAR = "NCHAR"
+    STRING = "STRING"
+    TEXT = "TEXT"
+    NVARCHAR = "NVARCHAR"
+    NVARCHAR2 = "NVARCHAR2"
+    CHAR_VARYING = "CHAR VARYING"
+    NCHAR_VARYING = "NCHAR VARYING"
+    BINARY = "BINARY"
+    VARBINARY = "VARBINARY"
+    BOOLEAN = "BOOLEAN"
+    DATE = "DATE"
+    DATETIME = "DATETIME"
+    TIME = "TIME"
+    TIMESTAMP = "TIMESTAMP"
+    TIMESTAMP_LTZ = "TIMESTAMP_LTZ"
+    TIMESTAMP_NTZ = "TIMESTAMP_NTZ"
+    TIMESTAMP_TZ = "TIMESTAMP_TZ"
+    ARRAY = "ARRAY"
+    OBJECT = "OBJECT"
+    VARIANT = "VARIANT"
+    GEOGRAPHY = "GEOGRAPHY"
+    GEOMETRY = "GEOMETRY"
+
+
+class Column:
+    """
+    <col_name> <col_type>
+      [ COLLATE '<collation_specification>' ]
+      [ COMMENT '<string_literal>' ]
+      [ { DEFAULT <expr>
+        | { AUTOINCREMENT | IDENTITY } [ { ( <start_num> , <step_num> ) | START <num> INCREMENT <num> } ] } ]
+      [ NOT NULL ]
+      [ [ WITH ] MASKING POLICY <policy_name> [ USING ( <col_name> , <cond_col1> , ... ) ] ]
+      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+      [ inlineConstraint ]
+      [ , <col_name> <col_type> [ ... ] ]
+      [ , outoflineConstraint ]
+      [ , ... ]
+
+    inlineConstraint ::=
+      [ CONSTRAINT <constraint_name> ]
+      { UNIQUE | PRIMARY KEY | { [ FOREIGN KEY ] REFERENCES <ref_table_name> [ ( <ref_col_name> ) ] } }
+      [ <constraint_properties> ]
+
+    outoflineConstraint ::=
+      [ CONSTRAINT <constraint_name> ]
+      {
+         UNIQUE [ ( <col_name> [ , <col_name> , ... ] ) ]
+       | PRIMARY KEY [ ( <col_name> [ , <col_name> , ... ] ) ]
+       | [ FOREIGN KEY ] [ ( <col_name> [ , <col_name> , ... ] ) ]
+                         REFERENCES <ref_table_name> [ ( <ref_col_name> [ , <ref_col_name> , ... ] ) ]
+      }
+      [ <constraint_properties> ]
+    """
+
+    def __init__(
+        self,
+        name: str,
+        col_type: str,
+        collate: Optional[str] = None,
+        comment: Optional[str] = None,
+        default=None,
+        not_null: Optional[bool] = None,
+        masking_policy=None,
+        tags: List[Tuple[str, str]] = [],
+        **kwargs,
+    ) -> None:
+        self.name = name
+        self.col_type = col_type
+        self.collate = collate
+        self.comment = comment
+        self.default = default
+        self.not_null = not_null
+        self.masking_policy = masking_policy
+        self.tags = tags
+
+
+class Columns:
+    pass
+
+
+# Table("raw_data", columns=)
