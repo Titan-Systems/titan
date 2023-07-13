@@ -8,6 +8,8 @@ Identifier = re.compile(r"[A-Za-z_][A-Za-z0-9_$]*")
 import pyparsing as pp
 from pyparsing import common
 
+from .parseable_enum import ParseableEnum
+
 # from pyparsing.common import convert_to_integer
 
 Keyword = pp.CaselessKeyword
@@ -207,14 +209,14 @@ class TagsProp(Prop):
 
 
 class IdentifierListProp(Prop):
-    def __init__(self, name):
-        expression = Keyword(name).suppress() + Eq + parens(pp.Group(pp.delimited_list(_Identifier)))
+    def __init__(self, name, naked=False):
+        if naked:
+            # This might need to be Any instead of _Identifier
+            expression = Keyword(name).suppress() + pp.Group(pp.delimited_list(_Identifier))
+        else:
+            expression = Keyword(name).suppress() + Eq + parens(pp.Group(pp.delimited_list(_Identifier)))
         value = None  # TODO: validate function should turn identifiers into objects
         super().__init__(name, expression, value)
-
-    # def normalize(self, value):
-    #     identifier_matches = re.findall(Identifier.pattern, value)
-    #     return [match for match in identifier_matches]
 
     def validate(self, tokens):
         return tokens.as_list()
@@ -265,8 +267,8 @@ def prop_scan(resource_type, props, sql):
     lexicon = []
     for prop_kwarg, prop_or_list in props.items():
         if isinstance(prop_or_list, list):
-            # prop_list = prop_or_list
-            raise Exception("no longer supported")
+            prop_list = prop_or_list
+            # raise Exception("no longer supported")
         else:
             prop_list = [prop_or_list]
         for prop in prop_list:
@@ -274,7 +276,7 @@ def prop_scan(resource_type, props, sql):
             named_marker = pp.Empty().set_parse_action(lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc))
             lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)
 
-    parser = pp.MatchFirst(lexicon)
+    parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
     ppt = pp.testing
     print("-" * 80)
     print(ppt.with_line_numbers(sql))
@@ -323,3 +325,114 @@ class FileFormatProp(Prop):
         if value is None:
             return ""
         return f"{self.name} = ({value.sql})"
+
+
+class ExpressionProp(Prop):
+    def __init__(self, name):
+        expression = Keyword(name).suppress() + ... + Keyword("AS").suppress()
+        # + Eq + Any()
+        value = None
+        super().__init__(name, expression, value)
+
+    def render(self, value):
+        if value is None:
+            return ""
+        return f"{self.name} = {value.sql}"
+
+
+class SessionParameter(ParseableEnum):
+    ABORT_DETACHED_QUERY = "ABORT_DETACHED_QUERY"
+    AUTOCOMMIT = "AUTOCOMMIT"
+    AUTOCOMMIT_API_SUPPORTED = "AUTOCOMMIT_API_SUPPORTED"
+    BINARY_INPUT_FORMAT = "BINARY_INPUT_FORMAT"
+    BINARY_OUTPUT_FORMAT = "BINARY_OUTPUT_FORMAT"
+    CLIENT_ENABLE_CONSERVATIVE_MEMORY_USAGE = "CLIENT_ENABLE_CONSERVATIVE_MEMORY_USAGE"
+    CLIENT_ENABLE_DEFAULT_OVERWRITE_IN_PUT = "CLIENT_ENABLE_DEFAULT_OVERWRITE_IN_PUT"
+    CLIENT_ENABLE_LOG_INFO_STATEMENT_PARAMETERS = "CLIENT_ENABLE_LOG_INFO_STATEMENT_PARAMETERS"
+    CLIENT_MEMORY_LIMIT = "CLIENT_MEMORY_LIMIT"
+    CLIENT_METADATA_REQUEST_USE_CONNECTION_CTX = "CLIENT_METADATA_REQUEST_USE_CONNECTION_CTX"
+    CLIENT_METADATA_USE_SESSION_DATABASE = "CLIENT_METADATA_USE_SESSION_DATABASE"
+    CLIENT_PREFETCH_THREADS = "CLIENT_PREFETCH_THREADS"
+    CLIENT_RESULT_CHUNK_SIZE = "CLIENT_RESULT_CHUNK_SIZE"
+    CLIENT_RESULT_COLUMN_CASE_INSENSITIVE = "CLIENT_RESULT_COLUMN_CASE_INSENSITIVE"
+    CLIENT_SESSION_CLONE = "CLIENT_SESSION_CLONE"
+    CLIENT_SESSION_KEEP_ALIVE = "CLIENT_SESSION_KEEP_ALIVE"
+    CLIENT_SESSION_KEEP_ALIVE_HEARTBEAT_FREQUENCY = "CLIENT_SESSION_KEEP_ALIVE_HEARTBEAT_FREQUENCY"
+    CLIENT_TIMESTAMP_TYPE_MAPPING = "CLIENT_TIMESTAMP_TYPE_MAPPING"
+    CSV_TIMESTAMP_FORMAT = "CSV_TIMESTAMP_FORMAT"
+    C_API_QUERY_RESULT_FORMAT = "C_API_QUERY_RESULT_FORMAT"
+    DATE_INPUT_FORMAT = "DATE_INPUT_FORMAT"
+    DATE_OUTPUT_FORMAT = "DATE_OUTPUT_FORMAT"
+    ENABLE_CONSOLE_OUTPUT = "ENABLE_CONSOLE_OUTPUT"
+    ENABLE_UNLOAD_PHYSICAL_TYPE_OPTIMIZATION = "ENABLE_UNLOAD_PHYSICAL_TYPE_OPTIMIZATION"
+    ERROR_ON_NONDETERMINISTIC_MERGE = "ERROR_ON_NONDETERMINISTIC_MERGE"
+    ERROR_ON_NONDETERMINISTIC_UPDATE = "ERROR_ON_NONDETERMINISTIC_UPDATE"
+    GEOGRAPHY_OUTPUT_FORMAT = "GEOGRAPHY_OUTPUT_FORMAT"
+    GEOMETRY_OUTPUT_FORMAT = "GEOMETRY_OUTPUT_FORMAT"
+    GO_QUERY_RESULT_FORMAT = "GO_QUERY_RESULT_FORMAT"
+    JDBC_FORMAT_DATE_WITH_TIMEZONE = "JDBC_FORMAT_DATE_WITH_TIMEZONE"
+    JDBC_QUERY_RESULT_FORMAT = "JDBC_QUERY_RESULT_FORMAT"
+    JDBC_TREAT_DECIMAL_AS_INT = "JDBC_TREAT_DECIMAL_AS_INT"
+    JDBC_TREAT_TIMESTAMP_NTZ_AS_UTC = "JDBC_TREAT_TIMESTAMP_NTZ_AS_UTC"
+    JDBC_USE_SESSION_TIMEZONE = "JDBC_USE_SESSION_TIMEZONE"
+    JSON_INDENT = "JSON_INDENT"
+    JS_TREAT_INTEGER_AS_BIGINT = "JS_TREAT_INTEGER_AS_BIGINT"
+    LANGUAGE = "LANGUAGE"
+    LOCK_TIMEOUT = "LOCK_TIMEOUT"
+    LOG_LEVEL = "LOG_LEVEL"
+    MULTI_STATEMENT_COUNT = "MULTI_STATEMENT_COUNT"
+    ODBC_QUERY_RESULT_FORMAT = "ODBC_QUERY_RESULT_FORMAT"
+    ODBC_SCHEMA_CACHING = "ODBC_SCHEMA_CACHING"
+    ODBC_USE_CUSTOM_SQL_DATA_TYPES = "ODBC_USE_CUSTOM_SQL_DATA_TYPES"
+    PREVENT_UNLOAD_TO_INTERNAL_STAGES = "PREVENT_UNLOAD_TO_INTERNAL_STAGES"
+    PYTHON_CONNECTOR_QUERY_RESULT_FORMAT = "PYTHON_CONNECTOR_QUERY_RESULT_FORMAT"
+    PYTHON_SNOWPARK_USE_SCOPED_TEMP_OBJECTS = "PYTHON_SNOWPARK_USE_SCOPED_TEMP_OBJECTS"
+    PYTHON_SNOWPARK_USE_SQL_SIMPLIFIER = "PYTHON_SNOWPARK_USE_SQL_SIMPLIFIER"
+    QA_TEST_NAME = "QA_TEST_NAME"
+    QUERY_RESULT_FORMAT = "QUERY_RESULT_FORMAT"
+    QUERY_TAG = "QUERY_TAG"
+    QUOTED_IDENTIFIERS_IGNORE_CASE = "QUOTED_IDENTIFIERS_IGNORE_CASE"
+    READ_LATEST_WRITES = "READ_LATEST_WRITES"
+    ROWS_PER_RESULTSET = "ROWS_PER_RESULTSET"
+    S3_STAGE_VPCE_DNS_NAME = "S3_STAGE_VPCE_DNS_NAME"
+    SEARCH_PATH = "SEARCH_PATH"
+    SHOW_EXTERNAL_TABLE_KIND_AS_TABLE = "SHOW_EXTERNAL_TABLE_KIND_AS_TABLE"
+    SIMULATED_DATA_SHARING_CONSUMER = "SIMULATED_DATA_SHARING_CONSUMER"
+    SNOWPARK_HIDE_INTERNAL_ALIAS = "SNOWPARK_HIDE_INTERNAL_ALIAS"
+    SNOWPARK_LAZY_ANALYSIS = "SNOWPARK_LAZY_ANALYSIS"
+    SNOWPARK_REQUEST_TIMEOUT_IN_SECONDS = "SNOWPARK_REQUEST_TIMEOUT_IN_SECONDS"
+    SNOWPARK_STORED_PROC_IS_FINAL_TABLE_QUERY = "SNOWPARK_STORED_PROC_IS_FINAL_TABLE_QUERY"
+    SNOWPARK_USE_SCOPED_TEMP_OBJECTS = "SNOWPARK_USE_SCOPED_TEMP_OBJECTS"
+    SQL_API_NULLABLE_IN_RESULT_SET = "SQL_API_NULLABLE_IN_RESULT_SET"
+    SQL_API_QUERY_RESULT_FORMAT = "SQL_API_QUERY_RESULT_FORMAT"
+    STATEMENT_QUEUED_TIMEOUT_IN_SECONDS = "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"
+    STATEMENT_TIMEOUT_IN_SECONDS = "STATEMENT_TIMEOUT_IN_SECONDS"
+    STRICT_JSON_OUTPUT = "STRICT_JSON_OUTPUT"
+    TIMESTAMP_DAY_IS_ALWAYS_24H = "TIMESTAMP_DAY_IS_ALWAYS_24H"
+    TIMESTAMP_INPUT_FORMAT = "TIMESTAMP_INPUT_FORMAT"
+    TIMESTAMP_LTZ_OUTPUT_FORMAT = "TIMESTAMP_LTZ_OUTPUT_FORMAT"
+    TIMESTAMP_NTZ_OUTPUT_FORMAT = "TIMESTAMP_NTZ_OUTPUT_FORMAT"
+    TIMESTAMP_OUTPUT_FORMAT = "TIMESTAMP_OUTPUT_FORMAT"
+    TIMESTAMP_TYPE_MAPPING = "TIMESTAMP_TYPE_MAPPING"
+    TIMESTAMP_TZ_OUTPUT_FORMAT = "TIMESTAMP_TZ_OUTPUT_FORMAT"
+    TIMEZONE = "TIMEZONE"
+    TIME_INPUT_FORMAT = "TIME_INPUT_FORMAT"
+    TIME_OUTPUT_FORMAT = "TIME_OUTPUT_FORMAT"
+    TRACE_LEVEL = "TRACE_LEVEL"
+    TRANSACTION_ABORT_ON_ERROR = "TRANSACTION_ABORT_ON_ERROR"
+    TRANSACTION_DEFAULT_ISOLATION_LEVEL = "TRANSACTION_DEFAULT_ISOLATION_LEVEL"
+    TWO_DIGIT_CENTURY_START = "TWO_DIGIT_CENTURY_START"
+    UI_QUERY_RESULT_FORMAT = "UI_QUERY_RESULT_FORMAT"
+    UNSUPPORTED_DDL_ACTION = "UNSUPPORTED_DDL_ACTION"
+    USE_CACHED_RESULT = "USE_CACHED_RESULT"
+    WEEK_OF_YEAR_POLICY = "WEEK_OF_YEAR_POLICY"
+    WEEK_START = "WEEK_START"
+
+
+# SESSION_PARAMETERS = {
+#     param.value.lower(): value for param in set(SessionParameter)
+#     }
+
+
+class SessionParametersProp(Prop):
+    pass

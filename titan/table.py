@@ -114,6 +114,10 @@ class Table(SchemaLevelResource):
         props = self.props_sql()
         return f"CREATE TABLE {self.fully_qualified_name} () {props}"
 
+    @property
+    def select_star_sql(self):
+        return f"SELECT * FROM {self.fully_qualified_name}"
+
     # https://github.com/python/mypy/issues/5936
     @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]
     def schema(self, schema_: Optional["Schema"]):

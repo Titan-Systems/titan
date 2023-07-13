@@ -28,8 +28,10 @@ from .role import Role
 from .schema import Schema
 from .stage import Stage
 from .table import Table
+from .task import Task
 from .user import User
 from .warehouse import Warehouse
+
 
 from .policy import Policy, PolicyPack
 
@@ -213,15 +215,16 @@ class App:
             (?:TEMP\s+)?
             (?P<create_kind>(
                 DATABASE |
+                DYNAMIC\s+TABLE |
                 FILE\s+FORMAT |
                 PIPE |
                 RESOURCE\s+MONITOR |
                 ROLE |
                 STAGE |
                 TABLE |
+                TASK |
                 USER |
                 WAREHOUSE |
-                DYNAMIC\s+TABLE |
             ))
         """,
             re.VERBOSE | re.IGNORECASE,
@@ -271,6 +274,8 @@ class App:
                     new_resource = Pipe.from_sql(sql)
                 elif create_kind == "dynamic table":
                     new_resource = DynamicTable.from_sql(sql)
+                elif create_kind == "task":
+                    new_resource = Task.from_sql(sql)
                 else:
                     raise Exception(f"Unknown create kind {create_kind}")
             elif isinstance(stmt, exp.Command) and stmt.this.lower() == "grant":

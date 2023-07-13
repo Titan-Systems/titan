@@ -11,6 +11,8 @@ from .share import Share
 from .user import User
 from .warehouse import Warehouse
 
+from .urn import URN
+
 
 class Account(OrganizationLevelResource):
     resource_name = "ACCOUNT"
@@ -39,6 +41,15 @@ class Account(OrganizationLevelResource):
             Role(name="SECURITYADMIN", implicit=True),
             Role(name="PUBLIC", implicit=True),
             Database(name="SNOWFLAKE", implicit=True),
+        )
+
+    @property
+    def urn(self):
+        """
+        urn:sf:us-central1.gcp::account/UJ63311
+        """
+        return URN(
+            region="us-central1.gcp", resource_type=self.resource_name.lower(), resource_name=self.name
         )
 
     def add(self, *other_resources: AccountLevelResource):

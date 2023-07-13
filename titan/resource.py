@@ -5,6 +5,7 @@ import re
 from typing import TypeVar, Optional, Dict, Type, Set, Union, List, TYPE_CHECKING
 
 from .props import prop_scan
+from .urn import URN
 
 # from .hooks import on_file_added_factory
 
@@ -91,6 +92,7 @@ class Resource:
         # IDEA: Maybe titan should support some format_spec options like mytable:qualified
         # print("__format__", self.__class__, format_spec, self.name, self.graph is None)
         # print("^^^^^", inspect.currentframe().f_back.f_back.f_code.resource_cls)
+        # raise Exception
 
         if self.graph and format_spec != "raw":
             self.graph.resource_referenced(self)
@@ -136,6 +138,14 @@ class Resource:
     @property
     def show_parameters_sql(self):
         return f"SHOW PARAMETERS FOR {self.resource_name} {self.fully_qualified_name}"
+
+    @property
+    def urn(self):
+        """
+        urn:sf:us-central1.gcp::account/UJ63311
+        """
+        resource_type = self.resource_name.lower().replace(" ", "_")
+        return URN("", "", resource_type, self.fully_qualified_name)
 
     def props_sql(self):
         return self._props_sql(self.props)
@@ -239,10 +249,14 @@ class AccountLevelResource(Resource, metaclass=ResourceWithDB):
     def account(self):
         return self._account
 
+    @property
+    def parent(self):
+        return self._account
+
     @account.setter
     def account(self, account: Optional[Account]):
-        if self.stub:
-            raise Exception(f"{repr(self)} is a stub and can't be modified")
+        # if self.stub:
+        #     raise Exception(f"{repr(self)} is a stub and can't be modified")
         self._account = account
         if self._account is not None:
             self.requires(self._account)
@@ -260,6 +274,7 @@ class DatabaseLevelResource(Resource, metaclass=ResourceWithDB):
     level = 3
 
     def __init__(self, name: str, database: Optional[Database] = None, **kwargs):
+        self._database = None
         super().__init__(name, **kwargs)
         self.database = database
 
@@ -286,10 +301,14 @@ class DatabaseLevelResource(Resource, metaclass=ResourceWithDB):
     def database(self) -> Optional[Database]:
         return self._database
 
+    @property
+    def parent(self):
+        return self._database
+
     @database.setter
     def database(self, database: Optional[Database]):
-        if self.stub:
-            raise Exception(f"{repr(self)} is a stub and can't be modified")
+        # if self.stub:
+        #     raise Exception(f"{repr(self)} is a stub and can't be modified")
         self._database = database
         if self._database is not None:
             self.requires(self._database)
@@ -308,8 +327,8 @@ class SchemaLevelResource(Resource):
     # __slots__ = ("_schema")
     level = 4
 
-    def __init__(self, schema: Optional[Schema] = None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, name: str, schema: Optional[Schema] = None, **kwargs):
+        super().__init__(name, **kwargs)
         self.schema = schema
 
     def __repr__(self):
@@ -349,10 +368,14 @@ class SchemaLevelResource(Resource):
     def schema(self) -> Optional[Schema]:
         return self._schema
 
+    @property
+    def parent(self):
+        return self._schema
+
     @schema.setter
     def schema(self, schema: Optional[Schema]):
-        if self.stub:
-            raise Exception(f"{repr(self)} is a stub and can't be modified")
+        # if self.stub:
+        #     raise Exception(f"{repr(self)} is a stub and can't be modified")
         self._schema = schema
         if self._schema is not None:
             self.requires(self._schema)

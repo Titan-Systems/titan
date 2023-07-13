@@ -37,10 +37,15 @@ def plan(path: str):
     print(LOGO, flush=True)
     print(f"      Titan v{__version__}\n")
 
+    app = App(policy=titan_standard)
+
+    if os.path.isfile(path):
+        app.parse_sql(open(path, "r").read())
+        return
+
     # Look for titan config file
     cfg = open_config(path) or {}
 
-    app = App(policy=titan_standard)
     for file in os.listdir(path):
         if file.endswith(".sql"):
             print("^" * 80, file)

@@ -13,6 +13,8 @@ from .schema import Schema
 from .user import User
 from .warehouse import Warehouse
 
+from .urn import URN
+
 
 class RoleGrant(AccountLevelResource):
     """
@@ -62,6 +64,14 @@ class RoleGrant(AccountLevelResource):
     def sql(self):
         grantee_type = "ROLE" if isinstance(self.grantee, Role) else "USER"
         return f"GRANT ROLE {self.role.name} TO {grantee_type} {self.grantee.name}"
+
+    @property
+    def urn(self):
+        """
+        urn:sf:us-central1.gcp:UJ63311:role_grant/
+        """
+
+        return URN("", "", "role_grant", "role:READERS#user:teej")
 
 
 class GlobalPrivs(ParseableEnum):
@@ -234,21 +244,15 @@ class PrivGrant(AccountLevelResource):
         rf"""
             GRANT\s+
             (?P<privs_stmt>.+)
-            (?:\s+PRIVILEGES)?
-            \s+
-            ON
-            \s+
-            (?P<on_stmt>.+)
-            \s+
-            TO
-            \s+
+            (?:\s+PRIVILEGES\s+)?
+            ON\s+
+            (?P<on_stmt>.+)\s+
+            TO\s+
             (?:ROLE\s+)?
             (?P<grantee_role>{Identifier.pattern})
         """,
         re.VERBOSE | re.IGNORECASE,
     )
-
-    # privs_statement = re.compile(rf"""({"|".join([e.value for e in GlobalPrivs])})""")
 
     on_statement = re.compile(
         rf"""
@@ -300,6 +304,7 @@ class PrivGrant(AccountLevelResource):
         privs: List[Union[str, T_Priv]],
         on: Optional[Resource],
         grantee: Union[None, str, Role],
+        with_grant_option: Optional[bool] = None,
     ):
         grantee_ = grantee if isinstance(grantee, Role) else Role.all[grantee]
         name = ":".join([",".join([str(p) for p in privs]), on.name if on else "account", grantee_.name])

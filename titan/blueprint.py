@@ -1,5 +1,12 @@
 class Blueprint:
-    pass
+    def __init__(self, name=None) -> None:
+        self.name = name
+
+    def plan(self, session):
+        pass
+
+    def apply(self, session):
+        pass
 
 
 """

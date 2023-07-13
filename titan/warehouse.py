@@ -61,22 +61,22 @@ class Warehouse(AccountLevelResource):  #
     resource_name = "WAREHOUSE"
 
     props = {
-        "WAREHOUSE_TYPE": EnumProp("WAREHOUSE_TYPE", WarehouseType),
-        "WAREHOUSE_SIZE": EnumProp("WAREHOUSE_SIZE", WarehouseSize),
-        "MAX_CLUSTER_COUNT": IntProp("MAX_CLUSTER_COUNT"),
-        "MIN_CLUSTER_COUNT": IntProp("MIN_CLUSTER_COUNT"),
-        "SCALING_POLICY": EnumProp("SCALING_POLICY", WarehouseScalingPolicy),
-        "AUTO_SUSPEND": IntProp("AUTO_SUSPEND"),  # TODO: find some way to make this nullable
-        "AUTO_RESUME": BoolProp("AUTO_RESUME"),
-        "INITIALLY_SUSPENDED": BoolProp("INITIALLY_SUSPENDED"),
-        "RESOURCE_MONITOR": IdentifierProp("RESOURCE_MONITOR"),
-        "COMMENT": StringProp("COMMENT"),
-        "ENABLE_QUERY_ACCELERATION": BoolProp("ENABLE_QUERY_ACCELERATION"),
-        "QUERY_ACCELERATION_MAX_SCALE_FACTOR": IntProp("QUERY_ACCELERATION_MAX_SCALE_FACTOR"),
-        "MAX_CONCURRENCY_LEVEL": IntProp("MAX_CONCURRENCY_LEVEL"),
-        "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS": IntProp("STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"),
-        "STATEMENT_TIMEOUT_IN_SECONDS": IntProp("STATEMENT_TIMEOUT_IN_SECONDS"),
-        "TAGS": TagsProp(),
+        "warehouse_type": EnumProp("WAREHOUSE_TYPE", WarehouseType),
+        "warehouse_size": EnumProp("WAREHOUSE_SIZE", WarehouseSize),
+        "max_cluster_count": IntProp("MAX_CLUSTER_COUNT"),
+        "min_cluster_count": IntProp("MIN_CLUSTER_COUNT"),
+        "scaling_policy": EnumProp("SCALING_POLICY", WarehouseScalingPolicy),
+        "auto_suspend": IntProp("AUTO_SUSPEND"),  # TODO: find some way to make this nullable
+        "auto_resume": BoolProp("AUTO_RESUME"),
+        "initially_suspended": BoolProp("INITIALLY_SUSPENDED"),
+        "resource_monitor": IdentifierProp("RESOURCE_MONITOR"),
+        "comment": StringProp("COMMENT"),
+        "enable_query_acceleration": BoolProp("ENABLE_QUERY_ACCELERATION"),
+        "query_acceleration_max_scale_factor": IntProp("QUERY_ACCELERATION_MAX_SCALE_FACTOR"),
+        "max_concurrency_level": IntProp("MAX_CONCURRENCY_LEVEL"),
+        "statement_queued_timeout_in_seconds": IntProp("STATEMENT_QUEUED_TIMEOUT_IN_SECONDS"),
+        "statement_timeout_in_seconds": IntProp("STATEMENT_TIMEOUT_IN_SECONDS"),
+        "tags": TagsProp(),
     }
 
     create_statement = re.compile(

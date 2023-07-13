@@ -1,5 +1,5 @@
 [tool.black]
-line-length = 120
+line-length = 110
 target-version = ['py39']
 include = '\.pyi?$'
 extend-exclude = '''
@@ -14,4 +14,4 @@ venvPath = ''
 venv = ''
 
 [tool.ruff]
-line-length = 120
+line-length = 110
