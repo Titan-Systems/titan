@@ -52,6 +52,10 @@ class Account(OrganizationLevelResource):
             region="us-central1.gcp", resource_type=self.resource_name.lower(), resource_name=self.name
         )
 
+    @property
+    def sql(self):
+        return ""
+
     def add(self, *other_resources: AccountLevelResource):
         for other_resource in other_resources:
             if not isinstance(other_resource, AccountLevelResource):

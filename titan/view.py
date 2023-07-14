@@ -29,6 +29,12 @@ class View(SchemaLevelResource):
         "as_": QueryProp("AS"),
     }
 
+    # class Props:
+    #     tags = TagsProp()
+    #     copy_grants = BoolProp("COPY GRANTS")
+    #     comment = StringProp("COMMENT")
+    #     as_ = QueryProp("AS")
+
     create_statement = re.compile(
         rf"""
             CREATE\s+

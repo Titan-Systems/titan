@@ -142,7 +142,9 @@ class IdentifierProp(Prop):
 
 class StringListProp(Prop):
     def __init__(self, name):
-        expression = Keyword(name).suppress() + Eq + parens(common.comma_separated_list).add_parse_action(strip_quotes)
+        expression = (
+            Keyword(name).suppress() + Eq + parens(common.comma_separated_list).add_parse_action(strip_quotes)
+        )
         super().__init__(name, expression)
 
     def render(self, values):
@@ -155,7 +157,9 @@ class StringListProp(Prop):
 
 class PropSet(Prop):
     def __init__(self, name, expected_props):
-        expression = Keyword(name).suppress() + Eq + pp.Combine(pp.nested_expr(), adjacent=False, join_string=" ")
+        expression = (
+            Keyword(name).suppress() + Eq + pp.Combine(pp.nested_expr(), adjacent=False, join_string=" ")
+        )
         super().__init__(name, expression)
         self.expected_props = expected_props
 
@@ -189,7 +193,9 @@ class TagsProp(Prop):
 
     def __init__(self):
         name = "TAGS"
-        expression = WITH + TAG + pp.nested_expr(content=pp.delimited_list(_Identifier + Eq + pp.sgl_quoted_string))
+        expression = (
+            WITH + TAG + pp.nested_expr(content=pp.delimited_list(_Identifier + Eq + pp.sgl_quoted_string))
+        )
         value = None
         super().__init__(name, expression, value)
 
@@ -273,14 +279,16 @@ def prop_scan(resource_type, props, sql):
             prop_list = [prop_or_list]
         for prop in prop_list:
             # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
-            named_marker = pp.Empty().set_parse_action(lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc))
+            named_marker = pp.Empty().set_parse_action(
+                lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc)
+            )
             lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)
 
     parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
-    ppt = pp.testing
-    print("-" * 80)
-    print(ppt.with_line_numbers(sql))
-    print("-" * 80)
+    # ppt = pp.testing
+    # print("-" * 80)
+    # print(ppt.with_line_numbers(sql))
+    # print("-" * 80)
 
     found_props = {}
     remainder_sql = sql
@@ -290,7 +298,9 @@ def prop_scan(resource_type, props, sql):
         except pp.ParseException:
             print(remainder_sql)
             # TODO: better error messages
-            raise Exception(f"Failed to parse {resource_type} props [{remainder_sql.strip().splitlines()[0]}]")
+            raise Exception(
+                f"Failed to parse {resource_type} props [{remainder_sql.strip().splitlines()[0]}]"
+            )
 
         # if prop_kwarg == "encryption":
         # found_prop = props[prop_kwarg]

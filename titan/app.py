@@ -196,7 +196,8 @@ class App:
         self.session.sql("SELECT '[Titan run=0xD34DB33F] end'").collect()
 
     def parse_sql(self, sql_blob: str) -> None:
-        stmts = sqlglot.parse(sql_blob, read="snowflake")
+        # stmts = sqlglot.parse(sql_blob, read="snowflake")
+        stmts = sql_blob.split(";")
         # I tried T_Resource here but there's some issue with binding that I dont understand
         # Dict[str, Optional[Resource]]
         local_state: Dict[str, Optional[Resource]] = {
@@ -231,9 +232,10 @@ class App:
         )
 
         for i, stmt in enumerate(stmts):
-            if stmt is None:
-                continue
-            sql = stmt.sql(dialect="snowflake")
+            # if stmt is None:
+            #     continue
+            # sql = stmt.sql(dialect="snowflake")
+            sql = stmt.strip()
             new_resource: Optional[Resource] = None
 
             if isinstance(stmt, exp.Create):

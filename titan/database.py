@@ -2,14 +2,52 @@ from __future__ import annotations
 
 import re
 
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional, List, Tuple, Dict, ClassVar
 
-from .resource import AccountLevelResource, DatabaseLevelResource, ResourceDB
+from pydantic import BaseModel, ConfigDict
+
+
+from .resource import DatabaseLevelResource, ResourceDB
 from .schema import Schema
-from .props import IntProp, StringProp, TagsProp, Identifier
+from .props import IntProp, StringProp, TagsProp, FlagProp
+
+from .resource2 import Resource
 
 
-class Database(AccountLevelResource):
+class Database(ResourcePydantic):
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
+
+    resource_name = "DATABASE"
+    ownable = True
+    # namespace = Namespace.ACCOUNT
+
+    # create_stmt = StatementParser(
+    #     _="CREATE",
+    #     or_replace="[ OR REPLACE ]",
+    #     transient="[ TRANSIENT ]",
+    #     database="DATABASE",
+    #     name="<name>",
+    #     props="<props>",
+    # )
+    props = Props(
+        transient=FlagProp("transient"),
+        data_retention_time_in_days=IntProp("data_retention_time_in_days"),
+        max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
+        default_ddl_collation=StringProp("default_ddl_collation"),
+        tags=TagsProp(),
+        comment=StringProp("comment"),
+    )
+
+    name: str
+    transient: bool = False
+    data_retention_time_in_days: int = None
+    max_data_extension_time_in_days: int = None
+    default_ddl_collation: str = None
+    tags: Dict[str, str] = {}
+    comment: str = None
+
+    _schemas: ResourceDB
+
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
         [ CLONE <source_db>
@@ -21,63 +59,28 @@ class Database(AccountLevelResource):
         [ COMMENT = '<string_literal>' ]
     """
 
-    props = {
-        "DATA_RETENTION_TIME_IN_DAYS": IntProp("DATA_RETENTION_TIME_IN_DAYS"),
-        "MAX_DATA_EXTENSION_TIME_IN_DAYS": IntProp("MAX_DATA_EXTENSION_TIME_IN_DAYS"),
-        "DEFAULT_DDL_COLLATION": StringProp("DEFAULT_DDL_COLLATION"),
-        "TAGS": TagsProp(),
-        "COMMENT": StringProp("COMMENT"),
-    }
-
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            (?:TRANSIENT\s+)?
-            DATABASE\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
-        """,
-        re.VERBOSE | re.IGNORECASE,
-    )
-
-    ownable = True
-
-    def __init__(
-        self,
-        name: str,
-        data_retention_time_in_days: Optional[int] = None,
-        max_data_extension_time_in_days: Optional[int] = None,
-        default_ddl_collation: Optional[str] = None,
-        tags: List[Tuple[str, str]] = [],
-        comment: Optional[str] = None,
-        **kwargs,
-    ):
-        super().__init__(name, **kwargs)
-        self.data_retention_time_in_days = data_retention_time_in_days
-        self.max_data_extension_time_in_days = max_data_extension_time_in_days
-        self.default_ddl_collation = default_ddl_collation
-        self.tags = tags
-        self.comment = comment
-
-        # self.database_roles = ResourceDB(DatabaseRole)
-        self.schemas = ResourceDB(Schema)
-
+    def model_post_init(self, ctx):
+        self._schemas = ResourceDB(Schema)
         self.add(
             Schema("PUBLIC", implicit=True),
             Schema("INFORMATION_SCHEMA", implicit=True),
         )
 
     @property
-    def sql(self):
-        return f"""
-            CREATE DATABASE {self.fully_qualified_name}
-            {self.props["DATA_RETENTION_TIME_IN_DAYS"].render(self.data_retention_time_in_days)}
-            {self.props["MAX_DATA_EXTENSION_TIME_IN_DAYS"].render(self.max_data_extension_time_in_days)}
-            {self.props["DEFAULT_DDL_COLLATION"].render(self.default_ddl_collation)}
-            {self.props["TAGS"].render(self.tags)}
-            {self.props["COMMENT"].render(self.comment)}
-        """.strip()
+    def schemas(self):
+        return self._schemas
+
+    # create_statement = re.compile(
+    #     rf"""
+    #         CREATE\s+
+    #         (?:OR\s+REPLACE\s+)?
+    #         (?:TRANSIENT\s+)?
+    #         DATABASE\s+
+    #         (?:IF\s+NOT\s+EXISTS\s+)?
+    #         ({Identifier.pattern})
+    #     """,
+    #     re.VERBOSE | re.IGNORECASE,
+    # )
 
     def add(self, *other_resources: DatabaseLevelResource):
         for other_resource in other_resources:

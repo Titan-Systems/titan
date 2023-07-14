@@ -6,6 +6,7 @@ from typing import TypeVar, Optional, Dict, Type, Set, Union, List, TYPE_CHECKIN
 
 from .props import prop_scan
 from .urn import URN
+from .sql import SQL, add_ref
 
 # from .hooks import on_file_added_factory
 
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from .schema import Schema
     from .resource_graph import ResourceGraph
     from .props import Prop
+
 
 T_Resource = TypeVar("T_Resource", bound="Resource")
 
@@ -91,12 +93,11 @@ class Resource:
     def __format__(self, format_spec):
         # IDEA: Maybe titan should support some format_spec options like mytable:qualified
         # print("__format__", self.__class__, format_spec, self.name, self.graph is None)
-        # print("^^^^^", inspect.currentframe().f_back.f_back.f_code.resource_cls)
-        # raise Exception
 
-        if self.graph and format_spec != "raw":
-            self.graph.resource_referenced(self)
+        # if self.graph and format_spec != "raw":
+        #     self.graph.resource_referenced(self)
 
+        add_ref(self)
         return self.fully_qualified_name
 
     def __repr__(self) -> str:
@@ -182,8 +183,8 @@ class Resource:
         # This allows None resources but that would be a type violation
         if not any(resources):
             return
-        if self.stub:
-            raise Exception(f"{repr(self)} is a stub and can't require other resources")
+        # if self.stub:
+        #     raise Exception(f"{repr(self)} is a stub and can't require other resources")
 
         for resource in resources:
             if not isinstance(resource, Resource):
@@ -288,6 +289,7 @@ class DatabaseLevelResource(Resource, metaclass=ResourceWithDB):
     def from_sql(cls: Type[T_DatabaseLevelResource], sql: str) -> T_DatabaseLevelResource:
         if not cls.create_statement:
             raise Exception(f"{cls.__name__} does not have a create_statement")
+
         # There needs to be conflict resolution here
         match = re.search(cls.create_statement, sql)
 
@@ -342,9 +344,23 @@ class SchemaLevelResource(Resource):
         return f"<{i}{type(self).__name__}:{db}.{schema}.{self.name}>"
 
     @classmethod
-    def from_sql(cls: Type[T_SchemaLevelResource], sql: str) -> T_SchemaLevelResource:
+    def from_sql(cls: Type[T_SchemaLevelResource], str_or_sql: str) -> T_SchemaLevelResource:
         if not cls.create_statement:
             raise Exception(f"{cls.__name__} does not have a create_statement")
+
+        # import inspect
+
+        # print("^", inspect.currentframe())
+        # print("^^", inspect.currentframe().f_back)
+        # print("^^^", inspect.currentframe().f_back.f_back)
+
+        if isinstance(str_or_sql, str):
+            sql = str_or_sql
+            refs = []
+        if isinstance(str_or_sql, SQL):
+            sql = str(str_or_sql)
+            refs = str_or_sql.refs
+
         # There needs to be conflict resolution here
         match = re.search(cls.create_statement, sql)
 
@@ -352,7 +368,9 @@ class SchemaLevelResource(Resource):
             raise Exception
         name = match.group(1)
         props = cls.parse_props(sql[match.end() :])
-        return cls(name=name, **props)
+        res = cls(name=name, **props)
+        res.requires(*refs)
+        return res
 
     @property
     def database(self) -> Optional[Database]:
