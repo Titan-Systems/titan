@@ -53,7 +53,8 @@ class App:
         self.account = account if isinstance(account, Account) else Account(name=account)
         self.resources.add(self.account)
 
-        database_ = Database.all[database]
+        # database_ = Database.all[database]
+        database_ = Database.find(database)
         if database_:
             self.resources.add(database_)
 

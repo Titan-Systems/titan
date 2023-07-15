@@ -13,12 +13,12 @@
             "justMyCode": true
         },
         {
-            "name": "Python: Module",
+            "name": "SQL Tests",
             "type": "python",
             "request": "launch",
             "module": "titan",
             "args": [
-                "plan",
+                "test",
                 "/Users/teej/Code/titan-examples/tests"
             ],
             "justMyCode": true

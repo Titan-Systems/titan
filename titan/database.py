@@ -1,34 +1,25 @@
-from __future__ import annotations
+from typing import Dict
 
-import re
-
-from typing import Union, Optional, List, Tuple, Dict, ClassVar
-
-from pydantic import BaseModel, ConfigDict
-
-
-from .resource import DatabaseLevelResource, ResourceDB
 from .schema import Schema
-from .props import IntProp, StringProp, TagsProp, FlagProp
+from .props import Props, IntProp, StringProp, TagsProp, FlagProp
 
-from .resource2 import Resource
+from .resource2 import Resource, Namespace, ResourceDB
 
 
-class Database(ResourcePydantic):
-    model_config = ConfigDict(from_attributes=True, extra="forbid")
+class Database(Resource):
+    """
+    CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
+        [ CLONE <source_db>
+                [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> } ) ] ]
+        [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
+        [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
+        [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
+        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+        [ COMMENT = '<string_literal>' ]
+    """
 
-    resource_name = "DATABASE"
-    ownable = True
-    # namespace = Namespace.ACCOUNT
-
-    # create_stmt = StatementParser(
-    #     _="CREATE",
-    #     or_replace="[ OR REPLACE ]",
-    #     transient="[ TRANSIENT ]",
-    #     database="DATABASE",
-    #     name="<name>",
-    #     props="<props>",
-    # )
+    resource_type = "DATABASE"
+    namespace = Namespace.ACCOUNT
     props = Props(
         transient=FlagProp("transient"),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
@@ -40,6 +31,7 @@ class Database(ResourcePydantic):
 
     name: str
     transient: bool = False
+    owner: str = None
     data_retention_time_in_days: int = None
     max_data_extension_time_in_days: int = None
     default_ddl_collation: str = None
@@ -48,66 +40,26 @@ class Database(ResourcePydantic):
 
     _schemas: ResourceDB
 
-    """
-    CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
-        [ CLONE <source_db>
-              [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> } ) ] ]
-        [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
-        [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
-        [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-        [ COMMENT = '<string_literal>' ]
-    """
-
     def model_post_init(self, ctx):
+        super().model_post_init(ctx)
         self._schemas = ResourceDB(Schema)
         self.add(
-            Schema("PUBLIC", implicit=True),
-            Schema("INFORMATION_SCHEMA", implicit=True),
+            Schema(name="PUBLIC", implicit=True),
+            Schema(name="INFORMATION_SCHEMA", implicit=True),
         )
 
     @property
     def schemas(self):
         return self._schemas
 
-    # create_statement = re.compile(
-    #     rf"""
-    #         CREATE\s+
-    #         (?:OR\s+REPLACE\s+)?
-    #         (?:TRANSIENT\s+)?
-    #         DATABASE\s+
-    #         (?:IF\s+NOT\s+EXISTS\s+)?
-    #         ({Identifier.pattern})
-    #     """,
-    #     re.VERBOSE | re.IGNORECASE,
-    # )
-
-    def add(self, *other_resources: DatabaseLevelResource):
+    def add(self, *other_resources: Resource):
         for other_resource in other_resources:
-            if not isinstance(other_resource, DatabaseLevelResource):
+            if other_resource.namespace and other_resource.namespace != Namespace.DATABASE:
                 raise TypeError(f"Cannot add {other_resource} to {self}")
-            other_resource.database = self
+            # other_resource.database = self
             if isinstance(other_resource, Schema):
                 self.schemas[other_resource.name] = other_resource
             # elif isinstance(other_resource, DatabaseRole):
             #     self.database_roles[other_resource.name] = other_resource
             else:
                 raise TypeError(f"Cannot add {other_resource} to {self}")
-
-
-# Lookup
-# db = titan.Database.all["ADMIN"]
-# db = titan.Database.all.get("ADMIN")
-# for db in titan.Database.all:
-#    ...
-
-
-# db = ...
-# db.schemas["PUBLIC"].tables["ORDERS"].columns["ORDER_ID"].grant("READ", "role:ACCOUNTADMIN")
-# db.resources["PUBLIC.ORDERS"]
-# for schema in db.schemas:
-#   ...
-
-# Create
-# db = titan.Database.from_sql("CREATE DATABASE ADMIN").create()
-# db = titan.Database(name="ADMIN").create()

@@ -1,14 +1,12 @@
-from __future__ import annotations
+from typing import Dict
 
-import re
+from .props import Props, BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, TagsProp
 
-from typing import Optional
-
-from .props import BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, Identifier
-from .resource import AccountLevelResource
+# from .resource import AccountLevelResource
+from .resource2 import Resource, Namespace, ResourceDB
 
 
-class User(AccountLevelResource):
+class User(Resource):
     """
     CREATE [ OR REPLACE ] USER [ IF NOT EXISTS ] <name>
         [ objectProperties ]
@@ -74,112 +72,51 @@ class User(AccountLevelResource):
         WEEK_START = <num>
     """
 
-    resource_name = "USER"
-
-    props = {
-        "PASSWORD": StringProp("PASSWORD"),
-        "LOGIN_NAME": StringProp("LOGIN_NAME"),
-        "DISPLAY_NAME": StringProp("DISPLAY_NAME"),
-        "FIRST_NAME": StringProp("FIRST_NAME"),
-        "MIDDLE_NAME": StringProp("MIDDLE_NAME"),
-        "LAST_NAME": StringProp("LAST_NAME"),
-        "EMAIL": StringProp("EMAIL"),
-        "MUST_CHANGE_PASSWORD": BoolProp("MUST_CHANGE_PASSWORD"),
-        "DISABLED": BoolProp("DISABLED"),
-        "DAYS_TO_EXPIRY": IntProp("DAYS_TO_EXPIRY"),
-        "MINS_TO_UNLOCK": IntProp("MINS_TO_UNLOCK"),
-        "DEFAULT_WAREHOUSE": IdentifierProp("DEFAULT_WAREHOUSE"),
-        "DEFAULT_NAMESPACE": StringProp("DEFAULT_NAMESPACE"),
-        "DEFAULT_ROLE": IdentifierProp("DEFAULT_ROLE"),
-        "DEFAULT_SECONDARY_ROLES": StringListProp("DEFAULT_SECONDARY_ROLES"),
-        "MINS_TO_BYPASS_MFA": IntProp("MINS_TO_BYPASS_MFA"),
-        "RSA_PUBLIC_KEY": StringProp("RSA_PUBLIC_KEY"),
-        "RSA_PUBLIC_KEY_2": StringProp("RSA_PUBLIC_KEY_2"),
-        "COMMENT": StringProp("COMMENT"),
-        "NETWORK_POLICY": StringProp("NETWORK_POLICY"),
-    }
-
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            USER\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
-        """,
-        re.IGNORECASE | re.VERBOSE,
+    resource_type = "USER"
+    namespace = Namespace.ACCOUNT
+    props = Props(
+        password=StringProp("password"),
+        login_name=StringProp("login_name"),
+        display_name=StringProp("display_name"),
+        first_name=StringProp("first_name"),
+        middle_name=StringProp("middle_name"),
+        last_name=StringProp("last_name"),
+        email=StringProp("email"),
+        must_change_password=BoolProp("must_change_password"),
+        disabled=BoolProp("disabled"),
+        days_to_expiry=IntProp("days_to_expiry"),
+        mins_to_unlock=IntProp("mins_to_unlock"),
+        default_warehouse=IdentifierProp("default_warehouse"),
+        default_namespace=StringProp("default_namespace"),
+        default_role=IdentifierProp("default_role"),
+        default_secondary_roles=StringListProp("default_secondary_roles"),
+        mins_to_bypass_mfa=IntProp("mins_to_bypass_mfa"),
+        rsa_public_key=StringProp("rsa_public_key"),
+        rsa_public_key_2=StringProp("rsa_public_key_2"),
+        comment=StringProp("comment"),
+        network_policy=StringProp("network_policy"),
+        tags=TagsProp(),
     )
 
-    ownable = True
-
-    def __init__(
-        self,
-        password: Optional[str] = None,
-        login_name: Optional[str] = None,
-        display_name: Optional[str] = None,
-        first_name: Optional[str] = None,
-        middle_name: Optional[str] = None,
-        last_name: Optional[str] = None,
-        email: Optional[str] = None,
-        must_change_password: Optional[bool] = None,
-        disabled: Optional[bool] = None,
-        days_to_expiry: Optional[int] = None,
-        mins_to_unlock: Optional[int] = None,
-        default_warehouse: Optional[str] = None,
-        default_namespace: Optional[str] = None,
-        default_role: Optional[str] = None,
-        default_secondary_roles: Optional[str] = None,
-        mins_to_bypass_mfa: Optional[int] = None,
-        rsa_public_key: Optional[str] = None,
-        rsa_public_key_2: Optional[str] = None,
-        comment: Optional[str] = None,
-        network_policy: Optional[str] = None,
-        **kwargs,
-    ):
-        self.password = password
-        self.login_name = login_name
-        self.display_name = display_name
-        self.first_name = first_name
-        self.middle_name = middle_name
-        self.last_name = last_name
-        self.email = email
-        self.must_change_password = must_change_password
-        self.disabled = disabled
-        self.days_to_expiry = days_to_expiry
-        self.mins_to_unlock = mins_to_unlock
-        self.default_warehouse = default_warehouse
-        self.default_namespace = default_namespace
-        self.default_role = default_role
-        self.default_secondary_roles = default_secondary_roles
-        self.mins_to_bypass_mfa = mins_to_bypass_mfa
-        self.rsa_public_key = rsa_public_key
-        self.rsa_public_key_2 = rsa_public_key_2
-        self.comment = comment
-        self.network_policy = network_policy
-        super().__init__(**kwargs)
-
-    # @property
-    # def sql(self):
-    #     return f"""
-    #         CREATE USER {self.fully_qualified_name}
-    #         {self.props["PASSWORD"].render(self.password)}
-    #         {self.props["LOGIN_NAME"].render(self.login_name)}
-    #         {self.props["DISPLAY_NAME"].render(self.display_name)}
-    #         {self.props["FIRST_NAME"].render(self.first_name)}
-    #         {self.props["MIDDLE_NAME"].render(self.middle_name)}
-    #         {self.props["LAST_NAME"].render(self.last_name)}
-    #         {self.props["EMAIL"].render(self.email)}
-    #         {self.props["MUST_CHANGE_PASSWORD"].render(self.must_change_password)}
-    #         {self.props["DISABLED"].render(self.disabled)}
-    #         {self.props["DAYS_TO_EXPIRY"].render(self.days_to_expiry)}
-    #         {self.props["MINS_TO_UNLOCK"].render(self.mins_to_unlock)}
-    #         {self.props["DEFAULT_WAREHOUSE"].render(self.default_warehouse)}
-    #         {self.props["DEFAULT_NAMESPACE"].render(self.default_namespace)}
-    #         {self.props["DEFAULT_ROLE"].render(self.default_role)}
-    #         {self.props["DEFAULT_SECONDARY_ROLES"].render(self.default_secondary_roles)}
-    #         {self.props["MINS_TO_BYPASS_MFA"].render(self.mins_to_bypass_mfa)}
-    #         {self.props["RSA_PUBLIC_KEY"].render(self.rsa_public_key)}
-    #         {self.props["RSA_PUBLIC_KEY_2"].render(self.rsa_public_key_2)}
-    #         {self.props["COMMENT"].render(self.comment)}
-    #         {self.props["NETWORK_POLICY"].render(self.network_policy)}
-    #     """.strip()
+    name: str
+    password: str = None
+    login_name: str = None
+    display_name: str = None
+    first_name: str = None
+    middle_name: str = None
+    last_name: str = None
+    email: str = None
+    must_change_password: bool = None
+    disabled: bool = None
+    days_to_expiry: int = None
+    mins_to_unlock: int = None
+    default_warehouse: str = None
+    default_namespace: str = None
+    default_role: str = None
+    default_secondary_roles: str = None
+    mins_to_bypass_mfa: int = None
+    rsa_public_key: str = None
+    rsa_public_key_2: str = None
+    comment: str = None
+    network_policy: str = None
+    tags: Dict[str, str] = {}

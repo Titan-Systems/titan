@@ -1,9 +1,6 @@
-import re
+from typing import Dict
 
-from typing import Optional, List, Tuple
-
-from .resource import DatabaseLevelResource, SchemaLevelResource, ResourceDB
-from .props import IntProp, StringProp, TagsProp, FlagProp, Identifier
+from .props import IntProp, StringProp, TagsProp, FlagProp, Props
 
 from .dynamic_table import DynamicTable
 from .file_format import FileFormat
@@ -13,8 +10,10 @@ from .stage import Stage
 from .table import Table
 from .view import View
 
+from .resource2 import Resource, Namespace, ResourceDB
 
-class Schema(DatabaseLevelResource):
+
+class Schema(Resource):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] SCHEMA [ IF NOT EXISTS ] <name>
       [ CLONE <source_schema>
@@ -27,70 +26,80 @@ class Schema(DatabaseLevelResource):
       [ COMMENT = '<string_literal>' ]
     """
 
-    props = {
-        "with_managed_access": FlagProp("WITH MANAGED ACCESS"),
-        "data_retention_time_in_days": IntProp("DATA_RETENTION_TIME_IN_DAYS"),
-        "max_data_extension_time_in_days": IntProp("MAX_DATA_EXTENSION_TIME_IN_DAYS"),
-        "default_ddl_collation": StringProp("DEFAULT_DDL_COLLATION"),
-        "tags": TagsProp(),
-        "comment": StringProp("COMMENT"),
-    }
-
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            (?:TRANSIENT\s+)?
-            SCHEMA\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
-        """,
-        re.VERBOSE | re.IGNORECASE,
+    resource_type = "SCHEMA"
+    namespace = Namespace.DATABASE
+    props = Props(
+        transient=FlagProp("transient"),
+        with_managed_access=FlagProp("with managed access"),
+        data_retention_time_in_days=IntProp("data_retention_time_in_days"),
+        max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
+        default_ddl_collation=StringProp("default_ddl_collation"),
+        tags=TagsProp(),
+        comment=StringProp("comment"),
     )
 
-    ownable = True
+    name: str
+    transient: bool = False
+    owner: str = None
+    with_managed_access: bool = False
+    data_retention_time_in_days: int = None
+    max_data_extension_time_in_days: int = None
+    default_ddl_collation: str = None
+    tags: Dict[str, str] = {}
+    comment: str = None
 
-    def __init__(
-        self,
-        name: str,
-        with_managed_access: Optional[bool] = None,
-        data_retention_time_in_days: Optional[int] = None,
-        max_data_extension_time_in_days: Optional[int] = None,
-        default_ddl_collation: Optional[str] = None,
-        tags: List[Tuple[str, str]] = [],
-        comment: Optional[str] = None,
-        **kwargs,
-    ):
-        super().__init__(name, **kwargs)
-        self.with_managed_access = with_managed_access
-        self.data_retention_time_in_days = data_retention_time_in_days
-        self.max_data_extension_time_in_days = max_data_extension_time_in_days
-        self.default_ddl_collation = default_ddl_collation
-        self.tags = tags
-        self.comment = comment
+    _dynamic_tables: ResourceDB
+    _file_formats: ResourceDB
+    _pipes: ResourceDB
+    _sprocs: ResourceDB
+    _stages: ResourceDB
+    _tables: ResourceDB
+    _views: ResourceDB
 
-        self.dynamic_tables = ResourceDB(DynamicTable)
-        self.file_formats = ResourceDB(FileFormat)
-        self.pipes = ResourceDB(Pipe)
-        self.sprocs = ResourceDB(Sproc)
-        self.stages = ResourceDB(Stage)
-        self.tables = ResourceDB(Table)
-        self.views = ResourceDB(View)
+    def model_post_init(self, ctx):
+        super().model_post_init(ctx)
+
+        self._dynamic_tables = ResourceDB(DynamicTable)
+        self._file_formats = ResourceDB(FileFormat)
+        self._pipes = ResourceDB(Pipe)
+        self._sprocs = ResourceDB(Sproc)
+        self._stages = ResourceDB(Stage)
+        self._tables = ResourceDB(Table)
+        self._views = ResourceDB(View)
 
     @property
-    def sql(self):
-        return f"""
-            CREATE SCHEMA {self.fully_qualified_name}
-            {self.props["WITH_MANAGED_ACCESS"].render(self.with_managed_access)}
-            {self.props["DATA_RETENTION_TIME_IN_DAYS"].render(self.data_retention_time_in_days)}
-            {self.props["MAX_DATA_EXTENSION_TIME_IN_DAYS"].render(self.max_data_extension_time_in_days)}
-            {self.props["DEFAULT_DDL_COLLATION"].render(self.default_ddl_collation)}
-            {self.props["TAGS"].render(self.tags)}
-            {self.props["COMMENT"].render(self.comment)}
-        """.strip()
+    def dynamic_tables(self):
+        return self._dynamic_tables
 
-    def add(self, *other_resources: SchemaLevelResource):
+    @property
+    def file_formats(self):
+        return self._file_formats
+
+    @property
+    def pipes(self):
+        return self._pipes
+
+    @property
+    def sprocs(self):
+        return self._sprocs
+
+    @property
+    def stages(self):
+        return self._stages
+
+    @property
+    def tables(self):
+        return self._tables
+
+    @property
+    def views(self):
+        return self._views
+
+    def add(self, *other_resources: Resource):
         for other_resource in other_resources:
-            if not isinstance(other_resource, SchemaLevelResource):
+            if other_resource.namespace and other_resource.namespace != Namespace.SCHEMA:
                 raise TypeError(f"Cannot add {other_resource} to {self}")
-            other_resource.schema = self
+            if isinstance(other_resource, View):
+                self.views[other_resource.name] = other_resource
+            else:
+                raise TypeError(f"Cannot add {other_resource} to {self}")

@@ -58,9 +58,10 @@ class Account(OrganizationLevelResource):
 
     def add(self, *other_resources: AccountLevelResource):
         for other_resource in other_resources:
-            if not isinstance(other_resource, AccountLevelResource):
-                raise TypeError(f"Cannot add {other_resource} to {self}")
-            other_resource.account = self
+            # if not isinstance(other_resource, AccountLevelResource):
+            #     if other_resource.namespace and other_resource.namespace != Namespace.ACCOUNT:
+            #         raise TypeError(f"Cannot add {other_resource} to {self}")
+            # other_resource.account = self
             if isinstance(other_resource, Database):
                 self.databases[other_resource.name] = other_resource
             elif isinstance(other_resource, ResourceMonitor):

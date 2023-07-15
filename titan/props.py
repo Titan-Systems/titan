@@ -267,58 +267,63 @@ class QueryProp(Prop):
         return f"{self.name} {value}"
 
 
-def prop_scan(resource_type, props, sql):
-    if sql.strip() == "":
-        return {}
-    lexicon = []
-    for prop_kwarg, prop_or_list in props.items():
-        if isinstance(prop_or_list, list):
-            prop_list = prop_or_list
-            # raise Exception("no longer supported")
-        else:
-            prop_list = [prop_or_list]
-        for prop in prop_list:
-            # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
-            named_marker = pp.Empty().set_parse_action(
-                lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc)
-            )
-            lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)
+# def prop_scan(resource_type, props, sql):
 
-    parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
-    # ppt = pp.testing
-    # print("-" * 80)
-    # print(ppt.with_line_numbers(sql))
-    # print("-" * 80)
 
-    found_props = {}
-    remainder_sql = sql
-    while True:
-        try:
-            tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
-        except pp.ParseException:
-            print(remainder_sql)
-            # TODO: better error messages
-            raise Exception(
-                f"Failed to parse {resource_type} props [{remainder_sql.strip().splitlines()[0]}]"
-            )
+class Props:
+    def __init__(self, **props):
+        self.props = props
 
-        # if prop_kwarg == "encryption":
-        # found_prop = props[prop_kwarg]
-        # TODO: this should be some sort of recursive/nested thing
-        # if isinstance(found_prop, PropSet):
-        if prop_kwarg == "encryption":
-            tokens = prop_scan(resource_type, props[prop_kwarg.upper()].expected_props, tokens)
-            print(prop_kwarg)
+    def parse(self, sql):
+        resource_type = "Foo"
+        if sql.strip() == "":
+            return {}
+        lexicon = []
+        for prop_kwarg, prop_or_list in self.props.items():
+            if isinstance(prop_or_list, list):
+                prop_list = prop_or_list
+                # raise Exception("no longer supported")
+            else:
+                prop_list = [prop_or_list]
+            for prop in prop_list:
+                # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
+                named_marker = pp.Empty().set_parse_action(
+                    lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc)
+                )
+                lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)
 
-        found_props[prop_kwarg] = tokens
-        print(prop_kwarg, "->", repr(tokens))
-        remainder_sql = remainder_sql[end_index:]
-        if remainder_sql.strip() == "":
-            break
+        parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
+        # ppt = pp.testing
+        # print("-" * 80)
+        # print(ppt.with_line_numbers(sql))
+        # print("-" * 80)
 
-    if len(remainder_sql.strip()) > 0:
-        raise Exception(f"Failed to parse props: {remainder_sql}")
-    return found_props
+        found_props = {}
+        remainder_sql = sql
+        while True:
+            try:
+                tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
+            except pp.ParseException:
+                print(remainder_sql)
+                # TODO: better error messages
+                raise Exception(
+                    f"Failed to parse {resource_type} props [{remainder_sql.strip().splitlines()[0]}]"
+                )
+
+            # TODO: this should be some sort of recursive/nested thing
+            # if isinstance(found_prop, PropSet):
+            # if prop_kwarg == "encryption":
+            #     tokens = prop_scan(resource_type, self.props[prop_kwarg.upper()].expected_props, tokens)
+            #     print(prop_kwarg)
+
+            found_props[prop_kwarg] = tokens
+            remainder_sql = remainder_sql[end_index:]
+            if remainder_sql.strip() == "":
+                break
+
+        if len(remainder_sql.strip()) > 0:
+            raise Exception(f"Failed to parse props: {remainder_sql}")
+        return found_props
 
 
 class FileFormatProp(Prop):

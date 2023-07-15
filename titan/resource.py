@@ -4,7 +4,7 @@ import re
 
 from typing import TypeVar, Optional, Dict, Type, Set, Union, List, TYPE_CHECKING
 
-from .props import prop_scan
+# from .props import prop_scan
 from .urn import URN
 from .sql import SQL, add_ref
 
@@ -113,9 +113,10 @@ class Resource:
 
     @classmethod
     def parse_props(cls, sql: str):
-        found_props = prop_scan(cls.__name__, cls.props, sql)
+        raise NotImplementedError
+        # found_props = prop_scan(cls.__name__, cls.props, sql)
 
-        return found_props
+        # return found_props
 
     @property
     def connections(self):

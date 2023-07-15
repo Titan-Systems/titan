@@ -4,15 +4,13 @@
     titan crawl
 """
 
-import inspect
-import importlib.util
 import os
-import sys
 
 from . import __version__, LOGO
 
 from .app import App
 from .policies.titan_standard import titan_standard
+from .resource2 import Resource
 
 import click
 import yaml
@@ -91,3 +89,27 @@ def up():
 def crawl():
     print(LOGO, flush=True)
     print(f"      Titan v{__version__}\n")
+
+
+@click.argument("path")
+@entrypoint.command()
+def test(path: str):
+    print(LOGO, flush=True)
+    print(f"      Titan v{__version__}\n")
+
+    for file in os.listdir(path):
+        # for file in ["schema.sql", "database.sql"]:
+        if file.endswith(".sql"):
+            print("^" * 80, file)
+            sql_blob = open(os.path.join(path, file), "r").read()
+            try:
+                for raw in sql_blob.split(";"):
+                    sql = raw.strip()
+                    if sql:
+                        res = Resource.from_sql(sql)
+                        print(res.name)
+            except Exception as e:
+                print(">>>SKIPPED<<<")
+                # print(e)
+                # print(sql_blob)
+                continue
