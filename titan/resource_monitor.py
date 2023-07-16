@@ -1,11 +1,25 @@
-import re
+# import re
 
-from typing import Union, Optional, List
+# from typing import Union, Optional, List
 
-from .resource import AccountLevelResource
-from .user import User
-from .parseable_enum import ParseableEnum
-from .props import Identifier, EnumProp, StringProp, IntProp, IdentifierListProp
+# from .resource import AccountLevelResource
+# from .user import User
+# from .parseable_enum import ParseableEnum
+# from .props import Identifier, EnumProp, StringProp, IntProp, IdentifierListProp
+
+from typing import Union, Optional, Dict
+
+from .props import (
+    EnumProp,
+    IntProp,
+    ParseableEnum,
+    Props,
+    StringProp,
+    IdentifierListProp,
+)
+
+
+from .resource2 import Resource, Namespace
 
 
 class ResourceMonitorFrequency(ParseableEnum):
@@ -16,7 +30,7 @@ class ResourceMonitorFrequency(ParseableEnum):
     NEVER = "NEVER"
 
 
-class ResourceMonitor(AccountLevelResource):  #
+class ResourceMonitor(Resource):  #
     """
     CREATE [ OR REPLACE ] RESOURCE MONITOR <name> WITH
                           [ CREDIT_QUOTA = <number> ]
@@ -30,47 +44,27 @@ class ResourceMonitor(AccountLevelResource):  #
         ON <threshold> PERCENT DO { SUSPEND | SUSPEND_IMMEDIATE | NOTIFY }
     """
 
-    resource_name = "RESOURCE MONITOR"
-
-    props = {
-        "CREDIT_QUOTA": IntProp("CREDIT_QUOTA"),
-        "FREQUENCY": EnumProp("FREQUENCY", ResourceMonitorFrequency),
-        "START_TIMESTAMP": StringProp("START_TIMESTAMP", alt_tokens=["IMMEDIATELY"]),
-        "END_TIMESTAMP": StringProp("END_TIMESTAMP"),
-        "NOTIFY_USERS": IdentifierListProp("NOTIFY_USERS"),
-        # "TRIGGERS": TagsProp(),
-    }
-
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            RESOURCE\s+MONITOR\s+
-            ({Identifier.pattern})\s+
-            WITH""",
-        re.IGNORECASE | re.VERBOSE,
+    resource_type = "RESOURCE MONITOR"
+    namespace = Namespace.ACCOUNT
+    props = Props(
+        credit_quota=IntProp("CREDIT_QUOTA"),
+        frequency=EnumProp("FREQUENCY", ResourceMonitorFrequency),
+        start_timestamp=StringProp("START_TIMESTAMP", alt_tokens=["IMMEDIATELY"]),
+        end_timestamp=StringProp("END_TIMESTAMP"),
+        notify_users=IdentifierListProp("NOTIFY_USERS"),
     )
 
-    ownable = False
+    name: str
+    credit_quota: int = None
+    frequency: ResourceMonitorFrequency = None
+    start_timestamp: str = None
+    end_timestamp: str = None
+    notify_users: list = []
 
-    def __init__(
-        self,
-        credit_quota: Optional[int] = None,
-        frequency: Union[None, str, ResourceMonitorFrequency] = None,
-        start_timestamp: Optional[str] = None,
-        end_timestamp: Optional[str] = None,
-        notify_users: List[Union[str, User]] = [],
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.credit_quota = credit_quota
-        self.frequency = frequency
-        self.start_timestamp = start_timestamp
-        self.end_timestamp = end_timestamp
-        self.notify_users: List[User] = [u if isinstance(u, User) else User.all[u] for u in notify_users]
-        self.requires(*self.notify_users)
+    # self.notify_users: List[User] = [u if isinstance(u, User) else User.all[u] for u in notify_users]
+    # self.requires(*self.notify_users)
 
-    @property
-    def sql(self):
-        props = self.props_sql()
-        return f"CREATE RESOURCE MONITOR {self.fully_qualified_name} WITH {props}"
+    # @property
+    # def sql(self):
+    #     props = self.props_sql()
+    #     return f"CREATE RESOURCE MONITOR {self.fully_qualified_name} WITH {props}"

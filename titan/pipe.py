@@ -1,12 +1,15 @@
-import re
+from .props import (
+    BoolProp,
+    IdentifierProp,
+    Props,
+    StringProp,
+    QueryProp,
+)
 
-from typing import Optional
-
-from .resource import SchemaLevelResource
-from .props import Identifier, StringProp, BoolProp, IdentifierProp, QueryProp
+from .resource2 import Resource, Namespace
 
 
-class Pipe(SchemaLevelResource):
+class Pipe(Resource):
     """
     CREATE [ OR REPLACE ] PIPE [ IF NOT EXISTS ] <name>
       [ AUTO_INGEST = [ TRUE | FALSE ] ]
@@ -17,44 +20,22 @@ class Pipe(SchemaLevelResource):
       AS <copy_statement>
     """
 
-    resource_name = "PIPE"
-
-    props = {
-        "AUTO_INGEST": BoolProp("AUTO_INGEST"),
-        "ERROR_INTEGRATION": IdentifierProp("ERROR_INTEGRATION"),
-        "AWS_SNS_TOPIC": StringProp("AWS_SNS_TOPIC"),
-        "INTEGRATION": StringProp("INTEGRATION"),
-        "COMMENT": StringProp("COMMENT"),
-        "AS_": QueryProp("AS"),
-    }
-
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            PIPE\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
-        """,
-        re.IGNORECASE | re.VERBOSE,
+    resource_type = "PIPE"
+    namespace = Namespace.SCHEMA
+    props = Props(
+        auto_ingest=BoolProp("auto_ingest"),
+        error_integration=IdentifierProp("error_integration"),
+        aws_sns_topic=StringProp("aws_sns_topic"),
+        integration=StringProp("integration"),
+        comment=StringProp("comment"),
+        as_=QueryProp("as"),
     )
 
-    ownable = True
-
-    def __init__(
-        self,
-        auto_ingest: Optional[bool] = None,
-        error_integration: Optional[str] = None,
-        aws_sns_topic: Optional[str] = None,
-        integration: Optional[str] = None,
-        comment: Optional[str] = None,
-        as_: Optional[str] = None,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.auto_ingest = auto_ingest
-        self.error_integration = error_integration
-        self.aws_sns_topic = aws_sns_topic
-        self.integration = integration
-        self.comment = comment
-        self.as_ = as_
+    name: str
+    owner: str = None
+    auto_ingest: bool = None
+    error_integration: str = None
+    aws_sns_topic: str = None
+    integration: str = None
+    comment: str = None
+    as_: str = None

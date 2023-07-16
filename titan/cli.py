@@ -102,14 +102,15 @@ def test(path: str):
         if file.endswith(".sql"):
             print("^" * 80, file)
             sql_blob = open(os.path.join(path, file), "r").read()
-            try:
-                for raw in sql_blob.split(";"):
-                    sql = raw.strip()
-                    if sql:
-                        res = Resource.from_sql(sql)
+            # try:
+            for raw in sql_blob.split(";"):
+                sql = raw.strip()
+                if sql:
+                    res = Resource.from_sql(sql)
+                    if res:
                         print(res.name)
-            except Exception as e:
-                print(">>>SKIPPED<<<")
-                # print(e)
-                # print(sql_blob)
-                continue
+            # except Exception as e:
+            #     print(">>>SKIPPED<<<")
+            #     print(e)
+            #     # print(sql_blob)
+            #     continue

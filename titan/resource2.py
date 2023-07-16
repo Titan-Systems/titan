@@ -13,6 +13,7 @@ CREATE = Keyword("CREATE").suppress()
 OR_REPLACE = (Keyword("OR") + Keyword("REPLACE")).suppress()
 IF_NOT_EXISTS = (Keyword("IF") + Keyword("NOT") + Keyword("EXISTS")).suppress()
 TEMPORARY = (Keyword("TEMP") + Keyword("TEMPORARY")).suppress()
+WITH = Keyword("WITH").suppress()
 
 REST_OF_STRING = pp.Word(pp.printables + " \n") | pp.StringEnd() | pp.Empty()
 
@@ -24,6 +25,7 @@ class Namespace(Enum):
     ACCOUNT = "ACCOUNT"
     DATABASE = "DATABASE"
     SCHEMA = "SCHEMA"
+    TABLE = "TABLE"
 
 
 resource_db = {}
@@ -53,14 +55,27 @@ class Resource(BaseModel):
 
     @classmethod
     def from_sql(cls, sql):
-        if sql[0:6] != "CREATE":
+        command = sql.split()[0].lower()
+        if command != "create":
+            print(f"Command {command} not supported")
             return
         props = {}
 
         is_generic_parse = cls == Resource
 
         if is_generic_parse:
-            types = dict([(cls.resource_type, cls) for cls in cls.__subclasses__()])
+            types = {}
+            type_parsers = []
+            for subcls in cls.__subclasses__():
+                types[subcls.resource_type] = subcls
+                type_parsers.append(
+                    pp.Combine(pp.And([Keyword(tok) for tok in subcls.resource_type.split()]))
+                )
+            # New but not working. Fixes bug with 2+ spaces between keywords eg RESOURCE  MONITOR
+            #                                                                           ^^
+            # resource_type = pp.Or(type_parsers)
+
+            # Old
             resource_type = pp.Or([Keyword(resource_type) for resource_type in types.keys()])
         else:
             types = None
@@ -78,10 +93,10 @@ class Resource(BaseModel):
                 REST_OF_STRING.set_results_name("remainder"),
             ]
         )
-        # if not is_generic_parse and cls.re:
+
         parsed = header.parse_string(sql)
         resource_name = parsed.resource_name
-        resource_type = parsed.resource_type
+        resource_type = parsed.resource_type.upper()
         [header_props] = parsed._skipped
         props_sql = (header_props + " " + parsed.remainder).strip()
 

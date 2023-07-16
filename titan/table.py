@@ -1,29 +1,24 @@
-import re
+from typing import List, Dict
 
-from typing import List, Tuple, Optional, TYPE_CHECKING
-
-from .parseable_enum import ParseableEnum
 from .props import (
     BoolProp,
+    EnumProp,
+    FileFormatProp,
     FlagProp,
-    Identifier,
     IdentifierListProp,
-    IdentifierProp,
     IntProp,
-    PropSet,
+    ParseableEnum,
+    Props,
     StringProp,
     TagsProp,
-    FileFormatProp,
 )
-from .resource import SchemaLevelResource
 
-if TYPE_CHECKING:
-    from .schema import Schema
 
+from .resource2 import Resource, Namespace
 from .stage import InternalStage
 
 
-class Table(SchemaLevelResource):
+class Table(Resource):
     """
     CREATE [ OR REPLACE ]
       [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE | TRANSIENT } ]
@@ -44,87 +39,70 @@ class Table(SchemaLevelResource):
           [ COMMENT = '<string_literal>' ]
     """
 
-    props = {
-        "cluster_by": IdentifierListProp("CLUSTER BY"),
-        "enable_schema_evolution": BoolProp("ENABLE_SCHEMA_EVOLUTION"),
-        "stage_file_format": FileFormatProp("STAGE_FILE_FORMAT"),
+    resource_type = "TABLE"
+    namespace = Namespace.SCHEMA
+    props = Props(
+        volatile=FlagProp("volatile"),
+        transient=FlagProp("transient"),
+        cluster_by=IdentifierListProp("cluster by"),
+        enable_schema_evolution=BoolProp("enable_schema_evolution"),
+        stage_file_format=FileFormatProp("stage_file_format"),
         # STAGE_COPY_OPTIONS
-        "data_retention_time_in_days": IntProp("DATA_RETENTION_TIME_IN_DAYS"),
-        "max_data_extension_time_in_days": IntProp("MAX_DATA_EXTENSION_TIME_IN_DAYS"),
-        "change_tracking": BoolProp("CHANGE_TRACKING"),
-        "default_ddl_collation": StringProp("DEFAULT_DDL_COLLATION"),
-        "copy_grants": FlagProp("COPY GRANTS"),
-        "tags": TagsProp(),
-        "comment": StringProp("COMMENT"),
-    }
-
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            (?:(?:LOCAL|GLOBAL)\s+)?
-            (?:(?:TEMP|TEMPORARY|VOLATILE|TRANSIENT)\s+)?
-            TABLE\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})\s*
-            \([\S\s]*\)
-        """,
-        re.VERBOSE | re.IGNORECASE,
+        data_retention_time_in_days=IntProp("data_retention_time_in_days"),
+        max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
+        change_tracking=BoolProp("change_tracking"),
+        default_ddl_collation=StringProp("default_ddl_collation"),
+        copy_grants=FlagProp("copy grants"),
+        tags=TagsProp(),
+        comment=StringProp("comment"),
     )
 
-    ownable = True
+    name: str
+    owner: str = None
+    volatile: bool = False
+    transient: bool = False
+    cluster_by: List[str] = []
+    enable_schema_evolution: bool = False
+    data_retention_time_in_days: int = None
+    max_data_extension_time_in_days: int = None
+    change_tracking: bool = False
+    default_ddl_collation: str = None
+    copy_grants: bool = False
+    tags: Dict[str, str] = {}
+    comment: str = None
 
-    def __init__(
-        self,
-        name: str,
-        cluster_by: List[str] = [],
-        enable_schema_evolution: Optional[bool] = None,
-        data_retention_time_in_days: Optional[int] = None,
-        max_data_extension_time_in_days: Optional[int] = None,
-        change_tracking: Optional[bool] = None,
-        default_ddl_collation: Optional[str] = None,
-        copy_grants: Optional[bool] = None,
-        tags: List[Tuple[str, str]] = [],
-        comment: Optional[str] = None,
-        autoload: Optional[bool] = False,
-        **kwargs,
-    ):
-        super().__init__(name, **kwargs)
+    _table_stage: InternalStage
 
-        self.cluster_by = cluster_by
-        self.enable_schema_evolution = enable_schema_evolution
-        self.data_retention_time_in_days = data_retention_time_in_days
-        self.max_data_extension_time_in_days = max_data_extension_time_in_days
-        self.change_tracking = change_tracking
-        self.default_ddl_collation = default_ddl_collation
-        self.copy_grants = copy_grants
-        self.tags = tags
-        self.comment = comment
+    # TODO: make this a changeable property that registers/deregisters the pipe when the flag is flipped
+    # self.autoload = autoload
 
-        # TODO: make this a changeable property that registers/deregisters the pipe when the flag is flipped
-        self.autoload = autoload
-
-        self.table_stage = InternalStage(name=f"@%{self.name}", implicit=True)
-        self.table_stage.requires(self)
-        if self.schema:
-            self.table_stage.schema = self.schema
+    def model_post_init(self, ctx):
+        super().model_post_init(ctx)
+        self._table_stage = InternalStage(name=f"@%{self.name}", implicit=True)
+        # self.table_stage.requires(self)
+        # if self.schema:
+        #     self.table_stage.schema = self.schema
 
     @property
-    def create_sql(self):
-        props = self.props_sql()
-        return f"CREATE TABLE {self.fully_qualified_name} () {props}"
+    def table_stage(self):
+        return self._table_stage
 
-    @property
-    def select_star_sql(self):
-        return f"SELECT * FROM {self.fully_qualified_name}"
+    # @property
+    # def create_sql(self):
+    #     props = self.props_sql()
+    #     return f"CREATE TABLE {self.fully_qualified_name} () {props}"
 
-    # https://github.com/python/mypy/issues/5936
-    @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]
-    def schema(self, schema_: Optional["Schema"]):
-        self._schema = schema_
-        if self._schema is not None:
-            self.requires(self._schema)
-            self.table_stage.schema = self._schema
+    # @property
+    # def select_star_sql(self):
+    #     return f"SELECT * FROM {self.fully_qualified_name}"
+
+    # # https://github.com/python/mypy/issues/5936
+    # @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]
+    # def schema(self, schema_: Optional["Schema"]):
+    #     self._schema = schema_
+    #     if self._schema is not None:
+    #         self.requires(self._schema)
+    #         self.table_stage.schema = self._schema
 
     # def create(self, session):
     #     super().create(session)
@@ -149,106 +127,3 @@ class Table(SchemaLevelResource):
     #     """,
     # )
     # pipe.create(session)
-
-
-class ColumnType(ParseableEnum):
-    NUMBER = "NUMBER"
-    DECIMAL = "DECIMAL"
-    NUMERIC = "NUMERIC"
-    INT = "INT"
-    INTEGER = "INTEGER"
-    BIGINT = "BIGINT"
-    SMALLINT = "SMALLINT"
-    TINYINT = "TINYINT"
-    BYTEINT = "BYTEINT"
-    FLOAT = "FLOAT"
-    FLOAT4 = "FLOAT4"
-    FLOAT8 = "FLOAT8"
-    DOUBLE = "DOUBLE"
-    DOUBLE_PRECISION = "DOUBLE PRECISION"
-    REAL = "REAL"
-    VARCHAR = "VARCHAR"
-    CHAR = "CHAR"
-    CHARACTER = "CHARACTER"
-    NCHAR = "NCHAR"
-    STRING = "STRING"
-    TEXT = "TEXT"
-    NVARCHAR = "NVARCHAR"
-    NVARCHAR2 = "NVARCHAR2"
-    CHAR_VARYING = "CHAR VARYING"
-    NCHAR_VARYING = "NCHAR VARYING"
-    BINARY = "BINARY"
-    VARBINARY = "VARBINARY"
-    BOOLEAN = "BOOLEAN"
-    DATE = "DATE"
-    DATETIME = "DATETIME"
-    TIME = "TIME"
-    TIMESTAMP = "TIMESTAMP"
-    TIMESTAMP_LTZ = "TIMESTAMP_LTZ"
-    TIMESTAMP_NTZ = "TIMESTAMP_NTZ"
-    TIMESTAMP_TZ = "TIMESTAMP_TZ"
-    ARRAY = "ARRAY"
-    OBJECT = "OBJECT"
-    VARIANT = "VARIANT"
-    GEOGRAPHY = "GEOGRAPHY"
-    GEOMETRY = "GEOMETRY"
-
-
-class Column:
-    """
-    <col_name> <col_type>
-      [ COLLATE '<collation_specification>' ]
-      [ COMMENT '<string_literal>' ]
-      [ { DEFAULT <expr>
-        | { AUTOINCREMENT | IDENTITY } [ { ( <start_num> , <step_num> ) | START <num> INCREMENT <num> } ] } ]
-      [ NOT NULL ]
-      [ [ WITH ] MASKING POLICY <policy_name> [ USING ( <col_name> , <cond_col1> , ... ) ] ]
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ inlineConstraint ]
-      [ , <col_name> <col_type> [ ... ] ]
-      [ , outoflineConstraint ]
-      [ , ... ]
-
-    inlineConstraint ::=
-      [ CONSTRAINT <constraint_name> ]
-      { UNIQUE | PRIMARY KEY | { [ FOREIGN KEY ] REFERENCES <ref_table_name> [ ( <ref_col_name> ) ] } }
-      [ <constraint_properties> ]
-
-    outoflineConstraint ::=
-      [ CONSTRAINT <constraint_name> ]
-      {
-         UNIQUE [ ( <col_name> [ , <col_name> , ... ] ) ]
-       | PRIMARY KEY [ ( <col_name> [ , <col_name> , ... ] ) ]
-       | [ FOREIGN KEY ] [ ( <col_name> [ , <col_name> , ... ] ) ]
-                         REFERENCES <ref_table_name> [ ( <ref_col_name> [ , <ref_col_name> , ... ] ) ]
-      }
-      [ <constraint_properties> ]
-    """
-
-    def __init__(
-        self,
-        name: str,
-        col_type: str,
-        collate: Optional[str] = None,
-        comment: Optional[str] = None,
-        default=None,
-        not_null: Optional[bool] = None,
-        masking_policy=None,
-        tags: List[Tuple[str, str]] = [],
-        **kwargs,
-    ) -> None:
-        self.name = name
-        self.col_type = col_type
-        self.collate = collate
-        self.comment = comment
-        self.default = default
-        self.not_null = not_null
-        self.masking_policy = masking_policy
-        self.tags = tags
-
-
-class Columns:
-    pass
-
-
-# Table("raw_data", columns=)

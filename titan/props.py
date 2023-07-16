@@ -78,7 +78,7 @@ class BoolProp(Prop):
 
 
 class IntProp(Prop):
-    def __init__(self, name):
+    def __init__(self, name, alt_tokens=[]):
         expression = Keyword(name).suppress() + Eq + Any
         # replace with common.integer
         value = Integer().add_parse_action(common.convert_to_integer)
@@ -87,7 +87,7 @@ class IntProp(Prop):
 
 class StringProp(Prop):
     def __init__(self, name, alt_tokens=[]):
-        expression = Keyword(name).suppress() + Eq + Any
+        expression = Keyword(name).suppress() + pp.Opt(Eq) + Any
         value = pp.sgl_quoted_string | pp.one_of(alt_tokens, caseless=True, as_keyword=True)
         value = value.set_parse_action(strip_quotes)
         super().__init__(name, expression, value)
@@ -111,13 +111,17 @@ class FlagProp(Prop):
 
 
 class IdentifierProp(Prop):
-    def __init__(self, name):
+    def __init__(self, name, resource_class=None):
         expression = Keyword(name).suppress() + Eq + Any
         value = _Identifier | pp.sgl_quoted_string
         super().__init__(name, expression, value)
+        self.resource_class = resource_class
 
-    # def validate(self, tokens):
-    #     return True
+    def validate(self, token):
+        if self.resource_class is None:
+            return super().validate(token)
+        # return self.resource_class(name=token[0], stub=True)
+        return self.resource_class.find(token[0])
 
     def render(self, value):
         if value is None:
@@ -163,18 +167,6 @@ class PropSet(Prop):
         super().__init__(name, expression)
         self.expected_props = expected_props
 
-    # def validate(self, tokens):
-    #     # return [tok.strip("'") for tok in tokens]
-    #     raise NotImplementedError
-
-    # def normalize(self, value: str) -> Any:
-    #     normalized = {}
-    #     for name, prop in self.expected_props.items():
-    #         match = prop.search(value)
-    #         if match:
-    #             normalized[name.lower()] = match
-    #     return normalized if normalized else None
-
     def render(self, values):
         if values is None or len(values) == 0:
             return ""
@@ -214,6 +206,31 @@ class TagsProp(Prop):
             return ""
 
 
+class DictProp(Prop):
+    """
+    HEADERS = ( '<header_1>' = '<value_1>' [ , '<header_2>' = '<value_2>' ... ] )
+    """
+
+    def __init__(self, name):
+        expression = (
+            Keyword(name).suppress()
+            + pp.Opt(Eq)
+            + pp.nested_expr(content=pp.delimited_list(pp.sgl_quoted_string + Eq + pp.sgl_quoted_string))
+        )
+        value = None
+        super().__init__(name, expression, value)
+
+    # def validate(self, tokens):
+    #     return self.enum_type.parse(tokens[0])
+
+    def render(self, value: Any) -> str:
+        if value:
+            tag_kv_pairs = ", ".join([f"{key} = '{value}'" for key, value in value.items()])
+            return f"{self.name} = ({tag_kv_pairs})"
+        else:
+            return ""
+
+
 class IdentifierListProp(Prop):
     def __init__(self, name, naked=False):
         if naked:
@@ -241,7 +258,7 @@ class EnumProp(Prop):
     def __init__(self, name, enum_or_list):
         # enum_or_list: a single enum class or a list of valid enum values
         valid_values = set(enum_or_list)
-        expression = Keyword(name).suppress() + Eq + Any().add_parse_action(strip_quotes)
+        expression = Keyword(name).suppress() + pp.Opt(Eq) + Any().add_parse_action(strip_quotes)
         value = pp.one_of([e.value for e in valid_values], caseless=True, as_keyword=True)
 
         super().__init__(name, expression, value)
@@ -267,17 +284,36 @@ class QueryProp(Prop):
         return f"{self.name} {value}"
 
 
-# def prop_scan(resource_type, props, sql):
+class ColumnsProp(Prop):
+    def __init__(self, name, enum_or_list):
+        valid_values = set(enum_or_list)
+        column_type = pp.one_of([e.value for e in valid_values], caseless=True, as_keyword=True)
+        column = _Identifier + column_type
+        expression = Lparen + ... + Rparen
+        # value = pp.one_of([e.value for e in valid_values], caseless=True, as_keyword=True)
+        value = pp.delimited_list(column)
+        super().__init__(name, expression, value)
+
+    def validate(self, tokens):
+        return list([tok.split() for tok in tokens])
+
+    def render(self, values):
+        if values is None:
+            return ""
+        return f"({', '.join([ col + ' ' + col_type for col, col_type in values])})"
 
 
 class Props:
-    def __init__(self, **props):
+    def __init__(self, _start_token=None, **props):
         self.props = props
+        self.start_token = pp.MatchFirst(Keyword(_start_token)) if _start_token else pp.Empty()
 
     def parse(self, sql):
-        resource_type = "Foo"
+        # Instead of passing in resource type, just bubble up exceptions with the important metadata
+        # resource_type = "Foo"
         if sql.strip() == "":
             return {}
+
         lexicon = []
         for prop_kwarg, prop_or_list in self.props.items():
             if isinstance(prop_or_list, list):
@@ -293,22 +329,21 @@ class Props:
                 lexicon.append(prop.expression.set_parse_action(prop.validate) + named_marker)
 
         parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
+
         # ppt = pp.testing
         # print("-" * 80)
         # print(ppt.with_line_numbers(sql))
         # print("-" * 80)
 
         found_props = {}
-        remainder_sql = sql
+        remainder_sql = self.consume_start_token(sql)
         while True:
             try:
                 tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
             except pp.ParseException:
                 print(remainder_sql)
                 # TODO: better error messages
-                raise Exception(
-                    f"Failed to parse {resource_type} props [{remainder_sql.strip().splitlines()[0]}]"
-                )
+                raise Exception(f"Failed to parse props [{remainder_sql.strip().splitlines()[0]}]")
 
             # TODO: this should be some sort of recursive/nested thing
             # if isinstance(found_prop, PropSet):
@@ -317,13 +352,19 @@ class Props:
             #     print(prop_kwarg)
 
             found_props[prop_kwarg] = tokens
-            remainder_sql = remainder_sql[end_index:]
-            if remainder_sql.strip() == "":
+            remainder_sql = remainder_sql[end_index:].strip()
+            if remainder_sql == "":
                 break
 
-        if len(remainder_sql.strip()) > 0:
-            raise Exception(f"Failed to parse props: {remainder_sql}")
+        if len(remainder_sql) > 0:
+            raise Exception(f"Unparsed props remain: [{remainder_sql}]")
         return found_props
+
+    def consume_start_token(self, sql):
+        for toks, _, end in self.start_token.scan_string(sql):
+            if toks:
+                return sql[end:]
+        return sql
 
 
 class FileFormatProp(Prop):

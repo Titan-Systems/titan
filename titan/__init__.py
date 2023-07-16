@@ -2,6 +2,7 @@ from titan.app import App
 from titan.blueprint import Blueprint
 
 from .database import Database
+from .external_function import ExternalFunction
 from .role import Role
 from .table import Table
 from .schema import Schema
