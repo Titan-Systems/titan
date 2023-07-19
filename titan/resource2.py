@@ -61,9 +61,9 @@ class Resource(BaseModel):
             return
         props = {}
 
-        is_generic_parse = cls == Resource
+        is_generic = cls == Resource
 
-        if is_generic_parse:
+        if is_generic:
             types = {}
             type_parsers = []
             for subcls in cls.__subclasses__():
@@ -100,7 +100,7 @@ class Resource(BaseModel):
         [header_props] = parsed._skipped
         props_sql = (header_props + " " + parsed.remainder).strip()
 
-        if is_generic_parse:
+        if is_generic:
             resource_cls = types[resource_type]
         else:
             resource_cls = cls

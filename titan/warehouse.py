@@ -1,4 +1,4 @@
-from typing import Union, Optional, Dict
+from typing import Dict
 
 from .props import (
     BoolProp,

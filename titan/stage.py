@@ -1,22 +1,38 @@
-import re
+# import re
 
-from typing import List, Optional, Tuple, Union
+# from typing import List, Optional, Tuple, Union
 
-from .parseable_enum import ParseableEnum
+# from .parseable_enum import ParseableEnum
+# from .props import (
+#     StringProp,
+#     TagsProp,
+#     Identifier,
+#     EnumProp,
+#     PropSet,
+#     IntProp,
+#     BoolProp,
+#     IdentifierProp,
+#     # AnonFileFormatProp,
+#     FileFormatProp,
+# )
+# from .resource import SchemaLevelResource
+# from .file_format import FileFormat
+
+from typing import Dict
+
 from .props import (
+    BoolProp,
+    EnumProp,
+    IdentifierProp,
+    IntProp,
+    ParseableEnum,
+    Props,
     StringProp,
     TagsProp,
-    Identifier,
-    EnumProp,
-    PropSet,
-    IntProp,
-    BoolProp,
-    IdentifierProp,
-    # AnonFileFormatProp,
-    FileFormatProp,
 )
-from .resource import SchemaLevelResource
-from .file_format import FileFormat
+
+
+from .resource2 import Resource, Namespace
 
 
 class StageType(ParseableEnum):
@@ -35,7 +51,7 @@ class EncryptionType(ParseableEnum):
     NONE = "NONE"
 
 
-class Stage(SchemaLevelResource):
+class Stage(Resource):
     """
     -- Internal stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <internal_stage_name>
@@ -94,51 +110,41 @@ class Stage(SchemaLevelResource):
 
     """
 
-    resource_name = "STAGE"
+    resource_type = "STAGE"
+    namespace = Namespace.SCHEMA
 
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            (?:(?:TEMP|TEMPORARY)\s+)?
-            STAGE\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
-        """,
-        re.VERBOSE | re.IGNORECASE,
-    )
+    name: str
+    owner: str = None
 
-    ownable = True
+    # def __init__(self, stage_type: Optional[StageType] = None, **kwargs):
+    #     # if type(self) == FileFormat:
+    #     #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
+    #     self.stage_type = stage_type or StageType.INTERNAL
+    #     super().__init__(**kwargs)
 
-    def __init__(self, stage_type: Optional[StageType] = None, **kwargs):
-        # if type(self) == FileFormat:
-        #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
-        self.stage_type = stage_type or StageType.INTERNAL
-        super().__init__(**kwargs)
+    # @classmethod
+    # def from_sql(cls, sql: str):
+    #     match = re.search(cls.create_statement, sql)
 
-    @classmethod
-    def from_sql(cls, sql: str):
-        match = re.search(cls.create_statement, sql)
+    #     if match is None:
+    #         raise Exception
+    #     name = match.group(1)
+    #     # url = StringProp("URL").search(sql[match.end() :])
+    #     # stage_type = StageType.EXTERNAL if url else StageType.INTERNAL
+    #     # try:
+    #     props = InternalStage.parse_props(sql[match.end() :])
+    #     return InternalStage(name=name, **props)
+    #     # except Exception:
+    #     #     print("&" * 120)
+    #     #     props = ExternalStage.parse_props(sql[match.end() :])
+    #     #     return ExternalStage(name=name, **props)
 
-        if match is None:
-            raise Exception
-        name = match.group(1)
-        # url = StringProp("URL").search(sql[match.end() :])
-        # stage_type = StageType.EXTERNAL if url else StageType.INTERNAL
-        # try:
-        props = InternalStage.parse_props(sql[match.end() :])
-        return InternalStage(name=name, **props)
-        # except Exception:
-        #     print("&" * 120)
-        #     props = ExternalStage.parse_props(sql[match.end() :])
-        #     return ExternalStage(name=name, **props)
-
-        if stage_type == StageType.INTERNAL:
-            props = InternalStage.parse_props(sql[match.end() :])
-            return InternalStage(name=name, **props)
-        else:
-            props = ExternalStage.parse_props(sql[match.end() :])
-            return ExternalStage(name=name, **props)
+    #     if stage_type == StageType.INTERNAL:
+    #         props = InternalStage.parse_props(sql[match.end() :])
+    #         return InternalStage(name=name, **props)
+    #     else:
+    #         props = ExternalStage.parse_props(sql[match.end() :])
+    #         return ExternalStage(name=name, **props)
 
     def props_sql(self):
         props = self.props.copy()
@@ -147,15 +153,6 @@ class Stage(SchemaLevelResource):
         if self.file_format:
             format_sql = ""
         return self._props_sql(props) + format_sql
-
-    # @property
-    # def sql(self):
-    #     return f"""
-    #         CREATE STAGE {self.fully_qualified_name}
-    #         {self.props["URL"].render(self.url)}
-    #         {self.props["TAGS"].render(self.tags)}
-    #         {self.props["COMMENT"].render(self.comment)}
-    #     """.strip()
 
     # @property
     # def on_file_added(self):
