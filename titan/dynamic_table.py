@@ -1,6 +1,7 @@
 from .props import Props, StringProp, IdentifierProp, QueryProp
 
-from .resource2 import Resource, Namespace
+from .resource import Resource, Namespace
+from .warehouse import Warehouse
 
 
 class DynamicTable(Resource):
@@ -15,12 +16,12 @@ class DynamicTable(Resource):
     namespace = Namespace.SCHEMA
     props = Props(
         target_lag=StringProp("TARGET_LAG", alt_tokens=["DOWNSTREAM"]),
-        warehouse=IdentifierProp("WAREHOUSE"),
+        warehouse=IdentifierProp("WAREHOUSE", Warehouse),
         as_=QueryProp("AS"),
     )
 
     name: str
     owner: str = None
     target_lag: str = None
-    warehouse: str = None
+    warehouse: Warehouse = None
     as_: str = None

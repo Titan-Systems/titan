@@ -3,14 +3,15 @@ from typing import Dict
 from .props import IntProp, StringProp, TagsProp, FlagProp, Props
 
 from .dynamic_table import DynamicTable
-from .file_format import FileFormat
+
+# from .file_format import FileFormat
 from .pipe import Pipe
-from .sproc import Sproc
 from .stage import Stage
 from .table import Table
-from .view import View
 
-from .resource2 import Resource, Namespace, ResourceDB
+# from .view import View
+
+from .resource import Resource, Namespace, ResourceDB
 
 
 class Schema(Resource):
@@ -51,7 +52,6 @@ class Schema(Resource):
     _dynamic_tables: ResourceDB
     _file_formats: ResourceDB
     _pipes: ResourceDB
-    _sprocs: ResourceDB
     _stages: ResourceDB
     _tables: ResourceDB
     _views: ResourceDB
@@ -60,12 +60,12 @@ class Schema(Resource):
         super().model_post_init(ctx)
 
         self._dynamic_tables = ResourceDB(DynamicTable)
-        self._file_formats = ResourceDB(FileFormat)
+        # self._file_formats = ResourceDB(FileFormat)
         self._pipes = ResourceDB(Pipe)
-        self._sprocs = ResourceDB(Sproc)
+        # self._sprocs = ResourceDB(Sproc)
         self._stages = ResourceDB(Stage)
         self._tables = ResourceDB(Table)
-        self._views = ResourceDB(View)
+        # self._views = ResourceDB(View)
 
     @property
     def dynamic_tables(self):

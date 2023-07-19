@@ -6,7 +6,7 @@ from .props import (
     QueryProp,
 )
 
-from .resource2 import Resource, Namespace
+from .resource import Resource, Namespace
 
 
 class Pipe(Resource):
@@ -24,7 +24,7 @@ class Pipe(Resource):
     namespace = Namespace.SCHEMA
     props = Props(
         auto_ingest=BoolProp("auto_ingest"),
-        error_integration=IdentifierProp("error_integration"),
+        # error_integration=IdentifierProp("error_integration"),
         aws_sns_topic=StringProp("aws_sns_topic"),
         integration=StringProp("integration"),
         comment=StringProp("comment"),

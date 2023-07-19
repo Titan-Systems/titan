@@ -1,10 +1,26 @@
 import re
 
-from typing import Optional, Type
+from typing import List
 
-from .resource import SchemaLevelResource, ResourceWithDB
+import pyparsing as pp
+from .props import (
+    Props,
+    Identifier,
+    BoolProp,
+    EnumProp,
+    StringProp,
+    IntProp,
+    StringListProp,
+    Prop,
+    parens,
+    Lparen,
+    Rparen,
+    Keyword,
+    Eq,
+)
+
+from .resource import Resource, Namespace
 from .parseable_enum import ParseableEnum
-from .props import Identifier, BoolProp, EnumProp, StringProp, IntProp, StringListProp, Prop
 
 
 class FileType(ParseableEnum):
@@ -35,7 +51,7 @@ class BinaryFormat(ParseableEnum):
     UTF8 = "UTF8"
 
 
-class FileFormat(SchemaLevelResource, metaclass=ResourceWithDB):
+class FileFormat(Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ]
@@ -107,298 +123,225 @@ class FileFormat(SchemaLevelResource, metaclass=ResourceWithDB):
          SKIP_BYTE_ORDER_MARK = TRUE | FALSE
     """
 
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            (?:(?:TEMP|TEMPORARY|VOLATILE)\s+)?
-            FILE\s+FORMAT\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
-        """,
-        re.IGNORECASE | re.VERBOSE,
-    )
+    resource_type = "FILE FORMAT"
+    namespace = Namespace.SCHEMA
+    props = Props()
 
-    ownable = True
-
-    def __init__(self, file_type: Optional[FileType] = None, name=None, anonymous: bool = False, **kwargs):
-        # if type(self) == FileFormat:
-        #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
-        if all([name, anonymous]):
-            raise Exception("Anonymous file formats cannot be named")
-        name = name or "__anon__"
-        super().__init__(name=name, **kwargs)
-        if self.stub and file_type is not None:
-            raise Exception("Cannot specify file type for stubbed file format")
-        self.file_type = FileType.parse(file_type) if isinstance(file_type, str) else file_type
-        self.anonymous = anonymous
+    name: str
+    owner: str = None
+    comment: str = None
 
     @classmethod
-    def from_sql(cls, sql: str):
-        match = re.search(cls.create_statement, sql)
+    def _resolve_class(cls, _: str, props_sql: str):
+        match = re.match(r"TYPE\s*=\s*(\w+)", props_sql, re.IGNORECASE)
+        file_type = FileType.parse(match.group(1))
+        return FileTypeMap[file_type]
 
-        if match is None:
-            raise Exception
 
-        name = match.group(1)
-        file_format_class, props = cls.parse_anonymous_file_format(sql[match.end() :])
-        return file_format_class(name=name, **props)
+#     def __init__(self, file_type: Optional[FileType] = None, name=None, anonymous: bool = False, **kwargs):
+#         # if type(self) == FileFormat:
+#         #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
+#         if all([name, anonymous]):
+#             raise Exception("Anonymous file formats cannot be named")
+#         name = name or "__anon__"
+#         super().__init__(name=name, **kwargs)
+#         if self.stub and file_type is not None:
+#             raise Exception("Cannot specify file type for stubbed file format")
+#         self.file_type = FileType.parse(file_type) if isinstance(file_type, str) else file_type
+#         self.anonymous = anonymous
 
-    @classmethod
-    def parse_anonymous_file_format(cls, sql: str):
-        [file_type] = EnumProp("TYPE", FileType).expression.parse_string(sql)
 
-        if file_type is None:
-            raise ValueError("No type specified for FILE FORMAT statement")
+# class AnonymousFileFormat(Resource):
+#     resource_type = None
+#     namespace = None
 
-        file_format_class = FileTypeMap[FileType.parse(file_type)]
-        props = file_format_class.parse_props(sql)
-        del props["type"]
-        return (file_format_class, props)
-
-    @property
-    def sql(self):
-        return f"""
-            CREATE FILE FORMAT {self.fully_qualified_name}
-        """.strip()
+#     @classmethod
+#     def from_sql(cls, sql):
+#         # parser = Identifier + Any + pp.Word(pp.printables + " \n")
+#         # parser = Identifier + Any
+#         # for (name, type), start, end in parser.scan_string(sql):
+#         #     remainder = sql[end:]
+#         #     props = cls.props.parse(remainder)
+#         #     return cls(name=name, type=ColumnType.parse(type), **props)
+#         props = EnumProp("type", FileType).parse(sql)
+#         file_format_class = FileTypeMap[props["type"]]
+#         return file_format_class(**props)
 
 
 class CSVFileFormat(FileFormat):
-    props = {
-        "TYPE": EnumProp("TYPE", [FileType.CSV]),
-        "COMPRESSION": EnumProp("COMPRESSION", Compression),
-        "RECORD_DELIMITER": StringProp("RECORD_DELIMITER", alt_tokens=["NONE"]),
-        "FIELD_DELIMITER": StringProp("FIELD_DELIMITER", alt_tokens=["NONE"]),
-        "FILE_EXTENSION": StringProp("FILE_EXTENSION"),
-        "PARSE_HEADER": BoolProp("PARSE_HEADER"),
-        "SKIP_HEADER": IntProp("SKIP_HEADER"),
-        "SKIP_BLANK_LINES": BoolProp("SKIP_BLANK_LINES"),
-        "DATE_FORMAT": StringProp("DATE_FORMAT", alt_tokens=["AUTO"]),
-        "TIME_FORMAT": StringProp("TIME_FORMAT", alt_tokens=["AUTO"]),
-        "TIMESTAMP_FORMAT": StringProp("TIMESTAMP_FORMAT", alt_tokens=["AUTO"]),
-        "BINARY_FORMAT": EnumProp("BINARY_FORMAT", BinaryFormat),
-        "ESCAPE": StringProp("ESCAPE", alt_tokens=["NONE"]),
-        "ESCAPE_UNENCLOSED_FIELD": StringProp("ESCAPE_UNENCLOSED_FIELD", alt_tokens=["NONE"]),
-        "TRIM_SPACE": BoolProp("TRIM_SPACE"),
-        "FIELD_OPTIONALLY_ENCLOSED_BY": StringProp("FIELD_OPTIONALLY_ENCLOSED_BY", alt_tokens=["NONE"]),
-        "NULL_IF": StringListProp("NULL_IF"),
-        "ERROR_ON_COLUMN_COUNT_MISMATCH": BoolProp("ERROR_ON_COLUMN_COUNT_MISMATCH"),
-        "REPLACE_INVALID_CHARACTERS": BoolProp("REPLACE_INVALID_CHARACTERS"),
-        "EMPTY_FIELD_AS_NULL": BoolProp("EMPTY_FIELD_AS_NULL"),
-        "SKIP_BYTE_ORDER_MARK": BoolProp("SKIP_BYTE_ORDER_MARK"),
-        "ENCODING": StringProp("ENCODING", alt_tokens=["UTF8"]),
-        "COMMENT": StringProp("COMMENT"),
-    }
+    props = Props(
+        type=EnumProp("type", [FileType.CSV]),
+        compression=EnumProp("compression", Compression),
+        record_delimiter=StringProp("record_delimiter", alt_tokens=["NONE"]),
+        field_delimiter=StringProp("field_delimiter", alt_tokens=["NONE"]),
+        file_extension=StringProp("file_extension"),
+        parse_header=BoolProp("parse_header"),
+        skip_header=IntProp("skip_header"),
+        skip_blank_lines=BoolProp("skip_blank_lines"),
+        date_format=StringProp("date_format", alt_tokens=["AUTO"]),
+        time_format=StringProp("time_format", alt_tokens=["AUTO"]),
+        timestamp_format=StringProp("timestamp_format", alt_tokens=["AUTO"]),
+        binary_format=EnumProp("binary_format", BinaryFormat),
+        escape=StringProp("escape", alt_tokens=["NONE"]),
+        escape_unenclosed_field=StringProp("escape_unenclosed_field", alt_tokens=["NONE"]),
+        trim_space=BoolProp("trim_space"),
+        field_optionally_enclosed_by=StringProp("field_optionally_enclosed_by", alt_tokens=["NONE"]),
+        null_if=StringListProp("null_if"),
+        error_on_column_count_mismatch=BoolProp("error_on_column_count_mismatch"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        empty_field_as_null=BoolProp("empty_field_as_null"),
+        skip_byte_order_mark=BoolProp("skip_byte_order_mark"),
+        encoding=StringProp("encoding", alt_tokens=["UTF8"]),
+        comment=StringProp("comment"),
+    )
 
-    def __init__(
-        self,
-        compression=None,
-        record_delimiter=None,
-        field_delimiter=None,
-        file_extension=None,
-        parse_header=None,
-        skip_header=None,
-        skip_blank_lines=None,
-        date_format=None,
-        time_format=None,
-        timestamp_format=None,
-        binary_format=None,
-        escape=None,
-        escape_unenclosed_field=None,
-        trim_space=None,
-        field_optionally_enclosed_by=None,
-        null_if=None,
-        error_on_column_count_mismatch=None,
-        replace_invalid_characters=None,
-        empty_field_as_null=None,
-        skip_byte_order_mark=None,
-        encoding=None,
-        **kwargs,
-    ):
-        super().__init__(file_type=FileType.CSV, **kwargs)
-        self.compression = Compression.parse(compression) if compression else None
-        self.record_delimiter = record_delimiter
-        self.field_delimiter = field_delimiter
-        self.file_extension = file_extension
-        self.parse_header = parse_header
-        self.skip_header = skip_header
-        self.skip_blank_lines = skip_blank_lines
-        self.date_format = date_format
-        self.time_format = time_format
-        self.timestamp_format = timestamp_format
-        self.binary_format = BinaryFormat.parse(binary_format) if binary_format else None
-        self.escape = escape
-        self.escape_unenclosed_field = escape_unenclosed_field
-        self.trim_space = trim_space
-        self.field_optionally_enclosed_by = field_optionally_enclosed_by
-        self.null_if = null_if
-        self.error_on_column_count_mismatch = error_on_column_count_mismatch
-        self.replace_invalid_characters = replace_invalid_characters
-        self.empty_field_as_null = empty_field_as_null
-        self.skip_byte_order_mark = skip_byte_order_mark
-        self.encoding = encoding
+    type: FileType
+    compression: Compression = None
+    record_delimiter: str = None
+    field_delimiter: str = None
+    file_extension: str = None
+    parse_header: bool = None
+    skip_header: int = None
+    skip_blank_lines: bool = None
+    date_format: str = None
+    time_format: str = None
+    timestamp_format: str = None
+    binary_format: BinaryFormat = None
+    escape: str = None
+    escape_unenclosed_field: str = None
+    trim_space: bool = None
+    field_optionally_enclosed_by: str = None
+    null_if: List[str] = []
+    error_on_column_count_mismatch: bool = None
+    replace_invalid_characters: bool = None
+    empty_field_as_null: bool = None
+    skip_byte_order_mark: bool = None
+    encoding: str = None
+    comment: str = None
 
 
 class JSONFileFormat(FileFormat):
-    props = {
-        "TYPE": EnumProp("TYPE", [FileType.JSON]),
-        "COMPRESSION": EnumProp("COMPRESSION", Compression),
-        "DATE_FORMAT": StringProp("DATE_FORMAT", alt_tokens=["AUTO"]),
-        "TIME_FORMAT": StringProp("TIME_FORMAT", alt_tokens=["AUTO"]),
-        "TIMESTAMP_FORMAT": StringProp("TIMESTAMP_FORMAT", alt_tokens=["AUTO"]),
-        "BINARY_FORMAT": EnumProp("BINARY_FORMAT", BinaryFormat),
-        "TRIM_SPACE": BoolProp("TRIM_SPACE"),
-        "NULL_IF": StringListProp("NULL_IF"),
-        "FILE_EXTENSION": StringProp("FILE_EXTENSION"),
-        "ENABLE_OCTAL": BoolProp("ENABLE_OCTAL"),
-        "ALLOW_DUPLICATE": BoolProp("ALLOW_DUPLICATE"),
-        "STRIP_OUTER_ARRAY": BoolProp("STRIP_OUTER_ARRAY"),
-        "STRIP_NULL_VALUES": BoolProp("STRIP_NULL_VALUES"),
-        "REPLACE_INVALID_CHARACTERS": BoolProp("REPLACE_INVALID_CHARACTERS"),
-        "IGNORE_UTF8_ERRORS": BoolProp("IGNORE_UTF8_ERRORS"),
-        "SKIP_BYTE_ORDER_MARK": BoolProp("SKIP_BYTE_ORDER_MARK"),
-        "COMMENT": StringProp("COMMENT"),
-    }
+    props = Props(
+        type=EnumProp("type", [FileType.JSON]),
+        compression=EnumProp("compression", Compression),
+        date_format=StringProp("date_format", alt_tokens=["AUTO"]),
+        time_format=StringProp("time_format", alt_tokens=["AUTO"]),
+        timestamp_format=StringProp("timestamp_format", alt_tokens=["AUTO"]),
+        binary_format=EnumProp("binary_format", BinaryFormat),
+        trim_space=BoolProp("trim_space"),
+        null_if=StringListProp("null_if"),
+        file_extension=StringProp("file_extension"),
+        enable_octal=BoolProp("enable_octal"),
+        allow_duplicate=BoolProp("allow_duplicate"),
+        strip_outer_array=BoolProp("strip_outer_array"),
+        strip_null_values=BoolProp("strip_null_values"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        ignore_utf8_errors=BoolProp("ignore_utf8_errors"),
+        skip_byte_order_mark=BoolProp("skip_byte_order_mark"),
+        comment=StringProp("comment"),
+    )
 
-    def __init__(
-        self,
-        compression=None,
-        date_format=None,
-        time_format=None,
-        timestamp_format=None,
-        binary_format=None,
-        trim_space=None,
-        null_if=None,
-        file_extension=None,
-        enable_octal=None,
-        allow_duplicate=None,
-        strip_outer_array=None,
-        strip_null_values=None,
-        replace_invalid_characters=None,
-        ignore_utf8_errors=None,
-        skip_byte_order_mark=None,
-        **kwargs,
-    ):
-        super().__init__(file_type=FileType.JSON, **kwargs)
-        self.compression = Compression.parse(compression) if compression else None
-        self.date_format = date_format
-        self.time_format = time_format
-        self.timestamp_format = timestamp_format
-        self.binary_format = BinaryFormat.parse(binary_format) if binary_format else None
-        self.trim_space = trim_space
-        self.null_if = null_if
-        self.file_extension = file_extension
-        self.enable_octal = enable_octal
-        self.allow_duplicate = allow_duplicate
-        self.strip_outer_array = strip_outer_array
-        self.strip_null_values = strip_null_values
-        self.replace_invalid_characters = replace_invalid_characters
-        self.ignore_utf8_errors = ignore_utf8_errors
-        self.skip_byte_order_mark = skip_byte_order_mark
+    type: FileType
+    compression: Compression = None
+    date_format: str = None
+    time_format: str = None
+    timestamp_format: str = None
+    binary_format: BinaryFormat = None
+    trim_space: bool = None
+    null_if: List[str] = []
+    file_extension: str = None
+    enable_octal: bool = None
+    allow_duplicate: bool = None
+    strip_outer_array: bool = None
+    strip_null_values: bool = None
+    replace_invalid_characters: bool = None
+    ignore_utf8_errors: bool = None
+    skip_byte_order_mark: bool = None
+    comment: str = None
 
 
 class AvroFileFormat(FileFormat):
-    props = {
-        "TYPE": EnumProp("TYPE", [FileType.AVRO]),
-        "COMPRESSION": EnumProp("COMPRESSION", Compression),
-        "TRIM_SPACE": BoolProp("TRIM_SPACE"),
-        "REPLACE_INVALID_CHARACTERS": BoolProp("REPLACE_INVALID_CHARACTERS"),
-        "NULL_IF": StringListProp("NULL_IF"),
-        "COMMENT": StringProp("COMMENT"),
-    }
+    props = Props(
+        type=EnumProp("type", [FileType.AVRO]),
+        compression=EnumProp("compression", Compression),
+        trim_space=BoolProp("trim_space"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        null_if=StringListProp("null_if"),
+        comment=StringProp("comment"),
+    )
 
-    def __init__(self, compression=None, trim_space=None, replace_invalid_characters=None, null_if=None, **kwargs):
-        super().__init__(file_type=FileType.AVRO, **kwargs)
-        self.compression = Compression.parse(compression) if compression else None
-        self.trim_space = trim_space
-        self.replace_invalid_characters = replace_invalid_characters
-        self.null_if = null_if
+    type: FileType
+    compression: Compression = None
+    trim_space: bool = None
+    replace_invalid_characters: bool = None
+    null_if: List[str] = []
+    comment: str = None
 
 
 class OrcFileFormat(FileFormat):
-    props = {
-        "TYPE": EnumProp("TYPE", FileType),
-        "TRIM_SPACE": BoolProp("TRIM_SPACE"),
-        "REPLACE_INVALID_CHARACTERS": BoolProp("REPLACE_INVALID_CHARACTERS"),
-        "NULL_IF": StringListProp("NULL_IF"),
-        "COMMENT": StringProp("COMMENT"),
-    }
+    props = Props(
+        type=EnumProp("type", [FileType.ORC]),
+        trim_space=BoolProp("trim_space"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        null_if=StringListProp("null_if"),
+        comment=StringProp("comment"),
+    )
 
-    def __init__(self, trim_space=None, replace_invalid_characters=None, null_if=None, **kwargs):
-        super().__init__(file_type=FileType.ORC, **kwargs)
-        self.trim_space = trim_space
-        self.replace_invalid_characters = replace_invalid_characters
-        self.null_if = null_if
+    type: FileType
+    trim_space: bool = None
+    replace_invalid_characters: bool = None
+    null_if: List[str] = []
+    comment: str = None
 
 
 class ParquetFileFormat(FileFormat):
-    props = {
-        "TYPE": EnumProp("TYPE", FileType),
-        "COMPRESSION": EnumProp(
-            "COMPRESSION", [Compression.AUTO, Compression.LZO, Compression.SNAPPY, Compression.NONE]
+    props = Props(
+        type=EnumProp("type", [FileType.PARQUET]),
+        compression=EnumProp(
+            "compression", [Compression.AUTO, Compression.LZO, Compression.SNAPPY, Compression.NONE]
         ),
-        "SNAPPY_COMPRESSION": BoolProp("SNAPPY_COMPRESSION"),
-        "BINARY_AS_TEXT": BoolProp("BINARY_AS_TEXT"),
-        "TRIM_SPACE": BoolProp("TRIM_SPACE"),
-        "REPLACE_INVALID_CHARACTERS": BoolProp("REPLACE_INVALID_CHARACTERS"),
-        "NULL_IF": StringListProp("NULL_IF"),
-        "COMMENT": StringProp("COMMENT"),
-    }
+        snappy_compression=BoolProp("snappy_compression"),
+        binary_as_text=BoolProp("binary_as_text"),
+        trim_space=BoolProp("trim_space"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        null_if=StringListProp("null_if"),
+        comment=StringProp("comment"),
+    )
 
-    def __init__(
-        self,
-        compression=None,
-        snappy_compression=None,
-        binary_as_text=None,
-        trim_space=None,
-        replace_invalid_characters=None,
-        null_if=None,
-        **kwargs,
-    ):
-        super().__init__(file_type=FileType.PARQUET, **kwargs)
-        self.compression = Compression.parse(compression) if compression else None
-        self.snappy_compression = snappy_compression
-        self.binary_as_text = binary_as_text
-        self.trim_space = trim_space
-        self.replace_invalid_characters = replace_invalid_characters
-        self.null_if = null_if
+    type: FileType
+    compression: Compression = None
+    snappy_compression: bool = None
+    binary_as_text: bool = None
+    trim_space: bool = None
+    replace_invalid_characters: bool = None
+    null_if: List[str] = []
+    comment: str = None
 
 
 class XMLFileFormat(FileFormat):
-    props = {
-        "TYPE": EnumProp("TYPE", FileType),
-        "COMPRESSION": EnumProp("COMPRESSION", Compression),
-        "IGNORE_UTF8_ERRORS": BoolProp("IGNORE_UTF8_ERRORS"),
-        "PRESERVE_SPACE": BoolProp("PRESERVE_SPACE"),
-        "STRIP_OUTER_ELEMENT": BoolProp("STRIP_OUTER_ELEMENT"),
-        "DISABLE_SNOWFLAKE_DATA": BoolProp("DISABLE_SNOWFLAKE_DATA"),
-        "DISABLE_AUTO_CONVERT": BoolProp("DISABLE_AUTO_CONVERT"),
-        "REPLACE_INVALID_CHARACTERS": BoolProp("REPLACE_INVALID_CHARACTERS"),
-        "SKIP_BYTE_ORDER_MARK": BoolProp("SKIP_BYTE_ORDER_MARK"),
-        "COMMENT": StringProp("COMMENT"),
-    }
+    props = Props(
+        type=EnumProp("type", [FileType.XML]),
+        compression=EnumProp("compression", Compression),
+        ignore_utf8_errors=BoolProp("ignore_utf8_errors"),
+        preserve_space=BoolProp("preserve_space"),
+        strip_outer_element=BoolProp("strip_outer_element"),
+        disable_snowflake_data=BoolProp("disable_snowflake_data"),
+        disable_auto_convert=BoolProp("disable_auto_convert"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        skip_byte_order_mark=BoolProp("skip_byte_order_mark"),
+        comment=StringProp("comment"),
+    )
 
-    def __init__(
-        self,
-        compression=None,
-        ignore_utf8_errors=None,
-        preserve_space=None,
-        strip_outer_element=None,
-        disable_snowflake_data=None,
-        disable_auto_convert=None,
-        replace_invalid_characters=None,
-        skip_byte_order_mark=None,
-        **kwargs,
-    ):
-        super().__init__(file_type=FileType.XML, **kwargs)
-        self.compression = Compression.parse(compression) if compression else None
-        self.ignore_utf8_errors = ignore_utf8_errors
-        self.preserve_space = preserve_space
-        self.strip_outer_element = strip_outer_element
-        self.disable_snowflake_data = disable_snowflake_data
-        self.disable_auto_convert = disable_auto_convert
-        self.replace_invalid_characters = replace_invalid_characters
-        self.skip_byte_order_mark = skip_byte_order_mark
+    type: FileType
+    compression: Compression = None
+    ignore_utf8_errors: bool = None
+    preserve_space: bool = None
+    strip_outer_element: bool = None
+    disable_snowflake_data: bool = None
+    disable_auto_convert: bool = None
+    replace_invalid_characters: bool = None
+    skip_byte_order_mark: bool = None
+    comment: str = None
 
 
 FileTypeMap = {
@@ -411,38 +354,29 @@ FileTypeMap = {
 }
 
 
-# class AnonFileFormatProp(Prop):
-#     def __init__(self, name) -> None:
-#         super().__init__(name, rf"{name}\s*=\s*\((.*)\)")
+class FileFormatProp(Prop):
+    """
+    FILE_FORMAT = my_named_ff
+    FILE_FORMAT = (FORMAT_NAME = my_named_ff)
+    FILE_FORMAT = (TYPE = CSV ...)
+    """
 
-#     def normalize(self, value: str) -> FileFormat:
-#         try:
-#             file_format_class, props = FileFormat.parse_anonymous_file_format(value)
-#             return file_format_class(anonymous=True, **props)
-#         except ValueError:
-#             return None
-
-#     def render(self, value: Optional[FileFormat]) -> str:
-#         if value is None:
-#             return ""
-#         return f"{self.name} = ({value.sql})"
-
-
-class AnonFileFormatProp(Prop):
     def __init__(self, name):
-        name = "FILE_FORMAT"
-        expression = None
-        value = None
-        super().__init__(name, expression, value)
+        expression = (
+            Keyword(name).suppress()
+            + Eq
+            + (
+                parens(StringProp("format_name").expression)
+                | (Lparen + ... + Rparen)
+                | Identifier
+                | pp.sgl_quoted_string
+            )
+        )
+        super().__init__(name, expression)
 
-    # def normalize(self, value: str) -> FileFormat:
-    #     try:
-    #         file_format_class, props = FileFormat.parse_anonymous_file_format(value)
-    #         return file_format_class(anonymous=True, **props)
-    #     except ValueError:
-    #         return None
-
-    def render(self, value):
-        if value is None:
-            return ""
-        return f"{self.name} = ({value.sql})"
+    def validate(self, prop_value):
+        file_type = EnumProp("type", FileType).parse(prop_value)
+        if file_type:
+            return FileTypeMap[file_type].props.parse(prop_value)
+        else:
+            return prop_value

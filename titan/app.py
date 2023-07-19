@@ -13,22 +13,24 @@ from sqlglot import exp
 # from snowflake.snowpark.stored_procedure import StoredProcedureRegistration
 
 # from .props import Identifier
-from .resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource
+from .__resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource
 from .resource_graph import ResourceGraph
 
 from .account import Account
 from .catalog import Catalog
 from .database import Database
 from .dynamic_table import DynamicTable
-from .file_format import FileFormat
-from .grants import RoleGrant, PrivGrant
+
+# from .file_format import FileFormat
+# from .grants import RoleGrant, PrivGrant
 from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
 from .role import Role
 from .schema import Schema
 from .stage import Stage
 from .table import Table
-from .task import Task
+
+# from .task import Task
 from .user import User
 from .warehouse import Warehouse
 

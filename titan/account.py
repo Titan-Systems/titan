@@ -1,10 +1,7 @@
-from enum import Enum
-
-from typing import Union, Optional
-
-from .resource import OrganizationLevelResource, AccountLevelResource, ResourceDB
+from .__resource import OrganizationLevelResource, AccountLevelResource, ResourceDB
 
 from .database import Database
+
 from .role import Role
 from .resource_monitor import ResourceMonitor
 from .share import Share

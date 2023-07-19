@@ -1,26 +1,21 @@
-import re
-from typing import Optional, List
-
-from titan.schema import Schema
-
-from .parseable_enum import ParseableEnum
+from .resource import Resource, Namespace
 from .props import (
-    BoolProp,
-    EnumProp,
-    FlagProp,
-    Identifier,
-    IdentifierListProp,
+    Props,
     IdentifierProp,
-    IntProp,
-    PropSet,
+    EnumProp,
     StringProp,
+    BoolProp,
+    IntProp,
+    FlagProp,
+    # IdentifierListProp,
     QueryProp,
+    ExpressionProp,
 )
-from .resource import SchemaLevelResource
-from .warehouse import WarehouseSize
+
+from .warehouse import Warehouse, WarehouseSize
 
 
-class Task(SchemaLevelResource):
+class Task(Resource):
     """
     CREATE [ OR REPLACE ] TASK [ IF NOT EXISTS ] <name>
       [ { WAREHOUSE = <string> } | { USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = <string> } ]
@@ -39,69 +34,40 @@ class Task(SchemaLevelResource):
       <sql>
     """
 
-    resource_name = "TASK"
-    ownable = True
-
-    create_statement = re.compile(
-        rf"""
-            CREATE\s+
-            (?:OR\s+REPLACE\s+)?
-            TASK\s+
-            (?:IF\s+NOT\s+EXISTS\s+)?
-            ({Identifier.pattern})
-        """,
-        re.VERBOSE | re.IGNORECASE,
+    resource_type = "TASK"
+    namespace = Namespace.ACCOUNT
+    props = Props(
+        warehouse=IdentifierProp("warehouse", resource_class=Warehouse),
+        user_task_managed_initial_warehouse_size=EnumProp(
+            "user_task_managed_initial_warehouse_size", WarehouseSize
+        ),
+        schedule=StringProp("schedule"),
+        config=StringProp("config"),
+        allow_overlapping_execution=BoolProp("allow_overlapping_execution"),
+        # session_parameters=PropSet("session parameters"),
+        user_task_timeout_ms=IntProp("user_task_timeout_ms"),
+        suspend_task_after_num_failures=IntProp("suspend_task_after_num_failures"),
+        error_integration=StringProp("error_integration"),
+        copy_grants=FlagProp("copy grants"),
+        comment=StringProp("comment"),
+        # after=IdentifierListProp("after", naked=true),
+        when=ExpressionProp("when"),
+        as_=QueryProp("as"),
     )
 
-    props = {
-        "warehouse": IdentifierProp("WAREHOUSE"),
-        "user_task_managed_initial_warehouse_size": EnumProp("USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE", WarehouseSize),
-        "schedule": StringProp("SCHEDULE"),
-        "config": StringProp("CONFIG"),
-        "allow_overlapping_execution": BoolProp("ALLOW_OVERLAPPING_EXECUTION"),
-        # "session_parameters": PropSet("SESSION PARAMETERS"),
-        "user_task_timeout_ms": IntProp("USER_TASK_TIMEOUT_MS"),
-        "suspend_task_after_num_failures": IntProp("SUSPEND_TASK_AFTER_NUM_FAILURES"),
-        "error_integration": IdentifierProp("ERROR_INTEGRATION"),
-        "copy_grants": FlagProp("COPY GRANTS"),
-        "comment": StringProp("COMMENT"),
-        "after": IdentifierListProp("AFTER", naked=True),
-        # "when": ExpressionProp("WHEN"),
-        "when": StringProp("WHEN"),
-        "as_": QueryProp("AS"),
-    }
-
-    def __init__(
-        self,
-        name: str,
-        warehouse: Optional[str] = None,
-        user_task_managed_initial_warehouse_size: Optional[str] = None,
-        schedule: Optional[str] = None,
-        config: Optional[str] = None,
-        allow_overlapping_execution: Optional[bool] = None,
-        # session_parameters: Optional[Dict[str, str]] = None,
-        user_task_timeout_ms: Optional[int] = None,
-        suspend_task_after_num_failures: Optional[int] = None,
-        error_integration: Optional[str] = None,
-        copy_grants: Optional[bool] = None,
-        comment: Optional[str] = None,
-        after: Optional[List[str]] = None,
-        when: Optional[str] = None,
-        as_: Optional[str] = None,
-        **kwargs,
-    ):
-        super().__init__(name, **kwargs)
-        self.warehouse = warehouse
-        self.user_task_managed_initial_warehouse_size = user_task_managed_initial_warehouse_size
-        self.schedule = schedule
-        self.config = config
-        self.allow_overlapping_execution = allow_overlapping_execution
-        # self.session_parameters = session_parameters
-        self.user_task_timeout_ms = user_task_timeout_ms
-        self.suspend_task_after_num_failures = suspend_task_after_num_failures
-        self.error_integration = error_integration
-        self.copy_grants = copy_grants
-        self.comment = comment
-        self.after = after
-        self.when = when
-        self.as_ = as_
+    name: str
+    owner: str = None
+    warehouse: Warehouse = None
+    user_task_managed_initial_warehouse_size: WarehouseSize = None
+    schedule: str = None
+    config: str = None
+    allow_overlapping_execution: bool = None
+    # session_parameters: Optional[Dict[str] = None
+    user_task_timeout_ms: int = None
+    suspend_task_after_num_failures: int = None
+    error_integration: str = None
+    copy_grants: bool = None
+    comment: str = None
+    # after: Optional[str] = None
+    when: str = None
+    as_: str = None

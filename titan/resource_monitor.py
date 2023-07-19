@@ -1,12 +1,3 @@
-# import re
-
-# from typing import Union, Optional, List
-
-# from .resource import AccountLevelResource
-# from .user import User
-# from .parseable_enum import ParseableEnum
-# from .props import Identifier, EnumProp, StringProp, IntProp, IdentifierListProp
-
 from typing import Union, Optional, Dict
 
 from .props import (
@@ -15,11 +6,11 @@ from .props import (
     ParseableEnum,
     Props,
     StringProp,
-    IdentifierListProp,
+    StringListProp,
 )
 
 
-from .resource2 import Resource, Namespace
+from .resource import Resource, Namespace
 
 
 class ResourceMonitorFrequency(ParseableEnum):
@@ -47,11 +38,12 @@ class ResourceMonitor(Resource):  #
     resource_type = "RESOURCE MONITOR"
     namespace = Namespace.ACCOUNT
     props = Props(
+        _start_token="WITH",
         credit_quota=IntProp("CREDIT_QUOTA"),
         frequency=EnumProp("FREQUENCY", ResourceMonitorFrequency),
         start_timestamp=StringProp("START_TIMESTAMP", alt_tokens=["IMMEDIATELY"]),
         end_timestamp=StringProp("END_TIMESTAMP"),
-        notify_users=IdentifierListProp("NOTIFY_USERS"),
+        notify_users=StringListProp("NOTIFY_USERS"),
     )
 
     name: str

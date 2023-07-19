@@ -1,9 +1,8 @@
-from .resource import AccountLevelResource, ResourceDB
-from .schema import Schema
-from .table import Table
+from .resource import Resource, Namespace
+from .props import Props, StringProp
 
 
-class Share(AccountLevelResource):
+class Share(Resource):
     """
     CREATE DATABASE
         IDENTIFIER('SNOWPARK_FOR_PYTHON__HANDSONLAB__WEATHER_DATA')
@@ -11,20 +10,29 @@ class Share(AccountLevelResource):
         IDENTIFIER('WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"');
     """
 
-    def __init__(self, name: str, from_share: str, **kwargs):
-        # accept_terms: bool = False,
-        super().__init__(name, **kwargs)
-        self.from_share = from_share
+    resource_type = "SHARE"
+    namespace = Namespace.ACCOUNT
+    props = Props(
+        from_share=StringProp("from share"),
+    )
 
-        self.schemas = ResourceDB(Schema)
+    name: str
+    from_share: str
 
-        # self.listing = listing
-        # self.accept_terms = accept_terms
-        # self.database_share: str = 'WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"'
-        # This is a bug, Shares need to have a model of all the entities that will be created
-        # self.implicit_schema: Schema = Schema(name="ONPOINT_ID", database=self, implicit=True)
+    # def __init__(self, name: str, from_share: str, **kwargs):
+    #     # accept_terms: bool = False,
+    #     super().__init__(name, **kwargs)
+    #     self.from_share = from_share
 
-        # SHOW OBJECTS IN DATABASE WEATHER_NYC
+    #     self.schemas = ResourceDB(Schema)
+
+    # self.listing = listing
+    # self.accept_terms = accept_terms
+    # self.database_share: str = 'WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"'
+    # This is a bug, Shares need to have a model of all the entities that will be created
+    # self.implicit_schema: Schema = Schema(name="ONPOINT_ID", database=self, implicit=True)
+
+    # SHOW OBJECTS IN DATABASE WEATHER_NYC
 
     # def create(self, session):
     #     # Punting for now. Not sure if this is better represented as a dependency in the resource graph

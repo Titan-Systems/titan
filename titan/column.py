@@ -1,20 +1,20 @@
 from typing import List, Dict
 
+import pyparsing as pp
+
 from .props import (
-    BoolProp,
-    EnumProp,
-    FileFormatProp,
-    FlagProp,
-    IdentifierListProp,
-    IntProp,
+    Prop,
+    parens,
+    Identifier,
     ParseableEnum,
     Props,
     StringProp,
     TagsProp,
+    Any,
 )
 
 
-from .resource2 import Resource, Namespace
+from .resource import Resource, Namespace
 
 
 class ColumnType(ParseableEnum):
@@ -92,18 +92,20 @@ class Column(Resource):
     """
 
     resource_type = "COLUMN"
-    namespace = Namespace.TABLE
+    namespace = None
     props = Props(
-        col_type=EnumProp("col_type", ColumnType),
         comment=StringProp("comment"),
     )
 
     name: str
-    col_type: ColumnType
+    type: ColumnType
+    comment: str = None
 
-
-class Columns:
-    pass
-
-
-# Table("raw_data", columns=)
+    @classmethod
+    def from_sql(cls, sql):
+        # parser = Identifier + Any + pp.Word(pp.printables + " \n")
+        parser = Identifier + Any
+        for (name, type), start, end in parser.scan_string(sql):
+            remainder = sql[end:]
+            props = cls.props.parse(remainder)
+            return cls(name=name, type=ColumnType.parse(type), **props)

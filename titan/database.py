@@ -3,7 +3,7 @@ from typing import Dict
 from .schema import Schema
 from .props import Props, IntProp, StringProp, TagsProp, FlagProp
 
-from .resource2 import Resource, Namespace, ResourceDB
+from .resource import Resource, Namespace, ResourceDB
 
 
 class Database(Resource):

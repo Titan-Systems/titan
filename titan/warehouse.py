@@ -12,7 +12,7 @@ from .props import (
 )
 
 
-from .resource2 import Resource, Namespace
+from .resource import Resource, Namespace
 from .resource_monitor import ResourceMonitor
 
 
@@ -47,7 +47,8 @@ class Warehouse(Resource):
 
     objectProperties ::=
         WAREHOUSE_TYPE = STANDARD | SNOWPARK-OPTIMIZED
-        WAREHOUSE_SIZE = XSMALL | SMALL | MEDIUM | LARGE | XLARGE | XXLARGE | XXXLARGE | X4LARGE | X5LARGE | X6LARGE
+        WAREHOUSE_SIZE = XSMALL | SMALL | MEDIUM | LARGE | XLARGE | XXLARGE | XXXLARGE
+                          | X4LARGE | X5LARGE | X6LARGE
         MAX_CLUSTER_COUNT = <num>
         MIN_CLUSTER_COUNT = <num>
         SCALING_POLICY = STANDARD | ECONOMY

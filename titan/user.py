@@ -1,9 +1,9 @@
-from typing import Dict
+from typing import Dict, List
 
 from .props import Props, BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, TagsProp
 
 # from .resource import AccountLevelResource
-from .resource2 import Resource, Namespace, ResourceDB
+from .resource import Resource, Namespace, ResourceDB
 
 
 class User(Resource):
@@ -86,9 +86,9 @@ class User(Resource):
         disabled=BoolProp("disabled"),
         days_to_expiry=IntProp("days_to_expiry"),
         mins_to_unlock=IntProp("mins_to_unlock"),
-        default_warehouse=IdentifierProp("default_warehouse"),
+        default_warehouse=StringProp("default_warehouse"),
         default_namespace=StringProp("default_namespace"),
-        default_role=IdentifierProp("default_role"),
+        default_role=StringProp("default_role"),
         default_secondary_roles=StringListProp("default_secondary_roles"),
         mins_to_bypass_mfa=IntProp("mins_to_bypass_mfa"),
         rsa_public_key=StringProp("rsa_public_key"),
@@ -113,7 +113,7 @@ class User(Resource):
     default_warehouse: str = None
     default_namespace: str = None
     default_role: str = None
-    default_secondary_roles: str = None
+    default_secondary_roles: List[str] = None
     mins_to_bypass_mfa: int = None
     rsa_public_key: str = None
     rsa_public_key_2: str = None

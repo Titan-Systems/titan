@@ -10,7 +10,7 @@ from . import __version__, LOGO
 
 from .app import App
 from .policies.titan_standard import titan_standard
-from .resource2 import Resource
+from .resource import Resource
 
 import click
 import yaml
@@ -106,11 +106,15 @@ def test(path: str):
             for raw in sql_blob.split(";"):
                 sql = raw.strip()
                 if sql:
+                    command = sql.split()[0].lower()
+                    if command != "create":
+                        # print(f"Command {command} not supported")
+                        continue
                     res = Resource.from_sql(sql)
                     if res:
-                        print(res.name)
-            # except Exception as e:
-            #     print(">>>SKIPPED<<<")
-            #     print(e)
-            #     # print(sql_blob)
-            #     continue
+                        print(
+                            "✅",
+                            f"<{res.__class__.__name__} {res.name}>",
+                            "=>",
+                            res.model_dump(exclude_none=True, exclude_defaults=True),
+                        )

@@ -3,13 +3,17 @@ from titan.blueprint import Blueprint
 
 from .database import Database
 from .external_function import ExternalFunction
+from .file_format import FileFormat
 from .role import Role
-from .table import Table
 from .schema import Schema
 from .share import Share
-from .warehouse import Warehouse
+from .table import Table
+from .task import Task
 from .user import User
-from .view import View
+from .warehouse import Warehouse
+
+
+# from .view import View
 
 
 __version__ = "0.0.1"

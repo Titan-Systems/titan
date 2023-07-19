@@ -2,11 +2,7 @@ from contextlib import contextmanager
 from queue import Queue
 from typing import List, Type, Optional, Set
 
-from .resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource
-
-from .account import Account
-from .database import Database
-from .schema import Schema
+from .resource import Resource
 
 
 class ResourceGraph:

@@ -2,20 +2,21 @@ from typing import List, Dict
 
 from .props import (
     BoolProp,
-    EnumProp,
-    FileFormatProp,
     FlagProp,
-    IdentifierListProp,
     IntProp,
-    ParseableEnum,
     Props,
+    ResourceListProp,
     StringProp,
+    StringListProp,
     TagsProp,
 )
 
 
-from .resource2 import Resource, Namespace
+from .resource import Resource, Namespace
+
+from .column import Column
 from .stage import InternalStage
+from .file_format import FileFormatProp
 
 
 class Table(Resource):
@@ -24,27 +25,28 @@ class Table(Resource):
       [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE | TRANSIENT } ]
       TABLE [ IF NOT EXISTS ] <table_name>
       ( ... )
-          [ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
-          [ ENABLE_SCHEMA_EVOLUTION = { TRUE | FALSE } ]
-          [ STAGE_FILE_FORMAT = ( { FORMAT_NAME = '<file_format_name>'
-                                   | TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ] } ) ]
-          [ STAGE_COPY_OPTIONS = ( copyOptions ) ]
-          [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
-          [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
-          [ CHANGE_TRACKING = { TRUE | FALSE } ]
-          [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
-          [ COPY GRANTS ]
-          [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
-          [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-          [ COMMENT = '<string_literal>' ]
+      [ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
+      [ ENABLE_SCHEMA_EVOLUTION = { TRUE | FALSE } ]
+      [ STAGE_FILE_FORMAT = ( { FORMAT_NAME = '<file_format_name>'
+                               | TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ] } ) ]
+      [ STAGE_COPY_OPTIONS = ( copyOptions ) ]
+      [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
+      [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
+      [ CHANGE_TRACKING = { TRUE | FALSE } ]
+      [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
+      [ COPY GRANTS ]
+      [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
+      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+      [ COMMENT = '<string_literal>' ]
     """
 
     resource_type = "TABLE"
     namespace = Namespace.SCHEMA
     props = Props(
+        columns=ResourceListProp(Column),
         volatile=FlagProp("volatile"),
         transient=FlagProp("transient"),
-        cluster_by=IdentifierListProp("cluster by"),
+        cluster_by=StringListProp("cluster by"),
         enable_schema_evolution=BoolProp("enable_schema_evolution"),
         stage_file_format=FileFormatProp("stage_file_format"),
         # STAGE_COPY_OPTIONS
@@ -59,6 +61,7 @@ class Table(Resource):
 
     name: str
     owner: str = None
+    columns: list = []
     volatile: bool = False
     transient: bool = False
     cluster_by: List[str] = []
