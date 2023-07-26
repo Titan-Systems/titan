@@ -5,6 +5,7 @@ from .props import (
     FlagProp,
     IntProp,
     Props,
+    PropSet,
     ResourceListProp,
     StringProp,
     StringListProp,
@@ -12,14 +13,14 @@ from .props import (
 )
 
 
-from .resource import Resource, Namespace
+from .resource import Resource, Namespace, SchemaScoped
 
 from .column import Column
-from .stage import InternalStage
+from .stage import InternalStage, copy_options
 from .file_format import FileFormatProp
 
 
-class Table(Resource):
+class Table(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ]
       [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE | TRANSIENT } ]
@@ -49,7 +50,7 @@ class Table(Resource):
         cluster_by=StringListProp("cluster by"),
         enable_schema_evolution=BoolProp("enable_schema_evolution"),
         stage_file_format=FileFormatProp("stage_file_format"),
-        # STAGE_COPY_OPTIONS
+        stage_copy_options=PropSet("stage_copy_options", copy_options),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
         max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
         change_tracking=BoolProp("change_tracking"),
@@ -71,7 +72,7 @@ class Table(Resource):
     change_tracking: bool = False
     default_ddl_collation: str = None
     copy_grants: bool = False
-    tags: Dict[str, str] = {}
+    tags: Dict[str, str] = None
     comment: str = None
 
     _table_stage: InternalStage
@@ -95,9 +96,9 @@ class Table(Resource):
     #     props = self.props_sql()
     #     return f"CREATE TABLE {self.fully_qualified_name} () {props}"
 
-    # @property
-    # def select_star_sql(self):
-    #     return f"SELECT * FROM {self.fully_qualified_name}"
+    @property
+    def select_star_sql(self):
+        return f"SELECT * FROM {self.fully_qualified_name}"
 
     # # https://github.com/python/mypy/issues/5936
     # @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]

@@ -1,20 +1,15 @@
-from typing import List, Dict
-
 import pyparsing as pp
 
+from .parseable_enum import ParseableEnum
 from .props import (
-    Prop,
-    parens,
     Identifier,
-    ParseableEnum,
     Props,
     StringProp,
-    TagsProp,
     Any,
 )
 
 
-from .resource import Resource, Namespace
+from .resource import Resource
 
 
 class ColumnType(ParseableEnum):
@@ -104,7 +99,7 @@ class Column(Resource):
     @classmethod
     def from_sql(cls, sql):
         # parser = Identifier + Any + pp.Word(pp.printables + " \n")
-        parser = Identifier + Any
+        parser = (Identifier | pp.dbl_quoted_string) + Any
         for (name, type), start, end in parser.scan_string(sql):
             remainder = sql[end:]
             props = cls.props.parse(remainder)

@@ -1,5 +1,6 @@
-from .resource import Resource, Namespace
+from .resource import Resource, ResourceDB, Namespace
 from .props import Props, StringProp
+from .schema import Schema
 
 
 class Share(Resource):
@@ -10,7 +11,7 @@ class Share(Resource):
         IDENTIFIER('WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"');
     """
 
-    resource_type = "SHARE"
+    # resource_type = "DATABASE"
     namespace = Namespace.ACCOUNT
     props = Props(
         from_share=StringProp("from share"),
@@ -19,12 +20,15 @@ class Share(Resource):
     name: str
     from_share: str
 
-    # def __init__(self, name: str, from_share: str, **kwargs):
-    #     # accept_terms: bool = False,
-    #     super().__init__(name, **kwargs)
-    #     self.from_share = from_share
+    _schemas: ResourceDB
 
-    #     self.schemas = ResourceDB(Schema)
+    def model_post_init(self, ctx):
+        super().model_post_init(ctx)
+        self._schemas = ResourceDB(Schema)
+
+    @property
+    def schemas(self):
+        return self._schemas
 
     # self.listing = listing
     # self.accept_terms = accept_terms

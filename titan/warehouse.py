@@ -1,11 +1,11 @@
 from typing import Dict
 
+from .parseable_enum import ParseableEnum
 from .props import (
     BoolProp,
     EnumProp,
     IdentifierProp,
     IntProp,
-    ParseableEnum,
     Props,
     StringProp,
     TagsProp,
@@ -106,6 +106,6 @@ class Warehouse(Resource):
     max_concurrency_level: int = None
     statement_queued_timeout_in_seconds: int = None
     statement_timeout_in_seconds: int = None
-    tags: Dict[str, str] = {}
+    tags: Dict[str, str] = None
 
     # self.requires(self.resource_monitor)

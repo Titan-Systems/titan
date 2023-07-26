@@ -3,9 +3,11 @@ from typing import ClassVar
 
 import pyparsing as pp
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, SerializeAsAny, field_serializer
 
 from .props import Props
+from .urn import URN
+from .sql import add_ref
 
 Keyword = pp.CaselessKeyword
 
@@ -22,6 +24,7 @@ ScopedIdentifier = Identifier
 
 
 class Namespace(Enum):
+    ORGANIZATION = "ORGANIZATION"
     ACCOUNT = "ACCOUNT"
     DATABASE = "DATABASE"
     SCHEMA = "SCHEMA"
@@ -32,17 +35,22 @@ resource_db = {}
 
 
 class Resource(BaseModel):
-    model_config = ConfigDict(from_attributes=True, extra="forbid")
+    model_config = ConfigDict(from_attributes=True, extra="forbid", validate_assignment=True)
 
     resource_type: ClassVar[str] = None
     namespace: ClassVar[Namespace]
     props: ClassVar[Props]
 
+    name: str
     implicit: bool = Field(exclude=True, default=False)
     stub: bool = Field(exclude=True, default=False)
 
     def model_post_init(self, ctx):
         resource_db[(self.__class__, self.name)] = self
+
+    @field_serializer("name")
+    def serialize_dt(self, name: str, _info):
+        return name.upper()
 
     @classmethod
     def find(cls, resource_name):
@@ -65,8 +73,8 @@ class Resource(BaseModel):
     def from_sql(cls, sql):
         is_generic = cls == Resource
 
-        #     # New but not working. Fixes bug with 2+ spaces between keywords eg RESOURCE  MONITOR
-        #     #                                                                           ^^
+        # New but not working. Fixes bug with 2+ spaces between keywords eg RESOURCE  MONITOR
+        #                                                                           ^^
         types = [cls.resource_type]
         if is_generic:
             types = [subcls.resource_type for subcls in cls.__subclasses__() if subcls.resource_type]
@@ -85,7 +93,7 @@ class Resource(BaseModel):
         )
         try:
             parsed = header.parse_string(sql)
-        except pp.ParseException:
+        except pp.ParseException as e:
             print("❌", "failed to parse header")
             return None
         resource_name = parsed.resource_name
@@ -96,10 +104,93 @@ class Resource(BaseModel):
         resource_cls = cls._resolve_class(resource_type, props_sql)
         try:
             props = resource_cls.props.parse(props_sql) if props_sql else {}
-        except:
+        except Exception as e:
+            print(e)
             print("❌", "failed to parse props", resource_cls, props_sql)
             return None
+            # raise e
         return resource_cls(name=resource_name, **props)
+
+    # @property
+    # def fully_qualified_name(self):
+    #     return self.name.upper()
+
+    @property
+    def fqn(self):
+        return self.fully_qualified_name
+
+    @property
+    def urn(self):
+        """
+        urn:sf:us-central1.gcp::account/UJ63311
+        """
+        resource_type = self.resource_type.lower().replace(" ", "_")
+        return URN(resource_type=resource_type, name=self.fully_qualified_name)
+
+    def __format__(self, format_spec):
+        add_ref(self)
+        return self.fully_qualified_name
+
+    # def finalize(self):
+    #     pass
+
+
+class AccountScoped(BaseModel):
+    namespace: ClassVar[Namespace] = Namespace.ACCOUNT
+    account: SerializeAsAny[Resource] = None
+
+    @property
+    def fully_qualified_name(self):
+        return self.name.upper()
+
+    @property
+    def urn(self):
+        """
+        urn:sf:us-central1.gcp:AB11223:database/TEST_DB
+        """
+        if self.account:
+            account = self.account.name
+            region = self.account.region
+        else:
+            account = "NULL"
+            region = "NULL"
+        resource_type = self.resource_type.lower().replace(" ", "_")
+        return URN(region, account, resource_type, self.fully_qualified_name)
+
+    def finalize(self):
+        # super().finalize()
+        if self.account is None:
+            raise Exception(f"AccountScoped resource {self} has no account")
+
+
+class DatabaseScoped(BaseModel):
+    namespace: ClassVar[Namespace] = Namespace.DATABASE
+    database: SerializeAsAny[Resource] = None
+
+    @property
+    def fully_qualified_name(self):
+        database = self.database.name if self.database else "[NULL]"
+        return ".".join([database, self.name.upper()])
+
+    def finalize(self):
+        # super().finalize()
+        if self.database is None:
+            raise Exception(f"DatabaseScoped resource {self} has no database")
+
+
+class SchemaScoped(BaseModel):
+    namespace: ClassVar[Namespace] = Namespace.SCHEMA
+    schema_: Resource = Field(alias="schema", default=None)
+    # _schema: Resource = Field(alias="schema", default=None)
+
+    @property
+    def fully_qualified_name(self):
+        schema = self.schema_.name if self.schema_ else "[NULL]"
+        return ".".join([schema, self.name.upper()])
+
+    def finalize(self):
+        if self.schema_ is None:
+            raise Exception(f"SchemaScoped resource {self} has no schema")
 
 
 class ResourceDB:

@@ -19,5 +19,5 @@ class Role(Resource):
     )
 
     name: str
-    tags: Dict[str, str] = {}
+    tags: Dict[str, str] = None
     comment: str = None

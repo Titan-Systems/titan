@@ -2,8 +2,7 @@ from typing import Dict, List
 
 from .props import Props, BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, TagsProp
 
-# from .resource import AccountLevelResource
-from .resource import Resource, Namespace, ResourceDB
+from .resource import Resource, Namespace
 
 
 class User(Resource):
@@ -119,4 +118,4 @@ class User(Resource):
     rsa_public_key_2: str = None
     comment: str = None
     network_policy: str = None
-    tags: Dict[str, str] = {}
+    tags: Dict[str, str] = None

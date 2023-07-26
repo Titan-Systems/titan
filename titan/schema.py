@@ -4,17 +4,16 @@ from .props import IntProp, StringProp, TagsProp, FlagProp, Props
 
 from .dynamic_table import DynamicTable
 
-# from .file_format import FileFormat
+from .file_format import FileFormat
 from .pipe import Pipe
 from .stage import Stage
 from .table import Table
+from .view import View
 
-# from .view import View
-
-from .resource import Resource, Namespace, ResourceDB
+from .resource import Resource, Namespace, ResourceDB, DatabaseScoped
 
 
-class Schema(Resource):
+class Schema(Resource, DatabaseScoped):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] SCHEMA [ IF NOT EXISTS ] <name>
       [ CLONE <source_schema>
@@ -46,7 +45,7 @@ class Schema(Resource):
     data_retention_time_in_days: int = None
     max_data_extension_time_in_days: int = None
     default_ddl_collation: str = None
-    tags: Dict[str, str] = {}
+    tags: Dict[str, str] = None
     comment: str = None
 
     _dynamic_tables: ResourceDB
@@ -60,12 +59,12 @@ class Schema(Resource):
         super().model_post_init(ctx)
 
         self._dynamic_tables = ResourceDB(DynamicTable)
-        # self._file_formats = ResourceDB(FileFormat)
+        self._file_formats = ResourceDB(FileFormat)
         self._pipes = ResourceDB(Pipe)
         # self._sprocs = ResourceDB(Sproc)
         self._stages = ResourceDB(Stage)
         self._tables = ResourceDB(Table)
-        # self._views = ResourceDB(View)
+        self._views = ResourceDB(View)
 
     @property
     def dynamic_tables(self):
@@ -103,3 +102,4 @@ class Schema(Resource):
                 self.views[other_resource.name] = other_resource
             else:
                 raise TypeError(f"Cannot add {other_resource} to {self}")
+            other_resource.schema = self

@@ -12,6 +12,8 @@ from .app import App
 from .policies.titan_standard import titan_standard
 from .resource import Resource
 
+from .parse import split_statements
+
 import click
 import yaml
 
@@ -98,13 +100,13 @@ def test(path: str):
     print(f"      Titan v{__version__}\n")
 
     for file in os.listdir(path):
-        # for file in ["schema.sql", "database.sql"]:
         if file.endswith(".sql"):
             print("^" * 80, file)
             sql_blob = open(os.path.join(path, file), "r").read()
             # try:
-            for raw in sql_blob.split(";"):
+            for raw in split_statements(sql_blob):
                 sql = raw.strip()
+                # print(">>>", sql, "<<<")
                 if sql:
                     command = sql.split()[0].lower()
                     if command != "create":
@@ -115,6 +117,6 @@ def test(path: str):
                         print(
                             "✅",
                             f"<{res.__class__.__name__} {res.name}>",
-                            "=>",
-                            res.model_dump(exclude_none=True, exclude_defaults=True),
+                            # "=>",
+                            # res.model_dump(exclude_none=True, exclude_defaults=True),
                         )

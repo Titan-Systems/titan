@@ -15,9 +15,9 @@ class DynamicTable(Resource):
     resource_type = "DYNAMIC TABLE"
     namespace = Namespace.SCHEMA
     props = Props(
-        target_lag=StringProp("TARGET_LAG", alt_tokens=["DOWNSTREAM"]),
-        warehouse=IdentifierProp("WAREHOUSE", Warehouse),
-        as_=QueryProp("AS"),
+        target_lag=StringProp("target_lag", alt_tokens=["DOWNSTREAM"]),
+        warehouse=IdentifierProp("warehouse", Warehouse),
+        as_=QueryProp("as"),
     )
 
     name: str

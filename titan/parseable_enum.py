@@ -16,7 +16,9 @@ class ParseableEnum(Enum):
             try:
                 parsed = cls[value.upper().replace("-", "_").replace(" ", "_")]
             except KeyError:
-                raise ValueError(f"Invalid {cls.__name__} value: {value}. Must be one of {[e.value for e in cls]}")
+                raise ValueError(
+                    f"Invalid {cls.__name__} value: {value}. Must be one of {[e.value for e in cls]}"
+                )
             return parsed
         else:
             raise ValueError(f"Invalid {cls.__name__} value: {value}")

@@ -1,5 +1,3 @@
-import re
-
 from typing import List
 
 import pyparsing as pp
@@ -133,39 +131,8 @@ class FileFormat(Resource):
 
     @classmethod
     def _resolve_class(cls, _: str, props_sql: str):
-        match = re.match(r"TYPE\s*=\s*(\w+)", props_sql, re.IGNORECASE)
-        file_type = FileType.parse(match.group(1))
+        file_type = EnumProp("type", FileType).parse(props_sql)
         return FileTypeMap[file_type]
-
-
-#     def __init__(self, file_type: Optional[FileType] = None, name=None, anonymous: bool = False, **kwargs):
-#         # if type(self) == FileFormat:
-#         #     raise TypeError(f"only children of '{type(self).__name__}' may be instantiated")
-#         if all([name, anonymous]):
-#             raise Exception("Anonymous file formats cannot be named")
-#         name = name or "__anon__"
-#         super().__init__(name=name, **kwargs)
-#         if self.stub and file_type is not None:
-#             raise Exception("Cannot specify file type for stubbed file format")
-#         self.file_type = FileType.parse(file_type) if isinstance(file_type, str) else file_type
-#         self.anonymous = anonymous
-
-
-# class AnonymousFileFormat(Resource):
-#     resource_type = None
-#     namespace = None
-
-#     @classmethod
-#     def from_sql(cls, sql):
-#         # parser = Identifier + Any + pp.Word(pp.printables + " \n")
-#         # parser = Identifier + Any
-#         # for (name, type), start, end in parser.scan_string(sql):
-#         #     remainder = sql[end:]
-#         #     props = cls.props.parse(remainder)
-#         #     return cls(name=name, type=ColumnType.parse(type), **props)
-#         props = EnumProp("type", FileType).parse(sql)
-#         file_format_class = FileTypeMap[props["type"]]
-#         return file_format_class(**props)
 
 
 class CSVFileFormat(FileFormat):

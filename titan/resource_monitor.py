@@ -1,9 +1,7 @@
-from typing import Union, Optional, Dict
-
+from .parseable_enum import ParseableEnum
 from .props import (
     EnumProp,
     IntProp,
-    ParseableEnum,
     Props,
     StringProp,
     StringListProp,

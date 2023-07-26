@@ -1,6 +1,9 @@
-_refs = set()
+_refs = []  # set()
 
-add_ref = _refs.add
+
+add_ref = _refs.append
+# def add_ref(ref):
+#     _refs.add(ref.fully_qualified_name)
 
 
 def capture_refs():
@@ -10,10 +13,16 @@ def capture_refs():
     return refs
 
 
-class SQL:
-    def __init__(self, sql: str) -> None:
-        self.refs = capture_refs()
-        self._sql = sql
+def SQL(sql: str):
+    capture_refs()
+    return sql
+    # return SQL(sql
 
-    def __str__(self):
-        return self._sql
+
+# class SQL:
+#     def __init__(self, sql: str) -> None:
+#         self.refs = capture_refs()
+#         self._sql = sql
+
+#     def __str__(self):
+#         return self._sql

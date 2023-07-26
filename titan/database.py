@@ -3,10 +3,10 @@ from typing import Dict
 from .schema import Schema
 from .props import Props, IntProp, StringProp, TagsProp, FlagProp
 
-from .resource import Resource, Namespace, ResourceDB
+from .resource import Resource, Namespace, ResourceDB, AccountScoped
 
 
-class Database(Resource):
+class Database(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
         [ CLONE <source_db>
@@ -19,7 +19,6 @@ class Database(Resource):
     """
 
     resource_type = "DATABASE"
-    namespace = Namespace.ACCOUNT
     props = Props(
         transient=FlagProp("transient"),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
@@ -31,11 +30,11 @@ class Database(Resource):
 
     name: str
     transient: bool = False
-    owner: str = None
-    data_retention_time_in_days: int = None
-    max_data_extension_time_in_days: int = None
+    owner: str = "SYSADMIN"
+    data_retention_time_in_days: int = 1
+    max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    tags: Dict[str, str] = {}
+    tags: Dict[str, str] = None
     comment: str = None
 
     _schemas: ResourceDB

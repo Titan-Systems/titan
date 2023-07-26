@@ -1,65 +1,57 @@
-# import re
+from typing import Dict
 
-# from typing import List, Optional, Tuple
+from pydantic import Field
 
-# from .resource import SchemaLevelResource
-# from .props import Identifier, BoolProp, QueryProp, StringProp, IntProp, TagsProp, IdentifierProp
+from .resource import Resource, Namespace, SchemaScoped
+
+from .props import (
+    Props,
+    FlagProp,
+    QueryProp,
+    ResourceListProp,
+    StringProp,
+    TagsProp,
+)
+
+from .column import Column
+
+# from .schema import Schema
 
 
-# class View(SchemaLevelResource):
-#     """
-#     CREATE [ OR REPLACE ] [ SECURE ] [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE } ] [ RECURSIVE ] VIEW [ IF NOT EXISTS ] <name>
-#       [ ( <column_list> ) ]
-#       [ <col1> [ WITH ] MASKING POLICY <policy_name> [ USING ( <col1> , <cond_col1> , ... ) ]
-#                [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-#       [ , <col2> [ ... ] ]
-#       [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
-#       [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-#       [ COPY GRANTS ]
-#       [ COMMENT = '<string_literal>' ]
-#       AS <select_statement>
-#     """
+class View(Resource, SchemaScoped):
+    """
+    CREATE [ OR REPLACE ] [ SECURE ] [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE } ] [ RECURSIVE ] VIEW [ IF NOT EXISTS ] <name>
+      [ ( <column_list> ) ]
+      [ <col1> [ WITH ] MASKING POLICY <policy_name> [ USING ( <col1> , <cond_col1> , ... ) ]
+               [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+      [ , <col2> [ ... ] ]
+      [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
+      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+      [ COPY GRANTS ]
+      [ COMMENT = '<string_literal>' ]
+      AS <select_statement>
+    """
 
-#     resource_name = "VIEW"
+    resource_type = "VIEW"
+    props = Props(
+        secure=FlagProp("secure"),
+        columns=ResourceListProp(Column),
+        volatile=FlagProp("volatile"),
+        recursive=FlagProp("recursive"),
+        tags=TagsProp(),
+        copy_grants=FlagProp("copy grants"),
+        comment=StringProp("comment"),
+        as_=QueryProp("as"),
+    )
 
-#     props = {
-#         "tags": TagsProp(),
-#         "copy_grants": BoolProp("COPY GRANTS"),
-#         "comment": StringProp("COMMENT"),
-#         "as_": QueryProp("AS"),
-#     }
+    name: str
+    owner: str = None
 
-#     # class Props:
-#     #     tags = TagsProp()
-#     #     copy_grants = BoolProp("COPY GRANTS")
-#     #     comment = StringProp("COMMENT")
-#     #     as_ = QueryProp("AS")
-
-#     create_statement = re.compile(
-#         rf"""
-#             CREATE\s+
-#             (?:OR\s+REPLACE\s+)?
-#             (?:SECURE\s+)?
-#             VIEW\s+
-#             (?:IF\s+NOT\s+EXISTS\s+)?
-#             ({Identifier.pattern})
-#             """,
-#         re.IGNORECASE | re.VERBOSE,
-#     )
-
-#     ownable = True
-
-#     def __init__(
-#         self,
-#         name: str,
-#         tags: List[Tuple[str, str]] = [],
-#         copy_grants: Optional[bool] = None,
-#         comment: Optional[str] = None,
-#         as_: Optional[str] = None,
-#         **kwargs,
-#     ):
-#         super().__init__(name, **kwargs)
-#         self.tags = tags
-#         self.copy_grants = copy_grants
-#         self.comment = comment
-#         self.as_ = as_
+    secure: bool = None
+    columns: list = []
+    volatile: bool = False
+    recursive: bool = False
+    tags: Dict[str, str] = None
+    copy_grants: bool = False
+    comment: str = None
+    as_: str = None
