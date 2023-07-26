@@ -1,7 +1,7 @@
 import pyparsing as pp
 
-from .parseable_enum import ParseableEnum
-from .props import (
+from titan.parseable_enum import ParseableEnum
+from titan.props import (
     Identifier,
     Props,
     StringProp,
@@ -9,7 +9,7 @@ from .props import (
 )
 
 
-from .resource import Resource
+from titan.resource import Resource
 
 
 class ColumnType(ParseableEnum):
@@ -87,7 +87,6 @@ class Column(Resource):
     """
 
     resource_type = "COLUMN"
-    namespace = None
     props = Props(
         comment=StringProp("comment"),
     )

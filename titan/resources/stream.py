@@ -1,28 +1,15 @@
 from typing import Dict
 
-from .resource import Resource, Namespace
-from .parseable_enum import ParseableEnum
-from .props import Props, FlagProp, EnumProp, StringProp, BoolProp, AtBeforeProp
+from titan.resource import Resource, Namespace
+from titan.parseable_enum import ParseableEnum
+from titan.props import Props, FlagProp, EnumProp, StringProp, BoolProp, AtBeforeProp
 
 
-class StreamType(ParseableEnum):
-    TABLE = "TABLE"
-    EXTERNAL_TABLE = "EXTERNAL TABLE"
-    STAGE = "STAGE"
-    VIEW = "VIEW"
-
-
-class Stream(Resource):
-    resource_type = "STREAM"
-    namespace = Namespace.SCHEMA
-
-    name: str
-    owner: str = None
-
-    @classmethod
-    def _resolve_class(cls, _, props_sql: str):
-        stream_type = EnumProp("ON", StreamType).parse(props_sql)
-        return StreamTypeMap[stream_type]
+# class StreamType(ParseableEnum):
+#     TABLE = "TABLE"
+#     EXTERNAL_TABLE = "EXTERNAL TABLE"
+#     STAGE = "STAGE"
+#     VIEW = "VIEW"
 
 
 class TableStream(Resource):
@@ -39,6 +26,7 @@ class TableStream(Resource):
 
     """
 
+    resource_type = "STREAM"
     props = Props(
         copy_grants=FlagProp("copy grants"),
         on_table=StringProp("on table"),
@@ -58,7 +46,7 @@ class TableStream(Resource):
     comment: str = None
 
 
-class ExternalTableStream(Stream):
+class ExternalTableStream(Resource):
     """
     -- External table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -70,6 +58,7 @@ class ExternalTableStream(Stream):
       [ COMMENT = '<string_literal>' ]
     """
 
+    resource_type = "STREAM"
     props = Props(
         copy_grants=FlagProp("copy grants"),
         on_external_table=StringProp("on external table"),
@@ -85,7 +74,7 @@ class ExternalTableStream(Stream):
     comment: str = None
 
 
-class StageStream(Stream):
+class StageStream(Resource):
     """
     -- Directory table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -95,6 +84,7 @@ class StageStream(Stream):
       [ COMMENT = '<string_literal>' ]
     """
 
+    resource_type = "STREAM"
     props = Props(
         copy_grants=FlagProp("copy grants"),
         on_stage=StringProp("on stage"),
@@ -108,7 +98,7 @@ class StageStream(Stream):
     comment: str = None
 
 
-class ViewStream(Stream):
+class ViewStream(Resource):
     """
     -- View
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -121,6 +111,7 @@ class ViewStream(Stream):
       [ COMMENT = '<string_literal>' ]
     """
 
+    resource_type = "STREAM"
     props = Props(
         copy_grants=FlagProp("copy grants"),
         on_view=StringProp("on view"),
@@ -138,9 +129,9 @@ class ViewStream(Stream):
     comment: str = None
 
 
-StreamTypeMap = {
-    StreamType.TABLE: TableStream,
-    StreamType.EXTERNAL_TABLE: ExternalTableStream,
-    StreamType.STAGE: StageStream,
-    StreamType.VIEW: ViewStream,
-}
+# StreamTypeMap = {
+#     StreamType.TABLE: TableStream,
+#     StreamType.EXTERNAL_TABLE: ExternalTableStream,
+#     StreamType.STAGE: StageStream,
+#     StreamType.VIEW: ViewStream,
+# }

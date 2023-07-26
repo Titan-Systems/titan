@@ -1,6 +1,5 @@
-# from .__resource import OrganizationLevelResource, AccountLevelResource, ResourceDB
-
-from .resource import Resource, Namespace
+from ..resource import Resource, Namespace
+from ..urn import URN
 
 from .database import Database
 from .role import Role
@@ -8,8 +7,6 @@ from .resource_monitor import ResourceMonitor
 from .share import Share
 from .user import User
 from .warehouse import Warehouse
-
-from .urn import URN
 
 
 class Account(Resource):

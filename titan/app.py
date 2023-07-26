@@ -9,17 +9,14 @@ import sqlglot
 
 from sqlglot import exp
 
-# import snowflake.snowpark.functions as sf
-# from snowflake.snowpark.stored_procedure import StoredProcedureRegistration
 
-# from .props import Identifier
 from .__resource import Resource, AccountLevelResource, DatabaseLevelResource, SchemaLevelResource
 from .resource_graph import ResourceGraph
 
-from .account import Account
-from .catalog import Catalog
-from .database import Database
-from .dynamic_table import DynamicTable
+from .resources.account import Account
+
+from .resources.database import Database
+from .resources.dynamic_table import DynamicTable
 
 # from .file_format import FileFormat
 # from .grants import RoleGrant, PrivGrant

@@ -1,7 +1,7 @@
 from typing import Dict, Union
 
-from .parseable_enum import ParseableEnum
-from .props import (
+from titan.parseable_enum import ParseableEnum
+from titan.props import (
     BoolProp,
     EnumProp,
     IntProp,
@@ -12,7 +12,7 @@ from .props import (
 )
 
 
-from .resource import Resource, Namespace
+from titan.resource import Resource, Namespace
 from .file_format import FileFormatProp
 
 
@@ -64,9 +64,7 @@ copy_options = Props(
     size_limit=IntProp("size_limit"),
     purge=BoolProp("purge"),
     return_failed_only=BoolProp("return_failed_only"),
-    match_by_column_name=StringProp(
-        "match_by_column_name", alt_tokens=["CASE_SENSITIVE", "CASE_INSENSITIVE", "NONE"]
-    ),
+    match_by_column_name=StringProp("match_by_column_name", alt_tokens=["CASE_SENSITIVE", "CASE_INSENSITIVE", "NONE"]),
     enforce_length=BoolProp("enforce_length"),
     truncatecolumns=BoolProp("truncatecolumns"),
     force=BoolProp("force"),

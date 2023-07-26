@@ -1,8 +1,8 @@
 from typing import Dict, List
 
-from .props import Props, BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, TagsProp
+from titan.props import Props, BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, TagsProp
 
-from .resource import Resource, Namespace
+from titan.resource import Resource, Namespace
 
 
 class User(Resource):

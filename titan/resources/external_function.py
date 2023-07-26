@@ -1,8 +1,8 @@
 from typing import Dict
 
 from .column import ColumnType, Column
-from .resource import Resource, Namespace
-from .props import Props, IntProp, StringProp, BoolProp, ResourceListProp, EnumProp, IdentifierProp
+from titan.resource import Resource, Namespace
+from titan.props import Props, IntProp, StringProp, BoolProp, ResourceListProp, EnumProp, IdentifierProp
 
 
 class ExternalFunction(Resource):

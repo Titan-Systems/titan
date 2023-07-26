@@ -1,9 +1,9 @@
 from typing import Dict
 
 from .schema import Schema
-from .props import Props, IntProp, StringProp, TagsProp, FlagProp
+from titan.props import Props, IntProp, StringProp, TagsProp, FlagProp, IdentifierProp
 
-from .resource import Resource, Namespace, ResourceDB, AccountScoped
+from titan.resource import Resource, Namespace, ResourceDB, AccountScoped
 
 
 class Database(Resource, AccountScoped):
@@ -62,3 +62,21 @@ class Database(Resource, AccountScoped):
             #     self.database_roles[other_resource.name] = other_resource
             else:
                 raise TypeError(f"Cannot add {other_resource} to {self}")
+
+
+class SharedDatabase(Resource, AccountScoped):
+    """
+    CREATE DATABASE
+        IDENTIFIER('SNOWPARK_FOR_PYTHON__HANDSONLAB__WEATHER_DATA')
+    FROM SHARE
+        IDENTIFIER('WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709"');
+    """
+
+    resource_type = "DATABASE"
+    props = Props(
+        # TODO: IdentifierProp("from share", Listing)
+        from_share=StringProp("from share"),
+    )
+
+    name: str
+    from_share: str

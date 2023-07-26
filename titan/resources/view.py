@@ -2,9 +2,9 @@ from typing import Dict
 
 from pydantic import Field
 
-from .resource import Resource, Namespace, SchemaScoped
+from titan.resource import Resource, Namespace, SchemaScoped
 
-from .props import (
+from titan.props import (
     Props,
     FlagProp,
     QueryProp,

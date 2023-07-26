@@ -1,7 +1,7 @@
 from typing import Dict
 
-from .parseable_enum import ParseableEnum
-from .props import (
+from titan.parseable_enum import ParseableEnum
+from titan.props import (
     BoolProp,
     EnumProp,
     IdentifierProp,
@@ -12,7 +12,7 @@ from .props import (
 )
 
 
-from .resource import Resource, Namespace
+from titan.resource import Resource, Namespace
 from .resource_monitor import ResourceMonitor
 
 

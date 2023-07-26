@@ -1,5 +1,5 @@
-from .parseable_enum import ParseableEnum
-from .props import (
+from titan.parseable_enum import ParseableEnum
+from titan.props import (
     EnumProp,
     IntProp,
     Props,
@@ -8,7 +8,7 @@ from .props import (
 )
 
 
-from .resource import Resource, Namespace
+from titan.resource import Resource, Namespace
 
 
 class ResourceMonitorFrequency(ParseableEnum):

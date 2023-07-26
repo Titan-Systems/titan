@@ -1,5 +1,5 @@
-from .resource import Resource
-from .props import Props, StringProp, QueryProp, AlertConditionProp
+from titan.resource import Resource
+from titan.props import Props, StringProp, QueryProp, AlertConditionProp
 
 
 class Alert(Resource):

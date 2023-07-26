@@ -1,6 +1,6 @@
 from typing import List, Dict
 
-from .props import (
+from titan.props import (
     BoolProp,
     FlagProp,
     IntProp,
@@ -13,7 +13,7 @@ from .props import (
 )
 
 
-from .resource import Resource, Namespace, SchemaScoped
+from titan.resource import Resource, Namespace, SchemaScoped
 
 from .column import Column
 from .stage import InternalStage, copy_options

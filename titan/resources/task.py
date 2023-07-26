@@ -1,5 +1,5 @@
-from .resource import Resource, Namespace
-from .props import (
+from titan.resource import Resource, Namespace
+from titan.props import (
     Props,
     IdentifierProp,
     EnumProp,
@@ -38,9 +38,7 @@ class Task(Resource):
     namespace = Namespace.ACCOUNT
     props = Props(
         warehouse=IdentifierProp("warehouse", resource_class=Warehouse),
-        user_task_managed_initial_warehouse_size=EnumProp(
-            "user_task_managed_initial_warehouse_size", WarehouseSize
-        ),
+        user_task_managed_initial_warehouse_size=EnumProp("user_task_managed_initial_warehouse_size", WarehouseSize),
         schedule=StringProp("schedule"),
         config=StringProp("config"),
         allow_overlapping_execution=BoolProp("allow_overlapping_execution"),

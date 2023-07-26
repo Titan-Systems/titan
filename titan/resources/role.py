@@ -1,7 +1,7 @@
 from typing import Dict
 
-from .resource import Resource, Namespace
-from .props import Props, StringProp, TagsProp
+from titan.resource import Resource, Namespace
+from titan.props import Props, StringProp, TagsProp
 
 
 class Role(Resource):

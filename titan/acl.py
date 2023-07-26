@@ -14,7 +14,7 @@
 
 # What are all the objects that user X can access?
 
-from .grant import Grant
+from .resources.grant import Grant
 
 
 class ACL:

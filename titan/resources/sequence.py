@@ -1,5 +1,5 @@
-from .resource import Resource
-from .props import Props, IntProp, StringProp
+from titan.resource import Resource
+from titan.props import Props, IntProp, StringProp
 
 
 class Sequence(Resource):

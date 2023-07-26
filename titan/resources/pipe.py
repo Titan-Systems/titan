@@ -1,4 +1,4 @@
-from .props import (
+from titan.props import (
     BoolProp,
     IdentifierProp,
     Props,
@@ -6,7 +6,7 @@ from .props import (
     QueryProp,
 )
 
-from .resource import Resource, Namespace
+from titan.resource import Resource, Namespace
 
 
 class Pipe(Resource):

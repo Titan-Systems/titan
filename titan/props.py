@@ -7,8 +7,12 @@ Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
 
 
-def Keywords(keywords):
-    return pp.And([Keyword(keyword) for keyword in keywords.split(" ")])
+# def Keywords(keywords):
+#     return pp.And([Keyword(keyword) for keyword in keywords.split(" ")])
+
+
+# def Keywords(keywords):
+#     return pp.ungroup(pp.And([Keyword(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
 
 
 Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
@@ -127,7 +131,7 @@ class FlagProp(Prop):
 
 class IdentifierProp(Prop):
     def __init__(self, name, resource_class):
-        expression = Keyword(name).suppress() + Eq + Any
+        expression = Keyword(name).suppress() + pp.Opt(Eq) + Any
         super().__init__(name, expression)
         self.resource_class = resource_class
 
@@ -395,12 +399,12 @@ class Props:
         found_props = {}
         remainder_sql = self.consume_start_token(sql)
         while True:
-            try:
-                tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
-            except pp.ParseException:
-                print(remainder_sql)
-                # TODO: better error messages
-                raise Exception(f"Failed to parse props [{remainder_sql.strip().splitlines()[0]}]")
+            # try:
+            tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
+            # except pp.ParseException:
+            #     print(remainder_sql)
+            #     # TODO: better error messages
+            #     raise Exception(f"Failed to parse props [{remainder_sql.strip().splitlines()[0]}]")
 
             found_props[prop_kwarg] = tokens
             remainder_sql = remainder_sql[end_index:].strip()

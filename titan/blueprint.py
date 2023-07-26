@@ -1,13 +1,10 @@
-# from snowflake.snowpark import Session
-
 from dictdiffer import diff
-
 
 from .resource import Namespace
 
-from .account import Account
-from .database import Database
-from .view import View
+# from .account import Account
+from .resources.database import Database
+from .resources.view import View
 
 
 class Blueprint:

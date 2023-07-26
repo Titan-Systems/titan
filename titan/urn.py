@@ -37,27 +37,10 @@ header = "urn"
 namespace = "sf"
 
 
-# def URN(region=None, account=None, resource_type=None, resource_name=None) -> str:
-# return "/".join(
-#     [
-#         ":".join(
-#             [
-#                 header,
-#                 namespace,
-#                 region or "",
-#                 account or "",
-#                 resource_type or "",
-#             ]
-#         ),
-#         resource_name or "",
-#     ]
-# )
-
-
 class URN(BaseModel):
     region: str = None
     account: str = None
-    resource_type: str = None
+    resource_key: str = None
     name: str = None
 
     def __str__(self) -> str:
@@ -69,7 +52,7 @@ class URN(BaseModel):
                         namespace,
                         self.region or "",
                         self.account or "",
-                        self.resource_type or "",
+                        self.resource_key or "",
                     ]
                 ),
                 self.name or "",
@@ -85,10 +68,10 @@ class URN(BaseModel):
 
 def parse_urn(urn_string):
     remainder, name = urn_string.split("/")
-    _, _, region, account, resource_type = remainder.split(":")
+    _, _, region, account, resource_key = remainder.split(":")
     return URN(
         region=region,
         account=account,
-        resource_type=resource_type,
+        resource_key=resource_key,
         name=name,
     )

@@ -1,6 +1,6 @@
 from typing import Dict
 
-from .props import IntProp, StringProp, TagsProp, FlagProp, Props
+from titan.props import IntProp, StringProp, TagsProp, FlagProp, Props
 
 from .dynamic_table import DynamicTable
 
@@ -10,7 +10,7 @@ from .stage import Stage
 from .table import Table
 from .view import View
 
-from .resource import Resource, Namespace, ResourceDB, DatabaseScoped
+from titan.resource import Resource, Namespace, ResourceDB, DatabaseScoped
 
 
 class Schema(Resource, DatabaseScoped):

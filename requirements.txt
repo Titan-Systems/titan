@@ -1,10 +1,11 @@
 click
-sqlglot
+dictdiffer
+inflection
+pydantic
+pyparsing
+pytest
+pyyaml
 snowflake-connector-python
 snowflake-snowpark-python
-pyparsing
+sqlglot
 treelib
-pyyaml
-pytest
-pydantic
-dictdiffer

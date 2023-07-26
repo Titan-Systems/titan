@@ -4,9 +4,9 @@
 
 # from typing import Optional, Union, List, TypeVar, Type
 
-# from .parseable_enum import ParseableEnum
-# from .props import Identifier, FlagProp
-# from .resource import AccountLevelResource, Resource
+# from titan.parseable_enum import ParseableEnum
+# from titan.props import Identifier, FlagProp
+# from titan.resource import AccountLevelResource, Resource
 # from .database import Database
 
 # # from .role import Role
@@ -14,7 +14,7 @@
 # from .user import User
 # from .warehouse import Warehouse
 
-# from .urn import URN
+# from titan.urn import URN
 
 
 # class RoleGrant(AccountLevelResource):

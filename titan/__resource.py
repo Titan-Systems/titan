@@ -4,8 +4,8 @@ import re
 
 from typing import TypeVar, Optional, Dict, Type, Set, Union, List, TYPE_CHECKING
 
-# from .props import prop_scan
-from .urn import URN
+# from titan.props import prop_scan
+from titan.urn import URN
 from .sql import SQL, add_ref
 
 # from .hooks import on_file_added_factory
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from .database import Database
     from .schema import Schema
     from .resource_graph import ResourceGraph
-    from .props import Prop
+    from titan.props import Prop
 
 
 T_Resource = TypeVar("T_Resource", bound="Resource")

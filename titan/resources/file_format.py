@@ -1,7 +1,12 @@
 from typing import List
 
 import pyparsing as pp
-from .props import (
+
+
+from ..resource import Resource, Namespace
+from ..parseable_enum import ParseableEnum
+from ..parse import _resolve_resource_class
+from ..props import (
     Props,
     Identifier,
     BoolProp,
@@ -16,9 +21,6 @@ from .props import (
     Keyword,
     Eq,
 )
-
-from .resource import Resource, Namespace
-from .parseable_enum import ParseableEnum
 
 
 class FileType(ParseableEnum):
@@ -50,9 +52,23 @@ class BinaryFormat(ParseableEnum):
 
 
 class FileFormat(Resource):
+    @classmethod
+    def from_sql(cls, sql):
+        resource_cls = Resource.classes[_resolve_resource_class(sql)]
+        return resource_cls.from_sql(sql)
+
+
+#     @classmethod
+#     def _resolve_class(cls, _: str, props_sql: str):
+#         file_type = EnumProp("type", FileType).parse(props_sql)
+#         return FileTypeMap[file_type]
+
+
+class CSVFileFormat(Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
-      TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ]
+      TYPE = CSV
+      [ formatTypeOptions ]
       [ COMMENT = '<string_literal>' ]
 
     formatTypeOptions ::=
@@ -78,64 +94,9 @@ class FileFormat(Resource):
          EMPTY_FIELD_AS_NULL = TRUE | FALSE
          SKIP_BYTE_ORDER_MARK = TRUE | FALSE
          ENCODING = '<string>' | UTF8
-    -- If TYPE = JSON
-         COMPRESSION = AUTO | GZIP | BZ2 | BROTLI | ZSTD | DEFLATE | RAW_DEFLATE | NONE
-         DATE_FORMAT = '<string>' | AUTO
-         TIME_FORMAT = '<string>' | AUTO
-         TIMESTAMP_FORMAT = '<string>' | AUTO
-         BINARY_FORMAT = HEX | BASE64 | UTF8
-         TRIM_SPACE = TRUE | FALSE
-         NULL_IF = ( '<string>' [ , '<string>' ... ] )
-         FILE_EXTENSION = '<string>'
-         ENABLE_OCTAL = TRUE | FALSE
-         ALLOW_DUPLICATE = TRUE | FALSE
-         STRIP_OUTER_ARRAY = TRUE | FALSE
-         STRIP_NULL_VALUES = TRUE | FALSE
-         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
-         IGNORE_UTF8_ERRORS = TRUE | FALSE
-         SKIP_BYTE_ORDER_MARK = TRUE | FALSE
-    -- If TYPE = AVRO
-         COMPRESSION = AUTO | GZIP | BROTLI | ZSTD | DEFLATE | RAW_DEFLATE | NONE
-         TRIM_SPACE = TRUE | FALSE
-         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
-         NULL_IF = ( '<string>' [ , '<string>' ... ] )
-    -- If TYPE = ORC
-         TRIM_SPACE = TRUE | FALSE
-         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
-         NULL_IF = ( '<string>' [ , '<string>' ... ] )
-    -- If TYPE = PARQUET
-         COMPRESSION = AUTO | LZO | SNAPPY | NONE
-         SNAPPY_COMPRESSION = TRUE | FALSE
-         BINARY_AS_TEXT = TRUE | FALSE
-         TRIM_SPACE = TRUE | FALSE
-         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
-         NULL_IF = ( '<string>' [ , '<string>' ... ] )
-    -- If TYPE = XML
-         COMPRESSION = AUTO | GZIP | BZ2 | BROTLI | ZSTD | DEFLATE | RAW_DEFLATE | NONE
-         IGNORE_UTF8_ERRORS = TRUE | FALSE
-         PRESERVE_SPACE = TRUE | FALSE
-         STRIP_OUTER_ELEMENT = TRUE | FALSE
-         DISABLE_SNOWFLAKE_DATA = TRUE | FALSE
-         DISABLE_AUTO_CONVERT = TRUE | FALSE
-         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
-         SKIP_BYTE_ORDER_MARK = TRUE | FALSE
     """
 
     resource_type = "FILE FORMAT"
-    namespace = Namespace.SCHEMA
-    props = Props()
-
-    name: str
-    owner: str = None
-    comment: str = None
-
-    @classmethod
-    def _resolve_class(cls, _: str, props_sql: str):
-        file_type = EnumProp("type", FileType).parse(props_sql)
-        return FileTypeMap[file_type]
-
-
-class CSVFileFormat(FileFormat):
     props = Props(
         type=EnumProp("type", [FileType.CSV]),
         compression=EnumProp("compression", Compression),
@@ -162,6 +123,8 @@ class CSVFileFormat(FileFormat):
         comment=StringProp("comment"),
     )
 
+    name: str
+    owner: str = None
     type: FileType
     compression: Compression = None
     record_delimiter: str = None
@@ -187,7 +150,33 @@ class CSVFileFormat(FileFormat):
     comment: str = None
 
 
-class JSONFileFormat(FileFormat):
+class JSONFileFormat(Resource):
+    """
+    CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
+      TYPE = JSON
+      [ formatTypeOptions ]
+      [ COMMENT = '<string_literal>' ]
+
+    formatTypeOptions ::=
+    -- If TYPE = JSON
+         COMPRESSION = AUTO | GZIP | BZ2 | BROTLI | ZSTD | DEFLATE | RAW_DEFLATE | NONE
+         DATE_FORMAT = '<string>' | AUTO
+         TIME_FORMAT = '<string>' | AUTO
+         TIMESTAMP_FORMAT = '<string>' | AUTO
+         BINARY_FORMAT = HEX | BASE64 | UTF8
+         TRIM_SPACE = TRUE | FALSE
+         NULL_IF = ( '<string>' [ , '<string>' ... ] )
+         FILE_EXTENSION = '<string>'
+         ENABLE_OCTAL = TRUE | FALSE
+         ALLOW_DUPLICATE = TRUE | FALSE
+         STRIP_OUTER_ARRAY = TRUE | FALSE
+         STRIP_NULL_VALUES = TRUE | FALSE
+         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
+         IGNORE_UTF8_ERRORS = TRUE | FALSE
+         SKIP_BYTE_ORDER_MARK = TRUE | FALSE
+    """
+
+    resource_type = "FILE FORMAT"
     props = Props(
         type=EnumProp("type", [FileType.JSON]),
         compression=EnumProp("compression", Compression),
@@ -208,6 +197,8 @@ class JSONFileFormat(FileFormat):
         comment=StringProp("comment"),
     )
 
+    name: str
+    owner: str = None
     type: FileType
     compression: Compression = None
     date_format: str = None
@@ -227,7 +218,22 @@ class JSONFileFormat(FileFormat):
     comment: str = None
 
 
-class AvroFileFormat(FileFormat):
+class AvroFileFormat(Resource):
+    """
+    CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
+      TYPE = AVRO
+      [ formatTypeOptions ]
+      [ COMMENT = '<string_literal>' ]
+
+    formatTypeOptions ::=
+    -- If TYPE = AVRO
+         COMPRESSION = AUTO | GZIP | BROTLI | ZSTD | DEFLATE | RAW_DEFLATE | NONE
+         TRIM_SPACE = TRUE | FALSE
+         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
+         NULL_IF = ( '<string>' [ , '<string>' ... ] )
+    """
+
+    resource_type = "FILE FORMAT"
     props = Props(
         type=EnumProp("type", [FileType.AVRO]),
         compression=EnumProp("compression", Compression),
@@ -237,6 +243,8 @@ class AvroFileFormat(FileFormat):
         comment=StringProp("comment"),
     )
 
+    name: str
+    owner: str = None
     type: FileType
     compression: Compression = None
     trim_space: bool = None
@@ -245,7 +253,21 @@ class AvroFileFormat(FileFormat):
     comment: str = None
 
 
-class OrcFileFormat(FileFormat):
+class OrcFileFormat(Resource):
+    """
+    CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
+      TYPE = ORC
+      [ formatTypeOptions ]
+      [ COMMENT = '<string_literal>' ]
+
+    formatTypeOptions ::=
+    -- If TYPE = ORC
+         TRIM_SPACE = TRUE | FALSE
+         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
+         NULL_IF = ( '<string>' [ , '<string>' ... ] )
+    """
+
+    resource_type = "FILE FORMAT"
     props = Props(
         type=EnumProp("type", [FileType.ORC]),
         trim_space=BoolProp("trim_space"),
@@ -254,6 +276,8 @@ class OrcFileFormat(FileFormat):
         comment=StringProp("comment"),
     )
 
+    name: str
+    owner: str = None
     type: FileType
     trim_space: bool = None
     replace_invalid_characters: bool = None
@@ -261,12 +285,27 @@ class OrcFileFormat(FileFormat):
     comment: str = None
 
 
-class ParquetFileFormat(FileFormat):
+class ParquetFileFormat(Resource):
+    """
+    CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
+      TYPE = PARQUET
+      [ formatTypeOptions ]
+      [ COMMENT = '<string_literal>' ]
+
+    formatTypeOptions ::=
+    -- If TYPE = PARQUET
+         COMPRESSION = AUTO | LZO | SNAPPY | NONE
+         SNAPPY_COMPRESSION = TRUE | FALSE
+         BINARY_AS_TEXT = TRUE | FALSE
+         TRIM_SPACE = TRUE | FALSE
+         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
+         NULL_IF = ( '<string>' [ , '<string>' ... ] )
+    """
+
+    resource_type = "FILE FORMAT"
     props = Props(
         type=EnumProp("type", [FileType.PARQUET]),
-        compression=EnumProp(
-            "compression", [Compression.AUTO, Compression.LZO, Compression.SNAPPY, Compression.NONE]
-        ),
+        compression=EnumProp("compression", [Compression.AUTO, Compression.LZO, Compression.SNAPPY, Compression.NONE]),
         snappy_compression=BoolProp("snappy_compression"),
         binary_as_text=BoolProp("binary_as_text"),
         trim_space=BoolProp("trim_space"),
@@ -275,6 +314,8 @@ class ParquetFileFormat(FileFormat):
         comment=StringProp("comment"),
     )
 
+    name: str
+    owner: str = None
     type: FileType
     compression: Compression = None
     snappy_compression: bool = None
@@ -285,7 +326,26 @@ class ParquetFileFormat(FileFormat):
     comment: str = None
 
 
-class XMLFileFormat(FileFormat):
+class XMLFileFormat(Resource):
+    """
+    CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
+      TYPE = XML
+      [ formatTypeOptions ]
+      [ COMMENT = '<string_literal>' ]
+
+    formatTypeOptions ::=
+    -- If TYPE = XML
+         COMPRESSION = AUTO | GZIP | BZ2 | BROTLI | ZSTD | DEFLATE | RAW_DEFLATE | NONE
+         IGNORE_UTF8_ERRORS = TRUE | FALSE
+         PRESERVE_SPACE = TRUE | FALSE
+         STRIP_OUTER_ELEMENT = TRUE | FALSE
+         DISABLE_SNOWFLAKE_DATA = TRUE | FALSE
+         DISABLE_AUTO_CONVERT = TRUE | FALSE
+         REPLACE_INVALID_CHARACTERS = TRUE | FALSE
+         SKIP_BYTE_ORDER_MARK = TRUE | FALSE
+    """
+
+    resource_type = "FILE FORMAT"
     props = Props(
         type=EnumProp("type", [FileType.XML]),
         compression=EnumProp("compression", Compression),
@@ -299,6 +359,8 @@ class XMLFileFormat(FileFormat):
         comment=StringProp("comment"),
     )
 
+    name: str
+    owner: str = None
     type: FileType
     compression: Compression = None
     ignore_utf8_errors: bool = None

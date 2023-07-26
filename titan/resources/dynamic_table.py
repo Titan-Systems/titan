@@ -1,6 +1,6 @@
-from .props import Props, StringProp, IdentifierProp, QueryProp
+from titan.props import Props, StringProp, IdentifierProp, QueryProp
 
-from .resource import Resource, Namespace
+from titan.resource import Resource, Namespace
 from .warehouse import Warehouse
 
 
