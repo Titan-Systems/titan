@@ -12,6 +12,10 @@ from titan.props import Props, FlagProp, EnumProp, StringProp, BoolProp, AtBefor
 #     VIEW = "VIEW"
 
 
+class Stream:
+    pass
+
+
 class TableStream(Resource):
     """
     -- table

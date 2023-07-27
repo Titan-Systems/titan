@@ -2,20 +2,8 @@ import pyparsing as pp
 from pyparsing import common
 
 from .parseable_enum import ParseableEnum
+from .parse import _consume_tokens, Keyword, Keywords, Literal, Literals
 
-Keyword = pp.CaselessKeyword
-Literal = pp.CaselessLiteral
-
-
-# def Keywords(keywords):
-#     return pp.And([Keyword(keyword) for keyword in keywords.split(" ")])
-
-
-# def Keywords(keywords):
-#     return pp.ungroup(pp.And([Keyword(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
-
-
-Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
 
 Eq = Literal("=").suppress()
 Lparen = Literal("(").suppress()
@@ -381,7 +369,7 @@ class Props:
     def __init__(self, _name: str = None, _start_token: str = None, **props):
         self.props = props
         self.name = _name
-        self.start_token = pp.MatchFirst(Keyword(_start_token)) if _start_token else pp.Empty()
+        self.start_token = Literals(_start_token) if _start_token else pp.Empty()
 
     def parse(self, sql):
         # Instead of passing in resource type, just bubble up exceptions with the important metadata
@@ -397,7 +385,7 @@ class Props:
 
         parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
         found_props = {}
-        remainder_sql = self.consume_start_token(sql)
+        remainder_sql = _consume_tokens(self.start_token, sql)
         while True:
             # try:
             tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
@@ -414,12 +402,6 @@ class Props:
         if len(remainder_sql) > 0:
             raise Exception(f"Unparsed props remain: [{remainder_sql}]")
         return found_props
-
-    def consume_start_token(self, sql):
-        for toks, _, end in self.start_token.scan_string(sql):
-            if toks:
-                return sql[end:]
-        return sql
 
 
 class SessionParameter(ParseableEnum):

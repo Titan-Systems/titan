@@ -1,3 +1,7 @@
+from typing import List, Union
+
+from pydantic import BaseModel, Field, ConfigDict, SerializeAsAny, field_serializer
+
 # _ = titan.Policy(
 #     acls=[
 #         titan.ACL(
@@ -14,11 +18,21 @@
 
 # What are all the objects that user X can access?
 
-from .resources.grant import Grant
+from .resource import Resource
+from .resources import Role, Grant
+from .parseable_enum import ParseableEnum
 
 
-class ACL:
-    superprivs = {"READ": {}, "WRITE": {}}
+class SuperPriv(ParseableEnum):
+    READ = "READ"
+    # CREATE = "CREATE"
+    # DELETE = "DELETE"
+
+
+class ACL(BaseModel):
+    privs: List[SuperPriv]
+    roles: List[Union[str, Role]]
+    resources: List[Resource]
 
     def __init__(self, privs, roles, resources):
         self.privs = privs

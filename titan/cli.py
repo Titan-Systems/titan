@@ -5,6 +5,7 @@
 """
 
 import os
+import time
 
 from . import __version__, LOGO
 
@@ -97,9 +98,12 @@ def test(path: str):
     print(LOGO, flush=True)
     print(f"      Titan v{__version__}\n")
 
+    now = time.time()
+
     for file in os.listdir(path):
         if file.endswith(".sql"):
             print("^" * 80, file)
+            start = time.time()
             sql_blob = open(os.path.join(path, file), "r").read()
             # try:
             for raw in _split_statements(sql_blob):
@@ -118,3 +122,5 @@ def test(path: str):
                             # "=>",
                             # res.model_dump(exclude_none=True, exclude_defaults=True),
                         )
+            print(f"Elapsed: {time.time() - start:.2f}s")
+    print(f">>>> Elapsed: {time.time() - now:.2f}s")

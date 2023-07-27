@@ -1,7 +1,9 @@
-from typing import Dict, Union
+from typing import Dict, Union, Any
 
-from titan.parseable_enum import ParseableEnum
-from titan.props import (
+from ..parseable_enum import ParseableEnum
+from ..parse import _resolve_resource_class
+from ..resource import Resource, SchemaScoped
+from ..props import (
     BoolProp,
     EnumProp,
     IntProp,
@@ -10,9 +12,6 @@ from titan.props import (
     TagsProp,
     PropSet,
 )
-
-
-from titan.resource import Resource, Namespace
 from .file_format import FileFormatProp
 
 
@@ -32,22 +31,6 @@ class EncryptionType(ParseableEnum):
     NONE = "NONE"
 
 
-class Stage(Resource):
-    resource_type = "STAGE"
-    namespace = Namespace.SCHEMA
-
-    name: str
-    owner: str = None
-
-    @classmethod
-    def _resolve_class(cls, resource_type: str, props_sql: str):
-        url = StringProp("URL").parse(props_sql)
-        if url:
-            return ExternalStage
-        else:
-            return InternalStage
-
-
 """
 copyOptions ::=
      ON_ERROR = { CONTINUE | SKIP_FILE | SKIP_FILE_<num> | 'SKIP_FILE_<num>%' | ABORT_STATEMENT }
@@ -60,7 +43,7 @@ copyOptions ::=
      FORCE = TRUE | FALSE
 """
 copy_options = Props(
-    on_error=StringProp("on_error"),
+    on_error=StringProp("on_error", alt_tokens=["CONTINUE", "SKIP_FILE", "ABORT_STATEMENT"]),
     size_limit=IntProp("size_limit"),
     purge=BoolProp("purge"),
     return_failed_only=BoolProp("return_failed_only"),
@@ -71,7 +54,7 @@ copy_options = Props(
 )
 
 
-class InternalStage(Stage):
+class InternalStage(Resource, SchemaScoped):
     """
     -- Internal stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <internal_stage_name>
@@ -91,6 +74,7 @@ class InternalStage(Stage):
                       [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
     """
 
+    resource_type = "STAGE"
     props = Props(
         encryption=PropSet(
             "encryption",
@@ -107,15 +91,16 @@ class InternalStage(Stage):
 
     name: str
     owner: str = None
+    type: StageType = StageType.INTERNAL
     encryption: Dict[str, EncryptionType] = None
     file_format: Union[str, dict] = None
     directory: Dict[str, bool] = None
-    copy_options: Dict[str, str] = None
+    copy_options: Dict[str, Any] = None
     tags: Dict[str, str] = None
     comment: str = None
 
 
-class ExternalStage(Stage):
+class ExternalStage(Resource, SchemaScoped):
     """
     -- External stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <external_stage_name>
@@ -157,6 +142,7 @@ class ExternalStage(Stage):
                       [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
     """
 
+    resource_type = "STAGE"
     props = Props(
         url=StringProp("url"),
         storage_integration=StringProp("storage_integration"),
@@ -175,12 +161,34 @@ class ExternalStage(Stage):
 
     name: str
     owner: str = None
+    type: StageType = StageType.EXTERNAL
     url: str
     directory: Dict[str, bool] = None
     storage_integration: str = None
     encryption: Dict[str, EncryptionType] = None
     file_format: Union[str, dict] = None
     directory: Dict[str, bool] = None
-    copy_options: Dict[str, str] = None
+    copy_options: Dict[str, Any] = None
     tags: Dict[str, str] = None
     comment: str = None
+
+
+StageTypeMap = {
+    StageType.INTERNAL: InternalStage,
+    StageType.EXTERNAL: ExternalStage,
+}
+
+
+class Stage(Resource):
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def __new__(cls, type: Union[str, StageType], **kwargs) -> Union[InternalStage, ExternalStage]:
+        stage_type = StageType.parse(type)
+        stage_cls = StageTypeMap[stage_type]
+        return stage_cls(type=stage_type, **kwargs)
+
+    @classmethod
+    def from_sql(cls, sql):
+        resource_cls = Resource.classes[_resolve_resource_class(sql)]
+        return resource_cls.from_sql(sql)

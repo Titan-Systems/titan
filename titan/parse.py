@@ -1,12 +1,17 @@
 import pyparsing as pp
 
 Keyword = pp.CaselessKeyword
+Literal = pp.CaselessLiteral
 Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
 ScopedIdentifier = Identifier
 
 
 def Keywords(keywords):
     return pp.ungroup(pp.And([Keyword(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
+
+
+def Literals(keywords):
+    return pp.ungroup(pp.And([Literal(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
 
 
 CREATE = Keyword("CREATE").suppress()
@@ -18,6 +23,10 @@ SECURE = Keyword("SECURE").suppress()
 WITH = Keyword("WITH").suppress()
 
 REST_OF_STRING = pp.Word(pp.printables + " \n") | pp.StringEnd() | pp.Empty()
+
+
+STORAGE_INTEGRATION = Keywords("STORAGE INTEGRATION")
+NOTIFICATION_INTEGRATION = Keywords("NOTIFICATION INTEGRATION")
 
 
 def _split_statements(sql_text):
@@ -65,50 +74,117 @@ def _parse_create_header(sql, expected_type):
         raise err
 
 
-_default_class_resolver = CREATE + pp.Opt(OR_REPLACE) + pp.Opt(TEMPORARY) + pp.Opt(TRANSIENT) + pp.Opt(SECURE)
+def _scan(parser, text):
+    results = next(parser.scan_string(text), -1)
+    return None if results == -1 else results
 
-_resource_class_resolvers = {
-    "external_function": (_default_class_resolver + Keywords("EXTERNAL FUNCTION")),
-    "external_stage": (_default_class_resolver + Keyword("STAGE") + ... + Keywords("URL =")),
-    "internal_stage": (_default_class_resolver + Keyword("STAGE") + ... + ~Keywords("URL =")),
-    "grant": Keyword("GRANT"),
-    "pipe": (_default_class_resolver + Keyword("PIPE")),
-    "schema": (_default_class_resolver + Keyword("SCHEMA")),
-    "shared_database": (Keywords("CREATE DATABASE") + Identifier + Keywords("FROM SHARE")),
-    "database": (_default_class_resolver + Keyword("DATABASE") + ... + ~Keywords("FROM SHARE")),
-    "view": (_default_class_resolver + Keyword("VIEW")),
-    "warehouse": (_default_class_resolver + Keyword("WAREHOUSE")),
-    "table": (_default_class_resolver + Keyword("TABLE")),
-    "role": (_default_class_resolver + Keyword("ROLE")),
-    "user": (_default_class_resolver + Keyword("USER")),
-    "csv_file_format": (_default_class_resolver + Keywords("FILE FORMAT") + ... + Keywords("TYPE = CSV")),
-    "json_file_format": (_default_class_resolver + Keywords("FILE FORMAT") + ... + Keywords("TYPE = JSON")),
-    "parquet_file_format": (_default_class_resolver + Keywords("FILE FORMAT") + ... + Keywords("TYPE = PARQUET")),
-    "xml_file_format": (_default_class_resolver + Keywords("FILE FORMAT") + ... + Keywords("TYPE = XML")),
-    "avro_file_format": (_default_class_resolver + Keywords("FILE FORMAT") + ... + Keywords("TYPE = AVRO")),
-    "orc_file_format": (_default_class_resolver + Keywords("FILE FORMAT") + ... + Keywords("TYPE = ORC")),
-    "sequence": (_default_class_resolver + Keyword("SEQUENCE")),
-    "task": (_default_class_resolver + Keyword("TASK")),
-    "alert": (_default_class_resolver + Keyword("ALERT")),
-    "tag": (_default_class_resolver + Keyword("TAG")),
-    "resource_monitor": (_default_class_resolver + Keyword("RESOURCE MONITOR")),
-    "dynamic_table": (_default_class_resolver + Keywords("DYNAMIC TABLE")),
-    "table_stream": (_default_class_resolver + Keywords("STREAM") + ... + Keywords("ON TABLE")),
-    "external_table_stream": (_default_class_resolver + Keywords("STREAM") + ... + Keywords("ON EXTERNAL TABLE")),
-    "view_stream": (_default_class_resolver + Keywords("STREAM") + ... + Keywords("ON VIEW")),
-    "stage_stream": (_default_class_resolver + Keywords("STREAM") + ... + Keywords("ON STAGE")),
-}
+
+def _matches(parser, text):
+    return _scan(parser, text) is not None
+
+
+def _resolve_database(sql):
+    if _matches(Keywords("FROM SHARE"), sql):
+        return "shared_database"
+    else:
+        return "database"
+
+
+def _resolve_file_format(sql):
+    if _matches(Literals("TYPE = CSV"), sql):
+        return "csv_file_format"
+    elif _matches(Literals("TYPE = JSON"), sql):
+        return "json_file_format"
+    elif _matches(Literals("TYPE = PARQUET"), sql):
+        return "parquet_file_format"
+    elif _matches(Literals("TYPE = XML"), sql):
+        return "xml_file_format"
+    elif _matches(Literals("TYPE = AVRO"), sql):
+        return "avro_file_format"
+    elif _matches(Literals("TYPE = ORC"), sql):
+        return "orc_file_format"
+
+
+def _resolve_stage(sql):
+    if _matches(Literals("URL ="), sql):
+        return "external_stage"
+    else:
+        return "internal_stage"
+
+
+def _resolve_stream(sql):
+    if _matches(Literals("ON TABLE"), sql):
+        return "table_stream"
+    elif _matches(Literals("ON EXTERNAL TABLE"), sql):
+        return "external_table_stream"
+    elif _matches(Literals("ON VIEW"), sql):
+        return "view_stream"
+    elif _matches(Literals("ON STAGE"), sql):
+        return "stage_stream"
+
+
+def _resolve_storage_integration(sql):
+    if _matches(Literals("STORAGE_PROVIDER = 'S3'"), sql):
+        return "s3_storage_integration"
+    elif _matches(Literals("STORAGE_PROVIDER = 'GCS'"), sql):
+        return "gcs_storage_integration"
+    elif _matches(Literals("STORAGE_PROVIDER = 'AZURE'"), sql):
+        return "azure_storage_integration"
+
+
+def _resolve_notification_integration(sql):
+    return "email_notification_integration"
+    # if _matches(Literals("TYPE = EMAIL"), sql):
+    #     return "email_notification_integration"
+    # elif _matches(Literals("TYPE = QUEUE"), sql):
+    #     return "aws_outbound_notification_integration"
 
 
 def _resolve_resource_class(sql):
-    for resource_key, resolver in _resource_class_resolvers.items():
-        if next(pp.MatchFirst(resolver).scan_string(sql), -1) != -1:
-            return resource_key
-    raise Exception(f"Could not resolve resource class for SQL: {sql}")
+    create_header = CREATE + pp.Opt(OR_REPLACE) + pp.Opt(TEMPORARY) + pp.Opt(TRANSIENT) + pp.Opt(SECURE)
+    sql = _consume_tokens(create_header, sql)
+
+    resource_key = scan(
+        {
+            "ALERT": lambda _: "alert",
+            "DATABASE": _resolve_database,
+            "DYNAMIC TABLE": lambda _: "dynamic_table",
+            "EXTERNAL FUNCTION": lambda _: "external_function",
+            "FILE FORMAT": _resolve_file_format,
+            "GRANT": lambda _: "grant",
+            "NOTIFICATION INTEGRATION": _resolve_notification_integration,
+            "PIPE": lambda _: "pipe",
+            "RESOURCE MONITOR": lambda _: "resource_monitor",
+            "ROLE": lambda _: "role",
+            "SCHEMA": lambda _: "schema",
+            "SEQUENCE": lambda _: "sequence",
+            "STAGE": _resolve_stage,
+            "STORAGE INTEGRATION": _resolve_storage_integration,
+            "STREAM": _resolve_stream,
+            "TABLE": lambda _: "table",
+            "TAG": lambda _: "tag",
+            "TASK": lambda _: "task",
+            "USER": lambda _: "user",
+            "VIEW": lambda _: "view",
+            "WAREHOUSE": lambda _: "warehouse",
+        },
+        sql,
+    )
+    if resource_key is None:
+        raise Exception(f"Could not resolve resource class for SQL: {sql}")
+
+    return resource_key
+
+
+def scan(lexicon, text):
+    parser = pp.MatchFirst([Keywords(tok) for tok in lexicon.keys()])
+    for tokens, _, end in parser.scan_string(text):
+        action = lexicon[tokens[0]]
+        return action(text[end:])
 
 
 def _consume_tokens(parser, text):
-    for toks, _, end in pp.MatchFirst(parser).scan_string(text):
-        if toks:
+    for tokens, _, end in pp.MatchFirst(parser).scan_string(text):
+        if tokens:
             return text[end:]
     return text

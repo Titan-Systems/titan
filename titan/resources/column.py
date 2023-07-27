@@ -1,12 +1,12 @@
 import pyparsing as pp
 
-from titan.parseable_enum import ParseableEnum
-from titan.props import (
-    Identifier,
+from ..parseable_enum import ParseableEnum
+from ..props import (
     Props,
     StringProp,
     Any,
 )
+from ..parse import Identifier
 
 
 from titan.resource import Resource

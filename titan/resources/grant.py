@@ -1,3 +1,10 @@
+from ..resource import Resource, AccountScoped
+
+
+class Grant(Resource, AccountScoped):
+    pass
+
+
 # from __future__ import annotations
 
 # import re

@@ -1,14 +1,13 @@
-from typing import List
+from typing import List, Union
 
 import pyparsing as pp
 
 
 from ..resource import Resource, Namespace
 from ..parseable_enum import ParseableEnum
-from ..parse import _resolve_resource_class
+from ..parse import _resolve_resource_class, Identifier
 from ..props import (
     Props,
-    Identifier,
     BoolProp,
     EnumProp,
     StringProp,
@@ -49,19 +48,6 @@ class BinaryFormat(ParseableEnum):
     HEX = "HEX"
     BASE64 = "BASE64"
     UTF8 = "UTF8"
-
-
-class FileFormat(Resource):
-    @classmethod
-    def from_sql(cls, sql):
-        resource_cls = Resource.classes[_resolve_resource_class(sql)]
-        return resource_cls.from_sql(sql)
-
-
-#     @classmethod
-#     def _resolve_class(cls, _: str, props_sql: str):
-#         file_type = EnumProp("type", FileType).parse(props_sql)
-#         return FileTypeMap[file_type]
 
 
 class CSVFileFormat(Resource):
@@ -409,3 +395,20 @@ class FileFormatProp(Prop):
             return FileTypeMap[file_type].props.parse(prop_value)
         else:
             return prop_value
+
+
+class FileFormat(Resource):
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def __new__(
+        cls, type: Union[str, FileType], **kwargs
+    ) -> Union[CSVFileFormat, JSONFileFormat, AvroFileFormat, OrcFileFormat, ParquetFileFormat, XMLFileFormat]:
+        file_type = FileType.parse(type)
+        file_type_cls = FileTypeMap[file_type]
+        return file_type_cls(type=file_type, **kwargs)
+
+    @classmethod
+    def from_sql(cls, sql):
+        resource_cls = Resource.classes[_resolve_resource_class(sql)]
+        return resource_cls.from_sql(sql)
