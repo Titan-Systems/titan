@@ -1,5 +1,5 @@
-from titan.resource import Resource, Namespace
-from titan.props import (
+from ..resource import Resource, AccountScoped
+from ..props import (
     Props,
     IdentifierProp,
     EnumProp,
@@ -7,7 +7,6 @@ from titan.props import (
     BoolProp,
     IntProp,
     FlagProp,
-    # IdentifierListProp,
     QueryProp,
     ExpressionProp,
 )
@@ -15,7 +14,7 @@ from titan.props import (
 from .warehouse import Warehouse, WarehouseSize
 
 
-class Task(Resource):
+class Task(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] TASK [ IF NOT EXISTS ] <name>
       [ { WAREHOUSE = <string> } | { USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = <string> } ]
@@ -35,7 +34,6 @@ class Task(Resource):
     """
 
     resource_type = "TASK"
-    namespace = Namespace.ACCOUNT
     props = Props(
         warehouse=IdentifierProp("warehouse", resource_class=Warehouse),
         user_task_managed_initial_warehouse_size=EnumProp("user_task_managed_initial_warehouse_size", WarehouseSize),

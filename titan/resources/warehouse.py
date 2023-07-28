@@ -12,7 +12,7 @@ from titan.props import (
 )
 
 
-from titan.resource import Resource, Namespace
+from titan.resource import Resource, AccountScoped
 from .resource_monitor import ResourceMonitor
 
 
@@ -39,7 +39,7 @@ class WarehouseScalingPolicy(ParseableEnum):
     ECONOMY = "ECONOMY"
 
 
-class Warehouse(Resource):
+class Warehouse(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] WAREHOUSE [ IF NOT EXISTS ] <name>
         [ [ WITH ] objectProperties ]
@@ -68,7 +68,6 @@ class Warehouse(Resource):
     """
 
     resource_type = "WAREHOUSE"
-    namespace = Namespace.ACCOUNT
     props = Props(
         warehouse_type=EnumProp("warehouse_type", WarehouseType),
         warehouse_size=EnumProp("warehouse_size", WarehouseSize),

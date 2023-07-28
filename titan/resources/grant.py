@@ -1,8 +1,112 @@
 from ..resource import Resource, AccountScoped
+from ..props import Props, IdentifierProp, FlagProp, StringProp, EnumProp
+from ..parseable_enum import ParseableEnum
+from .role import Role
+
+
+class GrantableObject(ParseableEnum):
+    ACCOUNT = "ACCOUNT"
+    USER = "USER"
+    RESOURCE_MONITOR = "RESOURCE MONITOR"
+    WAREHOUSE = "WAREHOUSE"
+    DATABASE = "DATABASE"
+    INTEGRATION = "INTEGRATION"
+    FAILOVER_GROUP = "FAILOVER GROUP"
+    REPLICATION_GROUP = "REPLICATION GROUP"
 
 
 class Grant(Resource, AccountScoped):
-    pass
+    """
+    GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
+        | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
+        | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { SCHEMA <schema_name> | ALL SCHEMAS IN DATABASE <db_name> }
+        | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { FUTURE SCHEMAS IN DATABASE <db_name> }
+        | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
+        | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
+        }
+    TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
+
+    globalPrivileges ::=
+        {
+            CREATE {
+                    ACCOUNT | DATA EXCHANGE LISTING | DATABASE | FAILOVER GROUP | INTEGRATION
+                    | NETWORK POLICY | REPLICATION GROUP | ROLE | SHARE | USER | WAREHOUSE
+            }
+            | APPLY { { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY | TAG }
+            | ATTACH POLICY | AUDIT |
+            | EXECUTE { ALERT | TASK }
+            | IMPORT SHARE
+            | MANAGE GRANTS
+            | MODIFY { LOG LEVEL | TRACE LEVEL | SESSION LOG LEVEL | SESSION TRACE LEVEL }
+            | MONITOR { EXECUTION | SECURITY | USAGE }
+            | OVERRIDE SHARE RESTRICTIONS | RESOLVE ALL
+        }
+        [ , ... ]
+
+    accountObjectPrivileges ::=
+        -- For DATABASE
+           { CREATE { DATABASE ROLE | SCHEMA } | IMPORTED PRIVILEGES | MODIFY | MONITOR | USAGE } [ , ... ]
+        -- For FAILOVER GROUP
+           { FAILOVER | MODIFY | MONITOR | REPLICATE } [ , ... ]
+        -- For INTEGRATION
+           { USAGE | USE_ANY_ROLE } [ , ... ]
+        -- For REPLICATION GROUP
+           { MODIFY | MONITOR | REPLICATE } [ , ... ]
+        -- For RESOURCE MONITOR
+           { MODIFY | MONITOR } [ , ... ]
+        -- For USER
+           { MONITOR } [ , ... ]
+        -- For WAREHOUSE
+           { MODIFY | MONITOR | USAGE | OPERATE } [ , ... ]
+
+    schemaPrivileges ::=
+        ADD SEARCH OPTIMIZATION
+        | CREATE {
+            ALERT | EXTERNAL TABLE | FILE FORMAT | FUNCTION
+            | MATERIALIZED VIEW | PIPE | PROCEDURE
+            | { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY
+            | SECRET | SEQUENCE | STAGE | STREAM
+            | TAG | TABLE | TASK | VIEW
+          }
+        | MODIFY | MONITOR | USAGE
+        [ , ... ]
+
+    schemaObjectPrivileges ::=
+        -- For ALERT
+           OPERATE [ , ... ]
+        -- For EVENT TABLE
+           { SELECT | INSERT } [ , ... ]
+        -- For FILE FORMAT, FUNCTION (UDF or external function), PROCEDURE, SECRET, or SEQUENCE
+           USAGE [ , ... ]
+        -- For PIPE
+           { MONITOR | OPERATE } [ , ... ]
+        -- For { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY or TAG
+           APPLY [ , ... ]
+        -- For external STAGE
+           USAGE [ , ... ]
+        -- For internal STAGE
+           READ [ , WRITE ] [ , ... ]
+        -- For STREAM
+           SELECT [ , ... ]
+        -- For TABLE
+           { SELECT | INSERT | UPDATE | DELETE | TRUNCATE | REFERENCES } [ , ... ]
+        -- For TASK
+           { MONITOR | OPERATE } [ , ... ]
+        -- For VIEW or MATERIALIZED VIEW
+           { SELECT | REFERENCES } [ , ... ]
+    """
+
+    props = Props(
+        # # on=StringProp("on"),
+        # on=EnumProp("on", GrantableObject),
+        # to=IdentifierProp("to", Role),
+        # with_grant_option=FlagProp("with grant option"),
+    )
+
+    privs: list
+    on: Resource
+    to: Role  # Role
+    with_grant_option: bool = None
 
 
 # from __future__ import annotations

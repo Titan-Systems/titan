@@ -100,7 +100,7 @@ def test(path: str):
 
     now = time.time()
 
-    for file in os.listdir(path):
+    for file in sorted(os.listdir(path)):
         if file.endswith(".sql"):
             print("^" * 80, file)
             start = time.time()

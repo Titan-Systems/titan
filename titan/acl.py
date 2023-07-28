@@ -22,6 +22,13 @@ from .resource import Resource
 from .resources import Role, Grant
 from .parseable_enum import ParseableEnum
 
+# GRANT
+#     USAGE
+# ON WAREHOUSE
+#     foobar
+# TO ROLE
+#     developers
+
 
 class SuperPriv(ParseableEnum):
     READ = "READ"
@@ -47,3 +54,11 @@ class ACL(BaseModel):
             for role in self.roles
             for resource in self.resources
         ]
+
+
+# if __name__ == "__main__":
+#     from .resources import Warehouse
+
+#     q = ACL(privs=[SuperPriv.READ], roles=["DATAENG"], resources=[Warehouse.find("foobar")])
+#     for grant in q.grants():
+#         print(grant)

@@ -1,10 +1,10 @@
 from typing import Dict
 
-from titan.resource import Resource, Namespace
-from titan.props import Props, StringProp, TagsProp
+from ..resource import Resource, AccountScoped
+from ..props import Props, StringProp, TagsProp
 
 
-class Role(Resource):
+class Role(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] ROLE [ IF NOT EXISTS ] <name>
       [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
@@ -12,7 +12,6 @@ class Role(Resource):
     """
 
     resource_type = "ROLE"
-    namespace = Namespace.ACCOUNT
     props = Props(
         tags=TagsProp(),
         comment=StringProp("comment"),
