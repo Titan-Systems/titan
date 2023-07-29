@@ -1,0 +1,25 @@
+CREATE STAGE foob ENCRYPTION = (TYPE = 'SNOWFLAKE_FULL');
+CREATE STAGE my_int_stage_1
+  COPY_OPTIONS = (
+    ON_ERROR='skip_file'
+    MATCH_BY_COLUMN_NAME = CASE_INSENSITIVE
+    ENFORCE_LENGTH = FALSE
+    TRUNCATECOLUMNS = TRUE
+    FORCE = FALSE
+);
+CREATE STAGE my_int_stage_2
+  ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE')
+  COPY_OPTIONS = (ON_ERROR= skip_file);
+CREATE TEMPORARY STAGE my_temp_int_stage;
+CREATE TEMPORARY STAGE my_int_stage_tmp
+  FILE_FORMAT = my_csv_format;
+CREATE STAGE mystage
+  DIRECTORY = (ENABLE = TRUE)
+  FILE_FORMAT = (FORMAT_NAME=myformat);
+
+CREATE OR REPLACE STAGE LOAD_STAGE
+    url = 'https://s3.amazonaws.com/tripdata/';
+
+CREATE STAGE stage_with_anon_file_format
+  FILE_FORMAT = (TYPE = CSV FIELD_DELIMITER = '|' SKIP_HEADER = 1)
+;

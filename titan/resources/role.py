@@ -1,6 +1,6 @@
 from typing import Dict
 
-from ..resource import Resource, AccountScoped
+from ..resource import Resource, AccountScoped, DatabaseScoped
 from ..props import Props, StringProp, TagsProp
 
 
@@ -18,5 +18,22 @@ class Role(Resource, AccountScoped):
     )
 
     name: str
+    owner: str = None
     tags: Dict[str, str] = None
+    comment: str = None
+
+
+class DatabaseRole(Resource, DatabaseScoped):
+    """
+    CREATE [ OR REPLACE ] DATABASE ROLE [ IF NOT EXISTS ] <name>
+      [ COMMENT = '<string_literal>' ]
+    """
+
+    resource_type = "DATABASE ROLE"
+    props = Props(
+        comment=StringProp("comment"),
+    )
+
+    name: str
+    owner: str = None
     comment: str = None

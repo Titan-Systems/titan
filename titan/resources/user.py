@@ -1,11 +1,11 @@
 from typing import Dict, List
 
-from titan.props import Props, BoolProp, IntProp, StringProp, StringListProp, IdentifierProp, TagsProp
+from titan.props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
-from titan.resource import Resource, Namespace
+from titan.resource import Resource, AccountScoped
 
 
-class User(Resource):
+class User(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] USER [ IF NOT EXISTS ] <name>
         [ objectProperties ]
@@ -72,7 +72,6 @@ class User(Resource):
     """
 
     resource_type = "USER"
-    namespace = Namespace.ACCOUNT
     props = Props(
         password=StringProp("password"),
         login_name=StringProp("login_name"),

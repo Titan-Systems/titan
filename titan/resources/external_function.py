@@ -1,11 +1,11 @@
 from typing import Dict
 
+from ..resource import Resource, AccountScoped
+from ..props import Props, IntProp, StringProp, BoolProp, ResourceListProp, EnumProp
 from .column import ColumnType, Column
-from titan.resource import Resource, Namespace
-from titan.props import Props, IntProp, StringProp, BoolProp, ResourceListProp, EnumProp, IdentifierProp
 
 
-class ExternalFunction(Resource):
+class ExternalFunction(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] [ SECURE ] EXTERNAL FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )
       RETURNS <result_data_type>
@@ -23,7 +23,6 @@ class ExternalFunction(Resource):
     """
 
     resource_type = "EXTERNAL FUNCTION"
-    namespace = Namespace.ACCOUNT
     props = Props(
         secure=BoolProp("secure"),
         columns=ResourceListProp(Column),

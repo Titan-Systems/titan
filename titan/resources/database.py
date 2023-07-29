@@ -1,9 +1,8 @@
 from typing import Dict
 
+from ..resource import Resource, ResourceDB, AccountScoped
+from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from .schema import Schema
-from titan.props import Props, IntProp, StringProp, TagsProp, FlagProp, IdentifierProp
-
-from titan.resource import Resource, Namespace, ResourceDB, AccountScoped
 
 
 class Database(Resource, AccountScoped):
@@ -37,31 +36,19 @@ class Database(Resource, AccountScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _schemas: ResourceDB
+    # _schemas: ResourceDB
 
-    def model_post_init(self, ctx):
-        super().model_post_init(ctx)
-        self._schemas = ResourceDB(Schema)
-        self.add(
-            Schema(name="PUBLIC", implicit=True),
-            Schema(name="INFORMATION_SCHEMA", implicit=True),
-        )
+    # def model_post_init(self, ctx):
+    #     super().model_post_init(ctx)
+    #     self._schemas = ResourceDB(Schema)
+    #     self.add(
+    #         Schema(name="PUBLIC", implicit=True),
+    #         Schema(name="INFORMATION_SCHEMA", implicit=True),
+    #     )
 
-    @property
-    def schemas(self):
-        return self._schemas
-
-    def add(self, *other_resources: Resource):
-        for other_resource in other_resources:
-            if other_resource.namespace and other_resource.namespace != Namespace.DATABASE:
-                raise TypeError(f"Cannot add {other_resource} to {self}")
-            # other_resource.database = self
-            if isinstance(other_resource, Schema):
-                self.schemas[other_resource.name] = other_resource
-            # elif isinstance(other_resource, DatabaseRole):
-            #     self.database_roles[other_resource.name] = other_resource
-            else:
-                raise TypeError(f"Cannot add {other_resource} to {self}")
+    # @property
+    # def schemas(self):
+    #     return self._schemas
 
 
 class SharedDatabase(Resource, AccountScoped):

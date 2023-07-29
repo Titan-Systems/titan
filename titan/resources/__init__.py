@@ -1,13 +1,15 @@
 from .alert import Alert
+from .api_integration import APIIntegration
 from .column import Column
 from .database import Database, SharedDatabase
 from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
+from .failover_group import FailoverGroup
 from .file_format import FileFormat
 from .grant import Grant
 from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
-from .role import Role
+from .role import Role, DatabaseRole
 from .schema import Schema
 from .sequence import Sequence
 from .stage import Stage, InternalStage, ExternalStage
@@ -39,17 +41,20 @@ from .storage_integration import (
 
 __all__ = [
     "Alert",
+    "APIIntegration",
     "AWSOutboundNotificationIntegration",
     "AzureInboundNotificationIntegration",
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
     "Column",
     "Database",
+    "DatabaseRole",
     "DynamicTable",
     "EmailNotificationIntegration",
     "ExternalFunction",
     "ExternalStage",
     "ExternalTableStream",
+    "FailoverGroup",
     "FileFormat",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",

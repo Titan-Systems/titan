@@ -1,16 +1,13 @@
 from typing import Dict
 
-from titan.props import IntProp, StringProp, TagsProp, FlagProp, Props
-
+from ..resource import Resource, ResourceDB, DatabaseScoped
+from ..props import IntProp, StringProp, TagsProp, FlagProp, Props
 from .dynamic_table import DynamicTable
-
 from .file_format import FileFormat
 from .pipe import Pipe
 from .stage import Stage
 from .table import Table
 from .view import View
-
-from titan.resource import Resource, Namespace, ResourceDB, DatabaseScoped
 
 
 class Schema(Resource, DatabaseScoped):
@@ -27,7 +24,6 @@ class Schema(Resource, DatabaseScoped):
     """
 
     resource_type = "SCHEMA"
-    namespace = Namespace.DATABASE
     props = Props(
         transient=FlagProp("transient"),
         with_managed_access=FlagProp("with managed access"),
@@ -93,13 +89,3 @@ class Schema(Resource, DatabaseScoped):
     @property
     def views(self):
         return self._views
-
-    def add(self, *other_resources: Resource):
-        for other_resource in other_resources:
-            if other_resource.namespace and other_resource.namespace != Namespace.SCHEMA:
-                raise TypeError(f"Cannot add {other_resource} to {self}")
-            if isinstance(other_resource, View):
-                self.views[other_resource.name] = other_resource
-            else:
-                raise TypeError(f"Cannot add {other_resource} to {self}")
-            other_resource.schema = self

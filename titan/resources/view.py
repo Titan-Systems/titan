@@ -2,7 +2,7 @@ from typing import Dict
 
 from pydantic import Field
 
-from titan.resource import Resource, Namespace, SchemaScoped
+from titan.resource import Resource, SchemaScoped
 
 from titan.props import (
     Props,

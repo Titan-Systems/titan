@@ -1,14 +1,15 @@
 from ..resource import Resource, AccountScoped
 from ..props import (
-    Props,
-    IdentifierProp,
-    EnumProp,
-    StringProp,
     BoolProp,
-    IntProp,
-    FlagProp,
-    QueryProp,
+    EnumProp,
     ExpressionProp,
+    FlagProp,
+    IdentifierProp,
+    IntProp,
+    Props,
+    QueryProp,
+    StringListProp,
+    StringProp,
 )
 
 from .warehouse import Warehouse, WarehouseSize
@@ -46,7 +47,7 @@ class Task(Resource, AccountScoped):
         error_integration=StringProp("error_integration"),
         copy_grants=FlagProp("copy grants"),
         comment=StringProp("comment"),
-        # after=IdentifierListProp("after", naked=true),
+        after=StringListProp("after"),
         when=ExpressionProp("when"),
         as_=QueryProp("as"),
     )
@@ -64,6 +65,6 @@ class Task(Resource, AccountScoped):
     error_integration: str = None
     copy_grants: bool = None
     comment: str = None
-    # after: Optional[str] = None
+    after: str = None
     when: str = None
     as_: str = None

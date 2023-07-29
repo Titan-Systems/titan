@@ -1,8 +1,7 @@
 from dictdiffer import diff
 
-from .resource import Namespace
 
-# from .account import Account
+from .resource import Scope
 from .resources.database import Database
 from .resources.view import View
 
@@ -23,7 +22,7 @@ class Blueprint:
         for resource in self.staged:
             if resource.urn in config:
                 raise Exception(f"Duplicate resource, {resource.urn}")
-            if resource.namespace == Namespace.ACCOUNT:
+            if resource.scope == Scope.ACCOUNT:
                 resource.account = adapter.account
             resource.finalize()
             if resource.name == "TPCH_SF10_ORDERS":

@@ -1,15 +1,11 @@
 import pyparsing as pp
 
 from ..parseable_enum import ParseableEnum
-from ..props import (
-    Props,
-    StringProp,
-    Any,
-)
+from ..props import Props, StringProp, Any
 from ..parse import Identifier
 
 
-from titan.resource import Resource
+from ..resource import Resource
 
 
 class ColumnType(ParseableEnum):

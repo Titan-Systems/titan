@@ -1,14 +1,14 @@
-from titan.parseable_enum import ParseableEnum
-from titan.props import (
+from typing import List
+
+from ..resource import Resource, AccountScoped
+from ..parseable_enum import ParseableEnum
+from ..props import (
     EnumProp,
     IntProp,
     Props,
     StringProp,
     StringListProp,
 )
-
-
-from titan.resource import Resource, Namespace
 
 
 class ResourceMonitorFrequency(ParseableEnum):
@@ -19,7 +19,7 @@ class ResourceMonitorFrequency(ParseableEnum):
     NEVER = "NEVER"
 
 
-class ResourceMonitor(Resource):  #
+class ResourceMonitor(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] RESOURCE MONITOR <name> WITH
                           [ CREDIT_QUOTA = <number> ]
@@ -34,14 +34,13 @@ class ResourceMonitor(Resource):  #
     """
 
     resource_type = "RESOURCE MONITOR"
-    namespace = Namespace.ACCOUNT
     props = Props(
         _start_token="WITH",
-        credit_quota=IntProp("CREDIT_QUOTA"),
-        frequency=EnumProp("FREQUENCY", ResourceMonitorFrequency),
-        start_timestamp=StringProp("START_TIMESTAMP", alt_tokens=["IMMEDIATELY"]),
-        end_timestamp=StringProp("END_TIMESTAMP"),
-        notify_users=StringListProp("NOTIFY_USERS"),
+        credit_quota=IntProp("credit_quota"),
+        frequency=EnumProp("frequency", ResourceMonitorFrequency),
+        start_timestamp=StringProp("start_timestamp", alt_tokens=["IMMEDIATELY"]),
+        end_timestamp=StringProp("end_timestamp"),
+        notify_users=StringListProp("notify_users"),
     )
 
     name: str
@@ -49,12 +48,4 @@ class ResourceMonitor(Resource):  #
     frequency: ResourceMonitorFrequency = None
     start_timestamp: str = None
     end_timestamp: str = None
-    notify_users: list = []
-
-    # self.notify_users: List[User] = [u if isinstance(u, User) else User.all[u] for u in notify_users]
-    # self.requires(*self.notify_users)
-
-    # @property
-    # def sql(self):
-    #     props = self.props_sql()
-    #     return f"CREATE RESOURCE MONITOR {self.fully_qualified_name} WITH {props}"
+    notify_users: List[str] = None

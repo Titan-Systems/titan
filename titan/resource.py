@@ -1,24 +1,16 @@
 from inflection import underscore
-from enum import Enum
-from typing import ClassVar
+from typing import ClassVar, Union
 
 from pydantic import BaseModel, Field, ConfigDict, SerializeAsAny, field_serializer
 from pydantic._internal._model_construction import ModelMetaclass
 
 from pyparsing import ParseException
 
+from .enums import Scope
 from .parse import _parse_create_header, _resolve_resource_class
 from .props import Props
 from .urn import URN
 from .sql import add_ref
-
-
-class Namespace(Enum):
-    ORGANIZATION = "ORGANIZATION"
-    ACCOUNT = "ACCOUNT"
-    DATABASE = "DATABASE"
-    SCHEMA = "SCHEMA"
-    TABLE = "TABLE"
 
 
 resource_db = {}
@@ -39,7 +31,6 @@ class Resource(BaseModel, metaclass=_Resource):
     model_config = ConfigDict(from_attributes=True, extra="forbid", validate_assignment=True)
 
     resource_type: ClassVar[str] = None
-    namespace: ClassVar[Namespace]
     props: ClassVar[Props]
 
     name: str
@@ -52,7 +43,7 @@ class Resource(BaseModel, metaclass=_Resource):
 
     # TODO: snowflake resource name compatibility
     @field_serializer("name")
-    def serialize_dt(self, name: str, _info):
+    def serialize_name(self, name: str, _info):
         return name.upper()
 
     # TODO: Reconsider
@@ -71,15 +62,19 @@ class Resource(BaseModel, metaclass=_Resource):
         if resource_cls == Resource:
             resource_cls = Resource.classes[_resolve_resource_class(sql)]
 
-        resource_name, remainder = _parse_create_header(sql, resource_cls.resource_type)
+        identifier, remainder = _parse_create_header(sql, resource_cls)
 
         try:
             props = resource_cls.props.parse(remainder) if remainder else {}
-            return resource_cls(name=resource_name, **props)
+            if isinstance(identifier, list):
+                print(identifier)
+                print("debug")
+            return resource_cls(**identifier, **props)
         except ParseException as err:
-            print(f"Error parsing resource props {resource_cls.__name__} {resource_name}")
+            print(f"Error parsing resource props {resource_cls.__name__} {identifier}")
             print(err.explain())
-            return None
+            # return None
+            raise err
 
     # @property
     # def fully_qualified_name(self):
@@ -100,13 +95,38 @@ class Resource(BaseModel, metaclass=_Resource):
         add_ref(self)
         return self.fully_qualified_name
 
-    # def finalize(self):
-    #     pass
+    def finalize(self):
+        raise NotImplementedError
+
+
+class OrganizationScoped(BaseModel):
+    scope: ClassVar[Scope] = Scope.ORGANIZATION
+    organziation: SerializeAsAny[Union[str, Resource]] = None
+
+    @property
+    def fully_qualified_name(self):
+        return self.name.upper()
+
+    @property
+    def urn(self):
+        """
+        urn:sf:us-central1.gcp:AB11223:database/TEST_DB
+        """
+        if self.account:
+            account = self.account.name
+            region = self.account.region
+        else:
+            account = "NULL"
+            region = "NULL"
+        return URN(region, account, self.resource_key, self.fully_qualified_name)
+
+    def finalize(self):
+        raise NotImplementedError
 
 
 class AccountScoped(BaseModel):
-    namespace: ClassVar[Namespace] = Namespace.ACCOUNT
-    account: SerializeAsAny[Resource] = None
+    scope: ClassVar[Scope] = Scope.ACCOUNT
+    account: SerializeAsAny[Union[str, Resource]] = None
 
     @property
     def fully_qualified_name(self):
@@ -131,8 +151,8 @@ class AccountScoped(BaseModel):
 
 
 class DatabaseScoped(BaseModel):
-    namespace: ClassVar[Namespace] = Namespace.DATABASE
-    database: SerializeAsAny[Resource] = None
+    scope: ClassVar[Scope] = Scope.DATABASE
+    database: SerializeAsAny[Union[str, Resource]] = None
 
     @property
     def fully_qualified_name(self):
@@ -145,8 +165,8 @@ class DatabaseScoped(BaseModel):
 
 
 class SchemaScoped(BaseModel):
-    namespace: ClassVar[Namespace] = Namespace.SCHEMA
-    schema_: Resource = Field(alias="schema", default=None)
+    scope: ClassVar[Scope] = Scope.SCHEMA
+    schema_: Union[str, Resource] = Field(alias="schema", default=None)
 
     @property
     def fully_qualified_name(self):
@@ -156,6 +176,11 @@ class SchemaScoped(BaseModel):
     def finalize(self):
         if self.schema_ is None:
             raise Exception(f"SchemaScoped resource {self} has no schema")
+
+
+class Createable(BaseModel):
+    def create_sql(self):
+        return f"CREATE {self.resource_type} {self.name}"  # self.props.sql()
 
 
 class ResourceDB:

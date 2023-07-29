@@ -1,15 +1,8 @@
-from titan.props import (
-    BoolProp,
-    IdentifierProp,
-    Props,
-    StringProp,
-    QueryProp,
-)
-
-from titan.resource import Resource, Namespace
+from ..resource import Resource, SchemaScoped
+from ..props import BoolProp, Props, StringProp, QueryProp
 
 
-class Pipe(Resource):
+class Pipe(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] PIPE [ IF NOT EXISTS ] <name>
       [ AUTO_INGEST = [ TRUE | FALSE ] ]
@@ -21,10 +14,9 @@ class Pipe(Resource):
     """
 
     resource_type = "PIPE"
-    namespace = Namespace.SCHEMA
     props = Props(
         auto_ingest=BoolProp("auto_ingest"),
-        # error_integration=IdentifierProp("error_integration"),
+        error_integration=StringProp("error_integration"),
         aws_sns_topic=StringProp("aws_sns_topic"),
         integration=StringProp("integration"),
         comment=StringProp("comment"),
@@ -38,4 +30,4 @@ class Pipe(Resource):
     aws_sns_topic: str = None
     integration: str = None
     comment: str = None
-    as_: str = None
+    as_: str

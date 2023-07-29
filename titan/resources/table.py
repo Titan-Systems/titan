@@ -13,7 +13,7 @@ from titan.props import (
 )
 
 
-from titan.resource import Resource, Namespace, SchemaScoped
+from titan.resource import Resource, SchemaScoped
 
 from .column import Column
 from .stage import InternalStage, copy_options
@@ -42,7 +42,6 @@ class Table(Resource, SchemaScoped):
     """
 
     resource_type = "TABLE"
-    namespace = Namespace.SCHEMA
     props = Props(
         columns=ResourceListProp(Column),
         volatile=FlagProp("volatile"),

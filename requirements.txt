@@ -3,9 +3,6 @@ dictdiffer
 inflection
 pydantic
 pyparsing
-pytest
 pyyaml
 snowflake-connector-python
 snowflake-snowpark-python
-sqlglot
-treelib

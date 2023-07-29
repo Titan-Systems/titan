@@ -2,7 +2,7 @@ import pyparsing as pp
 from pyparsing import common
 
 from .parseable_enum import ParseableEnum
-from .parse import _consume_tokens, Keyword, Keywords, Literal, Literals
+from .parse import _consume_tokens, Keyword, Keywords, Literal, Literals, _format_parser, _best_guess_failing_parser
 
 
 Eq = Literal("=").suppress()
@@ -178,19 +178,19 @@ class TagsProp(Prop):
     """
 
     def __init__(self):
-        # pp.nested_expr(content=pp.delimited_list(Identifier + Eq + pp.sgl_quoted_string))
         name = "TAGS"
         expression = WITH + TAG + Lparen + ... + Rparen
         super().__init__(name, expression)
 
-    def validate(self, prop_value):
-        raise NotImplementedError
+    def validate(self, prop_value) -> dict:
+        parser = pp.delimited_list(Any + Eq + pp.sgl_quoted_string)
+        pairs = iter(parser.parse_string(prop_value).as_list())
+        tags = {}
+        for key in pairs:
+            tags[key] = next(pairs)
+        return tags
 
-    # def normalize(self, value: str) -> Any:
-    #     tag_matches = re.findall(self.tag_pattern, value)
-    #     return {key: value for key, value in tag_matches}
-
-    def render(self, value: Any) -> str:
+    def render(self, value) -> str:
         if value:
             tag_kv_pairs = ", ".join([f"{key} = '{value}'" for key, value in value.items()])
             return f"WITH TAG ({tag_kv_pairs})"
@@ -387,12 +387,15 @@ class Props:
         found_props = {}
         remainder_sql = _consume_tokens(self.start_token, sql)
         while True:
-            # try:
-            tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
-            # except pp.ParseException:
-            #     print(remainder_sql)
-            #     # TODO: better error messages
-            #     raise Exception(f"Failed to parse props [{remainder_sql.strip().splitlines()[0]}]")
+            try:
+                tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
+            except pp.ParseException as err:
+                formatted_sql = "\n".join(["  " + line.strip() for line in remainder_sql.splitlines()])
+                # formatted_parser = _format_parser(parser)
+                failing_parser = _best_guess_failing_parser(parser, remainder_sql)
+                raise Exception(
+                    f"Failed to parse props.\nSQL: \n```\n{formatted_sql}\n```\n\nParser:\n{failing_parser}\n\n"
+                )
 
             found_props[prop_kwarg] = tokens
             remainder_sql = remainder_sql[end_index:].strip()

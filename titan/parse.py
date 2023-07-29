@@ -1,9 +1,23 @@
 import pyparsing as pp
 
+from .enums import Scope
+
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
 Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
-ScopedIdentifier = Identifier
+# ScopedIdentifier = Identifier
+
+
+def ScopedIdentifier(scope):
+    dot = Literal(".").suppress()
+    if scope == Scope.ACCOUNT:
+        return pp.Group(Identifier("name"))
+    elif scope == Scope.DATABASE:
+        return pp.Group(pp.Opt(Identifier("database") + dot) + Identifier("name"))
+    elif scope == Scope.SCHEMA:
+        return pp.Group(pp.Opt(pp.Opt(Identifier("database") + dot) + Identifier("schema") + dot) + Identifier("name"))
+    else:
+        raise Exception(f"Unsupported scope: {scope}")
 
 
 def Keywords(keywords):
@@ -45,28 +59,28 @@ def _split_statements(sql_text):
 
     # SQL Statement is any sequence of SQL strings and other characters, ended with semicolon
     sql_stmt = pp.OneOrMore(any_sql_string | other_chars).set_parse_action(" ".join) + semicolon
+    sql_stmt = sql_stmt.ignore(pp.c_style_comment)
     result = sql_stmt.search_string(sql_text).as_list()
     return [res[0] for res in result]
 
 
-def _parse_create_header(sql, expected_type):
-    # resource_type = pp.Or([Keywords(type) for type in expected_types])
+def _parse_create_header(sql, resource_cls):
     header = pp.And(
         [
             CREATE,
             pp.Opt(OR_REPLACE)("or_replace"),
             pp.Opt(TEMPORARY)("temporary"),
             ...,
-            Keywords(expected_type)("resource_type"),
+            Keywords(resource_cls.resource_type)("resource_type"),
             pp.Opt(IF_NOT_EXISTS)("if_not_exists"),
-            ScopedIdentifier("resource_name"),
+            ScopedIdentifier(resource_cls.scope)("resource_identifier"),
             REST_OF_STRING("remainder"),
         ]
     )
     try:
         results = header.parse_string(sql, parse_all=True).as_dict()
         remainder = (results["_skipped"][0] + " " + results.get("remainder", "")).strip()
-        return (results["resource_name"], remainder)
+        return (results["resource_identifier"], remainder)
     except pp.ParseException as err:
         print(err.explain())
         print("❌", "failed to parse header")
@@ -144,7 +158,7 @@ def _resolve_resource_class(sql):
     create_header = CREATE + pp.Opt(OR_REPLACE) + pp.Opt(TEMPORARY) + pp.Opt(TRANSIENT) + pp.Opt(SECURE)
     sql = _consume_tokens(create_header, sql)
 
-    resource_key = scan(
+    resource_key = scaner(
         {
             "ALERT": lambda _: "alert",
             "DATABASE": _resolve_database,
@@ -176,7 +190,7 @@ def _resolve_resource_class(sql):
     return resource_key
 
 
-def scan(lexicon, text):
+def scaner(lexicon, text):
     parser = pp.MatchFirst([Keywords(tok) for tok in lexicon.keys()])
     for tokens, _, end in parser.scan_string(text):
         action = lexicon[tokens[0]]
@@ -188,3 +202,35 @@ def _consume_tokens(parser, text):
         if tokens:
             return text[end:]
     return text
+
+
+def _format_parser(parser):
+    if hasattr(parser, "exprs"):
+        return " ".join([_format_parser(expr) for expr in parser.exprs])
+    elif hasattr(parser, "expr"):
+        return _format_parser(parser.expr)
+    else:
+        return str(parser)
+
+
+def _best_guess_failing_parser(parser, text):
+    first_token = text.split(" ")[0]
+    for expr in parser.exprs:
+        print(">>>>>", first_token, _format_parser(expr))
+        if first_token in _format_parser(expr):
+            return expr
+
+
+# def _lexicon_str(parser):
+#     formatted = []
+#     indent = ""
+#     stack = [parser]
+#     while stack:
+#         node = stack.pop()
+#         if isinstance(node, pp.MatchFirst):
+#             stack.extend(node.exprs)
+#             formatted.append(indent + "MatchFirst")
+#             indent += "  "
+#         break
+
+#     return "\n".join(formatted)

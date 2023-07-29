@@ -1,22 +1,19 @@
-from typing import Dict
+from typing import Dict, Union
 
-from titan.resource import Resource, Namespace
-from titan.parseable_enum import ParseableEnum
-from titan.props import Props, FlagProp, EnumProp, StringProp, BoolProp, AtBeforeProp
-
-
-# class StreamType(ParseableEnum):
-#     TABLE = "TABLE"
-#     EXTERNAL_TABLE = "EXTERNAL TABLE"
-#     STAGE = "STAGE"
-#     VIEW = "VIEW"
+from ..resource import Resource, SchemaScoped
+from ..parseable_enum import ParseableEnum
+from ..props import Props, FlagProp, StringProp, BoolProp, AtBeforeProp
+from ..parse import _resolve_resource_class
 
 
-class Stream:
-    pass
+class StreamType(ParseableEnum):
+    TABLE = "TABLE"
+    EXTERNAL_TABLE = "EXTERNAL TABLE"
+    STAGE = "STAGE"
+    VIEW = "VIEW"
 
 
-class TableStream(Resource):
+class TableStream(Resource, SchemaScoped):
     """
     -- table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -50,7 +47,7 @@ class TableStream(Resource):
     comment: str = None
 
 
-class ExternalTableStream(Resource):
+class ExternalTableStream(Resource, SchemaScoped):
     """
     -- External table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -66,6 +63,7 @@ class ExternalTableStream(Resource):
     props = Props(
         copy_grants=FlagProp("copy grants"),
         on_external_table=StringProp("on external table"),
+        at_before=AtBeforeProp(),
         insert_only=BoolProp("insert_only"),
         comment=StringProp("comment"),
     )
@@ -74,11 +72,12 @@ class ExternalTableStream(Resource):
     owner: str = None
     copy_grants: bool = None
     on_external_table: str
+    at_before: Dict[str, str] = None
     insert_only: bool = None
     comment: str = None
 
 
-class StageStream(Resource):
+class StageStream(Resource, SchemaScoped):
     """
     -- Directory table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -102,7 +101,7 @@ class StageStream(Resource):
     comment: str = None
 
 
-class ViewStream(Resource):
+class ViewStream(Resource, SchemaScoped):
     """
     -- View
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -119,6 +118,7 @@ class ViewStream(Resource):
     props = Props(
         copy_grants=FlagProp("copy grants"),
         on_view=StringProp("on view"),
+        at_before=AtBeforeProp(),
         append_only=BoolProp("append_only"),
         show_initial_rows=BoolProp("show_initial_rows"),
         comment=StringProp("comment"),
@@ -128,14 +128,32 @@ class ViewStream(Resource):
     owner: str = None
     copy_grants: bool = None
     on_view: str
+    at_before: Dict[str, str] = None
     append_only: bool = None
     show_initial_rows: bool = None
     comment: str = None
 
 
-# StreamTypeMap = {
-#     StreamType.TABLE: TableStream,
-#     StreamType.EXTERNAL_TABLE: ExternalTableStream,
-#     StreamType.STAGE: StageStream,
-#     StreamType.VIEW: ViewStream,
-# }
+StreamTypeMap = {
+    StreamType.TABLE: TableStream,
+    StreamType.EXTERNAL_TABLE: ExternalTableStream,
+    StreamType.STAGE: StageStream,
+    StreamType.VIEW: ViewStream,
+}
+
+
+class Stream(Resource):
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def __new__(
+        cls, type: Union[str, StreamType], **kwargs
+    ) -> Union[TableStream, ExternalTableStream, StageStream, ViewStream]:
+        file_type = StreamType.parse(type)
+        file_type_cls = StreamTypeMap[file_type]
+        return file_type_cls(**kwargs)
+
+    @classmethod
+    def from_sql(cls, sql):
+        resource_cls = Resource.classes[_resolve_resource_class(sql)]
+        return resource_cls.from_sql(sql)

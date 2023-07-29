@@ -3,7 +3,7 @@ from typing import List, Union
 import pyparsing as pp
 
 
-from ..resource import Resource, Namespace
+from ..resource import Resource, SchemaScoped
 from ..parseable_enum import ParseableEnum
 from ..parse import _resolve_resource_class, Identifier
 from ..props import (
@@ -50,7 +50,7 @@ class BinaryFormat(ParseableEnum):
     UTF8 = "UTF8"
 
 
-class CSVFileFormat(Resource):
+class CSVFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = CSV
@@ -136,7 +136,7 @@ class CSVFileFormat(Resource):
     comment: str = None
 
 
-class JSONFileFormat(Resource):
+class JSONFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = JSON
@@ -204,7 +204,7 @@ class JSONFileFormat(Resource):
     comment: str = None
 
 
-class AvroFileFormat(Resource):
+class AvroFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = AVRO
@@ -239,7 +239,7 @@ class AvroFileFormat(Resource):
     comment: str = None
 
 
-class OrcFileFormat(Resource):
+class OrcFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = ORC
@@ -271,7 +271,7 @@ class OrcFileFormat(Resource):
     comment: str = None
 
 
-class ParquetFileFormat(Resource):
+class ParquetFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = PARQUET
@@ -312,7 +312,7 @@ class ParquetFileFormat(Resource):
     comment: str = None
 
 
-class XMLFileFormat(Resource):
+class XMLFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = XML

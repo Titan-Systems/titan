@@ -1,8 +1,8 @@
-from titan.resource import Resource
-from titan.props import Props, IntProp, StringProp
+from ..resource import Resource, SchemaScoped
+from ..props import Props, IntProp, StringProp
 
 
-class Sequence(Resource):
+class Sequence(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] SEQUENCE [ IF NOT EXISTS ] <name>
       [ WITH ]
@@ -13,7 +13,7 @@ class Sequence(Resource):
 
     resource_type = "SEQUENCE"
     props = Props(
-        _start_token="WITH",
+        _start_token="with",
         start=IntProp("start"),
         increment=IntProp("increment"),
         comment=StringProp("comment"),

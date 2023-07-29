@@ -1,8 +1,8 @@
-from titan.resource import Resource
+from titan.resource import Resource, AccountScoped
 from titan.props import Props, StringProp, StringListProp
 
 
-class Tag(Resource):
+class Tag(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] TAG [ IF NOT EXISTS ] <name> [ COMMENT = '<string_literal>' ]
 
