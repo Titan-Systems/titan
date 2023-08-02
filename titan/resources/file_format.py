@@ -2,10 +2,9 @@ from typing import List, Union
 
 import pyparsing as pp
 
-
-from ..resource import Resource, SchemaScoped
-from ..parseable_enum import ParseableEnum
-from ..parse import _resolve_resource_class, Identifier
+from .base import Resource, SchemaScoped
+from ..enums import ParseableEnum
+from ..parse import _resolve_resource_class, Identifier, parens, LPAREN, RPAREN, Keyword, EQUALS
 from ..props import (
     Props,
     BoolProp,
@@ -14,11 +13,6 @@ from ..props import (
     IntProp,
     StringListProp,
     Prop,
-    parens,
-    Lparen,
-    Rparen,
-    Keyword,
-    Eq,
 )
 
 
@@ -379,10 +373,10 @@ class FileFormatProp(Prop):
     def __init__(self, name):
         expression = (
             Keyword(name).suppress()
-            + Eq
+            + EQUALS
             + (
                 parens(StringProp("format_name").expression)
-                | (Lparen + ... + Rparen)
+                | (LPAREN + ... + RPAREN)
                 | Identifier
                 | pp.sgl_quoted_string
             )

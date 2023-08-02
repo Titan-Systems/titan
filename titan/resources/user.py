@@ -1,8 +1,8 @@
 from typing import Dict, List
 
-from titan.props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
-
-from titan.resource import Resource, AccountScoped
+from . import Resource
+from .base import AccountScoped
+from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
 
 class User(Resource, AccountScoped):
@@ -97,6 +97,7 @@ class User(Resource, AccountScoped):
     )
 
     name: str
+    owner: str = "USERADMIN"
     password: str = None
     login_name: str = None
     display_name: str = None

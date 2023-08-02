@@ -1,58 +1,67 @@
 from dictdiffer import diff
 
+from .enums import Scope
 
-from .resource import Scope
-from .resources.database import Database
-from .resources.view import View
+
+def urn(blueprint, resource):
+    return f"urn:{blueprint.account}:{resource.resource_key}/{resource.fqn}"
 
 
 class Blueprint:
-    def __init__(self, name=None) -> None:
-        self.name = name
+    def __init__(self, name, account, database=None, schema=None, resources=[]) -> None:
+        self.name = name or ""
         self.staged = []
+        self.add(resources or [])
+        self.account = account
+        self.database = database
+        self.schema = schema
 
-    def plan(self, session):
-        # 1. Build a graph from staged dependencies
-        adapter = Adapter(session)
-        # account = Account(name=adapter.account, region=adapter.region)
-        # self.add(adapter.account)
-
-        config = {}
-        state = {}
+    @property
+    def manifest(self):
+        manifest = {}
         for resource in self.staged:
-            if resource.urn in config:
-                raise Exception(f"Duplicate resource, {resource.urn}")
+            self.finalize_scope(resource)
+            key = urn(self, resource)
+            value = resource.model_dump(exclude_none=True)
+            manifest[key] = value
+        return manifest
+
+    def finalize_scope(self, resource):
+        if resource.parent is None:
             if resource.scope == Scope.ACCOUNT:
-                resource.account = adapter.account
-            resource.finalize()
-            if resource.name == "TPCH_SF10_ORDERS":
-                print(resource)
-            config[resource.urn] = resource.model_dump(mode="json", by_alias=True)
-        for urn, res in config.items():
-            print("<<<<<", urn, ">>>>>\n", res)
+                resource.account = self.account
+            elif resource.scope == Scope.DATABASE:
+                if self.database is None:
+                    raise Exception(f"Orphaned resource found {resource}")
+                resource.database = self.database
+            elif resource.scope == Scope.SCHEMA:
+                if self.schema is None:
+                    raise Exception(f"Orphaned resource found {resource}")
+                resource.schema = self.schema
 
-        for resource in self.staged:
-            if isinstance(resource, Database):
-                state[resource.urn] = adapter.fetch_database(resource.urn)
-            elif isinstance(resource, View):
-                state[resource.urn] = adapter.fetch_view(resource.urn)
+    def plan(self):
+        pass
 
-        d = diff(state, config)
-        print("~" * 120)
-        for action, target, deltas in d:
-            print(f"[{action}]", target)
-            for delta in deltas:
-                print("\t", delta)
-        print("ok")
-        # print(graph)
+    def compare(self, remote_state):
+        return diff(self.manifest, remote_state)
 
-    def apply(self, session):
+        # d = diff(state, config)
+        # print("~" * 120)
+        # for action, target, deltas in d:
+        #     print(f"[{action}]", target)
+        #     for delta in deltas:
+        #         print("\t", delta)
+
+    def apply(self):
+        # diff = self.plan()
         pass
 
     def _add(self, resource):
         self.staged.append(resource)
 
     def add(self, *resources):
+        if isinstance(resources[0], list):
+            resources = resources[0]
         for resource in resources:
             self._add(resource)
 
@@ -77,16 +86,6 @@ def prod():
         titan.Database("SHARED"),
         provisioner,
     )
-
-Ideas
- - blueprints have parameters to let them be stamped out
- - blueprints have exports (why?)
-
-Stuck
- - How can we write a blueprint that doesnt result in a bunch of hanging python objects?
-   Explicit is probably better than implicit
-
-
 
 """
 

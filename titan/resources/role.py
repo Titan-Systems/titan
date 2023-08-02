@@ -1,6 +1,7 @@
 from typing import Dict
 
-from ..resource import Resource, AccountScoped, DatabaseScoped
+from . import Resource
+from .base import AccountScoped, DatabaseScoped
 from ..props import Props, StringProp, TagsProp
 
 

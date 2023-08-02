@@ -1,8 +1,9 @@
 from typing import List
 
-from ..resource import Resource, AccountScoped
+from . import Resource
+from .base import AccountScoped
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
-from ..parseable_enum import ParseableEnum
+from ..enums import ParseableEnum
 from ..parse import _resolve_resource_class
 
 

@@ -19,8 +19,8 @@ from pydantic import BaseModel, Field, ConfigDict, SerializeAsAny, field_seriali
 # What are all the objects that user X can access?
 
 from .resource import Resource
-from .resources import Role, Grant
-from .parseable_enum import ParseableEnum
+from . import Role, Grant
+from .enums import ParseableEnum
 
 # GRANT
 #     USAGE
@@ -57,7 +57,7 @@ class ACL(BaseModel):
 
 
 # if __name__ == "__main__":
-#     from .resources import Warehouse
+#     from . import Warehouse
 
 #     q = ACL(privs=[SuperPriv.READ], roles=["DATAENG"], resources=[Warehouse.find("foobar")])
 #     for grant in q.grants():

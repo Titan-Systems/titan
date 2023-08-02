@@ -1,9 +1,10 @@
 from typing import List, Union
 
-from ..resource import Resource, AccountScoped
+from . import Resource
+from .base import AccountScoped
 from ..parse import _resolve_resource_class
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
-from ..parseable_enum import ParseableEnum
+from ..enums import ParseableEnum
 
 
 class StorageProvider(ParseableEnum):

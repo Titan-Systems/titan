@@ -1,5 +1,6 @@
-from titan.resource import Resource, AccountScoped
-from titan.props import Props, StringProp, StringListProp
+from . import Resource
+from .base import AccountScoped
+from ..props import Props, StringProp, StringListProp
 
 
 class Tag(Resource, AccountScoped):

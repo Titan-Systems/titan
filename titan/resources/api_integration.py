@@ -1,6 +1,9 @@
-from ..resource import Resource, AccountScoped
-from ..parseable_enum import ParseableEnum
-from ..props import Props, EnumProp, StringProp, BoolProp
+from typing import List
+
+from . import Resource
+from .base import AccountScoped
+from ..enums import ParseableEnum
+from ..props import Props, EnumProp, StringProp, BoolProp, StringListProp
 
 
 class ApiProvider(ParseableEnum):
@@ -28,17 +31,17 @@ class APIIntegration(Resource, AccountScoped):
         api_provider=EnumProp("api_provider", ApiProvider),
         api_aws_role_arn=StringProp("api_aws_role_arn"),
         api_key=StringProp("api_key"),
-        api_allowed_prefixes=StringProp("api_allowed_prefixes"),
-        api_blocked_prefixes=StringProp("api_blocked_prefixes"),
+        api_allowed_prefixes=StringListProp("api_allowed_prefixes"),
+        api_blocked_prefixes=StringListProp("api_blocked_prefixes"),
         enabled=BoolProp("enabled"),
         comment=StringProp("comment"),
     )
 
     name: str
-    api_provider: str
+    api_provider: ApiProvider
     api_aws_role_arn: str
     api_key: str = None
-    api_allowed_prefixes: str
-    api_blocked_prefixes: str = None
+    api_allowed_prefixes: List[str]
+    api_blocked_prefixes: List[str] = None
     enabled: bool
     comment: str = None

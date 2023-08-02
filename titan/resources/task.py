@@ -1,4 +1,7 @@
-from ..resource import Resource, AccountScoped
+from typing import List
+from typing_extensions import Annotated
+
+from .base import Resource, AccountScoped, coerce_from_str
 from ..props import (
     BoolProp,
     EnumProp,
@@ -36,7 +39,7 @@ class Task(Resource, AccountScoped):
 
     resource_type = "TASK"
     props = Props(
-        warehouse=IdentifierProp("warehouse", resource_class=Warehouse),
+        warehouse=IdentifierProp("warehouse"),
         user_task_managed_initial_warehouse_size=EnumProp("user_task_managed_initial_warehouse_size", WarehouseSize),
         schedule=StringProp("schedule"),
         config=StringProp("config"),
@@ -54,7 +57,7 @@ class Task(Resource, AccountScoped):
 
     name: str
     owner: str = None
-    warehouse: Warehouse = None
+    warehouse: Annotated[Warehouse, coerce_from_str(Warehouse)] = None
     user_task_managed_initial_warehouse_size: WarehouseSize = None
     schedule: str = None
     config: str = None
@@ -65,6 +68,6 @@ class Task(Resource, AccountScoped):
     error_integration: str = None
     copy_grants: bool = None
     comment: str = None
-    after: str = None
+    after: List[str] = None
     when: str = None
     as_: str = None

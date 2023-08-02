@@ -1,7 +1,8 @@
 from typing import Dict
+from typing_extensions import Annotated
 
-from titan.parseable_enum import ParseableEnum
-from titan.props import (
+from ..enums import ParseableEnum
+from ..props import (
     BoolProp,
     EnumProp,
     IdentifierProp,
@@ -11,8 +12,7 @@ from titan.props import (
     TagsProp,
 )
 
-
-from titan.resource import Resource, AccountScoped
+from .base import Resource, AccountScoped, coerce_from_str
 from .resource_monitor import ResourceMonitor
 
 
@@ -77,7 +77,7 @@ class Warehouse(Resource, AccountScoped):
         auto_suspend=IntProp("auto_suspend", alt_tokens=["NULL"]),
         auto_resume=BoolProp("auto_resume"),
         initially_suspended=BoolProp("initially_suspended"),
-        resource_monitor=IdentifierProp("resource_monitor", ResourceMonitor),
+        resource_monitor=IdentifierProp("resource_monitor"),
         comment=StringProp("comment"),
         enable_query_acceleration=BoolProp("enable_query_acceleration"),
         query_acceleration_max_scale_factor=IntProp("query_acceleration_max_scale_factor"),
@@ -98,7 +98,7 @@ class Warehouse(Resource, AccountScoped):
     auto_suspend: int = None
     auto_resume: bool = None
     initially_suspended: bool = None
-    resource_monitor: ResourceMonitor = None
+    resource_monitor: Annotated[ResourceMonitor, coerce_from_str(ResourceMonitor)] = None
     comment: str = None
     enable_query_acceleration: bool = None
     query_acceleration_max_scale_factor: int = None

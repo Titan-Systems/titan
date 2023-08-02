@@ -1,4 +1,5 @@
-from ..resource import Resource, SchemaScoped
+from . import Resource
+from .base import SchemaScoped
 from ..props import BoolProp, Props, StringProp, QueryProp
 
 

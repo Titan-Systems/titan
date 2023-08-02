@@ -1,7 +1,18 @@
+from .base import (
+    Resource,
+    Organization,
+    OrganizationScoped,
+    Account,
+    AccountScoped,
+    Database,
+    DatabaseScoped,
+    Schema,
+    SchemaScoped,
+)
 from .alert import Alert
 from .api_integration import APIIntegration
 from .column import Column
-from .database import Database, SharedDatabase
+from .database import SharedDatabase
 from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
@@ -10,7 +21,6 @@ from .grant import Grant
 from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
-from .schema import Schema
 from .sequence import Sequence
 from .stage import Stage, InternalStage, ExternalStage
 from .stream import Stream, TableStream, ExternalTableStream, ViewStream, StageStream
@@ -40,6 +50,8 @@ from .storage_integration import (
 
 
 __all__ = [
+    "Account",
+    "AccountScoped",
     "Alert",
     "APIIntegration",
     "AWSOutboundNotificationIntegration",
@@ -49,6 +61,7 @@ __all__ = [
     "Column",
     "Database",
     "DatabaseRole",
+    "DatabaseScoped",
     "DynamicTable",
     "EmailNotificationIntegration",
     "ExternalFunction",
@@ -62,13 +75,16 @@ __all__ = [
     "Grant",
     "InternalStage",
     "NotificationIntegration",
+    "Organization",
+    "OrganizationScoped",
     "Pipe",
+    "Resource",
     "ResourceMonitor",
     "Role",
     "S3StorageIntegration",
     "Schema",
+    "SchemaScoped",
     "Sequence",
-    "Share",
     "SharedDatabase",
     "Stage",
     "StageStream",

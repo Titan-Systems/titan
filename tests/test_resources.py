@@ -28,6 +28,7 @@ from titan.resources import (
     View,
     Warehouse,
 )
+from titan.resources.warehouse import WarehouseSize
 
 
 class TestResources(unittest.TestCase):
@@ -36,6 +37,12 @@ class TestResources(unittest.TestCase):
 
     def validate_dict_serde(self, resource_cls, data):
         self.assertEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
+
+    def test_resource_composition(self):
+        assert Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
+        assert Task(name="TASK", as_="SELECT 1", warehouse=Warehouse(name="wh"))
+        assert Task(name="TASK", as_="SELECT 1", warehouse={"name": "wh"})
+        assert Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}})
 
     def test_alert(self):
         for sql in load_sql_fixtures("alert.sql"):
@@ -141,6 +148,7 @@ class TestResources(unittest.TestCase):
     def test_warehouse(self):
         for sql in load_sql_fixtures("warehouse.sql"):
             self.validate_from_sql(Warehouse, sql)
+        assert Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size == WarehouseSize.XSMALL
 
     def test_user(self):
         for sql in load_sql_fixtures("user.sql"):

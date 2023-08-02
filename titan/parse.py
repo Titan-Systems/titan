@@ -4,8 +4,20 @@ from .enums import Scope
 
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
-Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
-# ScopedIdentifier = Identifier
+Identifier = pp.delimited_list(
+    pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string, delim=".", min=1, max=3, combine=True
+)
+
+ARROW = Literal("=>").suppress()
+AS = Keyword("AS").suppress()
+AT = Keyword("AT").suppress()
+BEFORE = Keyword("BEFORE").suppress()
+EQUALS = Literal("=").suppress()
+LPAREN = Literal("(").suppress()
+RPAREN = Literal(")").suppress()
+TAG = Keyword("TAG").suppress()
+WITH = Keyword("WITH").suppress()
+ANY = pp.Word(pp.srange("[a-zA-Z0-9_]")) | pp.sgl_quoted_string
 
 
 def ScopedIdentifier(scope):
@@ -26,6 +38,10 @@ def Keywords(keywords):
 
 def Literals(keywords):
     return pp.ungroup(pp.And([Literal(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
+
+
+def list_expr(expr):
+    return pp.Group(pp.DelimitedList(expr) | parens(pp.DelimitedList(expr)))
 
 
 CREATE = Keyword("CREATE").suppress()
@@ -219,6 +235,10 @@ def _best_guess_failing_parser(parser, text):
         print(">>>>>", first_token, _format_parser(expr))
         if first_token in _format_parser(expr):
             return expr
+
+
+def parens(expr):
+    return LPAREN + expr + RPAREN
 
 
 # def _lexicon_str(parser):

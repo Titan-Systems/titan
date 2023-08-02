@@ -1,12 +1,11 @@
-from ..resource import Resource, OrganizationScoped
-from ..urn import URN
+from .base import Resource, OrganizationScoped
 
-from .database import Database
-from .role import Role
-from .resource_monitor import ResourceMonitor
-from .share import Share
-from .user import User
-from .warehouse import Warehouse
+# from .database import Database
+# from .role import Role
+# from .resource_monitor import ResourceMonitor
+# from .share import Share
+# from .user import User
+# from .warehouse import Warehouse
 
 
 class Account(Resource, OrganizationScoped):
@@ -35,10 +34,3 @@ class Account(Resource, OrganizationScoped):
     #         Role(name="PUBLIC", implicit=True),
     #         Database(name="SNOWFLAKE", implicit=True),
     #     )
-
-    @property
-    def urn(self):
-        """
-        urn:sf:us-central1.gcp::account/AB11223
-        """
-        return URN(region="us-central1.gcp", resource_type="account", resource_name=self.name)

@@ -1,6 +1,7 @@
-from titan.props import Props, StringProp, IdentifierProp, QueryProp
+from typing_extensions import Annotated
 
-from ..resource import Resource, SchemaScoped
+from ..props import Props, StringProp, IdentifierProp, QueryProp
+from .base import Resource, SchemaScoped, coerce_from_str
 from .warehouse import Warehouse
 
 
@@ -15,12 +16,12 @@ class DynamicTable(Resource, SchemaScoped):
     resource_type = "DYNAMIC TABLE"
     props = Props(
         target_lag=StringProp("target_lag", alt_tokens=["DOWNSTREAM"]),
-        warehouse=IdentifierProp("warehouse", Warehouse),
+        warehouse=IdentifierProp("warehouse"),
         as_=QueryProp("as"),
     )
 
     name: str
     owner: str = None
     target_lag: str
-    warehouse: Warehouse
+    warehouse: Annotated[Warehouse, coerce_from_str(Warehouse)]
     as_: str

@@ -1,6 +1,7 @@
 from typing import Dict
 
-from ..resource import Resource, AccountScoped
+from . import Resource
+from .base import AccountScoped
 from ..props import Props, IntProp, StringProp, BoolProp, ResourceListProp, EnumProp
 from .column import ColumnType, Column
 

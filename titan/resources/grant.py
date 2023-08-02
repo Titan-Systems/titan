@@ -1,7 +1,9 @@
-from ..resource import Resource, AccountScoped
-from ..props import Props, IdentifierProp, FlagProp, StringProp, EnumProp
-from ..parseable_enum import ParseableEnum
+from typing_extensions import Annotated
+
+from .base import Resource, AccountScoped, coerce_from_str
 from .role import Role
+from ..props import Props, IdentifierProp, FlagProp, StringProp, EnumProp
+from ..enums import ParseableEnum
 
 
 class GrantableObject(ParseableEnum):
@@ -99,33 +101,14 @@ class Grant(Resource, AccountScoped):
     props = Props(
         # # on=StringProp("on"),
         # on=EnumProp("on", GrantableObject),
-        # to=IdentifierProp("to", Role),
-        # with_grant_option=FlagProp("with grant option"),
+        to=IdentifierProp("to"),
+        with_grant_option=FlagProp("with grant option"),
     )
 
     privs: list
     on: Resource
-    to: Role  # Role
+    to: Annotated[Role, coerce_from_str(Role)]
     with_grant_option: bool = None
-
-
-# from __future__ import annotations
-
-# import re
-
-# from typing import Optional, Union, List, TypeVar, Type
-
-# from titan.parseable_enum import ParseableEnum
-# from titan.props import Identifier, FlagProp
-# from titan.resource import AccountLevelResource, Resource
-# from .database import Database
-
-# # from .role import Role
-# from .schema import Schema
-# from .user import User
-# from .warehouse import Warehouse
-
-# from titan.urn import URN
 
 
 # class RoleGrant(AccountLevelResource):

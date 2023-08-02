@@ -1,10 +1,10 @@
 from typing import Dict
 
-from ..resource import Resource, Createable, SchemaScoped
+from .base import Resource, SchemaScoped
 from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 
-class Alert(Resource, SchemaScoped, Createable):
+class Alert(Resource, SchemaScoped):  # Createable
     """
     CREATE [ OR REPLACE ] ALERT [ IF NOT EXISTS ] <name>
       WAREHOUSE = <warehouse_name>

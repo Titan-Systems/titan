@@ -1,20 +1,22 @@
 from .blueprint import Blueprint
 
-from .resources import (
-    Alert,
-    Database,
-    ExternalFunction,
-    FileFormat,
-    Role,
-    Schema,
-    Sequence,
-    Table,
-    Tag,
-    Task,
-    User,
-    View,
-    Warehouse,
-)
+from .resources import *
+
+# from . import (
+#     Alert,
+#     Database,
+#     ExternalFunction,
+#     FileFormat,
+#     Role,
+#     Schema,
+#     Sequence,
+#     Table,
+#     Tag,
+#     Task,
+#     User,
+#     View,
+#     Warehouse,
+# )
 
 
 __all__ = [
@@ -27,7 +29,7 @@ __all__ = [
     "Role",
     "Schema",
     "Sequence",
-    "Share",
+    "SharedDatabase",
     "Stream",
     "Table",
     "Tag",

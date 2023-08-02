@@ -1,7 +1,8 @@
 from typing import List
 
-from ..resource import Resource, AccountScoped
-from ..parseable_enum import ParseableEnum
+from . import Resource
+from .base import AccountScoped
+from ..enums import ParseableEnum
 from ..props import (
     EnumProp,
     IntProp,

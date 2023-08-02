@@ -1,8 +1,9 @@
 from typing import Dict, Union, Any
 
-from ..parseable_enum import ParseableEnum
+from ..enums import ParseableEnum
 from ..parse import _resolve_resource_class
-from ..resource import Resource, SchemaScoped
+from . import Resource
+from .base import SchemaScoped
 from ..props import (
     BoolProp,
     EnumProp,

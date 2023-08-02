@@ -1,10 +1,8 @@
 from typing import Dict
 
-from pydantic import Field
-
-from titan.resource import Resource, SchemaScoped
-
-from titan.props import (
+from . import Resource
+from .base import SchemaScoped
+from ..props import (
     Props,
     FlagProp,
     QueryProp,
