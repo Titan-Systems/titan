@@ -4,8 +4,14 @@ from .enums import Scope
 
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
-Identifier = pp.delimited_list(
-    pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string, delim=".", min=1, max=3, combine=True
+
+Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$")
+FullyQualifiedIdentifier = pp.DelimitedList(
+    pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string,
+    delim=".",
+    min=1,
+    max=3,
+    combine=True,
 )
 
 ARROW = Literal("=>").suppress()
@@ -33,7 +39,14 @@ def ScopedIdentifier(scope):
 
 
 def Keywords(keywords):
+    words = keywords.split(" ")
+    if len(words) == 1:
+        return Keyword(words[0])
+    # tokens = [Keyword(word) for word in words[:-1]] + [Literal(words[-1])]
+    # make last token a Literal
+    # return pp.original_text_for()
     return pp.ungroup(pp.And([Keyword(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
+    # return pp.original_text_for(pp.And([Keyword(word) for word in words[:-1]] + [Literal(words[-1])]))
 
 
 def Literals(keywords):
@@ -227,6 +240,15 @@ def _format_parser(parser):
         return _format_parser(parser.expr)
     else:
         return str(parser)
+
+
+def _first_expr(parser):
+    if hasattr(parser, "exprs"):
+        return _first_expr(parser.exprs[0])
+    elif hasattr(parser, "expr"):
+        return _first_expr(parser.expr)
+    else:
+        return parser
 
 
 def _best_guess_failing_parser(parser, text):

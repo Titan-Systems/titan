@@ -50,7 +50,7 @@ class Task(Resource, AccountScoped):
         error_integration=StringProp("error_integration"),
         copy_grants=FlagProp("copy grants"),
         comment=StringProp("comment"),
-        after=StringListProp("after"),
+        after=StringListProp("after", eq=False),
         when=ExpressionProp("when"),
         as_=QueryProp("as"),
     )

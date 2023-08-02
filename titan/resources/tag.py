@@ -14,7 +14,7 @@ class Tag(Resource, AccountScoped):
     resource_type = "TAG"
     props = Props(
         comment=StringProp("comment"),
-        allowed_values=StringListProp("allowed_values"),
+        allowed_values=StringListProp("allowed_values", eq=False),
     )
 
     name: str

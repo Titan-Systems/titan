@@ -6,7 +6,6 @@ from ..props import (
     Props,
     FlagProp,
     QueryProp,
-    ResourceListProp,
     StringProp,
     TagsProp,
 )
@@ -33,7 +32,7 @@ class View(Resource, SchemaScoped):
     resource_type = "VIEW"
     props = Props(
         secure=FlagProp("secure"),
-        columns=ResourceListProp(Column),
+        # columns=ResourceListProp(Column),
         volatile=FlagProp("volatile"),
         recursive=FlagProp("recursive"),
         tags=TagsProp(),

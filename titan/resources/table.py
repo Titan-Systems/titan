@@ -8,7 +8,6 @@ from ..props import (
     IntProp,
     Props,
     PropSet,
-    ResourceListProp,
     StringProp,
     StringListProp,
     TagsProp,
@@ -41,7 +40,7 @@ class Table(Resource, SchemaScoped):
 
     resource_type = "TABLE"
     props = Props(
-        columns=ResourceListProp(Column),
+        # columns=ResourceListProp(Column),
         volatile=FlagProp("volatile"),
         transient=FlagProp("transient"),
         cluster_by=StringListProp("cluster by"),

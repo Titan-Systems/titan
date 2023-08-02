@@ -1,54 +1,11 @@
 import pyparsing as pp
 
-from ..enums import ParseableEnum
+from ..enums import DataType
 from ..props import Props, StringProp
 from ..parse import Identifier, ANY
 
 
 from . import Resource
-
-
-class ColumnType(ParseableEnum):
-    NUMBER = "NUMBER"
-    DECIMAL = "DECIMAL"
-    NUMERIC = "NUMERIC"
-    INT = "INT"
-    INTEGER = "INTEGER"
-    BIGINT = "BIGINT"
-    SMALLINT = "SMALLINT"
-    TINYINT = "TINYINT"
-    BYTEINT = "BYTEINT"
-    FLOAT = "FLOAT"
-    FLOAT4 = "FLOAT4"
-    FLOAT8 = "FLOAT8"
-    DOUBLE = "DOUBLE"
-    DOUBLE_PRECISION = "DOUBLE PRECISION"
-    REAL = "REAL"
-    VARCHAR = "VARCHAR"
-    CHAR = "CHAR"
-    CHARACTER = "CHARACTER"
-    NCHAR = "NCHAR"
-    STRING = "STRING"
-    TEXT = "TEXT"
-    NVARCHAR = "NVARCHAR"
-    NVARCHAR2 = "NVARCHAR2"
-    CHAR_VARYING = "CHAR VARYING"
-    NCHAR_VARYING = "NCHAR VARYING"
-    BINARY = "BINARY"
-    VARBINARY = "VARBINARY"
-    BOOLEAN = "BOOLEAN"
-    DATE = "DATE"
-    DATETIME = "DATETIME"
-    TIME = "TIME"
-    TIMESTAMP = "TIMESTAMP"
-    TIMESTAMP_LTZ = "TIMESTAMP_LTZ"
-    TIMESTAMP_NTZ = "TIMESTAMP_NTZ"
-    TIMESTAMP_TZ = "TIMESTAMP_TZ"
-    ARRAY = "ARRAY"
-    OBJECT = "OBJECT"
-    VARIANT = "VARIANT"
-    GEOGRAPHY = "GEOGRAPHY"
-    GEOMETRY = "GEOMETRY"
 
 
 class Column(Resource):
@@ -88,7 +45,7 @@ class Column(Resource):
     )
 
     name: str
-    type: ColumnType
+    type: DataType
     comment: str = None
 
     @classmethod
@@ -97,4 +54,4 @@ class Column(Resource):
         for (name, type), start, end in parser.scan_string(sql):
             remainder = sql[end:]
             props = cls.props.parse(remainder)
-            return cls(name=name, type=ColumnType.parse(type), **props)
+            return cls(name=name, type=DataType.parse(type), **props)

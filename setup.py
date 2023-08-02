@@ -17,4 +17,14 @@ setup(
         "Programming Language :: SQL",
         "Topic :: Database",
     ],
+    install_requires=[
+        "click",
+        "dictdiffer",
+        "inflection",
+        "pydantic",
+        "pyparsing",
+        "pyyaml",
+        "snowflake-connector-python",
+        "snowflake-snowpark-python",
+    ],
 )

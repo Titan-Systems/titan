@@ -370,18 +370,12 @@ class FileFormatProp(Prop):
     FILE_FORMAT = (TYPE = CSV ...)
     """
 
-    def __init__(self, name):
-        expression = (
-            Keyword(name).suppress()
-            + EQUALS
-            + (
-                parens(StringProp("format_name").expression)
-                | (LPAREN + ... + RPAREN)
-                | Identifier
-                | pp.sgl_quoted_string
-            )
+    def __init__(self, label):
+        value_expr = (
+            parens(StringProp("format_name").expr) | (LPAREN + ... + RPAREN) | Identifier | pp.sgl_quoted_string
         )
-        super().__init__(name, expression)
+
+        super().__init__(label, value_expr, eq=True)
 
     def validate(self, prop_value):
         file_type = EnumProp("type", FileType).parse(prop_value)
