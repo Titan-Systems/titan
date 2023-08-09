@@ -56,7 +56,7 @@ class Task(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     warehouse: Annotated[Warehouse, coerce_from_str(Warehouse)] = None
     user_task_managed_initial_warehouse_size: WarehouseSize = None
     schedule: str = None

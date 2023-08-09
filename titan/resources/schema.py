@@ -37,7 +37,7 @@
 
 #     name: str
 #     transient: bool = False
-#     owner: str = None
+#     owner: str = "SYSADMIN"
 #     with_managed_access: bool = False
 #     data_retention_time_in_days: int = None
 #     max_data_extension_time_in_days: int = None

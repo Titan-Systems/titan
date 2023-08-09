@@ -1,3 +1,4 @@
+from .adapter import Adapter
 from .blueprint import Blueprint
 
 from .resources import *
@@ -21,6 +22,7 @@ from .resources import *
 
 __all__ = [
     # "App",
+    "Adapter",
     "Alert",
     "Blueprint",
     "Database",

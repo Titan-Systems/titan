@@ -104,7 +104,7 @@ class CSVFileFormat(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: FileType
     compression: Compression = None
     record_delimiter: str = None
@@ -178,7 +178,7 @@ class JSONFileFormat(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: FileType
     compression: Compression = None
     date_format: str = None
@@ -224,7 +224,7 @@ class AvroFileFormat(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: FileType
     compression: Compression = None
     trim_space: bool = None
@@ -257,7 +257,7 @@ class OrcFileFormat(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: FileType
     trim_space: bool = None
     replace_invalid_characters: bool = None
@@ -295,7 +295,7 @@ class ParquetFileFormat(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: FileType
     compression: Compression = None
     snappy_compression: bool = None
@@ -340,7 +340,7 @@ class XMLFileFormat(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: FileType
     compression: Compression = None
     ignore_utf8_errors: bool = None

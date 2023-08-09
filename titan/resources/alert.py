@@ -29,7 +29,7 @@ class Alert(Resource, SchemaScoped):  # Createable
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     warehouse: str
     schedule: str
     comment: str = None

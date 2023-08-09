@@ -43,7 +43,7 @@ class EmailNotificationIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: NotificationType = NotificationType.EMAIL
     enabled: bool
     allowed_recipients: List[str]
@@ -79,7 +79,7 @@ class AWSOutboundNotificationIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     enabled: bool
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
@@ -115,7 +115,7 @@ class GCPOutboundNotificationIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     enabled: bool
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
@@ -152,7 +152,7 @@ class AzureOutboundNotificationIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     enabled: bool
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
@@ -186,7 +186,7 @@ class GCPInboundNotificationIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     enabled: bool
     direction: NotificationDirection = NotificationDirection.INBOUND
     type: str = NotificationType.QUEUE
@@ -221,7 +221,7 @@ class AzureInboundNotificationIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     enabled: bool
     direction: NotificationDirection = NotificationDirection.INBOUND
     type: str = NotificationType.QUEUE

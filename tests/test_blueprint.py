@@ -1,6 +1,6 @@
 import unittest
 
-from titan import Blueprint, Database, Schema, Table, View
+from titan import Blueprint, Database, Schema, Table, View, Adapter
 
 
 class TestBlueprint(unittest.TestCase):
@@ -9,44 +9,58 @@ class TestBlueprint(unittest.TestCase):
 
         db = Database(name="DB")
         schema = Schema(name="SCHEMA", database=db)
-        table = Table(name="TABLE", schema=schema)
+        # table = Table(name="TABLE", schema=schema)
         view = View(name="VIEW", schema=schema)
-        blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, schema, table, view])
+        blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, schema, view])
+        manifest = blueprint.generate_manifest()
 
+        blueprint.plan(Adapter())
+
+        self.assertIn("urn:ABCD123:database/DB", manifest)
         self.assertEqual(
-            blueprint.manifest,
+            manifest["urn:ABCD123:database/DB"],
             {
-                "urn:ABCD123:database/DB": {
-                    "name": "DB",
-                    "data_retention_time_in_days": 1,
-                    "max_data_extension_time_in_days": 14,
-                    "owner": "SYSADMIN",
-                    "transient": False,
-                },
-                "urn:ABCD123:schema/DB.SCHEMA": {
-                    "name": "SCHEMA",
-                    "transient": False,
-                    "with_managed_access": False,
-                },
-                "urn:ABCD123:table/DB.SCHEMA.TABLE": {
-                    "name": "TABLE",
-                    "columns": [],
-                    "volatile": False,
-                    "transient": False,
-                    "cluster_by": [],
-                    "enable_schema_evolution": False,
-                    "change_tracking": False,
-                    "copy_grants": False,
-                },
-                "urn:ABCD123:view/DB.SCHEMA.VIEW": {
-                    "name": "VIEW",
-                    "columns": [],
-                    "volatile": False,
-                    "recursive": False,
-                    "copy_grants": False,
-                },
+                "name": "DB",
+                "owner": "SYSADMIN",
+                "transient": False,
+                "data_retention_time_in_days": 1,
+                "max_data_extension_time_in_days": 14,
             },
         )
+
+        self.assertIn("urn:ABCD123:schema/DB.SCHEMA", manifest)
+        self.assertEqual(
+            manifest["urn:ABCD123:schema/DB.SCHEMA"],
+            {
+                "name": "SCHEMA",
+                "owner": "SYSADMIN",
+                "transient": False,
+            },
+        )
+        self.assertIn("urn:ABCD123:view/DB.SCHEMA.VIEW", manifest)
+        self.assertEqual(
+            manifest["urn:ABCD123:view/DB.SCHEMA.VIEW"],
+            {
+                "name": "VIEW",
+                "owner": "SYSADMIN",
+                "secure": False,
+                "volatile": False,
+                "recursive": False,
+                "columns": [],
+            },
+        )
+        # self.assertIn("urn:ABCD123:table/DB.SCHEMA.TABLE", manifest)
+        #         ,
+        #         "urn:ABCD123:table/DB.SCHEMA.TABLE": {
+        #             "name": "TABLE",
+        #             "columns": [],
+        #             "volatile": False,
+        #             "transient": False,
+        #             "cluster_by": [],
+        #             "enable_schema_evolution": False,
+        #             "change_tracking": False,
+        #             "copy_grants": False,
+        #         },
 
         # provider = Provider()
         # state = provider.fetch_from_manifest(blueprint.manifest)

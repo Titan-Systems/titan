@@ -57,7 +57,7 @@ class Table(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     columns: list = []
     volatile: bool = False
     transient: bool = False

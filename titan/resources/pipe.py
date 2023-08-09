@@ -25,7 +25,7 @@ class Pipe(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     auto_ingest: bool = None
     error_integration: str = None
     aws_sns_topic: str = None

@@ -4,7 +4,6 @@ import pyparsing as pp
 from .enums import DataType
 from .parse import (
     _consume_tokens,
-    _first_expr,
     Keyword,
     Keywords,
     Literals,
@@ -17,10 +16,6 @@ from .parse import (
     RPAREN,
     EQUALS,
     ARROW,
-    WITH,
-    TAG,
-    AT,
-    BEFORE,
     ANY,
 )
 
@@ -94,7 +89,7 @@ class Props:
         while True:
             try:
                 tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
-            except pp.ParseException as err:
+            except pp.ParseException:
                 formatted_sql = "\n".join(["  " + line.strip() for line in remainder_sql.splitlines()])
                 # formatted_parser = _format_parser(parser)
                 failing_parser = _best_guess_failing_parser(parser, remainder_sql)
@@ -167,10 +162,10 @@ class FlagProp(Prop):
 
 class IdentifierProp(Prop):
     def __init__(self, label, **kwargs):
-        super().__init__(label, value_expr=FullyQualifiedIdentifier, **kwargs)
+        super().__init__(label, value_expr=pp.Group(FullyQualifiedIdentifier()), **kwargs)
 
     def validate(self, prop_value):
-        return prop_value
+        return ".".join(prop_value.as_list())
 
     def render(self, value):
         if value is None:
@@ -179,12 +174,15 @@ class IdentifierProp(Prop):
         return f"{self.label}{eq}{value}"
 
 
+# FIXME
 class IdentifierListProp(Prop):
     def __init__(self, label, **kwargs):
-        super().__init__(label, value_expr=Identifier, parens=True, **kwargs)
+        value_expr = pp.Group(pp.delimited_list(FullyQualifiedIdentifier()))
+        # value_expr = pp.Group(FullyQualifiedIdentifier())
+        super().__init__(label, value_expr=value_expr, **kwargs)
 
     def validate(self, prop_values):
-        return [prop_values.as_list()]
+        return ".".join(prop_values.as_list())
 
 
 class StringListProp(Prop):
@@ -327,7 +325,12 @@ class ExpressionProp(Prop):
 
 class TimeTravelProp(Prop):
     """
-    { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> | STREAM => '<name>' } )
+    { AT | BEFORE } ( {
+        TIMESTAMP => <timestamp> |
+        OFFSET => <time_difference> |
+        STATEMENT => <id> |
+        STREAM => '<name>'
+    } )
     """
 
     def __init__(self, label):

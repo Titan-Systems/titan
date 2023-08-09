@@ -51,6 +51,7 @@ class TestResources(unittest.TestCase):
             Alert,
             {
                 "name": "ALERT",
+                "owner": "SYSADMIN",
                 "warehouse": "wh",
                 "schedule": "1 minute",
                 "condition": "SELECT 1",
