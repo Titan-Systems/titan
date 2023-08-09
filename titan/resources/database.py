@@ -37,19 +37,19 @@ from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 #     tags: Dict[str, str] = None
 #     comment: str = None
 
-#     # _schemas: ResourceDB
+# _schemas: ResourceDB
 
-#     # def model_post_init(self, ctx):
-#     #     super().model_post_init(ctx)
-#     #     self._schemas = ResourceDB(Schema)
-#     #     self.add(
-#     #         Schema(name="PUBLIC", implicit=True),
-#     #         Schema(name="INFORMATION_SCHEMA", implicit=True),
-#     #     )
+# def model_post_init(self, ctx):
+#     super().model_post_init(ctx)
+#     self._schemas = ResourceDB(Schema)
+#     self.add(
+#         Schema(name="PUBLIC", implicit=True),
+#         Schema(name="INFORMATION_SCHEMA", implicit=True),
+#     )
 
-#     # @property
-#     # def schemas(self):
-#     #     return self._schemas
+# @property
+# def schemas(self):
+#     return self._schemas
 
 
 class SharedDatabase(Resource, AccountScoped):

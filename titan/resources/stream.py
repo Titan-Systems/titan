@@ -40,7 +40,7 @@ class TableStream(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     copy_grants: bool = None
     at: Dict[str, str] = None
     before: Dict[str, str] = None
@@ -73,7 +73,7 @@ class ExternalTableStream(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     copy_grants: bool = None
     on_external_table: str
     at: Dict[str, str] = None
@@ -100,7 +100,7 @@ class StageStream(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     copy_grants: bool = None
     on_stage: str
     comment: str = None
@@ -131,7 +131,7 @@ class ViewStream(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     copy_grants: bool = None
     on_view: str
     at: Dict[str, str] = None

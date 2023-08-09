@@ -89,7 +89,7 @@ class Warehouse(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     warehouse_type: WarehouseType = None
     warehouse_size: WarehouseSize = None
     max_cluster_count: int = None

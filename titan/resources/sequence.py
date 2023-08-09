@@ -21,7 +21,7 @@ class Sequence(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     start: int = None
     increment: int = None
     comment: str = None

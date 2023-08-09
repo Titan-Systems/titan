@@ -1,4 +1,4 @@
-from typing import ClassVar, Union, Dict
+from typing import ClassVar, Union, Dict, Set
 
 from inflection import underscore
 from pydantic import BaseModel, BeforeValidator, Field, ConfigDict, field_validator
@@ -8,9 +8,10 @@ from pyparsing import ParseException
 from ..enums import Scope
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..parse import _parse_create_header, _resolve_resource_class
-from ..sql import add_ref
 
-resource_db = {}
+# from ..sql import add_ref
+
+from ..identifiers import FQN
 
 
 class _Resource(ModelMetaclass):
@@ -26,7 +27,13 @@ class _Resource(ModelMetaclass):
 
 
 class Resource(BaseModel, metaclass=_Resource):
-    model_config = ConfigDict(from_attributes=True, extra="forbid", validate_assignment=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        extra="forbid",
+        validate_assignment=True,
+        # NOTE: This might be required to make SchemaScoped.schema = 'foo' work
+        # populate_by_name=True,
+    )
 
     resource_type: ClassVar[str] = None
     props: ClassVar[Props]
@@ -34,19 +41,11 @@ class Resource(BaseModel, metaclass=_Resource):
     name: str
     implicit: bool = Field(exclude=True, default=False)
     stub: bool = Field(exclude=True, default=False)
-
-    # @field_validator("*")
-    # @classmethod
-    # def coerce_resource(cls, v: Any, field: Field) -> Any:
-    #     if field.field_name != "name":
-    #         print(field)
-    #     # if issubclass(field, Resource and isinstance(v, str)):
-    #     #     return field.type_.find(v)
-    #     return v
+    _refs: Set["Resource"] = {}
 
     # TODO: check if this is being super()'d correctly
     def model_post_init(self, ctx):
-        resource_db[(self.__class__, self.name)] = self
+        pass
 
     # TODO: snowflake resource name compatibility
     @field_validator("name")
@@ -54,16 +53,9 @@ class Resource(BaseModel, metaclass=_Resource):
     def validate_name(cls, name: str):
         return name.upper()
 
-    # TODO: Reconsider
-    @classmethod
-    def find(cls, resource_name):
-        return cls(name=resource_name, stub=True)
-        # if resource_name is None:
-        #     return None
-        # key = (cls, resource_name)
-        # if key not in resource_db:
-        #     resource_db[key] = cls(name=resource_name, stub=True)
-        # return resource_db[key]
+    # @classmethod
+    # def as_stub(cls, resource_name):
+    #     return cls(name=resource_name, stub=True)
 
     @classmethod
     def from_sql(cls, sql):
@@ -82,6 +74,20 @@ class Resource(BaseModel, metaclass=_Resource):
             # return None
             raise err
 
+    def _requires(self, resource):
+        self._refs.add(resource)
+
+    def requires(self, *resources):
+        if isinstance(resources[0], list):
+            resources = resources[0]
+        for resource in resources:
+            self._requires(resource)
+        return self
+
+    @property
+    def references(self):
+        return self._refs
+
     # def __format__(self, format_spec):
     #     add_ref(self)
     #     return self.fully_qualified_name
@@ -95,30 +101,42 @@ class Createable(BaseModel):
     #     return f"CREATE OR REPLACE {self.resource_type} {self.name}"
 
 
-class ResourceDB:
-    def __init__(self, cls):
-        self.resource_class = cls
-        self._db = {}
+class ResourceCollection:
+    def __init__(self, parent):
+        self.parent = parent
+        self.items = {}
+
+    def _add(self, child):
+        if child.resource_key not in self.items:
+            self.items[child.resource_key] = []
+        # TODO: dedupe?
+        self.items[child.resource_key].append(child)
+        child.parent = self.parent
+
+    def add(self, *children):
+        if isinstance(children[0], list):
+            children = children[0]
+        for child in children:
+            self._add(child)
 
     def __getitem__(self, key):
-        if key is None:
-            return None
-        if key not in self._db:
-            self._db[key] = self.resource_class(name=key, stub=True)
-        return self._db[key]
+        raise NotImplementedError
 
-    def __setitem__(self, key, value):
-        if key is None:
-            raise Exception
-        if key in self._db:
-            if self._db[key].stub:
-                self._db[key] = value
-            else:
-                raise Exception("An object already exists with that name")
-        # if key not in self._db:
-        # self._db[key] = self.resource_class(name=key, implicit=True)
-        # return self._db[key]
-        self._db[key] = value
+    #     if key is None:
+    #         return None
+    #     if key not in self._db:
+    #         self._db[key] = self.resource_class(name=key, stub=True)
+    #     return self._db[key]
+
+    # def __setitem__(self, key, value):
+    #     if key is None:
+    #         raise Exception
+    #     if key in self._db:
+    #         if self._db[key].stub:
+    #             self._db[key] = value
+    #         else:
+    #             raise Exception("An object already exists with that name")
+    #     self._db[key] = value
 
 
 class Organization(Resource):
@@ -135,9 +153,13 @@ class OrganizationScoped(BaseModel):
     def parent(self):
         return self.organziation
 
+    @parent.setter
+    def parent(self, value):
+        self.organziation = value
+
     @property
     def fully_qualified_name(self):
-        return self.name.upper()
+        return FQN(name=self.name.upper())
 
     @property
     def fqn(self):
@@ -158,9 +180,13 @@ class AccountScoped(BaseModel):
     def parent(self):
         return self.account
 
+    @parent.setter
+    def parent(self, value):
+        self.account = value
+
     @property
     def fully_qualified_name(self):
-        return self.name.upper()
+        return FQN(name=self.name.upper())
 
     @property
     def fqn(self):
@@ -169,7 +195,7 @@ class AccountScoped(BaseModel):
     @field_validator("account")
     @classmethod
     def validate_account(cls, account: Union[str, Account]):
-        return account if isinstance(account, Account) else Account.find(account)
+        return account if isinstance(account, Account) else Account(name=account, stub=True)
 
 
 class Database(Resource, AccountScoped):
@@ -203,6 +229,20 @@ class Database(Resource, AccountScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
+    _children: ResourceCollection
+
+    def model_post_init(self, ctx):
+        super().model_post_init(ctx)
+        self._children = ResourceCollection(self)
+        self._children.add(
+            Schema(name="PUBLIC", implicit=True),
+            Schema(name="INFORMATION_SCHEMA", implicit=True),
+        )
+
+    @property
+    def schemas(self):
+        return self._children.schemas
+
 
 class DatabaseScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.DATABASE
@@ -212,12 +252,13 @@ class DatabaseScoped(BaseModel):
     def parent(self):
         return self.database
 
+    @parent.setter
+    def parent(self, value):
+        self.database = value
+
     @property
     def fully_qualified_name(self):
-        parts = [self.name.upper()]
-        if self.database:
-            parts.insert(0, self.database.name)
-        return ".".join(parts)
+        return FQN(database=self.database.name if self.database else None, name=self.name.upper())
 
     @property
     def fqn(self):
@@ -226,7 +267,7 @@ class DatabaseScoped(BaseModel):
     @field_validator("database")
     @classmethod
     def validate_database(cls, database: Union[str, Database]):
-        return database if isinstance(database, Database) else Database.find(database)
+        return database if isinstance(database, Database) else Database(name=database, stub=True)
 
 
 class Schema(Resource, DatabaseScoped):
@@ -255,13 +296,23 @@ class Schema(Resource, DatabaseScoped):
 
     name: str
     transient: bool = False
-    owner: str = None
-    with_managed_access: bool = False
+    owner: str = "SYSADMIN"
+    with_managed_access: bool = None
     data_retention_time_in_days: int = None
     max_data_extension_time_in_days: int = None
     default_ddl_collation: str = None
     tags: Dict[str, str] = None
     comment: str = None
+
+    _children: ResourceCollection
+
+    def model_post_init(self, ctx):
+        super().model_post_init(ctx)
+        self._children = ResourceCollection(self)
+
+    @property
+    def tables(self):
+        return self._children.tables
 
 
 class SchemaScoped(BaseModel):
@@ -272,12 +323,17 @@ class SchemaScoped(BaseModel):
     def parent(self):
         return self.schema_
 
+    @parent.setter
+    def parent(self, value):
+        self.schema_ = value
+
     @property
     def fully_qualified_name(self):
-        parts = [self.name.upper()]
-        if self.schema_:
-            parts.insert(0, self.schema_.fully_qualified_name)
-        return ".".join(parts)
+        schema = self.schema_.name if self.schema_ else None
+        database = None
+        if self.schema_ and self.schema_.database:
+            database = self.schema_.database.name
+        return FQN(database=database, schema=schema, name=self.name.upper())
 
     @property
     def fqn(self):
@@ -286,8 +342,8 @@ class SchemaScoped(BaseModel):
     @field_validator("schema_")
     @classmethod
     def validate_schema(cls, schema: Union[str, Schema]):
-        return schema if isinstance(schema, Schema) else Schema.find(schema)
+        return schema if isinstance(schema, Schema) else Schema(name=schema, stub=True)
 
 
 def coerce_from_str(cls: Resource) -> BeforeValidator:
-    return BeforeValidator(lambda name: cls.find(name) if isinstance(name, str) else name)
+    return BeforeValidator(lambda name: cls(name=name, stub=True) if isinstance(name, str) else name)

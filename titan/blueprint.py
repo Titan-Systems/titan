@@ -1,32 +1,39 @@
 from dictdiffer import diff
-
 from .enums import Scope
+from .identifiers import URN
 
 
-def urn(blueprint, resource):
-    return f"urn:{blueprint.account}:{resource.resource_key}/{resource.fqn}"
+def fetch_remote_state(adapter, manifest):
+    for urn_str in manifest.keys():
+        urn = URN.from_str(urn_str)
+        adapter.fetch_resource(urn)
 
 
 class Blueprint:
     def __init__(self, name, account, database=None, schema=None, resources=[]) -> None:
-        self.name = name or ""
         self.staged = []
         self.add(resources or [])
+        # NOTE: might want a resolution function here
         self.account = account
         self.database = database
         self.schema = schema
 
-    @property
-    def manifest(self):
+    def generate_manifest(self):
         manifest = {}
+        refs = []
         for resource in self.staged:
-            self.finalize_scope(resource)
-            key = urn(self, resource)
+            if resource.implicit:
+                continue
+            self._finalize_scope(resource)
+            key = URN.from_resource(account=self.account, resource=resource)
             value = resource.model_dump(exclude_none=True)
-            manifest[key] = value
+            manifest[str(key)] = value
+            # for ref in resource.refs:
+            #     refs.append([key, urn(self.account, ref)])
         return manifest
 
-    def finalize_scope(self, resource):
+    def _finalize_scope(self, resource):
+        # TODO: connect stubs
         if resource.parent is None:
             if resource.scope == Scope.ACCOUNT:
                 resource.account = self.account
@@ -39,22 +46,29 @@ class Blueprint:
                     raise Exception(f"Orphaned resource found {resource}")
                 resource.schema = self.schema
 
-    def plan(self):
-        pass
+    def plan(self, adapter):
+        manifest = self.generate_manifest()
+        remote_state = fetch_remote_state(adapter, manifest)
+        diffs = diff(manifest, remote_state)
+        for action, target, deltas in diffs:
+            print(f"[{action}]", target)
+            for delta in deltas:
+                print("\t", delta)
+        print("ok")
 
-    def compare(self, remote_state):
-        return diff(self.manifest, remote_state)
+    # def compare(self, remote_state):
+    #     return diff(self.manifest, remote_state)
 
-        # d = diff(state, config)
-        # print("~" * 120)
-        # for action, target, deltas in d:
-        #     print(f"[{action}]", target)
-        #     for delta in deltas:
-        #         print("\t", delta)
+    # d = diff(state, config)
+    # print("~" * 120)
+    # for action, target, deltas in d:
+    #     print(f"[{action}]", target)
+    #     for delta in deltas:
+    #         print("\t", delta)
 
-    def apply(self):
-        # diff = self.plan()
-        pass
+    # def apply(self):
+    #     # diff = self.plan()
+    #     pass
 
     def _add(self, resource):
         self.staged.append(resource)

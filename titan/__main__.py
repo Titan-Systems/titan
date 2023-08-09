@@ -1,9 +1,10 @@
-from titan.cli import entrypoint
+# from titan.cli import entrypoint
 
 
 def main():
-    entrypoint()
+    # entrypoint()
+    print("Hello, world!")
 
 
 if __name__ == "__main__":
-    entrypoint()
+    main()

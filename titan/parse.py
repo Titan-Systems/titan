@@ -5,13 +5,12 @@ from .enums import Scope
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
 
-Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$")
-FullyQualifiedIdentifier = pp.DelimitedList(
-    pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string,
-    delim=".",
-    min=1,
-    max=3,
-    combine=True,
+Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
+# FullyQualifiedIdentifier = pp.DelimitedList(Identifier, delim=".", min=1, max=3)
+FullyQualifiedIdentifier = (
+    pp.DelimitedList(Identifier, delim=".", min=3, max=3)
+    ^ pp.DelimitedList(Identifier, delim=".", min=2, max=2)
+    ^ Identifier
 )
 
 ARROW = Literal("=>").suppress()

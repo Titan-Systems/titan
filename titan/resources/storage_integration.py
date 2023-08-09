@@ -43,7 +43,7 @@ class S3StorageIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     storage_provider: StorageProvider
     storage_aws_role_arn: str
     storage_aws_object_acl: str = None
@@ -80,7 +80,7 @@ class GCSStorageIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     storage_provider: StorageProvider
     enabled: bool
     storage_allowed_locations: List[str]
@@ -116,7 +116,7 @@ class AzureStorageIntegration(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     storage_provider: StorageProvider
     azure_tenant_id: str
     enabled: bool

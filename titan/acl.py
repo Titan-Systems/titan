@@ -1,6 +1,6 @@
 from typing import List, Union
 
-from pydantic import BaseModel, Field, ConfigDict, SerializeAsAny, field_serializer
+from pydantic import BaseModel
 
 # _ = titan.Policy(
 #     acls=[
@@ -18,8 +18,7 @@ from pydantic import BaseModel, Field, ConfigDict, SerializeAsAny, field_seriali
 
 # What are all the objects that user X can access?
 
-from .resource import Resource
-from . import Role, Grant
+from .resources import Resource, Role, Grant
 from .enums import ParseableEnum
 
 # GRANT

@@ -91,7 +91,7 @@ class InternalStage(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: StageType = StageType.INTERNAL
     encryption: Dict[str, EncryptionType] = None
     file_format: Union[str, dict] = None
@@ -161,7 +161,7 @@ class ExternalStage(Resource, SchemaScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
     url: str
     directory: Dict[str, bool] = None

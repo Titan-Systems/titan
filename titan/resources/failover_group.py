@@ -47,7 +47,7 @@ class FailoverGroup(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     object_types: List[ObjectType]
     allowed_databases: List[str] = None
     allowed_shares: List[str] = None

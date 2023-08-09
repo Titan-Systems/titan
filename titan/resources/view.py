@@ -3,16 +3,15 @@ from typing import Dict
 from . import Resource
 from .base import SchemaScoped
 from ..props import (
-    Props,
+    BoolProp,
     FlagProp,
+    Props,
     QueryProp,
     StringProp,
     TagsProp,
 )
 
 from .column import Column
-
-# from .schema import Schema
 
 
 class View(Resource, SchemaScoped):
@@ -36,19 +35,21 @@ class View(Resource, SchemaScoped):
         volatile=FlagProp("volatile"),
         recursive=FlagProp("recursive"),
         tags=TagsProp(),
+        change_tracking=BoolProp("change_tracking"),
         copy_grants=FlagProp("copy grants"),
         comment=StringProp("comment"),
         as_=QueryProp("as"),
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
 
-    secure: bool = None
-    columns: list = []
+    secure: bool = False
     volatile: bool = False
     recursive: bool = False
+    columns: list = []
     tags: Dict[str, str] = None
-    copy_grants: bool = False
+    change_tracking: bool = None
+    copy_grants: bool = None
     comment: str = None
     as_: str = None

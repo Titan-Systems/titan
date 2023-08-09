@@ -19,7 +19,7 @@ class Role(Resource, AccountScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     tags: Dict[str, str] = None
     comment: str = None
 
@@ -36,5 +36,5 @@ class DatabaseRole(Resource, DatabaseScoped):
     )
 
     name: str
-    owner: str = None
+    owner: str = "SYSADMIN"
     comment: str = None

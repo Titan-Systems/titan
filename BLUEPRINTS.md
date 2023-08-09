@@ -1,5 +1,46 @@
 # Blueprints
 
+## Parent-child relationships
+
+```Python
+
+# Read
+schema = Schema(name="foo")
+schema.parent # => Database
+schema.children # => {Table, View, Function, ...}
+
+# Update
+schema.add(Table(name="tbl"))
+
+
+# Read by resource type
+tbl = schema.tables["tbl"]
+for tbl in schema.tables:
+    ...
+
+
+# Stubs cannot read children
+schema = Schema.stub("ANALYTICS") # this is a stub
+for tbl in schema.tables: # so this fails
+    print(tbl.name)
+
+# Live schemas can read children
+schema = Schema.find("ANALYTICS")
+for tbl in schema.tables: # this works
+    print(tbl.name)
+
+```
+
+
+
+
+
+
+
+
+
+
+
 Not sure what a solid pythonic way is to implement blueprints.
 
 This seems fine

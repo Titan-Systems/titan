@@ -2,7 +2,7 @@ from typing_extensions import Annotated
 
 from .base import Resource, AccountScoped, coerce_from_str
 from .role import Role
-from ..props import Props, IdentifierProp, FlagProp, StringProp, EnumProp
+from ..props import Props, IdentifierProp, FlagProp
 from ..enums import ParseableEnum
 
 
