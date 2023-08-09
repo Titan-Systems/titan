@@ -4,12 +4,13 @@ import pyparsing as pp
 
 from .base import Resource, SchemaScoped
 from ..enums import ParseableEnum
-from ..parse import _resolve_resource_class, Identifier, parens, LPAREN, RPAREN, Keyword, EQUALS
+from ..parse import _resolve_resource_class, FullyQualifiedIdentifier, parens, _parse_props
 from ..props import (
     Props,
     BoolProp,
     EnumProp,
     StringProp,
+    IdentifierProp,
     IntProp,
     StringListProp,
     Prop,
@@ -372,17 +373,28 @@ class FileFormatProp(Prop):
 
     def __init__(self, label):
         value_expr = (
-            parens(StringProp("format_name").expr) | (LPAREN + ... + RPAREN) | Identifier | pp.sgl_quoted_string
+            parens(IdentifierProp("format_name").parser("prop_value"))
+            | pp.original_text_for(pp.nested_expr())("prop_value")
+            | FullyQualifiedIdentifier("prop_value")
+            | pp.sgl_quoted_string("prop_value")
         )
 
         super().__init__(label, value_expr, eq=True)
 
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
+        # Prop is an identifier name
+        if isinstance(prop_value, list):
+            return ".".join(prop_value)
+
+        prop_value = prop_value.strip("()")
         file_type = EnumProp("type", FileType).parse(prop_value)
-        if file_type:
-            return FileTypeMap[file_type].props.parse(prop_value)
-        else:
-            return prop_value
+
+        if file_type is None:
+            raise ValueError(f"Invalid inline file format: {prop_value}")
+
+        # Prop is an inline file format
+        file_type_cls = FileTypeMap[file_type]
+        return _parse_props(file_type_cls.props, prop_value)
 
 
 class FileFormat(Resource):

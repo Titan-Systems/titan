@@ -7,7 +7,7 @@ from pyparsing import ParseException
 
 from ..enums import Scope
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
-from ..parse import _parse_create_header, _resolve_resource_class
+from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 
 # from ..sql import add_ref
 
@@ -53,20 +53,16 @@ class Resource(BaseModel, metaclass=_Resource):
     def validate_name(cls, name: str):
         return name.upper()
 
-    # @classmethod
-    # def as_stub(cls, resource_name):
-    #     return cls(name=resource_name, stub=True)
-
     @classmethod
     def from_sql(cls, sql):
         resource_cls = cls
         if resource_cls == Resource:
             resource_cls = Resource.classes[_resolve_resource_class(sql)]
 
-        identifier, remainder = _parse_create_header(sql, resource_cls)
+        identifier, remainder_sql = _parse_create_header(sql, resource_cls)
 
         try:
-            props = resource_cls.props.parse(remainder) if remainder else {}
+            props = _parse_props(resource_cls.props, remainder_sql) if remainder_sql else {}
             return resource_cls(**identifier, **props)
         except ParseException as err:
             print(f"Error parsing resource props {resource_cls.__name__} {identifier}")

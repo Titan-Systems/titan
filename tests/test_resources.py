@@ -33,7 +33,7 @@ from titan.resources.warehouse import WarehouseSize
 
 class TestResources(unittest.TestCase):
     def validate_from_sql(self, resource_cls, sql):
-        resource_cls.from_sql(sql)
+        self.assertIsNotNone(resource_cls.from_sql(sql))
 
     def validate_dict_serde(self, resource_cls, data):
         self.assertEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
@@ -64,7 +64,8 @@ class TestResources(unittest.TestCase):
             self.validate_from_sql(APIIntegration, sql)
 
     def test_column(self):
-        pass
+        for sql in load_sql_fixtures("column.sql"):
+            self.validate_from_sql(Column, sql)
 
     def test_database(self):
         for sql in load_sql_fixtures("database.sql"):

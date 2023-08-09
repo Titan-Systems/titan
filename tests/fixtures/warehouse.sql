@@ -7,6 +7,7 @@ CREATE WAREHOUSE IF NOT EXISTS XSMALL_WH
     AUTO_RESUME = FALSE
     initially_suspended = true
     RESOURCE_MONITOR = my_mon
+    COMMENT = 'My XSMALL warehouse'
 ;
 
 

@@ -56,6 +56,10 @@ def list_expr(expr):
     return pp.Group(pp.DelimitedList(expr) | parens(pp.DelimitedList(expr)))
 
 
+def parens(expr):
+    return LPAREN + expr + RPAREN
+
+
 CREATE = Keyword("CREATE").suppress()
 OR_REPLACE = Keywords("OR REPLACE").suppress()
 IF_NOT_EXISTS = Keywords("IF NOT EXISTS").suppress()
@@ -186,7 +190,7 @@ def _resolve_resource_class(sql):
     create_header = CREATE + pp.Opt(OR_REPLACE) + pp.Opt(TEMPORARY) + pp.Opt(TRANSIENT) + pp.Opt(SECURE)
     sql = _consume_tokens(create_header, sql)
 
-    resource_key = scaner(
+    resource_key = scanner(
         {
             "ALERT": lambda _: "alert",
             "DATABASE": _resolve_database,
@@ -218,7 +222,7 @@ def _resolve_resource_class(sql):
     return resource_key
 
 
-def scaner(lexicon, text):
+def scanner(lexicon, text):
     parser = pp.MatchFirst([Keywords(tok) for tok in lexicon.keys()])
     for tokens, _, end in parser.scan_string(text):
         action = lexicon[tokens[0]]
@@ -258,8 +262,13 @@ def _best_guess_failing_parser(parser, text):
             return expr
 
 
-def parens(expr):
-    return LPAREN + expr + RPAREN
+def _parser_has_results_name(parser, name):
+    if parser.resultsName == name:
+        return True
+    if hasattr(parser, "exprs"):
+        return any([_parser_has_results_name(expr, name) for expr in parser.exprs])
+    elif hasattr(parser, "expr"):
+        return False
 
 
 # def _lexicon_str(parser):
@@ -275,3 +284,41 @@ def parens(expr):
 #         break
 
 #     return "\n".join(formatted)
+
+
+def _marker(name):
+    return pp.Empty().set_parse_action(lambda s, loc, toks, marker=name: marker)
+
+
+def _parse_props(props, sql):
+    if sql.strip() == "":
+        return {}
+
+    found_props = {}
+
+    lexicon = []
+    for prop_kwarg, prop in props.props.items():
+        lexicon.append(prop.parser.copy() + _marker(prop_kwarg))
+
+    parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
+    sql = _consume_tokens(props.start_token, sql)
+
+    for parse_results, _, end in parser.scan_string(sql):
+        prop_kwarg = parse_results[-1]
+        prop = props[prop_kwarg]
+
+        if "prop_value" not in parse_results:
+            raise Exception(f"Failed to parse prop {prop} in {sql}")
+        prop_value = parse_results["prop_value"]
+
+        if isinstance(prop_value, pp.ParseResults):
+            prop_value = prop_value.as_list()
+
+        found_props[prop_kwarg] = prop.typecheck(prop_value)
+        remainder = sql[end:]
+
+    if len(remainder.strip(" ")) > 0:
+        formatted_sql = "\n".join(["  " + line.strip() for line in remainder.splitlines()])
+        failing_parser = _best_guess_failing_parser(parser, remainder)
+        raise Exception(f"Failed to parse props.\nSQL: \n```\n{formatted_sql}\n```\n\nParser:\n{failing_parser}\n\n")
+    return found_props

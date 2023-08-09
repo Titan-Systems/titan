@@ -1,16 +1,16 @@
 from abc import ABC
+from typing import Dict
 
 import pyparsing as pp
 from .enums import DataType
 from .parse import (
-    _consume_tokens,
+    _parser_has_results_name,
+    _parse_props,
     Keyword,
     Keywords,
     Literals,
     list_expr,
     parens,
-    _best_guess_failing_parser,
-    Identifier,
     FullyQualifiedIdentifier,
     LPAREN,
     RPAREN,
@@ -18,10 +18,6 @@ from .parse import (
     ARROW,
     ANY,
 )
-
-
-def strip_quotes(tokens):
-    return [tok.strip("'") for tok in tokens]
 
 
 class Prop(ABC):
@@ -38,29 +34,25 @@ class Prop(ABC):
         if parens:
             value_expr = list_expr(value_expr)
 
-        self.expr = Keywords(self.label).suppress() + eq_expr.suppress() + value_expr
+        if not _parser_has_results_name(value_expr, "prop_value"):
+            value_expr = value_expr("prop_value")
+
+        self.parser = Keywords(self.label).suppress() + eq_expr.suppress() + value_expr
 
     def __repr__(self):
         return f"{self.__class__.__name__}('{self.label}')"
 
     def parse(self, sql):
         try:
-            values = self.expr.parse_string(sql).as_list()
-            return self.on_parse(values)
-        except pp.ParseException:
+            prop_value = self.parser.parse_string(sql)["prop_value"]
+            if isinstance(prop_value, pp.ParseResults):
+                prop_value = prop_value.as_list()
+            return self.typecheck(prop_value)
+        except pp.ParseException as err:
+            print(err)
             return None
 
-    def on_parse(self, values):
-        if len(values) > 1:
-            raise Exception(f"Too many values: {values}")
-        if len(values) == 0:
-            raise Exception("No values parsed")
-        prop_value = values[0]
-        if self.alt_tokens and prop_value.lower() in self.alt_tokens:
-            return prop_value
-        return self.validate(prop_value)
-
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         raise NotImplementedError
 
     def render(self, value):
@@ -68,50 +60,20 @@ class Prop(ABC):
 
 
 class Props:
-    def __init__(self, _name: str = None, _start_token: str = None, **props):
-        self.props = props
+    def __init__(self, _name: str = None, _start_token: str = None, **props: Dict[str, Prop]):
+        self.props: Dict[str, Prop] = props
         self.name = _name
         self.start_token = Literals(_start_token) if _start_token else pp.Empty()
 
-    def parse(self, sql):
-        if sql.strip() == "":
-            return {}
-
-        lexicon = []
-        for prop_kwarg, prop in self.props.items():
-            # https://docs.python.org/3/faq/programming.html#why-do-lambdas-defined-in-a-loop-with-different-values-all-return-the-same-result
-            named_marker = pp.Empty().set_parse_action(lambda s, loc, toks, name=prop_kwarg.lower(): (name, loc))
-            lexicon.append(prop.expr.set_parse_action(prop.on_parse) + named_marker)
-
-        parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
-        found_props = {}
-        remainder_sql = _consume_tokens(self.start_token, sql)
-        while True:
-            try:
-                tokens, (prop_kwarg, end_index) = parser.parse_string(remainder_sql)
-            except pp.ParseException:
-                formatted_sql = "\n".join(["  " + line.strip() for line in remainder_sql.splitlines()])
-                # formatted_parser = _format_parser(parser)
-                failing_parser = _best_guess_failing_parser(parser, remainder_sql)
-                raise Exception(
-                    f"Failed to parse props.\nSQL: \n```\n{formatted_sql}\n```\n\nParser:\n{failing_parser}\n\n"
-                )
-
-            found_props[prop_kwarg] = tokens
-            remainder_sql = remainder_sql[end_index:].strip()
-            if remainder_sql == "":
-                break
-
-        if len(remainder_sql) > 0:
-            raise Exception(f"Unparsed props remain: [{remainder_sql}]")
-        return found_props
+    def __getitem__(self, key: str) -> Prop:
+        return self.props[key]
 
     def render(self, values):
         pass
 
 
 class BoolProp(Prop):
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         if prop_value.lower() not in ["true", "false"]:
             raise ValueError(f"Invalid boolean value: {prop_value}")
         return prop_value.lower() == "true"
@@ -124,7 +86,7 @@ class BoolProp(Prop):
 
 
 class IntProp(Prop):
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         try:
             return int(prop_value)
         except ValueError:
@@ -138,7 +100,7 @@ class IntProp(Prop):
 
 
 class StringProp(Prop):
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         return prop_value.strip("'")
 
     def render(self, value):
@@ -151,9 +113,9 @@ class StringProp(Prop):
 class FlagProp(Prop):
     def __init__(self, label):
         super().__init__(label, eq=False)
-        self.expr = Keywords(self.label)
+        self.parser = Keywords(self.label)("prop_value")
 
-    def validate(self, _):
+    def typecheck(self, _):
         return True
 
     def render(self, value):
@@ -162,10 +124,10 @@ class FlagProp(Prop):
 
 class IdentifierProp(Prop):
     def __init__(self, label, **kwargs):
-        super().__init__(label, value_expr=pp.Group(FullyQualifiedIdentifier()), **kwargs)
+        super().__init__(label, value_expr=FullyQualifiedIdentifier(), **kwargs)
 
-    def validate(self, prop_value):
-        return ".".join(prop_value.as_list())
+    def typecheck(self, prop_value):
+        return ".".join(prop_value)
 
     def render(self, value):
         if value is None:
@@ -177,30 +139,30 @@ class IdentifierProp(Prop):
 # FIXME
 class IdentifierListProp(Prop):
     def __init__(self, label, **kwargs):
-        value_expr = pp.Group(pp.delimited_list(FullyQualifiedIdentifier()))
-        # value_expr = pp.Group(FullyQualifiedIdentifier())
+        value_expr = pp.delimited_list(pp.Group(FullyQualifiedIdentifier()))
         super().__init__(label, value_expr=value_expr, **kwargs)
 
-    def validate(self, prop_values):
-        return ".".join(prop_values.as_list())
+    def typecheck(self, prop_values):
+        return [".".join(id_parts) for id_parts in prop_values]
 
 
 class StringListProp(Prop):
     def __init__(self, label, **kwargs):
         super().__init__(label, value_expr=ANY(), parens=True, **kwargs)
 
-    def validate(self, prop_value):
-        return [[tok.strip(" '") for tok in prop_value]]
+    def typecheck(self, prop_value):
+        return [tok.strip(" '") for tok in prop_value]
 
 
 class PropSet(Prop):
-    def __init__(self, label, props):
-        value_expr = LPAREN + ... + RPAREN
+    def __init__(self, label, props: Props):
+        value_expr = pp.original_text_for(pp.nested_expr())
         super().__init__(label, value_expr)
-        self.props = props
+        self.props: Props = props
 
-    def validate(self, prop_value):
-        return self.props.parse(prop_value)
+    def typecheck(self, prop_value):
+        prop_value = prop_value.strip("()")
+        return _parse_props(self.props, prop_value)
 
     # def render(self, values):
     #     if values is None or len(values) == 0:
@@ -222,7 +184,7 @@ class TagsProp(Prop):
         label = "TAG"
         super().__init__(label, value_expr=(ANY() + EQUALS() + ANY()), eq=False, parens=True)
 
-    def validate(self, prop_value: list) -> dict:
+    def typecheck(self, prop_value: list) -> dict:
         pairs = iter(prop_value)
         tags = {}
         for key in pairs:
@@ -245,7 +207,7 @@ class DictProp(Prop):
         value_expr = pp.delimited_list(ANY() + EQUALS() + ANY())
         super().__init__(label, value_expr, parens=True, **kwargs)
 
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         pairs = iter(prop_value)
         values = {}
         for key in pairs:
@@ -260,7 +222,7 @@ class EnumProp(Prop):
         value_expr = pp.MatchFirst([Keywords(str(val)) for val in self.valid_values]) | ANY
         super().__init__(label, value_expr, **kwargs)
 
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         parsed = self.enum_type.parse(prop_value.strip("'"))
         if parsed not in self.valid_values:
             raise ValueError(f"Invalid value: {prop_value} must be one of {self.valid_values}")
@@ -281,12 +243,13 @@ class EnumListProp(Prop):
         value_expr = enum_values | ANY
         super().__init__(label, value_expr, parens=True)
 
-    def validate(self, prop_values):
+    def typecheck(self, prop_values):
         parsed = [self.enum_type.parse(prop_value.strip("'")) for prop_value in prop_values]
         for value in parsed:
             if value not in self.valid_values:
                 raise ValueError(f"Invalid value: {value} must be one of {self.valid_values}")
-        return [parsed]
+        # return [parsed]
+        return parsed
 
     def render(self, values):
         if values is None or len(values) == 0:
@@ -300,7 +263,7 @@ class QueryProp(Prop):
         value_expr = pp.Word(pp.printables + " \n")
         super().__init__(label, value_expr, eq=False)
 
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         return prop_value
 
     def render(self, value):
@@ -311,10 +274,10 @@ class QueryProp(Prop):
 
 class ExpressionProp(Prop):
     def __init__(self, label):
-        value_expr = pp.Empty() + ... + pp.FollowedBy(Keyword("AS"))
+        value_expr = pp.Empty() + pp.SkipTo(Keyword("AS"))("prop_value")
         super().__init__(label, value_expr, eq=False)
 
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         return prop_value.strip()
 
     def render(self, value):
@@ -337,7 +300,7 @@ class TimeTravelProp(Prop):
         value_expr = ANY + ARROW + ANY
         super().__init__(label, value_expr, eq=False, parens=True)
 
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         key, value = prop_value
         value = value.strip("'")
         return dict([(key, value)])
@@ -351,10 +314,12 @@ class TimeTravelProp(Prop):
 class AlertConditionProp(Prop):
     def __init__(self):
         label = "IF"
-        value_expr = LPAREN + Keyword("EXISTS").suppress() + pp.original_text_for(pp.nested_expr()) + RPAREN
+        value_expr = (
+            LPAREN + Keyword("EXISTS").suppress() + pp.original_text_for(pp.nested_expr())("prop_value") + RPAREN
+        )
         super().__init__(label, value_expr, eq=False)
 
-    def validate(self, prop_value):
+    def typecheck(self, prop_value):
         return prop_value.strip("()").strip()
 
     def render(self, value):
@@ -369,20 +334,19 @@ class SessionParametersProp(Prop):
 
 class ColumnsProp(Prop):
     def __init__(self):
-        # super().__init__("columns", value_expr=ANY(), parens=True)
-        label = "columns"
-        super().__init__(label, eq=False, parens=True)
+        super().__init__(label="columns", eq=False, parens=True)
         arg_type = pp.MatchFirst([Keywords(str(val)) for val in set(DataType)]) | ANY
-        self.expr = pp.Group(parens(pp.delimited_list(pp.Group(ANY() + arg_type))))
+        self.parser = parens(pp.delimited_list(pp.Group(ANY() + arg_type)))("prop_value")
 
-    def validate(self, prop_values):
-        return [prop_values.as_list()]
-        # columns = []
-        # for col in prop_values:
-        #     # tags[key] = next(values).strip("'")
-        #     columns.append(
-        #         {
-        #             "name": key,
-        #         }
-        #     )
-        # return columns
+    def typecheck(self, prop_values):
+        # return [prop_values.as_list()]
+        columns = []
+        for col_name, col_type in prop_values:
+            # tags[key] = next(values).strip("'")
+            columns.append(
+                {
+                    "name": col_name,
+                    "type": col_type,
+                }
+            )
+        return columns

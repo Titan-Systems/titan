@@ -15,7 +15,7 @@ CREATE TEMPORARY STAGE my_int_stage_tmp
   FILE_FORMAT = my_csv_format;
 CREATE STAGE mystage
   DIRECTORY = (ENABLE = TRUE)
-  FILE_FORMAT = (FORMAT_NAME=myformat);
+  FILE_FORMAT = (FORMAT_NAME=nested_format_name);
 
 CREATE OR REPLACE STAGE LOAD_STAGE
     url = 'https://s3.amazonaws.com/tripdata/';

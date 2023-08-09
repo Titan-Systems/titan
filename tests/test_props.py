@@ -1,5 +1,6 @@
 import unittest
 
+from titan.enums import DataType
 from titan.props import (
     AlertConditionProp,
     BoolProp,
@@ -7,7 +8,6 @@ from titan.props import (
     FlagProp,
     IdentifierProp,
     IntProp,
-    Props,
     StringProp,
     TagsProp,
     TimeTravelProp,
@@ -28,6 +28,13 @@ class TestProps(unittest.TestCase):
         assert BoolProp("bar").parse("bar = FALSE") is False
         self.validate_identity(BoolProp("boolprop"), "boolprop = TRUE")
 
+    def test_prop_enum(self):
+        self.assertEqual(EnumProp("data_type", DataType).parse("DATA_TYPE = VARCHAR"), DataType.VARCHAR)
+
+    def test_prop_flag(self):
+        self.assertEqual(FlagProp("this is a flag").parse("this is a flag"), True)
+        self.assertEqual(FlagProp("this is another flag").parse(""), None)
+
     def test_prop_identifier(self):
         assert IdentifierProp("label").parse("label = value") == "value"
         assert IdentifierProp("label").parse('label = "value"') == '"value"'
@@ -38,12 +45,16 @@ class TestProps(unittest.TestCase):
             == '"DB"."SCHEMA".function'
         )
 
-    def test_prop_string(self):
-        assert StringProp("multi label").parse("MULTI LABEL = VALUE") == "VALUE"
+    def test_prop_int(self):
+        self.assertEqual(IntProp("int_prop").parse("int_prop = 42"), 42)
 
-    def test_prop_flag(self):
-        assert FlagProp("this is a flag").parse("this is a flag") is True
-        assert FlagProp("this is another flag").parse("") is None
+    def test_prop_string(self):
+        self.assertEqual(StringProp("string_prop").parse("STRING_PROP = 'quoted value'"), "quoted value")
+        self.assertEqual(StringProp("multi label").parse("MULTI LABEL = VALUE"), "VALUE")
+
+    def test_prop_tags(self):
+        self.assertDictEqual(TagsProp().parse("TAG (moon_phase = 'waxing')"), {"moon_phase": "waxing"})
+        # self.assertDictEqual(TagsProp().parse("WITH TAG (a = 'b')"), {"a": "b"})
 
     def test_prop_time_travel(self):
-        assert TimeTravelProp("at").parse("AT(TIMESTAMP => 123)") == {"TIMESTAMP": "123"}
+        self.assertDictEqual(TimeTravelProp("at").parse("AT(TIMESTAMP => 123)"), {"TIMESTAMP": "123"})
