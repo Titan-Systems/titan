@@ -1,5 +1,7 @@
 import unittest
 
+from pydantic import ValidationError
+
 from tests.helpers import load_sql_fixtures
 from titan.resources import (
     Alert,
@@ -36,7 +38,7 @@ class TestResources(unittest.TestCase):
         self.assertIsNotNone(resource_cls.from_sql(sql))
 
     def validate_dict_serde(self, resource_cls, data):
-        self.assertEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
+        self.assertDictEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
 
     def test_resource_composition(self):
         assert Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
@@ -64,7 +66,7 @@ class TestResources(unittest.TestCase):
             self.validate_from_sql(APIIntegration, sql)
 
     def test_column(self):
-        for sql in load_sql_fixtures("column.sql"):
+        for sql in load_sql_fixtures("column.sql", lines=True):
             self.validate_from_sql(Column, sql)
 
     def test_database(self):
@@ -146,6 +148,23 @@ class TestResources(unittest.TestCase):
     def test_view(self):
         for sql in load_sql_fixtures("view.sql"):
             self.validate_from_sql(View, sql)
+        self.validate_dict_serde(
+            View,
+            {
+                "name": "MY_VIEW",
+                "owner": "SYSADMIN",
+                "volatile": True,
+                "as_": "SELECT * FROM tbl",
+            },
+        )
+
+    def test_view_fails_with_empty_columns(self):
+        self.assertRaises(ValidationError, View, name="MY_VIEW", columns=[], as_="SELECT 1")
+
+    def test_view_with_columns(self):
+        # view = View(name="MY_VIEW", columns=[Column(name="COL1", type="VARCHAR")], as_="SELECT 1")
+        view = View.from_sql("CREATE VIEW MY_VIEW (COL1) AS SELECT 1")
+        assert view.columns == [Column(name="COL1")]
 
     def test_warehouse(self):
         for sql in load_sql_fixtures("warehouse.sql"):

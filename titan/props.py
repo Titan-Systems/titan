@@ -339,14 +339,30 @@ class ColumnsProp(Prop):
         self.parser = parens(pp.delimited_list(pp.Group(ANY() + arg_type)))("prop_value")
 
     def typecheck(self, prop_values):
-        # return [prop_values.as_list()]
         columns = []
         for col_name, col_type in prop_values:
-            # tags[key] = next(values).strip("'")
             columns.append(
                 {
                     "name": col_name,
                     "type": col_type,
+                }
+            )
+        return columns
+
+
+class ColumnsSchemaProp(Prop):
+    def __init__(self):
+        super().__init__(label="columns", eq=False, parens=True)
+        comment = StringProp("comment", eq=False).parser
+        self.parser = parens(pp.delimited_list(ANY() + pp.Opt(comment)))("prop_value")
+
+    def typecheck(self, prop_values):
+        columns = []
+        for col_name, comment in prop_values:
+            columns.append(
+                {
+                    "name": col_name,
+                    "comment": comment,
                 }
             )
         return columns

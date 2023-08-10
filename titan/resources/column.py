@@ -1,8 +1,8 @@
 import pyparsing as pp
 
 from ..enums import DataType
-from ..props import Props, StringProp
-from ..parse import Identifier, ANY
+from ..props import FlagProp, Props, StringProp
+from ..parse import COLUMN, _parse_props, _scan
 
 
 from . import Resource
@@ -41,17 +41,22 @@ class Column(Resource):
 
     resource_type = "COLUMN"
     props = Props(
-        comment=StringProp("comment"),
+        collate=StringProp("collate", eq=False),
+        comment=StringProp("comment", eq=False),
+        not_null=FlagProp("not null"),
     )
 
     name: str
     type: DataType
+    collate: str = None
     comment: str = None
+    not_null: bool = None
 
     @classmethod
     def from_sql(cls, sql):
-        parser = (Identifier | pp.dbl_quoted_string) + ANY
-        for (name, type), start, end in parser.scan_string(sql):
-            remainder = sql[end:]
-            props = cls.props.parse(remainder)
-            return cls(name=name, type=DataType.parse(type), **props)
+        parse_results, start, end = _scan(COLUMN, sql)
+        col_name = parse_results["col_name"]
+        col_type = DataType.parse(parse_results["col_type"])
+        remainder = sql[end:]
+        props = _parse_props(cls.props, remainder)
+        return cls(name=col_name, type=col_type, **props)

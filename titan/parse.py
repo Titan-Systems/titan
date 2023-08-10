@@ -74,6 +74,8 @@ REST_OF_STRING = pp.Word(pp.printables + " \n") | pp.StringEnd() | pp.Empty()
 STORAGE_INTEGRATION = Keywords("STORAGE INTEGRATION")
 NOTIFICATION_INTEGRATION = Keywords("NOTIFICATION INTEGRATION")
 
+COLUMN = (Identifier | pp.dbl_quoted_string)("col_name") + ANY("col_type") + pp.Opt(parens(ANY()))
+
 
 def _split_statements(sql_text):
     # Define SQL strings
@@ -301,7 +303,7 @@ def _parse_props(props, sql):
         lexicon.append(prop.parser.copy() + _marker(prop_kwarg))
 
     parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
-    sql = _consume_tokens(props.start_token, sql)
+    sql = remainder = _consume_tokens(props.start_token, sql)
 
     for parse_results, _, end in parser.scan_string(sql):
         prop_kwarg = parse_results[-1]

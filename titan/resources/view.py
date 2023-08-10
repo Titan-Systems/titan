@@ -1,9 +1,12 @@
-from typing import Dict
+from typing import Dict, List
+
+from pydantic import field_validator
 
 from . import Resource
 from .base import SchemaScoped
 from ..props import (
     BoolProp,
+    ColumnsSchemaProp,
     FlagProp,
     Props,
     QueryProp,
@@ -31,11 +34,11 @@ class View(Resource, SchemaScoped):
     resource_type = "VIEW"
     props = Props(
         secure=FlagProp("secure"),
-        # columns=ResourceListProp(Column),
         volatile=FlagProp("volatile"),
         recursive=FlagProp("recursive"),
+        columns=ColumnsSchemaProp(),
         tags=TagsProp(),
-        change_tracking=BoolProp("change_tracking"),
+        change_tracking=BoolProp("change_tracking"),  # Not documented
         copy_grants=FlagProp("copy grants"),
         comment=StringProp("comment"),
         as_=QueryProp("as"),
@@ -44,12 +47,19 @@ class View(Resource, SchemaScoped):
     name: str
     owner: str = "SYSADMIN"
 
-    secure: bool = False
-    volatile: bool = False
-    recursive: bool = False
-    columns: list = []
+    secure: bool = None
+    volatile: bool = None
+    recursive: bool = None
+    columns: List[Column] = None
     tags: Dict[str, str] = None
     change_tracking: bool = None
     copy_grants: bool = None
     comment: str = None
-    as_: str = None
+    as_: str
+
+    @field_validator("columns")
+    @classmethod
+    def validate_columns(cls, columns):
+        if isinstance(columns, list):
+            assert len(columns) > 0, "columns must not be empty"
+        return columns

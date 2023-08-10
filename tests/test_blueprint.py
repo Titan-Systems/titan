@@ -10,7 +10,7 @@ class TestBlueprint(unittest.TestCase):
         db = Database(name="DB")
         schema = Schema(name="SCHEMA", database=db)
         # table = Table(name="TABLE", schema=schema)
-        view = View(name="VIEW", schema=schema)
+        view = View(name="VIEW", schema=schema, as_="SELECT 1")
         blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, schema, view])
         manifest = blueprint.generate_manifest()
 
@@ -40,14 +40,7 @@ class TestBlueprint(unittest.TestCase):
         self.assertIn("urn:ABCD123:view/DB.SCHEMA.VIEW", manifest)
         self.assertEqual(
             manifest["urn:ABCD123:view/DB.SCHEMA.VIEW"],
-            {
-                "name": "VIEW",
-                "owner": "SYSADMIN",
-                "secure": False,
-                "volatile": False,
-                "recursive": False,
-                "columns": [],
-            },
+            {"name": "VIEW", "owner": "SYSADMIN", "as_": "SELECT 1"},
         )
         # self.assertIn("urn:ABCD123:table/DB.SCHEMA.TABLE", manifest)
         #         ,
