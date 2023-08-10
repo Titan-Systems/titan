@@ -25,11 +25,19 @@ class Prop(ABC):
     A Prop is a named expression that can be parsed from a SQL string.
     """
 
-    def __init__(self, label, value_expr=ANY(), eq=True, parens=False, alt_tokens=[]):
+    # TODO: find a better home for alt_tokens
+    def __init__(self, label, value_expr=ANY(), eq=True, parens=False, alt_tokens=[], consume=[]):
         self.label = label
         self.eq = eq
         self.alt_tokens = set([tok.lower() for tok in alt_tokens])
+
         eq_expr = EQUALS() if eq else pp.Empty()
+
+        if isinstance(consume, str):
+            consume = [consume]
+        consume_expr = pp.Empty()
+        if consume:
+            consume_expr = pp.And([pp.Opt(Keyword(tok)) for tok in consume])
 
         if parens:
             value_expr = list_expr(value_expr)
@@ -37,7 +45,7 @@ class Prop(ABC):
         if not _parser_has_results_name(value_expr, "prop_value"):
             value_expr = value_expr("prop_value")
 
-        self.parser = Keywords(self.label).suppress() + eq_expr.suppress() + value_expr
+        self.parser = Keywords(self.label).suppress() + consume_expr.suppress() + eq_expr.suppress() + value_expr
 
     def __repr__(self):
         return f"{self.__class__.__name__}('{self.label}')"
@@ -139,7 +147,7 @@ class IdentifierProp(Prop):
 # FIXME
 class IdentifierListProp(Prop):
     def __init__(self, label, **kwargs):
-        value_expr = pp.delimited_list(pp.Group(FullyQualifiedIdentifier()))
+        value_expr = pp.DelimitedList(pp.Group(FullyQualifiedIdentifier()))
         super().__init__(label, value_expr=value_expr, **kwargs)
 
     def typecheck(self, prop_values):
@@ -204,7 +212,7 @@ class DictProp(Prop):
     """
 
     def __init__(self, label, **kwargs):
-        value_expr = pp.delimited_list(ANY() + EQUALS() + ANY())
+        value_expr = pp.DelimitedList(ANY() + EQUALS() + ANY())
         super().__init__(label, value_expr, parens=True, **kwargs)
 
     def typecheck(self, prop_value):
@@ -336,7 +344,7 @@ class ColumnsProp(Prop):
     def __init__(self):
         super().__init__(label="columns", eq=False, parens=True)
         arg_type = pp.MatchFirst([Keywords(str(val)) for val in set(DataType)]) | ANY
-        self.parser = parens(pp.delimited_list(pp.Group(ANY() + arg_type)))("prop_value")
+        self.parser = parens(pp.DelimitedList(pp.Group(ANY() + arg_type)))("prop_value")
 
     def typecheck(self, prop_values):
         columns = []
@@ -354,7 +362,7 @@ class ColumnsSchemaProp(Prop):
     def __init__(self):
         super().__init__(label="columns", eq=False, parens=True)
         comment = StringProp("comment", eq=False).parser
-        self.parser = parens(pp.delimited_list(ANY() + pp.Opt(comment)))("prop_value")
+        self.parser = parens(pp.DelimitedList(ANY() + pp.Opt(comment)))("prop_value")
 
     def typecheck(self, prop_values):
         columns = []

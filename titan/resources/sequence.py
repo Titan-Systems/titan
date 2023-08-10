@@ -15,8 +15,8 @@ class Sequence(Resource, SchemaScoped):
     resource_type = "SEQUENCE"
     props = Props(
         _start_token="with",
-        start=IntProp("start"),
-        increment=IntProp("increment"),
+        start=IntProp("start", consume=["with", "="], eq=False),
+        increment=IntProp("increment", consume=["by", "="], eq=False),
         comment=StringProp("comment"),
     )
 

@@ -2,6 +2,7 @@ from typing_extensions import Annotated
 
 from .base import Resource, AccountScoped, coerce_from_str
 from .role import Role
+from ..parse import _parse_grant, _parse_props
 from ..props import Props, IdentifierProp, FlagProp
 from ..enums import ParseableEnum
 
@@ -47,19 +48,19 @@ class Grant(Resource, AccountScoped):
 
     accountObjectPrivileges ::=
         -- For DATABASE
-           { CREATE { DATABASE ROLE | SCHEMA } | IMPORTED PRIVILEGES | MODIFY | MONITOR | USAGE } [ , ... ]
+            { CREATE { DATABASE ROLE | SCHEMA } | IMPORTED PRIVILEGES | MODIFY | MONITOR | USAGE } [ , ... ]
         -- For FAILOVER GROUP
-           { FAILOVER | MODIFY | MONITOR | REPLICATE } [ , ... ]
+            { FAILOVER | MODIFY | MONITOR | REPLICATE } [ , ... ]
         -- For INTEGRATION
-           { USAGE | USE_ANY_ROLE } [ , ... ]
+            { USAGE | USE_ANY_ROLE } [ , ... ]
         -- For REPLICATION GROUP
-           { MODIFY | MONITOR | REPLICATE } [ , ... ]
+            { MODIFY | MONITOR | REPLICATE } [ , ... ]
         -- For RESOURCE MONITOR
-           { MODIFY | MONITOR } [ , ... ]
+            { MODIFY | MONITOR } [ , ... ]
         -- For USER
-           { MONITOR } [ , ... ]
+            { MONITOR } [ , ... ]
         -- For WAREHOUSE
-           { MODIFY | MONITOR | USAGE | OPERATE } [ , ... ]
+            { MODIFY | MONITOR | USAGE | OPERATE } [ , ... ]
 
     schemaPrivileges ::=
         ADD SEARCH OPTIMIZATION
@@ -69,46 +70,51 @@ class Grant(Resource, AccountScoped):
             | { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY
             | SECRET | SEQUENCE | STAGE | STREAM
             | TAG | TABLE | TASK | VIEW
-          }
+            }
         | MODIFY | MONITOR | USAGE
         [ , ... ]
 
     schemaObjectPrivileges ::=
         -- For ALERT
-           OPERATE [ , ... ]
+            OPERATE [ , ... ]
         -- For EVENT TABLE
-           { SELECT | INSERT } [ , ... ]
+            { SELECT | INSERT } [ , ... ]
         -- For FILE FORMAT, FUNCTION (UDF or external function), PROCEDURE, SECRET, or SEQUENCE
-           USAGE [ , ... ]
+            USAGE [ , ... ]
         -- For PIPE
-           { MONITOR | OPERATE } [ , ... ]
+            { MONITOR | OPERATE } [ , ... ]
         -- For { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY or TAG
-           APPLY [ , ... ]
+            APPLY [ , ... ]
         -- For external STAGE
-           USAGE [ , ... ]
+            USAGE [ , ... ]
         -- For internal STAGE
-           READ [ , WRITE ] [ , ... ]
+            READ [ , WRITE ] [ , ... ]
         -- For STREAM
-           SELECT [ , ... ]
+            SELECT [ , ... ]
         -- For TABLE
-           { SELECT | INSERT | UPDATE | DELETE | TRUNCATE | REFERENCES } [ , ... ]
+            { SELECT | INSERT | UPDATE | DELETE | TRUNCATE | REFERENCES } [ , ... ]
         -- For TASK
-           { MONITOR | OPERATE } [ , ... ]
+            { MONITOR | OPERATE } [ , ... ]
         -- For VIEW or MATERIALIZED VIEW
-           { SELECT | REFERENCES } [ , ... ]
+            { SELECT | REFERENCES } [ , ... ]
     """
 
+    resource_type = "GRANT"
     props = Props(
-        # # on=StringProp("on"),
-        # on=EnumProp("on", GrantableObject),
-        to=IdentifierProp("to"),
+        to=IdentifierProp("to", eq=False, consume="role"),
         with_grant_option=FlagProp("with grant option"),
     )
 
     privs: list
-    on: Resource
+    on: str
     to: Annotated[Role, coerce_from_str(Role)]
     with_grant_option: bool = None
+
+    @classmethod
+    def from_sql(cls, sql):
+        parsed = _parse_grant(sql)
+        props = _parse_props(cls.props, parsed["remainder"])
+        return cls(privs=parsed["privs"], on=parsed["on"], **props)
 
 
 # class RoleGrant(AccountLevelResource):

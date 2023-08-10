@@ -1,9 +1,12 @@
 from typing import List, Dict
 
+from pydantic import field_validator
+
 from . import Resource
 from .base import SchemaScoped
 from ..props import (
     BoolProp,
+    ColumnsProp,
     FlagProp,
     IntProp,
     Props,
@@ -12,7 +15,7 @@ from ..props import (
     StringListProp,
     TagsProp,
 )
-from .column import Column
+
 from .stage import InternalStage, copy_options
 from .file_format import FileFormatProp
 
@@ -40,7 +43,7 @@ class Table(Resource, SchemaScoped):
 
     resource_type = "TABLE"
     props = Props(
-        # columns=ResourceListProp(Column),
+        columns=ColumnsProp(),
         volatile=FlagProp("volatile"),
         transient=FlagProp("transient"),
         cluster_by=StringListProp("cluster by"),
@@ -73,19 +76,21 @@ class Table(Resource, SchemaScoped):
 
     _table_stage: InternalStage
 
-    # TODO: make this a changeable property that registers/deregisters the pipe when the flag is flipped
-    # self.autoload = autoload
-
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
         self._table_stage = InternalStage(name=f"@%{self.name}", implicit=True)
-        # self.table_stage.requires(self)
-        # if self.schema:
-        #     self.table_stage.schema = self.schema
+        self._table_stage.parent = self.parent
 
     @property
     def table_stage(self):
         return self._table_stage
+
+    @field_validator("columns")
+    @classmethod
+    def validate_columns(cls, columns):
+        if isinstance(columns, list):
+            assert len(columns) > 0, "columns must not be empty"
+        return columns
 
     # @property
     # def create_sql(self):

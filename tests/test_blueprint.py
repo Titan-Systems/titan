@@ -9,15 +9,14 @@ class TestBlueprint(unittest.TestCase):
 
         db = Database(name="DB")
         schema = Schema(name="SCHEMA", database=db)
-        # table = Table(name="TABLE", schema=schema)
+        table = Table(name="TABLE")
+        table.parent = schema
         view = View(name="VIEW", schema=schema, as_="SELECT 1")
-        blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, schema, view])
+        blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, table, schema, view])
         manifest = blueprint.generate_manifest()
 
-        blueprint.plan(Adapter())
-
         self.assertIn("urn:ABCD123:database/DB", manifest)
-        self.assertEqual(
+        self.assertDictEqual(
             manifest["urn:ABCD123:database/DB"],
             {
                 "name": "DB",
@@ -29,7 +28,7 @@ class TestBlueprint(unittest.TestCase):
         )
 
         self.assertIn("urn:ABCD123:schema/DB.SCHEMA", manifest)
-        self.assertEqual(
+        self.assertDictEqual(
             manifest["urn:ABCD123:schema/DB.SCHEMA"],
             {
                 "name": "SCHEMA",
@@ -38,36 +37,22 @@ class TestBlueprint(unittest.TestCase):
             },
         )
         self.assertIn("urn:ABCD123:view/DB.SCHEMA.VIEW", manifest)
-        self.assertEqual(
+        self.assertDictEqual(
             manifest["urn:ABCD123:view/DB.SCHEMA.VIEW"],
             {"name": "VIEW", "owner": "SYSADMIN", "as_": "SELECT 1"},
         )
-        # self.assertIn("urn:ABCD123:table/DB.SCHEMA.TABLE", manifest)
-        #         ,
-        #         "urn:ABCD123:table/DB.SCHEMA.TABLE": {
-        #             "name": "TABLE",
-        #             "columns": [],
-        #             "volatile": False,
-        #             "transient": False,
-        #             "cluster_by": [],
-        #             "enable_schema_evolution": False,
-        #             "change_tracking": False,
-        #             "copy_grants": False,
-        #         },
-
-        # provider = Provider()
-        # state = provider.fetch_from_manifest(blueprint.manifest)
-
-        # # Calculate the diff
-        # diff = blueprint.compare(state)
-
-        # # Now, make assertions based on the diff.
-        # # For example, assuming diff is a dictionary with resource names as keys:
-        # assert "res1" in diff
-        # assert "res2" in diff
-
-        # Or, you can make specific assertions based on the diff's content:
-        # assert diff['res1'] == { ... expected difference ... }
-        # assert diff['res2'] == { ... expected difference ... }
-
-        # Add more assertions as needed, based on your diff calculation logic.
+        self.assertIn("urn:ABCD123:table/DB.SCHEMA.TABLE", manifest)
+        self.assertDictEqual(
+            manifest["urn:ABCD123:table/DB.SCHEMA.TABLE"],
+            {
+                "name": "TABLE",
+                "owner": "SYSADMIN",
+                "columns": [],
+                "volatile": False,
+                "transient": False,
+                "cluster_by": [],
+                "enable_schema_evolution": False,
+                "change_tracking": False,
+                "copy_grants": False,
+            },
+        )

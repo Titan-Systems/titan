@@ -171,13 +171,3 @@ class Adapter:
             "comment": show_result[0]["comment"] or None,
             "as_": show_result[0]["text"],
         }
-
-        # with self.session.cursor() as cur:
-        #     ) in cur.execute(f"SHOW VIEWS LIKE '{fqn}'").fetchall():
-        #         if is_materialized == "true":
-        #             return {}
-        #         else:
-        #             view.update(
-
-        #             )
-        # return view

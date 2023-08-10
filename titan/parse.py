@@ -23,6 +23,9 @@ RPAREN = Literal(")").suppress()
 TAG = Keyword("TAG").suppress()
 WITH = Keyword("WITH").suppress()
 ANY = pp.Word(pp.srange("[a-zA-Z0-9_]")) | pp.sgl_quoted_string
+GRANT = Keyword("GRANT").suppress()
+ON = Keyword("ON").suppress()
+TO = Keyword("TO").suppress()
 
 
 def ScopedIdentifier(scope):
@@ -122,6 +125,29 @@ def _parse_create_header(sql, resource_cls):
         raise err
 
 
+def _parse_grant(sql):
+    grant_header = (
+        GRANT
+        + pp.DelimitedList(ANY)("privs")
+        + ON
+        + pp.SkipTo(TO)("on")
+        + REST_OF_STRING("remainder")
+        # + TO
+        # + pp.Opt(Keyword("ROLE").suppress())
+        # + pp.delimitedList(ANY)
+    )
+
+    try:
+        results = grant_header.parse_string(sql, parse_all=True).as_dict()
+        # remainder = (results["_skipped"][0] + " " + results.get("remainder", "")).strip()
+        # return (results["resource_identifier"], remainder)
+        return results
+    except pp.ParseException as err:
+        print(err.explain())
+        print("❌", "failed to parse grant")
+        raise err
+
+
 def _scan(parser, text):
     results = next(parser.scan_string(text), -1)
     return None if results == -1 else results
@@ -199,7 +225,7 @@ def _resolve_resource_class(sql):
             "DYNAMIC TABLE": lambda _: "dynamic_table",
             "EXTERNAL FUNCTION": lambda _: "external_function",
             "FILE FORMAT": _resolve_file_format,
-            "GRANT": lambda _: "grant",
+            # "GRANT": lambda _: "grant",
             "NOTIFICATION INTEGRATION": _resolve_notification_integration,
             "PIPE": lambda _: "pipe",
             "RESOURCE MONITOR": lambda _: "resource_monitor",
@@ -305,22 +331,41 @@ def _parse_props(props, sql):
     parser = pp.MatchFirst(lexicon).ignore(pp.c_style_comment)
     sql = remainder = _consume_tokens(props.start_token, sql)
 
-    for parse_results, _, end in parser.scan_string(sql):
+    prev_end = 0
+
+    for parse_results, start, end in parser.scan_string(sql):
+        # Check if we skipped any text
+        if len(sql[prev_end:start].strip()) > 0:
+            raise Exception(f"Failed to parse prop {sql[prev_end:start]}")
+
         prop_kwarg = parse_results[-1]
         prop = props[prop_kwarg]
 
         if "prop_value" not in parse_results:
-            raise Exception(f"Failed to parse prop {prop} in {sql}")
+            raise RuntimeError(f"Parsed prop {prop} did not return a prop_value")
         prop_value = parse_results["prop_value"]
 
         if isinstance(prop_value, pp.ParseResults):
             prop_value = prop_value.as_list()
 
         found_props[prop_kwarg] = prop.typecheck(prop_value)
-        remainder = sql[end:]
+        remainder = sql[end:].strip(" ")
+        prev_end = end
 
-    if len(remainder.strip(" ")) > 0:
+        print("ok")
+        if remainder == "":
+            break
+
+    if len(remainder) > 0:
         formatted_sql = "\n".join(["  " + line.strip() for line in remainder.splitlines()])
-        failing_parser = _best_guess_failing_parser(parser, remainder)
-        raise Exception(f"Failed to parse props.\nSQL: \n```\n{formatted_sql}\n```\n\nParser:\n{failing_parser}\n\n")
+        # failing_parser = _best_guess_failing_parser(parser, remainder)
+        formatted_props = _format_props(props)
+        raise Exception(f"Failed to parse props.\nSQL: \n```\n{formatted_sql}\n```\nProps:\n{formatted_props}\n\n")
     return found_props
+
+
+def _format_props(props):
+    buf = []
+    for prop_kwarg, prop in props.props.items():
+        buf.append(f"{type(prop).__name__}('{prop_kwarg}') -> {str(prop.parser)}")
+    return "\n".join(buf)
