@@ -139,6 +139,11 @@ class Organization(Resource):
     resource_type = "ORGANIZATION"
 
     name: str
+    _children: ResourceCollection = Field(alias="children")
+
+    def model_post_init(self, ctx):
+        super().model_post_init(ctx)
+        self._children = ResourceCollection(self)
 
 
 class OrganizationScoped(BaseModel):
@@ -150,8 +155,10 @@ class OrganizationScoped(BaseModel):
         return self.organziation
 
     @parent.setter
-    def parent(self, value):
-        self.organziation = value
+    def parent(self, new_parent):
+        if not isinstance(new_parent, Organization):
+            raise ValueError(f"Parent must be an Organization, not {new_parent}")
+        new_parent.children.add(self)
 
     @property
     def fully_qualified_name(self):
@@ -225,7 +232,7 @@ class Database(Resource, AccountScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _children: ResourceCollection
+    _children: ResourceCollection = Field(alias="children")
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
@@ -300,7 +307,7 @@ class Schema(Resource, DatabaseScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _children: ResourceCollection
+    _children: ResourceCollection = Field(alias="children")
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
@@ -320,8 +327,13 @@ class SchemaScoped(BaseModel):
         return self.schema_
 
     @parent.setter
-    def parent(self, value):
-        self.schema_ = value
+    def parent(self, new_parent):
+        if new_parent is None:
+            return
+        if not isinstance(new_parent, Schema):
+            raise ValueError(f"Parent must be a Schema, not {new_parent}")
+        # new_parent.children.add(self)
+        self.schema_ = new_parent
 
     @property
     def fully_qualified_name(self):
