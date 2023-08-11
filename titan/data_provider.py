@@ -2,12 +2,11 @@ import os
 
 # from snowflake.snowpark import Session
 import snowflake.connector
-from snowflake.connector import DictCursor
 
 from snowflake.connector.errors import ProgrammingError
 
-from .builder import create_warehouse_sql
 from .identifiers import FQN
+from .resources import Resource, Role, RoleGrant
 
 connection_params = {
     "account": os.environ["SNOWFLAKE_ACCOUNT"],
@@ -22,14 +21,16 @@ def get_session():
     return snowflake.connector.connect(**connection_params)
 
 
-def execute(session, sql) -> list:
-    try:
-        print("EXECUTE >>>", sql)
-        res = session.cursor(DictCursor).execute(sql).fetchall()
-        return res
-    except ProgrammingError as err:
-        print(f"failed to execute sql, [{sql}]")
-        raise err
+def execute(session, sql, use_role=None) -> list:
+    with session.cursor(snowflake.connector.DictCursor) as cur:
+        try:
+            if use_role:
+                cur.execute(f"USE ROLE {use_role}")
+            print(f"[{session.role}] >>>", sql)
+            result = cur.execute(sql).fetchall()
+            return result
+        except ProgrammingError as err:
+            raise ProgrammingError(f"failed to execute sql, [{sql}]") from err
 
 
 def params_result_to_dict(params_result):
@@ -101,7 +102,7 @@ class DataProvider:
             "comment": show_result[0]["comment"] or None,
             "transient": "TRANSIENT" in options,
             "owner": show_result[0]["owner"],
-            "max_data_extension_time_in_days": params["data_retention_time_in_days"],
+            "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
             "default_ddl_collation": params["default_ddl_collation"],
         }
 
@@ -153,6 +154,30 @@ class DataProvider:
             "default_ddl_collation": params["default_ddl_collation"],
             "comment": data["comment"] or None,
         }
+
+    def fetch_role_grant(self, fqn):
+        try:
+            show_result = execute(self.session, f"SHOW GRANTS OF ROLE {fqn.name}")
+        except ProgrammingError:
+            return None
+
+        if len(show_result) == 0:
+            return None
+
+        grants = {"to_role": [], "to_user": []}
+
+        for data in show_result:
+            role_grant = {"role": data["role"], "owner": data["granted_by"]}
+            if data["granted_to"] == "ROLE":
+                role_grant["to_role"] = data["grantee_name"]
+                grants["to_role"].append(role_grant)
+            elif data["granted_to"] == "USER":
+                role_grant["to_user"] = data["grantee_name"]
+                grants["to_user"].append(role_grant)
+            else:
+                raise Exception(f"Unexpected role grant for role {fqn.name}", data)
+
+        return grants
 
     def fetch_user(self, fqn):
         try:
@@ -238,6 +263,10 @@ class DataProvider:
         show_params_result = execute(self.session, f"SHOW PARAMETERS FOR WAREHOUSE {fqn}")
         params = params_result_to_dict(show_params_result)
 
+        query_accel = data.get("enable_query_acceleration")
+        if query_accel:
+            query_accel = query_accel == "true"
+
         return {
             "name": data["name"],
             "owner": data["owner"],
@@ -249,14 +278,24 @@ class DataProvider:
             "auto_suspend": data["auto_suspend"],
             "auto_resume": data["auto_resume"] == "true",
             "comment": data["comment"] or None,
-            "enable_query_acceleration": data.get("enable_query_acceleration", "false") == "true",
+            "enable_query_acceleration": query_accel,
             "max_concurrency_level": params["max_concurrency_level"],
             "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
             "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
         }
 
     def update_resource(self, urn, data):
-        return getattr(self, f"update_{urn.resource_key}")(urn.fqn, data)
+        try:
+            return getattr(self, f"update_{urn.resource_key}")(urn.fqn, data)
+        except AttributeError:
+            raise NotImplementedError(f"Updates for resource {urn.resource_key} not supported")
+
+    def update_user(self, fqn, data):
+        attr, value = data.popitem()
+        if attr == "owner":
+            execute(self.session, f"GRANT OWNERSHIP ON USER {fqn} TO ROLE {value}")
+        else:
+            execute(self.session, f"ALTER USER {fqn} SET {attr} = {value}")
 
     def update_warehouse(self, fqn, data):
         attr, value = data.popitem()
@@ -265,8 +304,58 @@ class DataProvider:
         else:
             execute(self.session, f"ALTER WAREHOUSE {fqn} SET {attr} = {value}")
 
-    def create_resource(self, urn, data):
-        return getattr(self, f"create_{urn.resource_key}")(urn.fqn, data)
+    # region Resource Creation
 
-    def create_warehouse(self, fqn, data):
-        execute(self.session, create_warehouse_sql(**data))
+    def create_resource(self, urn, data):
+        if hasattr(self, f"create_{urn.resource_key}"):
+            return getattr(self, f"create_{urn.resource_key}")(urn, data)
+
+        use_role = data["owner"] if "owner" in data else None
+        resource_cls = Resource.classes[urn.resource_key]
+        resource = resource_cls(**data)
+        sql = resource.create_sql()
+        execute(self.session, sql, use_role=use_role)
+
+    def create_role(self, urn, data):
+        role = Role(**data)
+        sql = role.create_sql()
+        execute(self.session, sql, use_role="USERADMIN")
+        execute(self.session, f"GRANT OWNERSHIP ON ROLE {role.name} TO ROLE {role.owner}", use_role="USERADMIN")
+
+    def create_role(self, urn, data):
+        role = Role(**data)
+        sql = role.create_sql()
+        execute(self.session, sql, use_role="USERADMIN")
+        execute(self.session, f"GRANT OWNERSHIP ON ROLE {role.name} TO ROLE {role.owner}", use_role="USERADMIN")
+
+    def create_role_grant(self, urn, container):
+        grants = container["to_role"] + container["to_user"]
+        for data in grants:
+            grant = RoleGrant(**data)
+            sql = grant.create_sql()
+            # According to the docs, SECURITYADMIN should issue the GRANT ROLE command but
+            # the grant itself will be owned by SYSADMIN (or maybe the role owner?), even if SECURITYADMIN runs the command
+            execute(self.session, sql, use_role="SECURITYADMIN")
+
+    # endregion
+
+    # region Resource Destruction
+
+    def drop_resource(self, urn, data):
+        if hasattr(self, f"drop_{urn.resource_key}"):
+            return getattr(self, f"drop_{urn.resource_key}")(urn, data)
+
+        use_role = data["owner"] if "owner" in data else None
+        resource_cls = Resource.classes[urn.resource_key]
+        resource = resource_cls(**data)
+        sql = resource.drop_sql()
+        execute(self.session, sql, use_role=use_role)
+
+    def drop_role_grant(self, urn, container):
+        grants = container["to_role"] + container["to_user"]
+        for data in grants:
+            grant = RoleGrant(**data)
+            sql = grant.drop_sql()
+            execute(self.session, sql, use_role="SYSADMIN")
+
+    # endregion

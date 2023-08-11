@@ -4,7 +4,7 @@ from .base import Resource, SchemaScoped
 from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 
-class Alert(Resource, SchemaScoped):  # Createable
+class Alert(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] ALERT [ IF NOT EXISTS ] <name>
       WAREHOUSE = <warehouse_name>

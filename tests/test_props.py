@@ -1,6 +1,7 @@
 import unittest
 
 from titan.enums import DataType
+from titan.resources import Database
 from titan.props import (
     AlertConditionProp,
     BoolProp,
@@ -14,7 +15,7 @@ from titan.props import (
 )
 
 
-class TestProps(unittest.TestCase):
+class TestProp(unittest.TestCase):
     def validate_identity(self, prop, sql):
         assert prop.render(prop.parse(sql)) == sql
 
@@ -58,3 +59,12 @@ class TestProps(unittest.TestCase):
 
     def test_prop_time_travel(self):
         self.assertDictEqual(TimeTravelProp("at").parse("AT(TIMESTAMP => 123)"), {"TIMESTAMP": "123"})
+
+
+class TestProps(unittest.TestCase):
+    def test_props_render(self):
+        db = Database(name="foo", comment="bar")
+        rendered = db.props.render(db)
+        self.assertEqual(
+            rendered, "data_retention_time_in_days = 1 max_data_extension_time_in_days = 14 COMMENT = 'bar'"
+        )

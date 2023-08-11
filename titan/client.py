@@ -1,8 +1,15 @@
-# import os
+import os
+import snowflake.connector
+
+connection_params = {
+    "account": os.environ["SNOWFLAKE_ACCOUNT"],
+    "user": os.environ["SNOWFLAKE_USER"],
+    "password": os.environ["SNOWFLAKE_PASSWORD"],
+}
 
 
-# # import snowflake.connector
-# # conn = snowflake.connector.connect(**connection_params)
+def get_session():
+    return snowflake.connector.connect(**connection_params)
 
 
 # from snowflake.snowpark import Session

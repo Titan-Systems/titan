@@ -1,21 +1,34 @@
-# from abc import ABC
-from typing import List, Union
+from typing import List
 from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
 from .base import Resource, AccountScoped, Database, Schema
-from .role import Role
+from .role import T_Role
+from .user import T_User
 from .validators import coerce_from_str, listify
+from ..builder import tidy_sql
 from ..parse import _parse_grant, _parse_props
 from ..props import Props, IdentifierProp, FlagProp
 from ..enums import GlobalPrivs, SchemaPrivs  # SchemaObjectPrivs, AccountObjectPrivs
 
 
-# Annotated[List[GlobalPrivs], coerce_from_str(Role)]
-
-
 class Grant(Resource, AccountScoped):
+    resource_type = "GRANT"
+
+    @classmethod
+    def from_sql(cls, sql):
+        parsed = _parse_grant(sql)
+        grant_cls = Resource.classes[parsed["resource_key"]]
+        if grant_cls is RoleGrant:
+            props = _parse_props(RoleGrant.props, sql)
+            return RoleGrant(**props)
+
+        props = _parse_props(grant_cls.props, parsed["remainder"])
+        return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
+
+
+class PrivGrant(Grant):
     """
     GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
         | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
@@ -96,7 +109,6 @@ class Grant(Resource, AccountScoped):
             { SELECT | REFERENCES } [ , ... ]
     """
 
-    resource_type = "GRANT"
     props = Props(
         to=IdentifierProp("to", eq=False, consume="role"),
         with_grant_option=FlagProp("with grant option"),
@@ -104,28 +116,24 @@ class Grant(Resource, AccountScoped):
 
     privs: Annotated[List[str], BeforeValidator(listify)]
     on: str
-    to: Annotated[Role, BeforeValidator(coerce_from_str(Role))]
+    to: T_Role
     with_grant_option: bool = None
 
+    @property
+    def name(self):
+        return f"{self.on}.{self.to.name}"
+
+    # TODO: implement instantiating grant
+    # TODO: implement fallback to grant
     # def __new__(
-    #     cls, type: Union[str, FileType], **kwargs
-    # ) -> Union[CSVFileFormat, JSONFileFormat, AvroFileFormat, OrcFileFormat, ParquetFileFormat, XMLFileFormat]:
+    #     cls, type: Union[str, Grant], **kwargs
+    # ) -> Union[...types...]:
     #     file_type = FileType.parse(type)
     #     file_type_cls = FileTypeMap[file_type]
     #     return file_type_cls(type=file_type, **kwargs)
 
-    @classmethod
-    def from_sql(cls, sql):
-        parsed = _parse_grant(sql)
-        grant_cls = Resource.classes[parsed["resource_key"]]
-        props = _parse_props(grant_cls.props, parsed["remainder"])
-        return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
 
-        # return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
-        # return cls(privs=parsed["privs"], on=parsed["on"], **props)
-
-
-class AccountGrant(Grant):
+class AccountGrant(PrivGrant):
     """
     GRANT { globalPrivileges | ALL [ PRIVILEGES ] }
     ON ACCOUNT
@@ -137,7 +145,7 @@ class AccountGrant(Grant):
     on: str = "ACCOUNT"
 
 
-class AccountObjectGrant(Grant):
+class AccountObjectGrant(PrivGrant):
     """
     GRANT { accountObjectPrivileges | ALL [ PRIVILEGES ] }
     ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
@@ -148,7 +156,7 @@ class AccountObjectGrant(Grant):
     privs: list
 
 
-class SchemaGrant(Grant):
+class SchemaGrant(PrivGrant):
     """
     GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
     ON SCHEMA <schema_name>
@@ -160,11 +168,7 @@ class SchemaGrant(Grant):
     on: Annotated[Schema, BeforeValidator(coerce_from_str(Schema))]
 
 
-def test(value, **kwargs):
-    print("hello world")
-
-
-class SchemasGrant(Grant):
+class SchemasGrant(PrivGrant):
     """
     GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
     ON ALL SCHEMAS IN DATABASE <db_name>
@@ -176,7 +180,7 @@ class SchemasGrant(Grant):
     on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
 
 
-class FutureSchemasGrant(Grant):
+class FutureSchemasGrant(PrivGrant):
     """
     GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
     ON FUTURE SCHEMAS IN DATABASE <db_name>
@@ -184,11 +188,11 @@ class FutureSchemasGrant(Grant):
     [ WITH GRANT OPTION ]
     """
 
-    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]  # , BeforeValidator(test)
+    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
     on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
 
 
-class SchemaObjectGrant(Grant):
+class SchemaObjectGrant(PrivGrant):
     """
     GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
     ON <object_type> <object_name>
@@ -199,7 +203,7 @@ class SchemaObjectGrant(Grant):
     privs: list
 
 
-class SchemaObjectsGrant(Grant):
+class SchemaObjectsGrant(PrivGrant):
     """
     GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
     ON ALL <object_type>
@@ -211,7 +215,7 @@ class SchemaObjectsGrant(Grant):
     privs: list
 
 
-class FutureSchemaObjectsGrant(Grant):
+class FutureSchemaObjectsGrant(PrivGrant):
     """
     GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
     ON FUTURE <object_type>
@@ -223,280 +227,39 @@ class FutureSchemaObjectsGrant(Grant):
     privs: list
 
 
-# class RoleGrant(AccountLevelResource):
-#     """
-#     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
-#     """
+# TODO: add a model validator to ensure to_role and to_user arent used together
+class RoleGrant(Grant):
+    """
+    GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
+    """
 
-#     props = {}
-#     ownable = False
-#     create_statement = re.compile(
-#         rf"""
-#             GRANT\s+ROLE\s+
-#             (?P<role>{Identifier.pattern})
-#             \s+TO\s+
-#             (?:
-#                 ROLE\s+(?P<grantee_role>{Identifier.pattern})
-#                 |
-#                 USER\s+(?P<grantee_user>{Identifier.pattern})
-#             )""",
-#         re.VERBOSE | re.IGNORECASE,
-#     )
+    props = Props(
+        _start_token="grant",
+        role=IdentifierProp("role", eq=False),
+        to_role=IdentifierProp("to role", eq=False),
+        to_user=IdentifierProp("to user", eq=False),
+    )
 
-#     def __init__(
-#         self,
-#         role: Union[str, Role],
-#         grantee: Union[Role, User],
-#     ):
-#         name = ":".join((str(role), grantee.name))
-#         super().__init__(name)
-#         self.role = role if isinstance(role, Role) else Role.all[role]
-#         if isinstance(grantee, str):
-#             raise Exception
-#         self.grantee = grantee
-#         self.requires(self.role, self.grantee)
+    role: T_Role
+    to_role: T_Role = None
+    to_user: T_User = None
+    owner: str = "SYSADMIN"
 
-#     @classmethod
-#     def from_sql(cls, sql: str) -> RoleGrant:
-#         match = re.search(cls.create_statement, sql)
+    @property
+    def name(self):
+        return self.role.name
 
-#         if match is None:
-#             raise Exception
-#         parsed = match.groupdict()
-#         role = parsed["role"]
-#         grantee = Role.all[parsed["grantee_role"]] or User.all[parsed["grantee_user"]]
-#         return cls(role, grantee)
+    def create_sql(self):
+        return tidy_sql(
+            "GRANT",
+            self.props.render(self),
+        )
 
-#     @property
-#     def sql(self):
-#         grantee_type = "ROLE" if isinstance(self.grantee, Role) else "USER"
-#         return f"GRANT ROLE {self.role.name} TO {grantee_type} {self.grantee.name}"
-
-#     @property
-#     def urn(self):
-#         """
-#         urn:sf:us-central1.gcp:UJ63311:role_grant/
-#         """
-
-#         return URN("", "", "role_grant", "role:READERS#user:teej")
-
-
-# T_Priv = TypeVar("T_Priv", GlobalPrivs, DatabasePrivs, WarehousePrivs)
-# # T_Priv = Union[Type[GlobalPrivs], Type[DatabasePrivs], Type[WarehousePrivs]]
-
-
-# class PrivGrant(AccountLevelResource):
-#     """
-#     GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
-#         | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
-#         | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { SCHEMA <schema_name> | ALL SCHEMAS IN DATABASE <db_name> }
-#         | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { FUTURE SCHEMAS IN DATABASE <db_name> }
-#         | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
-#         | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
-#         }
-#     TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
-
-#     globalPrivileges ::=
-#         {
-#             CREATE {
-#                     ACCOUNT | DATA EXCHANGE LISTING | DATABASE | FAILOVER GROUP | INTEGRATION
-#                     | NETWORK POLICY | REPLICATION GROUP | ROLE | SHARE | USER | WAREHOUSE
-#             }
-#             | APPLY { { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY | TAG }
-#             | ATTACH POLICY | AUDIT |
-#             | EXECUTE { ALERT | TASK }
-#             | IMPORT SHARE
-#             | MANAGE GRANTS
-#             | MODIFY { LOG LEVEL | TRACE LEVEL | SESSION LOG LEVEL | SESSION TRACE LEVEL }
-#             | MONITOR { EXECUTION | SECURITY | USAGE }
-#             | OVERRIDE SHARE RESTRICTIONS | RESOLVE ALL
-#         }
-#         [ , ... ]
-
-#     accountObjectPrivileges ::=
-#         -- For DATABASE
-#            { CREATE { DATABASE ROLE | SCHEMA } | IMPORTED PRIVILEGES | MODIFY | MONITOR | USAGE } [ , ... ]
-#         -- For FAILOVER GROUP
-#            { FAILOVER | MODIFY | MONITOR | REPLICATE } [ , ... ]
-#         -- For INTEGRATION
-#            { USAGE | USE_ANY_ROLE } [ , ... ]
-#         -- For REPLICATION GROUP
-#            { MODIFY | MONITOR | REPLICATE } [ , ... ]
-#         -- For RESOURCE MONITOR
-#            { MODIFY | MONITOR } [ , ... ]
-#         -- For USER
-#            { MONITOR } [ , ... ]
-#         -- For WAREHOUSE
-#            { MODIFY | MONITOR | USAGE | OPERATE } [ , ... ]
-
-#     schemaPrivileges ::=
-#         ADD SEARCH OPTIMIZATION
-#         | CREATE {
-#             ALERT | EXTERNAL TABLE | FILE FORMAT | FUNCTION
-#             | MATERIALIZED VIEW | PIPE | PROCEDURE
-#             | { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY
-#             | SECRET | SEQUENCE | STAGE | STREAM
-#             | TAG | TABLE | TASK | VIEW
-#           }
-#         | MODIFY | MONITOR | USAGE
-#         [ , ... ]
-
-#     schemaObjectPrivileges ::=
-#         -- For ALERT
-#            OPERATE [ , ... ]
-#         -- For EVENT TABLE
-#            { SELECT | INSERT } [ , ... ]
-#         -- For FILE FORMAT, FUNCTION (UDF or external function), PROCEDURE, SECRET, or SEQUENCE
-#            USAGE [ , ... ]
-#         -- For PIPE
-#            { MONITOR | OPERATE } [ , ... ]
-#         -- For { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY or TAG
-#            APPLY [ , ... ]
-#         -- For external STAGE
-#            USAGE [ , ... ]
-#         -- For internal STAGE
-#            READ [ , WRITE ] [ , ... ]
-#         -- For STREAM
-#            SELECT [ , ... ]
-#         -- For TABLE
-#            { SELECT | INSERT | UPDATE | DELETE | TRUNCATE | REFERENCES } [ , ... ]
-#         -- For TASK
-#            { MONITOR | OPERATE } [ , ... ]
-#         -- For VIEW or MATERIALIZED VIEW
-#            { SELECT | REFERENCES } [ , ... ]
-#     """
-
-#     props = {
-#         "WITH_GRANT_OPTION": FlagProp("WITH GRANT OPTION"),
-#     }
-#     ownable = False
-
-#     create_statement = re.compile(
-#         rf"""
-#             GRANT\s+
-#             (?P<privs_stmt>.+)
-#             (?:\s+PRIVILEGES\s+)?
-#             ON\s+
-#             (?P<on_stmt>.+)\s+
-#             TO\s+
-#             (?:ROLE\s+)?
-#             (?P<grantee_role>{Identifier.pattern})
-#         """,
-#         re.VERBOSE | re.IGNORECASE,
-#     )
-
-#     on_statement = re.compile(
-#         rf"""
-#             (?P<global>
-#                 ACCOUNT
-#             )?
-#             (?:
-#                 (?P<account_object>
-#                     USER |
-#                     RESOURCE\s+MONITOR |
-#                     WAREHOUSE |
-#                     DATABASE |
-#                     INTEGRATION |
-#                     FAILOVER\s+GROUP |
-#                     REPLICATION\s+GROUP
-#                 )
-#                 \s+
-#                 (?P<account_object_name>{Identifier.pattern})
-#             )?
-#             (?P<schema_object>
-#                 SCHEMA\s+
-#                 (?P<schema_object_name>{Identifier.pattern})
-#             )?
-#             (?P<schema_object_plural>
-#                 ALL\ SCHEMAS\ IN\ DATABASE
-#             )?
-#             (?P<future_schema_object>
-#                 FUTURE\ SCHEMAS\ IN\ DATABASE
-#             )?
-#             (?P<class_object>
-#                 CLASS
-#             )?
-#         """,
-#         re.VERBOSE | re.IGNORECASE,
-#     )
-
-#     """
-#     GRANT USAGE ON WAREHOUSE XSMALL_WH TO ROLE PUBLIC;
-
-#     PrivGrant(
-#         privs=['USAGE'],
-#         on=Warehouse.all["XSMALL_WH"],
-#         grantee=Role.all["PUBLIC"],
-#     )
-#     """
-
-#     def __init__(
-#         self,
-#         privs: List[Union[str, T_Priv]],
-#         on: Optional[Resource],
-#         grantee: Union[None, str, Role],
-#         with_grant_option: Optional[bool] = None,
-#     ):
-#         grantee_ = grantee if isinstance(grantee, Role) else Role.all[grantee]
-#         name = ":".join([",".join([str(p) for p in privs]), on.name if on else "account", grantee_.name])
-#         super().__init__(name)
-#         self.privs = privs
-#         self.on = on
-#         self.grantee = grantee_
-#         self.requires(self.grantee)
-#         if self.on:
-#             self.requires(self.on)
-
-#     @classmethod
-#     def from_sql(cls, sql: str) -> PrivGrant:
-#         match = re.search(cls.create_statement, sql)
-
-#         if match is None:
-#             raise Exception
-#         parsed = match.groupdict()
-#         on_type, on_resource = cls.parse_on(parsed["on_stmt"])
-
-#         privs = cls.parse_privs(parsed["privs_stmt"], on_type)
-#         grantee = parsed["grantee_role"]
-#         # grantee = parsed["grantee_role"] or parsed["grantee_user"]
-
-#         return cls(privs, on_resource, grantee)
-
-#     @classmethod
-#     def parse_on(cls, on_stmt: str):  #  -> (Enum, str)
-#         match = re.search(cls.on_statement, on_stmt)
-#         if match is None:
-#             raise Exception
-#         parsed = match.groupdict()
-#         if parsed["global"]:
-#             # This is like implied account?
-#             return (GlobalPrivs, None)
-#         elif parsed["account_object"]:
-#             account_object = parsed["account_object"].lower()
-#             if account_object == "warehouse":
-#                 return (WarehousePrivs, Warehouse.all[parsed["account_object_name"]])
-#             elif account_object == "database":
-#                 return (DatabasePrivs, Database.all[parsed["account_object_name"]])
-#         elif parsed["schema_object"]:
-#             return (SchemaPrivs, Schema.all[parsed["schema_object_name"]])
-#         else:
-#             print(parsed)
-#         raise Exception(f"Not implemented for {on_stmt}")
-#         # return parsed
-
-#     @classmethod
-#     def parse_privs(cls, privs_stmt: str, on_type: Type[T_Priv]) -> List[T_Priv]:
-#         privs_statement = re.compile(rf"""({"|".join([e.value for e in on_type])})""")
-#         privs = re.findall(privs_statement, privs_stmt)
-#         # if not privs:
-#         #     print(privs_stmt)
-#         #     raise Exception
-#         return [on_type.parse(priv) for priv in privs]
-
-#     @property
-#     def sql(self):
-#         privs = ", ".join([str(p) for p in self.privs])
-#         return (
-#             f"GRANT {privs} ON {type(self.on).__name__.upper() if self.on else 'ACCOUNT'}"
-#             + f" {self.on.name if self.on else ''} TO ROLE {self.grantee.name}"
-#         )
+    def drop_sql(self):
+        return tidy_sql(
+            "REVOKE ROLE",
+            self.role.name,
+            "FROM",
+            "ROLE" if self.to_role else "USER",
+            self.to_role.name or self.to_user.name,
+        )

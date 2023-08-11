@@ -1,3 +1,6 @@
+# from .resources import Database
+
+
 def create_warehouse_sql(
     name,
     or_replace=False,
@@ -27,3 +30,14 @@ def create_warehouse_sql(
     exists = "IF NOT EXISTS " if if_not_exists else ""
 
     return f"""CREATE {replace}WAREHOUSE {exists}{name}"""
+
+
+# def create_database_sql(**kwargs):
+#     d = Database(**kwargs)
+#     return d.create_sql()
+
+
+def tidy_sql(*parts):
+    if isinstance(parts[0], list):
+        parts = parts[0]
+    return " ".join([str(part) for part in parts if part])

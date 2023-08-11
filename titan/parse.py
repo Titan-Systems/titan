@@ -152,6 +152,11 @@ def _parse_grant(sql):
         | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
     }
     """
+
+    # Check for role grant
+    if _contains(Keywords("GRANT ROLE"), sql):
+        return {"resource_key": "role_grant"}
+
     grant = GRANT + pp.SkipTo(ON)("privs") + ON + pp.SkipTo(TO)("on") + REST_OF_STRING("remainder")
     grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
 

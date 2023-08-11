@@ -1,7 +1,9 @@
 from typing import Dict, List
+from typing_extensions import Annotated
 
-from . import Resource
-from .base import AccountScoped
+from pydantic import BeforeValidator
+
+from .base import AccountScoped, Resource, serialize_resource_by_name, coerce_from_str
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
 
@@ -119,3 +121,6 @@ class User(Resource, AccountScoped):
     comment: str = None
     network_policy: str = None
     tags: Dict[str, str] = None
+
+
+T_User = Annotated[User, BeforeValidator(coerce_from_str(User)), serialize_resource_by_name]

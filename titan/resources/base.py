@@ -3,7 +3,7 @@ from typing import ClassVar, Union, Dict, Set
 from typing_extensions import Annotated
 
 from inflection import underscore
-from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, field_validator, model_validator
+from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, PlainSerializer, field_validator
 from pydantic.functional_validators import AfterValidator
 from pydantic._internal._model_construction import ModelMetaclass
 from pyparsing import ParseException
@@ -15,6 +15,7 @@ from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 # from ..sql import add_ref
 
 from ..identifiers import FQN
+from ..builder import tidy_sql
 from .validators import coerce_from_str
 
 
@@ -25,6 +26,8 @@ def normalize_resource_name(name: str):
 
 
 ResourceName = Annotated[str, AfterValidator(normalize_resource_name)]
+
+serialize_resource_by_name = PlainSerializer(lambda resource: resource.name, return_type=str)
 
 
 class _Resource(ModelMetaclass):
@@ -71,6 +74,10 @@ class Resource(BaseModel, metaclass=_Resource):
         except ParseException as err:
             raise ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
+    @property
+    def references(self):
+        return self._refs
+
     def _requires(self, resource):
         self._refs.add(resource)
 
@@ -81,21 +88,27 @@ class Resource(BaseModel, metaclass=_Resource):
             self._requires(resource)
         return self
 
-    @property
-    def references(self):
-        return self._refs
+    def create_sql(self, or_replace=False, if_not_exists=False):
+        return tidy_sql(
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            self.resource_type,
+            "IF NOT EXISTS" if if_not_exists else "",
+            self.fqn,
+            self.props.render(self),
+        )
+
+    def drop_sql(self, if_exists=False):
+        return tidy_sql(
+            "DROP",
+            self.resource_type,
+            "IF EXISTS" if if_exists else "",
+            self.fqn,
+        )
 
     # def __format__(self, format_spec):
     #     add_ref(self)
     #     return self.fully_qualified_name
-
-
-class Createable(BaseModel):
-    def create_sql(self):
-        return f"CREATE {self.resource_type} {self.name}"  # self.props.sql()
-
-    # def create_or_replace_sql(self):
-    #     return f"CREATE OR REPLACE {self.resource_type} {self.name}"
 
 
 class ResourceChildren:
@@ -238,6 +251,20 @@ class Database(Resource, AccountScoped):
     @property
     def children(self):
         return self._children
+
+    def create_sql(self, or_replace=False, if_not_exists=False):
+        return tidy_sql(
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            "TRANSIENT" if self.transient else "",
+            "DATABASE",
+            "IF NOT EXISTS" if if_not_exists else "",
+            self.fqn,
+            self.props.render(self),
+        )
+
+    def create_or_replace_sql(self):
+        return self.create_sql(or_replace=True)
 
     # @property
     # def schemas(self):

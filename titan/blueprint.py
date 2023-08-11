@@ -3,15 +3,20 @@ from dictdiffer import diff
 from .data_provider import DataProvider
 from .enums import Scope
 from .identifiers import URN
+from .resources import RoleGrant
+
+
+def remove_none_values(d):
+    return {k: v for k, v in d.items() if v is not None}
 
 
 def fetch_remote_state(provider: DataProvider, manifest):
     state = {}
     for urn_str in manifest.keys():
         urn = URN.from_str(urn_str)
-        resource = provider.fetch_resource(urn)
-        if resource:
-            state[urn_str] = resource
+        data = provider.fetch_resource(urn)
+        if data:
+            state[urn_str] = remove_none_values(data)
 
     return state
 
@@ -34,14 +39,27 @@ class Blueprint:
 
     def generate_manifest(self):
         manifest = {}
-        refs = []
+        # refs = []
         for resource in self.staged:
             if resource.implicit:
                 continue
             self._finalize_scope(resource)
-            key = URN.from_resource(account=self.account, resource=resource)
-            value = resource.model_dump(exclude_none=True)  # mode="json",
-            manifest[str(key)] = value
+            urn = URN.from_resource(account=self.account, resource=resource)
+            data = resource.model_dump(exclude_none=True)  # mode="json",
+
+            manifest_key = str(urn)
+            if isinstance(resource, RoleGrant):
+                # TODO: codesmell
+                if manifest_key not in manifest:
+                    manifest[manifest_key] = {"to_role": [], "to_user": []}
+                if "to_role" in data:
+                    manifest[manifest_key]["to_role"].append(data)
+                else:
+                    manifest[manifest_key]["to_user"].append(data)
+            else:
+                if manifest_key in manifest:
+                    raise RuntimeError(f"Duplicate resource found {manifest_key}")
+                manifest[manifest_key] = data
             # for ref in resource.refs:
             #     refs.append([key, urn(self.account, ref)])
         return manifest
@@ -64,27 +82,30 @@ class Blueprint:
         provider = DataProvider(session)
         manifest = self.generate_manifest()
         remote_state = fetch_remote_state(provider, manifest)
-
-        # diffs = diff(remote_state, manifest)
-        # print_diffs(diffs)
         return Plan(remote_state, manifest)
 
-    def deploy(self, session, plan=None):
+    def apply(self, session, plan=None):
         plan = plan or self.plan(session)
 
         provider = DataProvider(session)
         for action, urn_str, data in plan.changes:
             urn = URN.from_str(urn_str)
             if action == "create":
-                # resource.create(session)
-                pass
+                provider.create_resource(urn, data)
             elif action == "update":
-                # resource.update(session)
                 provider.update_resource(urn, data)
-            # elif action == "delete":
-            #     resource.delete(session)
+            elif action == "delete":
+                raise NotImplementedError
             else:
                 raise Exception(f"Unexpected action {action} in plan")
+
+    def destroy(self, session, manifest=None):
+        manifest = manifest or self.generate_manifest()
+
+        provider = DataProvider(session)
+        for urn_str, data in manifest.items():
+            urn = URN.from_str(urn_str)
+            provider.drop_resource(urn, data)
 
     def _add(self, resource):
         self.staged.append(resource)
@@ -99,21 +120,16 @@ class Blueprint:
 class Plan:
     def __init__(self, remote_state, manifest):
         self.changes = []
-        diffs = diff(remote_state, manifest)
-        # print_diffs(diffs)
+        diffs = list(diff(remote_state, manifest))
+        print("~" * 120)
+        print_diffs(diffs)
+        print("~" * 120)
         for action, target, deltas in diffs:
-            # urn_str = target[0]
-            # urn = URN.from_str(urn_str)
             if action == "add":
                 for delta in deltas:
                     urn_str = delta[0]
                     self.changes.append(("create", urn_str, manifest[urn_str]))
             elif action == "change":
-                # modified_attr = target[-1]
-                #
                 urn_str, modified_attr = target[0], target[1]
                 new_value = deltas[-1]
                 self.changes.append(("update", urn_str, {modified_attr: new_value}))
-
-        # for change in self.changes:
-        #     print(change)

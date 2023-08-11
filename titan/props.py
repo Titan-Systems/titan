@@ -2,6 +2,8 @@ from abc import ABC
 from typing import Dict
 
 import pyparsing as pp
+
+from .builder import tidy_sql
 from .enums import DataType
 from .parse import (
     _parser_has_results_name,
@@ -76,8 +78,20 @@ class Props:
     def __getitem__(self, key: str) -> Prop:
         return self.props[key]
 
-    def render(self, values):
-        pass
+    def render(self, resource):
+        resource_fields = resource.model_json_schema()["properties"]
+        data = resource.model_dump(exclude_none=True)
+
+        rendered = []
+        for prop_kwarg, prop in self.props.items():
+            value = data.get(prop_kwarg)
+            if value is None:
+                continue
+            field_has_default = "default" in resource_fields[prop_kwarg]
+            value_is_default = value == resource_fields[prop_kwarg].get("default")
+            if not (field_has_default and value_is_default):
+                rendered.append(prop.render(value))
+        return tidy_sql(rendered)
 
 
 class BoolProp(Prop):
@@ -89,8 +103,11 @@ class BoolProp(Prop):
     def render(self, value):
         if value is None:
             return ""
-        eq = " = " if self.eq else " "
-        return f"{self.label}{eq}{str(value).upper()}"
+        return tidy_sql(
+            self.label.upper(),
+            "=" if self.eq else "",
+            str(value).upper(),
+        )
 
 
 class IntProp(Prop):
@@ -103,8 +120,13 @@ class IntProp(Prop):
     def render(self, value):
         if value is None:
             return ""
-        eq = " = " if self.eq else " "
-        return f"{self.label}{eq}{value}"
+        if self.label == "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS":
+            print("ok")
+        return tidy_sql(
+            self.label.upper(),
+            "=" if self.eq else "",
+            value,
+        )
 
 
 class StringProp(Prop):
@@ -114,8 +136,11 @@ class StringProp(Prop):
     def render(self, value):
         if value is None:
             return ""
-        eq = " = " if self.eq else " "
-        return f"{self.label}{eq}'{value}'"
+        return tidy_sql(
+            self.label.upper(),
+            "=" if self.eq else "",
+            f"'{value}'",
+        )
 
 
 class FlagProp(Prop):
@@ -127,7 +152,7 @@ class FlagProp(Prop):
         return True
 
     def render(self, value):
-        return self.label if value else ""
+        return self.label.upper() if value else ""
 
 
 class IdentifierProp(Prop):
@@ -140,8 +165,11 @@ class IdentifierProp(Prop):
     def render(self, value):
         if value is None:
             return ""
-        eq = " = " if self.eq else " "
-        return f"{self.label}{eq}{value}"
+        return tidy_sql(
+            self.label.upper(),
+            "=" if self.eq else "",
+            value,
+        )
 
 
 # FIXME
@@ -153,6 +181,9 @@ class IdentifierListProp(Prop):
     def typecheck(self, prop_values):
         return [".".join(id_parts) for id_parts in prop_values]
 
+    def render(self, values):
+        raise NotImplementedError
+
 
 class StringListProp(Prop):
     def __init__(self, label, **kwargs):
@@ -160,6 +191,16 @@ class StringListProp(Prop):
 
     def typecheck(self, prop_value):
         return [tok.strip(" '") for tok in prop_value]
+
+    def render(self, values):
+        if values is None:
+            return ""
+        value_list = ", ".join(values)
+        return tidy_sql(
+            self.label.upper(),
+            "=" if self.eq else "",
+            f"({value_list})",
+        )
 
 
 class PropSet(Prop):

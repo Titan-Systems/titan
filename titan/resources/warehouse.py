@@ -3,6 +3,7 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
+from ..builder import tidy_sql
 from ..enums import ParseableEnum
 from ..props import (
     BoolProp,
@@ -24,6 +25,7 @@ class WarehouseType(ParseableEnum):
     SNOWPARK_OPTIMIZED = "SNOWPARK-OPTIMIZED"
 
 
+# TODO: add alias support, eg XSMALL = X-SMALL
 class WarehouseSize(ParseableEnum):
     XSMALL = "XSMALL"
     SMALL = "SMALL"
@@ -72,6 +74,7 @@ class Warehouse(Resource, AccountScoped):
 
     resource_type = "WAREHOUSE"
     props = Props(
+        _start_token="WITH",
         warehouse_type=EnumProp("warehouse_type", WarehouseType),
         warehouse_size=EnumProp("warehouse_size", WarehouseSize),
         max_cluster_count=IntProp("max_cluster_count"),
@@ -88,7 +91,6 @@ class Warehouse(Resource, AccountScoped):
         statement_queued_timeout_in_seconds=IntProp("statement_queued_timeout_in_seconds"),
         statement_timeout_in_seconds=IntProp("statement_timeout_in_seconds"),
         tags=TagsProp(),
-        _start_token="WITH",
     )
 
     name: str
@@ -110,4 +112,12 @@ class Warehouse(Resource, AccountScoped):
     statement_timeout_in_seconds: int = 172800
     tags: Dict[str, str] = None
 
-    # self.requires(self.resource_monitor)
+    def create_sql(self, or_replace=False, if_not_exists=False):
+        return tidy_sql(
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            "WAREHOUSE",
+            "IF NOT EXISTS" if if_not_exists else "",
+            self.fqn,
+            self.props.render(self),
+        )

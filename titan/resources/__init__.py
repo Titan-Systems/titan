@@ -17,7 +17,7 @@ from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .file_format import FileFormat
-from .grant import Grant
+from .grant import Grant, RoleGrant
 from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
@@ -81,6 +81,7 @@ __all__ = [
     "Resource",
     "ResourceMonitor",
     "Role",
+    "RoleGrant",
     "S3StorageIntegration",
     "Schema",
     "SchemaScoped",

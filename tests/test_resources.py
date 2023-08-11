@@ -1,6 +1,7 @@
 import unittest
 
 from pydantic import ValidationError
+from pyparsing import ParseException
 
 from tests.helpers import load_sql_fixtures
 from titan.resources import (
@@ -35,7 +36,10 @@ from titan.resources.warehouse import WarehouseSize
 
 class TestResources(unittest.TestCase):
     def validate_from_sql(self, resource_cls, sql):
-        self.assertIsNotNone(resource_cls.from_sql(sql), f"Failed to parse {resource_cls.__name__} from sql: {sql}")
+        try:
+            assert resource_cls.from_sql(sql)
+        except ParseException as e:
+            self.fail(f"Failed to parse {resource_cls.__name__} from SQL: {sql}")
 
     def validate_dict_serde(self, resource_cls, data):
         self.assertDictEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)

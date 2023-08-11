@@ -1,7 +1,10 @@
 from typing import Dict
+from typing_extensions import Annotated
+
+from pydantic import BeforeValidator
 
 from . import Resource
-from .base import AccountScoped, DatabaseScoped
+from .base import AccountScoped, DatabaseScoped, serialize_resource_by_name, coerce_from_str
 from ..props import Props, StringProp, TagsProp
 
 
@@ -38,3 +41,6 @@ class DatabaseRole(Resource, DatabaseScoped):
     name: str
     owner: str = "SYSADMIN"
     comment: str = None
+
+
+T_Role = Annotated[Role, BeforeValidator(coerce_from_str(Role)), serialize_resource_by_name]
