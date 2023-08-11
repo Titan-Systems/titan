@@ -1,6 +1,6 @@
 import unittest
 
-from titan import Blueprint, Database, Schema, Table, View, Adapter
+from titan import Blueprint, Database, Schema, Table, View
 
 
 class TestBlueprint(unittest.TestCase):

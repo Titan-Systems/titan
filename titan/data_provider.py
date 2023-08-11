@@ -1,0 +1,272 @@
+import os
+
+# from snowflake.snowpark import Session
+import snowflake.connector
+from snowflake.connector import DictCursor
+
+from snowflake.connector.errors import ProgrammingError
+
+from .builder import create_warehouse_sql
+from .identifiers import FQN
+
+connection_params = {
+    "account": os.environ["SNOWFLAKE_ACCOUNT"],
+    "user": os.environ["SNOWFLAKE_USER"],
+    "password": os.environ["SNOWFLAKE_PASSWORD"],
+}
+
+
+def get_session():
+    # TODO: make this snowpark-compatible
+    # return Session.builder.configs(**connection_params).create()
+    return snowflake.connector.connect(**connection_params)
+
+
+def execute(session, sql) -> list:
+    try:
+        print("EXECUTE >>>", sql)
+        res = session.cursor(DictCursor).execute(sql).fetchall()
+        return res
+    except ProgrammingError as err:
+        print(f"failed to execute sql, [{sql}]")
+        raise err
+
+
+def params_result_to_dict(params_result):
+    params = {}
+    for param in params_result:
+        if param["type"] == "BOOLEAN":
+            typed_value = param["value"] == "true"
+        elif param["type"] == "NUMBER":
+            typed_value = int(param["value"])
+        elif param["type"] == "STRING":
+            typed_value = str(param["value"]) if param["value"] else None
+        params[param["key"].lower()] = typed_value
+    return params
+
+
+def options_result_to_list(options_result):
+    return [option.strip(" ") for option in options_result.split(",")]
+
+
+class DataProvider:
+    def __init__(self, session=None):
+        self.session = session or get_session()
+
+    def fetch_resource(self, urn):
+        return getattr(self, f"fetch_{urn.resource_key}")(urn.fqn)
+
+    def fetch_account_locator(self):
+        locator = execute(self.session, "SELECT CURRENT_ACCOUNT()")[0]
+        return locator
+
+    def fetch_region(self):
+        region = execute(self.session, "SELECT CURRENT_REGION()")[0]
+        return region
+
+    def fetch_columns(self, resource_type: str, fqn: FQN):
+        desc_result = execute(self.session, f"DESC {resource_type} {fqn}")
+        columns = []
+        for col in desc_result:
+            if col["kind"] != "COLUMN":
+                raise Exception(f"Unexpected kind {col['kind']} in desc result")
+            columns.append(
+                {
+                    "name": col["name"],
+                    "type": col["type"],
+                    "nullable": col["null?"] == "Y",
+                    "default": col["default"],
+                    "comment": col["comment"],
+                }
+            )
+        return columns
+
+    def fetch_database(self, fqn: FQN):
+        show_result = execute(self.session, f"SHOW DATABASES LIKE '{fqn.name}'")
+
+        if len(show_result) == 0:
+            return None
+        if len(show_result) > 1:
+            raise Exception(f"Found multiple databases matching {fqn}")
+        if show_result[0]["kind"] != "STANDARD":
+            return None
+
+        options = options_result_to_list(show_result[0]["options"])
+        show_params_result = execute(self.session, f"SHOW PARAMETERS IN DATABASE {fqn.name}")
+        params = params_result_to_dict(show_params_result)
+
+        return {
+            "name": show_result[0]["name"],
+            "data_retention_time_in_days": int(show_result[0]["retention_time"]),
+            "comment": show_result[0]["comment"] or None,
+            "transient": "TRANSIENT" in options,
+            "owner": show_result[0]["owner"],
+            "max_data_extension_time_in_days": params["data_retention_time_in_days"],
+            "default_ddl_collation": params["default_ddl_collation"],
+        }
+
+    def fetch_role(self, fqn):
+        try:
+            show_result = execute(self.session, f"SHOW ROLES LIKE '{fqn.name}'")
+        except ProgrammingError:
+            return None
+
+        if len(show_result) == 0:
+            return None
+        if len(show_result) > 1:
+            raise Exception(f"Found multiple roles matching {fqn}")
+
+        data = show_result[0]
+
+        return {
+            "name": data["name"],
+            "comment": data["comment"] or None,
+            "owner": data["owner"],
+        }
+
+    def fetch_schema(self, fqn):
+        if fqn.database is None:
+            raise Exception(f"Schema fqn must have a database {fqn}")
+        try:
+            show_result = execute(self.session, f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+        except ProgrammingError:
+            return None
+
+        if len(show_result) == 0:
+            return None
+        if len(show_result) > 1:
+            raise Exception(f"Found multiple schemas matching {fqn}")
+
+        data = show_result[0]
+
+        options = options_result_to_list(data["options"])
+        show_params_result = execute(self.session, f"SHOW PARAMETERS IN SCHEMA {fqn}")
+        params = params_result_to_dict(show_params_result)
+
+        return {
+            "name": data["name"],
+            "transient": "TRANSIENT" in options,
+            "owner": data["owner"],
+            "with_managed_access": "MANAGED ACCESS" in options,
+            "data_retention_time_in_days": int(data["retention_time"]),
+            "max_data_extension_time_in_days": params["data_retention_time_in_days"],
+            "default_ddl_collation": params["default_ddl_collation"],
+            "comment": data["comment"] or None,
+        }
+
+    def fetch_user(self, fqn):
+        try:
+            show_result = execute(self.session, f"SHOW USERS LIKE '{fqn.name}'")
+        except ProgrammingError:
+            return None
+
+        if len(show_result) == 0:
+            return None
+        if len(show_result) > 1:
+            raise Exception(f"Found multiple users matching {fqn}")
+
+        data = show_result[0]
+
+        return {
+            "name": data["name"],
+            "login_name": data["login_name"],
+            "display_name": data["display_name"],
+            "first_name": data["first_name"] or None,
+            "last_name": data["last_name"] or None,
+            "email": data["email"] or None,
+            "mins_to_unlock": data["mins_to_unlock"] or None,
+            "days_to_expiry": data["days_to_expiry"] or None,
+            "comment": data["comment"] or None,
+            "disabled": data["disabled"] == "true",
+            "must_change_password": data["must_change_password"] == "true",
+            "snowflake_lock": data["snowflake_lock"] == "true",
+            "default_warehouse": data["default_warehouse"] or None,
+            "default_namespace": data["default_namespace"] or None,
+            "default_role": data["default_role"] or None,
+            "default_secondary_roles": data["default_secondary_roles"] or None,
+            "ext_authn_duo": data["ext_authn_duo"] == "true",
+            "ext_authn_uid": data["ext_authn_uid"] or None,
+            "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
+            "owner": data["owner"],
+            "has_password": data["has_password"] == "true",
+            "has_rsa_public_key": data["has_rsa_public_key"] == "true",
+        }
+
+    def fetch_view(self, fqn):
+        if fqn.schema is None:
+            raise Exception(f"View fqn must have a schema {fqn}")
+        try:
+            show_result = execute(self.session, f"SHOW VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+        except ProgrammingError:
+            return None
+
+        if len(show_result) == 0:
+            return None
+        if len(show_result) > 1:
+            raise Exception(f"Found multiple views matching {fqn}")
+
+        data = show_result[0]
+
+        if data["is_materialized"] == "true":
+            return None
+
+        columns = self.fetch_columns("VIEW", fqn)
+
+        return {
+            "name": data["name"],
+            "owner": data["owner"],
+            "secure": data["is_secure"] == "true",
+            "columns": columns,
+            "change_tracking": data["change_tracking"] == "ON",
+            "comment": data["comment"] or None,
+            "as_": data["text"],
+        }
+
+    def fetch_warehouse(self, fqn):
+        try:
+            show_result = execute(self.session, f"SHOW WAREHOUSES LIKE '{fqn.name}'")
+        except ProgrammingError:
+            return None
+
+        if len(show_result) == 0:
+            return None
+        if len(show_result) > 1:
+            raise Exception(f"Found multiple warehouses matching {fqn}")
+
+        data = show_result[0]
+
+        show_params_result = execute(self.session, f"SHOW PARAMETERS FOR WAREHOUSE {fqn}")
+        params = params_result_to_dict(show_params_result)
+
+        return {
+            "name": data["name"],
+            "owner": data["owner"],
+            "warehouse_type": data["type"],
+            "warehouse_size": data["size"].upper(),
+            # "max_cluster_count": data["max_cluster_count"],
+            # "min_cluster_count": data["min_cluster_count"],
+            # "scaling_policy": data["scaling_policy"],
+            "auto_suspend": data["auto_suspend"],
+            "auto_resume": data["auto_resume"] == "true",
+            "comment": data["comment"] or None,
+            "enable_query_acceleration": data.get("enable_query_acceleration", "false") == "true",
+            "max_concurrency_level": params["max_concurrency_level"],
+            "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
+            "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
+        }
+
+    def update_resource(self, urn, data):
+        return getattr(self, f"update_{urn.resource_key}")(urn.fqn, data)
+
+    def update_warehouse(self, fqn, data):
+        attr, value = data.popitem()
+        if attr == "owner":
+            execute(self.session, f"GRANT OWNERSHIP ON WAREHOUSE {fqn} TO ROLE {value}")
+        else:
+            execute(self.session, f"ALTER WAREHOUSE {fqn} SET {attr} = {value}")
+
+    def create_resource(self, urn, data):
+        return getattr(self, f"create_{urn.resource_key}")(urn.fqn, data)
+
+    def create_warehouse(self, fqn, data):
+        execute(self.session, create_warehouse_sql(**data))

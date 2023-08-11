@@ -16,6 +16,7 @@ GRANT USAGE ON ALL SCHEMAS IN DATABASE somedb TO ROLE somerole;
 
 -- Future Schema Privileges
 GRANT CREATE ROW ACCESS POLICY ON FUTURE SCHEMAS IN DATABASE somedb TO ROLE somerole;
+grant usage on future schemas in database mydb to role role1;
 
 -- Schema Object Privileges
 GRANT ALL PRIVILEGES ON FUNCTION mydb.myschema.add5(number) TO ROLE analyst;
@@ -29,4 +30,4 @@ GRANT USAGE ON ALL FUNCTIONS IN DATABASE somedb TO ROLE analyst;
 -- Future Schema Objects Privileges
 GRANT SELECT,INSERT ON FUTURE TABLES IN SCHEMA mydb.myschema TO ROLE somerole;
 
-grant usage on future schemas in database mydb to role role1;
+

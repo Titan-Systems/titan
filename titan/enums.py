@@ -1,7 +1,4 @@
 from enum import Enum, EnumMeta
-from typing import TypeVar, Type, Union
-
-T_ParseableEnum = TypeVar("T_ParseableEnum", bound="ParseableEnum")
 
 
 def _normalize_enum_value(value: str) -> str:

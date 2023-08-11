@@ -1,4 +1,4 @@
-from .adapter import Adapter
+from .data_provider import DataProvider
 from .blueprint import Blueprint
 
 from .resources import *
@@ -22,10 +22,10 @@ from .resources import *
 
 __all__ = [
     # "App",
-    "Adapter",
     "Alert",
     "Blueprint",
     "Database",
+    "DataProvider",
     "ExternalFunction",
     "FileFormat",
     "Role",

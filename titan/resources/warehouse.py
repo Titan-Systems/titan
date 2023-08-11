@@ -93,21 +93,21 @@ class Warehouse(Resource, AccountScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    warehouse_type: WarehouseType = None
+    warehouse_type: WarehouseType = "STANDARD"
     warehouse_size: WarehouseSize = None
     max_cluster_count: int = None
     min_cluster_count: int = None
     scaling_policy: WarehouseScalingPolicy = None
-    auto_suspend: int = None
-    auto_resume: bool = None
+    auto_suspend: int = 600
+    auto_resume: bool = True
     initially_suspended: bool = None
     resource_monitor: Annotated[ResourceMonitor, BeforeValidator(coerce_from_str(ResourceMonitor))] = None
     comment: str = None
     enable_query_acceleration: bool = None
     query_acceleration_max_scale_factor: int = None
-    max_concurrency_level: int = None
-    statement_queued_timeout_in_seconds: int = None
-    statement_timeout_in_seconds: int = None
+    max_concurrency_level: int = 8
+    statement_queued_timeout_in_seconds: int = 0
+    statement_timeout_in_seconds: int = 172800
     tags: Dict[str, str] = None
 
     # self.requires(self.resource_monitor)

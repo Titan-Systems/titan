@@ -3,7 +3,7 @@ from typing import ClassVar, Union, Dict, Set
 from typing_extensions import Annotated
 
 from inflection import underscore
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, field_validator, model_validator
 from pydantic.functional_validators import AfterValidator
 from pydantic._internal._model_construction import ModelMetaclass
 from pyparsing import ParseException
@@ -15,6 +15,7 @@ from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 # from ..sql import add_ref
 
 from ..identifiers import FQN
+from .validators import coerce_from_str
 
 
 # TODO: snowflake resource name compatibility
@@ -43,21 +44,18 @@ class Resource(BaseModel, metaclass=_Resource):
         from_attributes=True,
         extra="forbid",
         validate_assignment=True,
+        # Don't use this
+        use_enum_values=True,
         # NOTE: This might be required to make SchemaScoped.schema = 'foo' work
-        # populate_by_name=True,
+        populate_by_name=True,
     )
 
     resource_type: ClassVar[str] = None
     props: ClassVar[Props]
 
-    # name: str
     implicit: bool = Field(exclude=True, default=False)
     stub: bool = Field(exclude=True, default=False)
     _refs: Set["Resource"] = {}
-
-    # TODO: check if this is being super()'d correctly
-    def model_post_init(self, ctx):
-        pass
 
     @classmethod
     def from_sql(cls, sql):
@@ -100,7 +98,7 @@ class Createable(BaseModel):
     #     return f"CREATE OR REPLACE {self.resource_type} {self.name}"
 
 
-class ResourceCollection:
+class ResourceChildren:
     def __init__(self, parent):
         self.parent = parent
         self.items = {}
@@ -118,39 +116,24 @@ class ResourceCollection:
         for child in children:
             self._add(child)
 
-    def __getitem__(self, key):
-        raise NotImplementedError
-
-    #     if key is None:
-    #         return None
-    #     if key not in self._db:
-    #         self._db[key] = self.resource_class(name=key, stub=True)
-    #     return self._db[key]
-
-    # def __setitem__(self, key, value):
-    #     if key is None:
-    #         raise Exception
-    #     if key in self._db:
-    #         if self._db[key].stub:
-    #             self._db[key] = value
-    #         else:
-    #             raise Exception("An object already exists with that name")
-    #     self._db[key] = value
+    def __contains__(self, child):
+        return child.resource_key in self.items and child in self.items[child.resource_key]
 
 
 class Organization(Resource):
     resource_type = "ORGANIZATION"
 
     name: ResourceName
-    _children: ResourceCollection = Field(alias="children")
+    _children: ResourceChildren = Field(alias="children")
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
-        self._children = ResourceCollection(self)
+        self._children = ResourceChildren(self)
 
 
 class OrganizationScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.ORGANIZATION
+
     organziation: Union[str, Organization] = Field(default=None, exclude=True)
 
     @property
@@ -176,11 +159,23 @@ class Account(Resource, OrganizationScoped):
     resource_type = "ACCOUNT"
 
     name: ResourceName
+    _children: ResourceChildren
+
+    def model_post_init(self, ctx):
+        super().model_post_init(ctx)
+        self._children = ResourceChildren(self)
+
+    @property
+    def children(self):
+        return self._children
 
 
 class AccountScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.ACCOUNT
-    account: Union[str, Account] = Field(default=None, exclude=True)
+
+    account: Annotated[Account, BeforeValidator(coerce_from_str(Account))] = Field(
+        alias="parent", default=None, exclude=True
+    )
 
     @property
     def parent(self):
@@ -197,11 +192,6 @@ class AccountScoped(BaseModel):
     @property
     def fqn(self):
         return self.fully_qualified_name
-
-    @field_validator("account")
-    @classmethod
-    def validate_account(cls, account: Union[str, Account]):
-        return account if isinstance(account, Account) else Account(name=account, stub=True)
 
 
 class Database(Resource, AccountScoped):
@@ -235,19 +225,23 @@ class Database(Resource, AccountScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _children: ResourceCollection = Field(alias="children")
+    _children: ResourceChildren = Field(alias="children")
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
-        self._children = ResourceCollection(self)
+        self._children = ResourceChildren(self)
         self._children.add(
             Schema(name="PUBLIC", implicit=True),
             Schema(name="INFORMATION_SCHEMA", implicit=True),
         )
 
     @property
-    def schemas(self):
-        return self._children.schemas
+    def children(self):
+        return self._children
+
+    # @property
+    # def schemas(self):
+    #     return self._children.schemas
 
 
 class DatabaseScoped(BaseModel):
@@ -310,15 +304,19 @@ class Schema(Resource, DatabaseScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _children: ResourceCollection = Field(alias="children")
+    _children: ResourceChildren = Field(alias="children")
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
-        self._children = ResourceCollection(self)
+        self._children = ResourceChildren(self)
 
     @property
-    def tables(self):
-        return self._children.tables
+    def children(self):
+        return self._children
+
+    # @property
+    # def tables(self):
+    #     return self._children.tables
 
 
 class SchemaScoped(BaseModel):

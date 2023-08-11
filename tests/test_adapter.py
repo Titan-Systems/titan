@@ -1,6 +1,6 @@
 import unittest
 
-from titan.adapter import Adapter
+from titan.data_provider import Adapter
 
 
 class TestAdapter(unittest.TestCase):

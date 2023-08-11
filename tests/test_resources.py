@@ -40,7 +40,7 @@ class TestResources(unittest.TestCase):
     def validate_dict_serde(self, resource_cls, data):
         self.assertDictEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
 
-    def test_resource_composition(self):
+    def test_resource_constructors(self):
         assert Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
         assert Task(name="TASK", as_="SELECT 1", warehouse=Warehouse(name="wh"))
         assert Task(name="TASK", as_="SELECT 1", warehouse={"name": "wh"})
@@ -94,8 +94,6 @@ class TestResources(unittest.TestCase):
             self.validate_from_sql(FileFormat, sql)
 
     def test_grant(self):
-        # g = Grant()
-        # self.assertIsNotNone(g)
         for sql in load_sql_fixtures("grant.sql"):
             self.validate_from_sql(Grant, sql)
 
@@ -171,7 +169,7 @@ class TestResources(unittest.TestCase):
     def test_warehouse(self):
         for sql in load_sql_fixtures("warehouse.sql"):
             self.validate_from_sql(Warehouse, sql)
-        assert Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size == WarehouseSize.XSMALL
+        self.assertEqual(Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size, WarehouseSize.XSMALL)
 
     def test_user(self):
         for sql in load_sql_fixtures("user.sql"):

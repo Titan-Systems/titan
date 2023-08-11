@@ -106,7 +106,7 @@ class User(Resource, AccountScoped):
     last_name: str = None
     email: str = None
     must_change_password: bool = None
-    disabled: bool = None
+    disabled: bool = False
     days_to_expiry: int = None
     mins_to_unlock: int = None
     default_warehouse: str = None

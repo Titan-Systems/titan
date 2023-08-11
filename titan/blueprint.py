@@ -1,12 +1,26 @@
 from dictdiffer import diff
+
+from .data_provider import DataProvider
 from .enums import Scope
 from .identifiers import URN
 
 
-def fetch_remote_state(adapter, manifest):
+def fetch_remote_state(provider: DataProvider, manifest):
+    state = {}
     for urn_str in manifest.keys():
         urn = URN.from_str(urn_str)
-        adapter.fetch_resource(urn)
+        resource = provider.fetch_resource(urn)
+        if resource:
+            state[urn_str] = resource
+
+    return state
+
+
+def print_diffs(diffs):
+    for action, target, deltas in diffs:
+        print(f"[{action}]", target)
+        for delta in deltas:
+            print("\t", delta)
 
 
 class Blueprint:
@@ -26,7 +40,7 @@ class Blueprint:
                 continue
             self._finalize_scope(resource)
             key = URN.from_resource(account=self.account, resource=resource)
-            value = resource.model_dump(exclude_none=True)
+            value = resource.model_dump(exclude_none=True)  # mode="json",
             manifest[str(key)] = value
             # for ref in resource.refs:
             #     refs.append([key, urn(self.account, ref)])
@@ -46,29 +60,31 @@ class Blueprint:
                     raise Exception(f"Orphaned resource found {resource}")
                 resource.schema = self.schema
 
-    def plan(self, adapter):
+    def plan(self, session):
+        provider = DataProvider(session)
         manifest = self.generate_manifest()
-        remote_state = fetch_remote_state(adapter, manifest)
-        diffs = diff(manifest, remote_state)
-        for action, target, deltas in diffs:
-            print(f"[{action}]", target)
-            for delta in deltas:
-                print("\t", delta)
-        print("ok")
+        remote_state = fetch_remote_state(provider, manifest)
 
-    # def compare(self, remote_state):
-    #     return diff(self.manifest, remote_state)
+        # diffs = diff(remote_state, manifest)
+        # print_diffs(diffs)
+        return Plan(remote_state, manifest)
 
-    # d = diff(state, config)
-    # print("~" * 120)
-    # for action, target, deltas in d:
-    #     print(f"[{action}]", target)
-    #     for delta in deltas:
-    #         print("\t", delta)
+    def deploy(self, session, plan=None):
+        plan = plan or self.plan(session)
 
-    # def apply(self):
-    #     # diff = self.plan()
-    #     pass
+        provider = DataProvider(session)
+        for action, urn_str, data in plan.changes:
+            urn = URN.from_str(urn_str)
+            if action == "create":
+                # resource.create(session)
+                pass
+            elif action == "update":
+                # resource.update(session)
+                provider.update_resource(urn, data)
+            # elif action == "delete":
+            #     resource.delete(session)
+            else:
+                raise Exception(f"Unexpected action {action} in plan")
 
     def _add(self, resource):
         self.staged.append(resource)
@@ -80,29 +96,24 @@ class Blueprint:
             self._add(resource)
 
 
-"""
+class Plan:
+    def __init__(self, remote_state, manifest):
+        self.changes = []
+        diffs = diff(remote_state, manifest)
+        # print_diffs(diffs)
+        for action, target, deltas in diffs:
+            # urn_str = target[0]
+            # urn = URN.from_str(urn_str)
+            if action == "add":
+                for delta in deltas:
+                    urn_str = delta[0]
+                    self.changes.append(("create", urn_str, manifest[urn_str]))
+            elif action == "change":
+                # modified_attr = target[-1]
+                #
+                urn_str, modified_attr = target[0], target[1]
+                new_value = deltas[-1]
+                self.changes.append(("update", urn_str, {modified_attr: new_value}))
 
-@titan.blueprint
-def prod():
-    admin_db = titan.Database("ADMIN")
-    shared_db = titan.Database("SHARED")
-    # setup_base(base_db)
-    provisioner = titan.Role("provisioner")
-    provisioner.grant(client_database.required_permissions)
-    return {}
-
-@titan.blueprint(policies=[titan.Policy(...), titan_standard_policy])
-def prod():
-    provisioner = titan.Role("provisioner")
-    provisioner.grant(client_database.required_permissions)
-    return (
-        titan.Database("ADMIN"),
-        titan.Database("SHARED"),
-        provisioner,
-    )
-
-"""
-
-
-class Provisioner:
-    pass
+        # for change in self.changes:
+        #     print(change)
