@@ -31,7 +31,7 @@ AS
    )
    SELECT * 
       FROM employee_hierarchy_cte
-)*/;
+);*/
 
 /*CREATE RECURSIVE VIEW employee_hierarchy_02 (title, employee_ID, manager_ID, "MGR_EMP_ID (SHOULD BE SAME)", "MGR TITLE") AS (
       -- Start at the top of the hierarchy ...
@@ -47,4 +47,4 @@ AS
              employee_hierarchy_02.title AS "MGR TITLE"
         FROM employees INNER JOIN employee_hierarchy_02
         WHERE employee_hierarchy_02.employee_ID = employees.manager_ID
-)*/;
+);*/

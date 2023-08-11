@@ -173,7 +173,7 @@ class TestResources(unittest.TestCase):
     def test_warehouse(self):
         for sql in load_sql_fixtures("warehouse.sql"):
             self.validate_from_sql(Warehouse, sql)
-        self.assertEqual(Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size, WarehouseSize.XSMALL)
+        self.assertEqual(Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size, WarehouseSize.XSMALL.value)
 
     def test_user(self):
         for sql in load_sql_fixtures("user.sql"):

@@ -47,7 +47,13 @@ class Prop(ABC):
         if not _parser_has_results_name(value_expr, "prop_value"):
             value_expr = value_expr("prop_value")
 
-        self.parser = Keywords(self.label).suppress() + consume_expr.suppress() + eq_expr.suppress() + value_expr
+        self.parser = (
+            consume_expr.suppress()
+            + Keywords(self.label).suppress()
+            + consume_expr.suppress()
+            + eq_expr.suppress()
+            + value_expr
+        )
 
     def __repr__(self):
         return f"{self.__class__.__name__}('{self.label}')"
@@ -231,7 +237,7 @@ class TagsProp(Prop):
 
     def __init__(self):
         label = "TAG"
-        super().__init__(label, value_expr=(ANY() + EQUALS() + ANY()), eq=False, parens=True)
+        super().__init__(label, value_expr=(ANY() + EQUALS() + ANY()), eq=False, parens=True, consume="WITH")
 
     def typecheck(self, prop_value: list) -> dict:
         pairs = iter(prop_value)

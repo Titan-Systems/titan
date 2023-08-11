@@ -27,7 +27,7 @@ def normalize_resource_name(name: str):
 
 ResourceName = Annotated[str, AfterValidator(normalize_resource_name)]
 
-serialize_resource_by_name = PlainSerializer(lambda resource: resource.name, return_type=str)
+serialize_resource_by_name = PlainSerializer(lambda resource: resource.name if resource else None, return_type=str)
 
 
 class _Resource(ModelMetaclass):

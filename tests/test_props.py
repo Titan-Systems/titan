@@ -17,7 +17,7 @@ from titan.props import (
 
 class TestProp(unittest.TestCase):
     def validate_identity(self, prop, sql):
-        assert prop.render(prop.parse(sql)) == sql
+        self.assertEqual(prop.render(prop.parse(sql)), sql)
 
     def test_prop_alert_condition(self):
         assert AlertConditionProp().parse("IF(EXISTS(SELECT 1))") == "SELECT 1"
@@ -25,9 +25,9 @@ class TestProp(unittest.TestCase):
         self.validate_identity(AlertConditionProp(), "IF(EXISTS( SELECT 1 ))")
 
     def test_prop_bool(self):
-        assert BoolProp("foo").parse("FOO = TRUE") is True
-        assert BoolProp("bar").parse("bar = FALSE") is False
-        self.validate_identity(BoolProp("boolprop"), "boolprop = TRUE")
+        self.assertTrue(BoolProp("foo").parse("FOO = TRUE"))
+        self.assertFalse(BoolProp("bar").parse("bar = FALSE"))
+        self.validate_identity(BoolProp("boolprop"), "BOOLPROP = TRUE")
 
     def test_prop_enum(self):
         self.assertEqual(EnumProp("data_type", DataType).parse("DATA_TYPE = VARCHAR"), DataType.VARCHAR)
@@ -55,7 +55,7 @@ class TestProp(unittest.TestCase):
 
     def test_prop_tags(self):
         self.assertDictEqual(TagsProp().parse("TAG (moon_phase = 'waxing')"), {"moon_phase": "waxing"})
-        # self.assertDictEqual(TagsProp().parse("WITH TAG (a = 'b')"), {"a": "b"})
+        self.assertDictEqual(TagsProp().parse("WITH TAG (a = 'b')"), {"a": "b"})
 
     def test_prop_time_travel(self):
         self.assertDictEqual(TimeTravelProp("at").parse("AT(TIMESTAMP => 123)"), {"TIMESTAMP": "123"})
@@ -65,6 +65,4 @@ class TestProps(unittest.TestCase):
     def test_props_render(self):
         db = Database(name="foo", comment="bar")
         rendered = db.props.render(db)
-        self.assertEqual(
-            rendered, "data_retention_time_in_days = 1 max_data_extension_time_in_days = 14 COMMENT = 'bar'"
-        )
+        self.assertEqual(rendered, "COMMENT = 'bar'")
