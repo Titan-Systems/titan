@@ -102,10 +102,19 @@ def _split_statements(sql_text):
     semicolon = pp.Literal(";").suppress()
 
     # SQL Statement is any sequence of SQL strings and other characters, ended with semicolon
-    sql_stmt = pp.OneOrMore(any_sql_string | other_chars).set_parse_action(" ".join) + semicolon
-    sql_stmt = sql_stmt.ignore(pp.c_style_comment | snowflake_sql_comment)
-    result = sql_stmt.search_string(sql_text).as_list()
-    return [res[0] for res in result]
+    parser = pp.OneOrMore(any_sql_string | other_chars).set_parse_action(" ".join) + semicolon
+    parser = parser.ignore(pp.c_style_comment | snowflake_sql_comment)
+
+    results = []
+    for result, start, end in parser.scan_string(sql_text):
+        results.append(result[0])
+
+    # Allow last statement to not have a semicolon
+    remainder = sql_text[end:]
+    if remainder.strip():
+        results.append(remainder)
+
+    return results
 
 
 def _parse_create_header(sql, resource_cls):
@@ -144,6 +153,7 @@ def _parse_grant(sql):
     }
     """
     grant = GRANT + pp.SkipTo(ON)("privs") + ON + pp.SkipTo(TO)("on") + REST_OF_STRING("remainder")
+    grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
 
     try:
         results = grant.parse_string(sql, parse_all=True)
@@ -201,24 +211,40 @@ def _resolve_grant_class(on_stmt):
         | Keyword("TASK")
         | Keyword("VIEW")
     )
-    # if on_stmt == "ACCOUNT":
-    #     return "account_grant"
-    # elif _contains(account_object + FullyQualifiedIdentifier(), on_stmt):
-    #     return "account_object_grant"
-    # elif _contains(Keyword("SCHEMA") + FullyQualifiedIdentifier(), on_stmt):
-    #     return "schema_grant"
-    # elif _contains(Keywords("ALL SCHEMAS IN DATABASE"), on_stmt):
-    #     return "schemas_grant"
-    # elif _contains(Keywords("FUTURE SCHEMAS IN DATABASE"), on_stmt):
-    #     return "future_schemas_grant"
-    # # elif _contains(Keyword("ALL") + schema_object, on_stmt):
-    # #     return "schema_objects_grant"
-    # elif _contains(schema_object, on_stmt):
-    #     return "schema_object_grant"
+
+    schema_objects = (
+        Keyword("ALERTS")
+        | Keywords("DYNAMIC TABLES")
+        | Keywords("EVENT TABLES")
+        | Keywords("EXTERNAL TABLES")
+        | Keywords("FILE FORMATS")
+        | Keyword("FUNCTIONS")
+        | Keywords("MASKING POLICIES")
+        | Keywords("MATERIALIZED VIEWS")
+        | Keywords("PASSWORD POLICIES")
+        | Keyword("PIPES")
+        | Keyword("PROCEDURES")
+        | Keywords("ROW ACCESS POLICIES")
+        | Keyword("SECRETS")
+        | Keywords("SESSION POLICIES")
+        | Keyword("SEQUENCES")
+        | Keyword("STAGES")
+        | Keyword("STREAMS")
+        | Keyword("TABLES")
+        | Keyword("TASKS")
+        | Keyword("VIEWS")
+    )
+
     lexicon = Lexicon(
         {
             "ACCOUNT": "account_grant",
             account_object: "account_object_grant",
+            "SCHEMA": "schema_grant",
+            "ALL SCHEMAS IN DATABASE": "schemas_grant",
+            "FUTURE SCHEMAS IN DATABASE": "future_schemas_grant",
+            schema_object: "schema_object_grant",
+            Keyword("ALL") + schema_objects: "schema_objects_grant",
+            Keyword("FUTURE") + schema_objects: "future_schema_objects_grant",
         }
     )
 
@@ -336,19 +362,6 @@ def _resolve_resource_class(sql):
         raise ParseException(f"Could not resolve resource class for SQL: {sql}") from err
 
 
-def convert_match(lexicon, text):
-    parser = pp.StringStart() + lexicon.parser
-    parse_result, start, end = _first_match(parser, text)
-    if parse_result is None:
-        raise ParseException(f"Could not match {text}")
-    action_or_str = lexicon.get_action(parse_result)
-    if callable(action_or_str):
-        action = action_or_str
-        return action(text[end:])
-    else:
-        return action_or_str
-
-
 class Lexicon:
     def __init__(self, lexicon: Dict[Union[str, pp.ParserElement], Union[str, Callable[[str], str]]]):
         self._words = []
@@ -370,6 +383,19 @@ class Lexicon:
         result_names = list(parse_result.as_dict().keys())
         idx = int(result_names[0])
         return self._actions[idx]
+
+
+def convert_match(lexicon: Lexicon, text):
+    parser = pp.StringStart() + lexicon.parser
+    parse_result, _, end = _first_match(parser, text)
+    if parse_result is None:
+        raise ParseException(f"Could not match {text}")
+    action_or_str = lexicon.get_action(parse_result)
+    if callable(action_or_str):
+        action = action_or_str
+        return action(text[end:])
+    else:
+        return action_or_str
 
 
 def _consume_tokens(parser, text):

@@ -56,7 +56,7 @@ class Column(Resource):
     def from_sql(cls, sql):
         parse_results, start, end = _first_match(COLUMN, sql)
         col_name = parse_results["col_name"]
-        col_type = DataType.parse(parse_results["col_type"])
+        col_type = DataType(parse_results["col_type"])
         remainder = sql[end:]
         props = _parse_props(cls.props, remainder)
         return cls(name=col_name, type=col_type, **props)

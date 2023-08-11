@@ -227,14 +227,15 @@ class EnumProp(Prop):
     def __init__(self, label, enum_or_list, **kwargs):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
-        value_expr = pp.MatchFirst([Keywords(str(val)) for val in self.valid_values]) | ANY
+        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | ANY
         super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_value):
-        parsed = self.enum_type.parse(prop_value.strip("'"))
-        if parsed not in self.valid_values:
+        prop_value = prop_value.strip("'")
+        prop_value = self.enum_type(prop_value)
+        if prop_value not in self.valid_values:
             raise ValueError(f"Invalid value: {prop_value} must be one of {self.valid_values}")
-        return parsed
+        return prop_value
 
     def render(self, value):
         if value is None:
@@ -247,17 +248,18 @@ class EnumListProp(Prop):
     def __init__(self, label, enum_or_list):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
-        enum_values = pp.MatchFirst([Keywords(str(val)) for val in self.valid_values])
+        enum_values = pp.MatchFirst([Keywords(val.value) for val in self.valid_values])
         value_expr = enum_values | ANY
         super().__init__(label, value_expr, parens=True)
 
     def typecheck(self, prop_values):
-        parsed = [self.enum_type.parse(prop_value.strip("'")) for prop_value in prop_values]
-        for value in parsed:
+        prop_values = [val.strip("'") for val in prop_values]
+        prop_values = [self.enum_type(val) for val in prop_values]
+        for value in prop_values:
             if value not in self.valid_values:
                 raise ValueError(f"Invalid value: {value} must be one of {self.valid_values}")
         # return [parsed]
-        return parsed
+        return prop_values
 
     def render(self, values):
         if values is None or len(values) == 0:

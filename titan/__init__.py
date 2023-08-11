@@ -54,3 +54,18 @@ LOGO = r"""
 """.strip(
     "\n"
 )
+
+
+from .enums import ParseableEnum, SchemaPrivs
+
+# _old_new = SchemaPrivs.__new__
+
+
+# def test_new(cls, value):
+#     print("ok")
+#     # _old_new(cls, value)
+#     # cls.__new__(cls, value)
+#     # super(ParseableEnum, cls).__new__(cls, value)
+
+
+# SchemaPrivs.__new__ = test_new

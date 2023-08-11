@@ -97,7 +97,7 @@ class Warehouse(Resource, AccountScoped):
     warehouse_size: WarehouseSize = None
     max_cluster_count: int = None
     min_cluster_count: int = None
-    scaling_policy: str = None
+    scaling_policy: WarehouseScalingPolicy = None
     auto_suspend: int = None
     auto_resume: bool = None
     initially_suspended: bool = None

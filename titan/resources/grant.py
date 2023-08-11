@@ -160,6 +160,10 @@ class SchemaGrant(Grant):
     on: Annotated[Schema, BeforeValidator(coerce_from_str(Schema))]
 
 
+def test(value, **kwargs):
+    print("hello world")
+
+
 class SchemasGrant(Grant):
     """
     GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
@@ -180,7 +184,7 @@ class FutureSchemasGrant(Grant):
     [ WITH GRANT OPTION ]
     """
 
-    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
+    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]  # , BeforeValidator(test)
     on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
 
 
@@ -188,6 +192,30 @@ class SchemaObjectGrant(Grant):
     """
     GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
     ON <object_type> <object_name>
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: list
+
+
+class SchemaObjectsGrant(Grant):
+    """
+    GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
+    ON ALL <object_type>
+    IN { DATABASE <db_name> | SCHEMA <schema_name> }
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: list
+
+
+class FutureSchemaObjectsGrant(Grant):
+    """
+    GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
+    ON FUTURE <object_type>
+    IN { DATABASE <db_name> | SCHEMA <schema_name> }
     TO [ ROLE ] <role_name>
     [ WITH GRANT OPTION ]
     """

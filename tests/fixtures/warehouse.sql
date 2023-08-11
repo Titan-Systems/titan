@@ -12,9 +12,12 @@ CREATE WAREHOUSE IF NOT EXISTS XSMALL_WH
 
 
 
-CREATE WAREHOUSE IF NOT EXISTS XSMALL_WH2
-    
+-- CREATE WAREHOUSE IF NOT EXISTS XSMALL_WH2 AUTO_SUSPEND = NULL;
+
+CREATE WAREHOUSE lowercase_wh
+warehouse_size = x6large
+warehouse_type = snowpark-optimized
+scaling_policy = economy
 ;
 
-/* WITH AUTO_SUSPEND = NULL */
 
