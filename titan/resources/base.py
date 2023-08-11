@@ -1,7 +1,10 @@
 from typing import ClassVar, Union, Dict, Set
 
+from typing_extensions import Annotated
+
 from inflection import underscore
-from pydantic import BaseModel, BeforeValidator, Field, ConfigDict, field_validator
+from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic.functional_validators import AfterValidator
 from pydantic._internal._model_construction import ModelMetaclass
 from pyparsing import ParseException
 
@@ -12,6 +15,15 @@ from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 # from ..sql import add_ref
 
 from ..identifiers import FQN
+
+
+# TODO: snowflake resource name compatibility
+# TODO: make this configurable
+def normalize_resource_name(name: str):
+    return name.upper()
+
+
+ResourceName = Annotated[str, AfterValidator(normalize_resource_name)]
 
 
 class _Resource(ModelMetaclass):
@@ -38,7 +50,7 @@ class Resource(BaseModel, metaclass=_Resource):
     resource_type: ClassVar[str] = None
     props: ClassVar[Props]
 
-    name: str
+    # name: str
     implicit: bool = Field(exclude=True, default=False)
     stub: bool = Field(exclude=True, default=False)
     _refs: Set["Resource"] = {}
@@ -46,12 +58,6 @@ class Resource(BaseModel, metaclass=_Resource):
     # TODO: check if this is being super()'d correctly
     def model_post_init(self, ctx):
         pass
-
-    # TODO: snowflake resource name compatibility
-    @field_validator("name")
-    @classmethod
-    def validate_name(cls, name: str):
-        return name.upper()
 
     @classmethod
     def from_sql(cls, sql):
@@ -65,10 +71,7 @@ class Resource(BaseModel, metaclass=_Resource):
             props = _parse_props(resource_cls.props, remainder_sql) if remainder_sql else {}
             return resource_cls(**identifier, **props)
         except ParseException as err:
-            print(f"Error parsing resource props {resource_cls.__name__} {identifier}")
-            print(err.explain())
-            # return None
-            raise err
+            raise ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
     def _requires(self, resource):
         self._refs.add(resource)
@@ -138,7 +141,7 @@ class ResourceCollection:
 class Organization(Resource):
     resource_type = "ORGANIZATION"
 
-    name: str
+    name: ResourceName
     _children: ResourceCollection = Field(alias="children")
 
     def model_post_init(self, ctx):
@@ -172,7 +175,7 @@ class OrganizationScoped(BaseModel):
 class Account(Resource, OrganizationScoped):
     resource_type = "ACCOUNT"
 
-    name: str
+    name: ResourceName
 
 
 class AccountScoped(BaseModel):
@@ -223,7 +226,7 @@ class Database(Resource, AccountScoped):
         comment=StringProp("comment"),
     )
 
-    name: str
+    name: ResourceName
     transient: bool = False
     owner: str = "SYSADMIN"
     data_retention_time_in_days: int = 1
@@ -297,7 +300,7 @@ class Schema(Resource, DatabaseScoped):
         comment=StringProp("comment"),
     )
 
-    name: str
+    name: ResourceName
     transient: bool = False
     owner: str = "SYSADMIN"
     with_managed_access: bool = None
@@ -351,7 +354,3 @@ class SchemaScoped(BaseModel):
     @classmethod
     def validate_schema(cls, schema: Union[str, Schema]):
         return schema if isinstance(schema, Schema) else Schema(name=schema, stub=True)
-
-
-def coerce_from_str(cls: Resource) -> BeforeValidator:
-    return BeforeValidator(lambda name: cls(name=name, stub=True) if isinstance(name, str) else name)

@@ -1,21 +1,18 @@
+# from abc import ABC
+from typing import List, Union
 from typing_extensions import Annotated
 
-from .base import Resource, AccountScoped, coerce_from_str
+from pydantic import BeforeValidator
+
+from .base import Resource, AccountScoped, Database, Schema
 from .role import Role
+from .validators import coerce_from_str, listify
 from ..parse import _parse_grant, _parse_props
 from ..props import Props, IdentifierProp, FlagProp
-from ..enums import ParseableEnum
+from ..enums import GlobalPrivs, SchemaPrivs  # SchemaObjectPrivs, AccountObjectPrivs
 
 
-class GrantableObject(ParseableEnum):
-    ACCOUNT = "ACCOUNT"
-    USER = "USER"
-    RESOURCE_MONITOR = "RESOURCE MONITOR"
-    WAREHOUSE = "WAREHOUSE"
-    DATABASE = "DATABASE"
-    INTEGRATION = "INTEGRATION"
-    FAILOVER_GROUP = "FAILOVER GROUP"
-    REPLICATION_GROUP = "REPLICATION GROUP"
+# Annotated[List[GlobalPrivs], coerce_from_str(Role)]
 
 
 class Grant(Resource, AccountScoped):
@@ -105,16 +102,97 @@ class Grant(Resource, AccountScoped):
         with_grant_option=FlagProp("with grant option"),
     )
 
-    privs: list
+    privs: Annotated[List[str], BeforeValidator(listify)]
     on: str
-    to: Annotated[Role, coerce_from_str(Role)]
+    to: Annotated[Role, BeforeValidator(coerce_from_str(Role))]
     with_grant_option: bool = None
+
+    # def __new__(
+    #     cls, type: Union[str, FileType], **kwargs
+    # ) -> Union[CSVFileFormat, JSONFileFormat, AvroFileFormat, OrcFileFormat, ParquetFileFormat, XMLFileFormat]:
+    #     file_type = FileType.parse(type)
+    #     file_type_cls = FileTypeMap[file_type]
+    #     return file_type_cls(type=file_type, **kwargs)
 
     @classmethod
     def from_sql(cls, sql):
         parsed = _parse_grant(sql)
-        props = _parse_props(cls.props, parsed["remainder"])
-        return cls(privs=parsed["privs"], on=parsed["on"], **props)
+        grant_cls = Resource.classes[parsed["resource_key"]]
+        props = _parse_props(grant_cls.props, parsed["remainder"])
+        return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
+
+        # return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
+        # return cls(privs=parsed["privs"], on=parsed["on"], **props)
+
+
+class AccountGrant(Grant):
+    """
+    GRANT { globalPrivileges | ALL [ PRIVILEGES ] }
+    ON ACCOUNT
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: Annotated[List[GlobalPrivs], BeforeValidator(listify)]
+    on: str = "ACCOUNT"
+
+
+class AccountObjectGrant(Grant):
+    """
+    GRANT { accountObjectPrivileges | ALL [ PRIVILEGES ] }
+    ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: list
+
+
+class SchemaGrant(Grant):
+    """
+    GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
+    ON SCHEMA <schema_name>
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
+    on: Annotated[Schema, BeforeValidator(coerce_from_str(Schema))]
+
+
+class SchemasGrant(Grant):
+    """
+    GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
+    ON ALL SCHEMAS IN DATABASE <db_name>
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
+    on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
+
+
+class FutureSchemasGrant(Grant):
+    """
+    GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
+    ON FUTURE SCHEMAS IN DATABASE <db_name>
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
+    on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
+
+
+class SchemaObjectGrant(Grant):
+    """
+    GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
+    ON <object_type> <object_name>
+    TO [ ROLE ] <role_name>
+    [ WITH GRANT OPTION ]
+    """
+
+    privs: list
 
 
 # class RoleGrant(AccountLevelResource):
@@ -173,82 +251,6 @@ class Grant(Resource, AccountScoped):
 #         """
 
 #         return URN("", "", "role_grant", "role:READERS#user:teej")
-
-
-# class GlobalPrivs(ParseableEnum):
-#     CREATE_ACCOUNT = "CREATE ACCOUNT"
-#     CREATE_DATA_EXCHANGE_LISTING = "CREATE DATA EXCHANGE LISTING"
-#     CREATE_DATABASE = "CREATE DATABASE"
-#     CREATE_FAILOVER_GROUP = "CREATE FAILOVER GROUP"
-#     CREATE_INTEGRATION = "CREATE INTEGRATION"
-#     CREATE_NETWORK_POLICY = "CREATE NETWORK POLICY"
-#     CREATE_REPLICATION_GROUP = "CREATE REPLICATION GROUP"
-#     CREATE_ROLE = "CREATE ROLE"
-#     CREATE_SHARE = "CREATE SHARE"
-#     CREATE_USER = "CREATE USER"
-#     CREATE_WAREHOUSE = "CREATE WAREHOUSE"
-#     APPLY_MASKING_POLICY = "APPLY MASKING POLICY"
-#     APPLY_PASSWORD_POLICY = "APPLY PASSWORD POLICY"
-#     APPLY_ROW_ACCESS_POLICY = "APPLY ROW ACCESS POLICY"
-#     APPLY_SESSION_POLICY = "APPLY SESSION POLICY"
-#     APPLY_TAG = "APPLY TAG"
-#     ATTACH_POLICY = "ATTACH POLICY"
-#     AUDIT = "AUDIT"
-#     EXECUTE_ALERT = "EXECUTE ALERT"
-#     EXECUTE_TASK = "EXECUTE TASK"
-#     IMPORT_SHARE = "IMPORT SHARE"
-#     MANAGE_GRANTS = "MANAGE GRANTS"
-#     MODIFY_LOG_LEVEL = "MODIFY LOG LEVEL"
-#     MODIFY_TRACE_LEVEL = "MODIFY TRACE LEVEL"
-#     MODIFY_SESSION_LOG_LEVEL = "MODIFY SESSION LOG LEVEL"
-#     MODIFY_SESSION_TRACE_LEVEL = "MODIFY SESSION TRACE LEVEL"
-#     MONITOR_EXECUTION = "MONITOR EXECUTION"
-#     MONITOR_SECURITY = "MONITOR SECURITY"
-#     MONITOR_USAGE = "MONITOR USAGE"
-#     OVERRIDE_SHARE_RESTRICTIONS = "OVERRIDE SHARE RESTRICTIONS"
-#     RESOLVE_ALL = "RESOLVE ALL"
-
-
-# class DatabasePrivs(ParseableEnum):
-#     CREATE_DATABASE_ROLE = "CREATE DATABASE ROLE"
-#     CREATE_SCHEMA = "CREATE SCHEMA"
-#     IMPORTED_PRIVILEGES = "IMPORTED PRIVILEGES"
-#     MODIFY = "MODIFY"
-#     MONITOR = "MONITOR"
-#     USAGE = "USAGE"
-
-
-# class SchemaPrivs(ParseableEnum):
-#     ADD_SEARCH_OPTIMIZATION = "ADD SEARCH OPTIMIZATION"
-#     CREATE_ALERT = "CREATE ALERT"
-#     CREATE_EXTERNAL_TABLE = "CREATE EXTERNAL TABLE"
-#     CREATE_FILE_FORMAT = "CREATE FILE FORMAT"
-#     CREATE_FUNCTION = "CREATE FUNCTION"
-#     CREATE_MATERIALIZED_VIEW = "CREATE MATERIALIZED VIEW"
-#     CREATE_PIPE = "CREATE PIPE"
-#     CREATE_PROCEDURE = "CREATE PROCEDURE"
-#     CREATE_MASKING_POLICY = "CREATE MASKING POLICY"
-#     CREATE_PASSWORD_POLICY = "CREATE PASSWORD POLICY"
-#     CREATE_ROW_ACCESS_POLICY = "CREATE ROW ACCESS POLICY"
-#     CREATE_SESSION_POLICY = "CREATE SESSION POLICY"
-#     CREATE_SECRET = "CREATE SECRET"
-#     CREATE_SEQUENCE = "CREATE SEQUENCE"
-#     CREATE_STAGE = "CREATE STAGE"
-#     CREATE_STREAM = "CREATE STREAM"
-#     CREATE_TAG = "CREATE TAG"
-#     CREATE_TABLE = "CREATE TABLE"
-#     CREATE_TASK = "CREATE TASK"
-#     CREATE_VIEW = "CREATE VIEW"
-#     MODIFY = "MODIFY"
-#     MONITOR = "MONITOR"
-#     USAGE = "USAGE"
-
-
-# class WarehousePrivs(ParseableEnum):
-#     MODIFY = "MODIFY"
-#     MONITOR = "MONITOR"
-#     USAGE = "USAGE"
-#     OPERATE = "OPERATE"
 
 
 # T_Priv = TypeVar("T_Priv", GlobalPrivs, DatabasePrivs, WarehousePrivs)

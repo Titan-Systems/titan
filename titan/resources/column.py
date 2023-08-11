@@ -2,7 +2,7 @@ import pyparsing as pp
 
 from ..enums import DataType
 from ..props import FlagProp, Props, StringProp
-from ..parse import COLUMN, _parse_props, _scan
+from ..parse import COLUMN, _parse_props, _first_match
 
 
 from . import Resource
@@ -54,7 +54,7 @@ class Column(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        parse_results, start, end = _scan(COLUMN, sql)
+        parse_results, start, end = _first_match(COLUMN, sql)
         col_name = parse_results["col_name"]
         col_type = DataType.parse(parse_results["col_type"])
         remainder = sql[end:]

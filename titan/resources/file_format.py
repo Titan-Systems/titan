@@ -1,3 +1,4 @@
+from abc import ABC
 from typing import List, Union
 
 import pyparsing as pp
@@ -397,10 +398,7 @@ class FileFormatProp(Prop):
         return _parse_props(file_type_cls.props, prop_value)
 
 
-class FileFormat(Resource):
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
+class FileFormat(Resource, ABC):
     def __new__(
         cls, type: Union[str, FileType], **kwargs
     ) -> Union[CSVFileFormat, JSONFileFormat, AvroFileFormat, OrcFileFormat, ParquetFileFormat, XMLFileFormat]:

@@ -1,6 +1,8 @@
 from typing import Dict
 from typing_extensions import Annotated
 
+from pydantic import BeforeValidator
+
 from ..enums import ParseableEnum
 from ..props import (
     BoolProp,
@@ -12,8 +14,9 @@ from ..props import (
     TagsProp,
 )
 
-from .base import Resource, AccountScoped, coerce_from_str
+from .base import Resource, AccountScoped
 from .resource_monitor import ResourceMonitor
+from .validators import coerce_from_str
 
 
 class WarehouseType(ParseableEnum):
@@ -98,7 +101,7 @@ class Warehouse(Resource, AccountScoped):
     auto_suspend: int = None
     auto_resume: bool = None
     initially_suspended: bool = None
-    resource_monitor: Annotated[ResourceMonitor, coerce_from_str(ResourceMonitor)] = None
+    resource_monitor: Annotated[ResourceMonitor, BeforeValidator(coerce_from_str(ResourceMonitor))] = None
     comment: str = None
     enable_query_acceleration: bool = None
     query_acceleration_max_scale_factor: int = None

@@ -1,7 +1,9 @@
 from typing import List
 from typing_extensions import Annotated
 
-from .base import Resource, AccountScoped, coerce_from_str
+from pydantic import BeforeValidator
+
+from .base import Resource, AccountScoped
 from ..props import (
     BoolProp,
     EnumProp,
@@ -14,7 +16,7 @@ from ..props import (
     StringListProp,
     StringProp,
 )
-
+from .validators import coerce_from_str
 from .warehouse import Warehouse, WarehouseSize
 
 
@@ -57,7 +59,7 @@ class Task(Resource, AccountScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    warehouse: Annotated[Warehouse, coerce_from_str(Warehouse)] = None
+    warehouse: Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse))] = None
     user_task_managed_initial_warehouse_size: WarehouseSize = None
     schedule: str = None
     config: str = None

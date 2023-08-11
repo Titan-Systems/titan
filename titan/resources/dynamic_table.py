@@ -1,7 +1,10 @@
 from typing_extensions import Annotated
 
+from pydantic import BeforeValidator
+
 from ..props import Props, StringProp, IdentifierProp, QueryProp
-from .base import Resource, SchemaScoped, coerce_from_str
+from .base import Resource, SchemaScoped
+from .validators import coerce_from_str
 from .warehouse import Warehouse
 
 
@@ -23,5 +26,5 @@ class DynamicTable(Resource, SchemaScoped):
     name: str
     owner: str = "SYSADMIN"
     target_lag: str
-    warehouse: Annotated[Warehouse, coerce_from_str(Warehouse)]
+    warehouse: Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse))]
     as_: str

@@ -35,7 +35,7 @@ from titan.resources.warehouse import WarehouseSize
 
 class TestResources(unittest.TestCase):
     def validate_from_sql(self, resource_cls, sql):
-        self.assertIsNotNone(resource_cls.from_sql(sql))
+        self.assertIsNotNone(resource_cls.from_sql(sql), f"Failed to parse {resource_cls.__name__} from sql: {sql}")
 
     def validate_dict_serde(self, resource_cls, data):
         self.assertDictEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
@@ -94,6 +94,8 @@ class TestResources(unittest.TestCase):
             self.validate_from_sql(FileFormat, sql)
 
     def test_grant(self):
+        # g = Grant()
+        # self.assertIsNotNone(g)
         for sql in load_sql_fixtures("grant.sql"):
             self.validate_from_sql(Grant, sql)
 

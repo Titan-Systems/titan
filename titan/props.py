@@ -71,7 +71,7 @@ class Props:
     def __init__(self, _name: str = None, _start_token: str = None, **props: Dict[str, Prop]):
         self.props: Dict[str, Prop] = props
         self.name = _name
-        self.start_token = Literals(_start_token) if _start_token else pp.Empty()
+        self.start_token = Literals(_start_token) if _start_token else None
 
     def __getitem__(self, key: str) -> Prop:
         return self.props[key]
