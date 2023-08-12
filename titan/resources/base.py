@@ -137,11 +137,15 @@ class Organization(Resource):
     resource_type = "ORGANIZATION"
 
     name: ResourceName
-    _children: ResourceChildren = Field(alias="children")
+    _children: ResourceChildren
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
         self._children = ResourceChildren(self)
+
+    @property
+    def children(self):
+        return self._children
 
 
 class OrganizationScoped(BaseModel):

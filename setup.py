@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name="Titan",
+    name="titan",
     version="0.0.1",
     description="The easy way to automate data warehouse infrastructure",
     long_description=open("README.md").read(),
@@ -16,6 +16,7 @@ setup(
         "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: SQL",
         "Topic :: Database",
+        "Framework :: Titan",
     ],
     install_requires=[
         "click",
