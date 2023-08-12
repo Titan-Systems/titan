@@ -284,7 +284,7 @@ class DataProvider:
         if attr == "owner":
             execute(self.session, f"GRANT OWNERSHIP ON USER {fqn} TO ROLE {value}")
         else:
-            execute(self.session, f"ALTER USER {fqn} SET {attr} = {value}")
+            execute(self.session, f"ALTER USER {fqn} SET {attr} = {value}", use_role="USERADMIN")
 
     def update_warehouse(self, fqn, data):
         attr, value = data.popitem()
