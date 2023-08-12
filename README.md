@@ -9,12 +9,22 @@ Titan is made up of many parts:
 
 - **Titan Resource API**. Manage resources with pure-Python backed by [Pydantic data models](https://docs.pydantic.dev/). 
   
-- **Titan Blueprint**. Build infrastructure with code. Easily automate infrastucture deployments.
+- **Titan Blueprint**. Define infrastructure with code.
+
+- **Titan Access Control** [WIP]. Use ACLs to manage permissions and RBAC. Easily automate access control deployments.
 
 
 ## Why Use Titan?
 
-<<<Feel free to include any ideas you have here, but be sure to include: declarative API, deferred execution, SQL compatibility, type checking, >>>
+Titan provides a simple way to manage your data warehouse. With Titan, you can:
+
+1. **Declarative API**: Describe what you want without the hassle of how to achieve it.
+
+2. **Deferred Execution**: Plan your infrastructure modifications without immediate execution, allowing you to visualize and review changes before they happen.
+
+3. **SQL Compatibility**: Integrate your existing SQL scripts and workflows into Titan, ensuring a smooth transition and continuous functionality.
+
+4. **Type Checking**: With the power of Pydantic data models, Titan ensures that the resources and configurations you define are correctly typed, reducing the chances of runtime errors.
 
 ## Installation
 
