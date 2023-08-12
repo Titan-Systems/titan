@@ -9,4 +9,5 @@ connection_params = {
 
 
 def get_session():
+    # TODO: make this snowpark-compatible
     return snowflake.connector.connect(**connection_params)

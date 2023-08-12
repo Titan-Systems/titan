@@ -5,20 +5,9 @@ import snowflake.connector
 
 from snowflake.connector.errors import ProgrammingError
 
+from .client import get_session
 from .identifiers import FQN
 from .resources import Resource, Role, RoleGrant
-
-connection_params = {
-    "account": os.environ["SNOWFLAKE_ACCOUNT"],
-    "user": os.environ["SNOWFLAKE_USER"],
-    "password": os.environ["SNOWFLAKE_PASSWORD"],
-}
-
-
-def get_session():
-    # TODO: make this snowpark-compatible
-    # return Session.builder.configs(**connection_params).create()
-    return snowflake.connector.connect(**connection_params)
 
 
 def execute(session, sql, use_role=None) -> list:
