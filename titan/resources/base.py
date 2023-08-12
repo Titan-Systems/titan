@@ -151,7 +151,9 @@ class Organization(Resource):
 class OrganizationScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.ORGANIZATION
 
-    organziation: Union[str, Organization] = Field(default=None, exclude=True)
+    organziation: Annotated[Organization, BeforeValidator(coerce_from_str(Organization))] = Field(
+        alias="parent", default=None, exclude=True
+    )
 
     @property
     def parent(self):
@@ -176,6 +178,7 @@ class Account(Resource, OrganizationScoped):
     resource_type = "ACCOUNT"
 
     name: ResourceName
+
     _children: ResourceChildren
 
     def model_post_init(self, ctx):
@@ -242,7 +245,7 @@ class Database(Resource, AccountScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _children: ResourceChildren = Field(alias="children")
+    _children: ResourceChildren
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
@@ -277,7 +280,10 @@ class Database(Resource, AccountScoped):
 
 class DatabaseScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.DATABASE
-    database: Union[str, Database] = Field(default=None, exclude=True)
+
+    database: Annotated[Database, BeforeValidator(coerce_from_str(Database))] = Field(
+        alias="parent", default=None, exclude=True
+    )
 
     @property
     def parent(self):
@@ -335,7 +341,7 @@ class Schema(Resource, DatabaseScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _children: ResourceChildren = Field(alias="children")
+    _children: ResourceChildren
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
