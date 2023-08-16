@@ -9,13 +9,12 @@ from .parse import (
     _parser_has_results_name,
     _parse_props,
     Keyword,
+    Identifier,
     Keywords,
     Literals,
-    list_expr,
-    parens,
+    in_parens,
     FullyQualifiedIdentifier,
-    LPAREN,
-    RPAREN,
+    COLUMN,
     EQUALS,
     ARROW,
     ANY,
@@ -33,40 +32,42 @@ class Prop(ABC):
         self.eq = eq
         self.alt_tokens = set([tok.lower() for tok in alt_tokens])
 
-        eq_expr = EQUALS() if eq else pp.Empty()
-
         if isinstance(consume, str):
             consume = [consume]
-        consume_expr = pp.Empty()
+        consume_expr = None
         if consume:
-            consume_expr = pp.And([pp.Opt(Keyword(tok)) for tok in consume])
+            consume_expr = pp.And([pp.Opt(Keyword(tok)) for tok in consume]).suppress()
 
-        if parens:
-            value_expr = list_expr(value_expr)
+        label_expr = None
+        if self.label:
+            label_expr = Keywords(self.label).suppress()
+
+        eq_expr = None
+        if self.eq:
+            eq_expr = EQUALS()
 
         if not _parser_has_results_name(value_expr, "prop_value"):
             value_expr = value_expr("prop_value")
 
-        self.parser = (
-            consume_expr.suppress()
-            + Keywords(self.label).suppress()
-            + consume_expr.suppress()
-            + eq_expr.suppress()
-            + value_expr
-        )
+        if parens:
+            value_expr = in_parens(value_expr)
+
+        expressions = []
+        for expr in [consume_expr, label_expr, consume_expr, eq_expr, value_expr]:
+            if expr:
+                expressions.append(expr)
+
+        self.parser = pp.And(expressions)
 
     def __repr__(self):
         return f"{self.__class__.__name__}('{self.label}')"
 
     def parse(self, sql):
-        try:
-            prop_value = self.parser.parse_string(sql)["prop_value"]
-            if isinstance(prop_value, pp.ParseResults):
-                prop_value = prop_value.as_list()
-            return self.typecheck(prop_value)
-        except pp.ParseException as err:
-            print(err)
-            return None
+        parsed = self.parser.parse_string(sql)
+        prop_value = parsed["prop_value"]
+        if isinstance(prop_value, pp.ParseResults):
+            prop_value = prop_value.as_list()
+        return self.typecheck(prop_value)
 
     def typecheck(self, prop_value):
         raise NotImplementedError
@@ -126,8 +127,6 @@ class IntProp(Prop):
     def render(self, value):
         if value is None:
             return ""
-        if self.label == "STATEMENT_QUEUED_TIMEOUT_IN_SECONDS":
-            print("ok")
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
@@ -193,7 +192,8 @@ class IdentifierListProp(Prop):
 
 class StringListProp(Prop):
     def __init__(self, label, **kwargs):
-        super().__init__(label, value_expr=ANY(), parens=True, **kwargs)
+        value_expr = pp.DelimitedList(ANY())
+        super().__init__(label, value_expr=value_expr, **kwargs)
 
     def typecheck(self, prop_value):
         return [tok.strip(" '") for tok in prop_value]
@@ -237,7 +237,8 @@ class TagsProp(Prop):
 
     def __init__(self):
         label = "TAG"
-        super().__init__(label, value_expr=(ANY() + EQUALS() + ANY()), eq=False, parens=True, consume="WITH")
+        value_expr = pp.DelimitedList(ANY() + EQUALS() + ANY())
+        super().__init__(label, value_expr=value_expr, eq=False, parens=True, consume="WITH")
 
     def typecheck(self, prop_value: list) -> dict:
         pairs = iter(prop_value)
@@ -260,7 +261,7 @@ class DictProp(Prop):
 
     def __init__(self, label, **kwargs):
         value_expr = pp.DelimitedList(ANY() + EQUALS() + ANY())
-        super().__init__(label, value_expr, parens=True, **kwargs)
+        super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_value):
         pairs = iter(prop_value)
@@ -292,12 +293,12 @@ class EnumProp(Prop):
 
 
 class EnumListProp(Prop):
-    def __init__(self, label, enum_or_list):
+    def __init__(self, label, enum_or_list, **kwargs):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
         enum_values = pp.MatchFirst([Keywords(val.value) for val in self.valid_values])
-        value_expr = enum_values | ANY
-        super().__init__(label, value_expr, parens=True)
+        value_expr = pp.DelimitedList(enum_values | ANY)
+        super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_values):
         prop_values = [val.strip("'") for val in prop_values]
@@ -305,7 +306,6 @@ class EnumListProp(Prop):
         for value in prop_values:
             if value not in self.valid_values:
                 raise ValueError(f"Invalid value: {value} must be one of {self.valid_values}")
-        # return [parsed]
         return prop_values
 
     def render(self, values):
@@ -371,10 +371,8 @@ class TimeTravelProp(Prop):
 class AlertConditionProp(Prop):
     def __init__(self):
         label = "IF"
-        value_expr = (
-            LPAREN + Keyword("EXISTS").suppress() + pp.original_text_for(pp.nested_expr())("prop_value") + RPAREN
-        )
-        super().__init__(label, value_expr, eq=False)
+        value_expr = Keyword("EXISTS").suppress() + pp.original_text_for(pp.nested_expr())("prop_value")
+        super().__init__(label, value_expr, eq=False, parens=True)
 
     def typecheck(self, prop_value):
         return prop_value.strip("()").strip()
@@ -391,35 +389,58 @@ class SessionParametersProp(Prop):
 
 class ColumnsProp(Prop):
     def __init__(self):
-        super().__init__(label="columns", eq=False, parens=True)
-        arg_type = pp.MatchFirst([Keywords(str(val)) for val in set(DataType)]) | ANY
-        self.parser = parens(pp.DelimitedList(pp.Group(ANY() + arg_type)))("prop_value")
+        value_expr = pp.original_text_for(pp.nested_expr())
+        super().__init__(label=None, value_expr=value_expr, eq=False)
 
     def typecheck(self, prop_values):
+        prop_values = prop_values.strip("()")
+        parsed = pp.DelimitedList(pp.Group(COLUMN())).parse_string(prop_values)
         columns = []
-        for col_name, col_type in prop_values:
-            columns.append(
-                {
-                    "name": col_name,
-                    "type": col_type,
-                }
-            )
+        for column_data in parsed:
+            column = column_data.as_dict()
+            column["name"] = column["name"].strip('"')
+            column["data_type"] = DataType(column["data_type"])
+            if "comment" in column:
+                column["comment"] = column["comment"].strip("'")
+            columns.append(column)
         return columns
 
 
-class ColumnsSchemaProp(Prop):
+class ColumnNamesProp(Prop):
     def __init__(self):
-        super().__init__(label="columns", eq=False, parens=True)
-        comment = StringProp("comment", eq=False).parser
-        self.parser = parens(pp.DelimitedList(ANY() + pp.Opt(comment)))("prop_value")
+        value_expr = pp.original_text_for(pp.nested_expr())
+        super().__init__(label=None, value_expr=value_expr, eq=False)
 
     def typecheck(self, prop_values):
-        columns = []
-        for col_name, comment in prop_values:
-            columns.append(
-                {
-                    "name": col_name,
-                    "comment": comment,
-                }
+        prop_values = prop_values.strip("()")
+        column_name_parser = pp.DelimitedList(
+            pp.Group(
+                (Identifier() | pp.dbl_quoted_string)("name")
+                + pp.Opt(Keyword("COMMENT") + pp.sgl_quoted_string("comment"))
             )
+        )
+        parsed = column_name_parser.parse_string(prop_values)
+        columns = []
+        for column_data in parsed:
+            column = column_data.as_dict()
+            column["name"] = column["name"].strip('"')
+            if "comment" in column:
+                column["comment"] = column["comment"].strip("'")
+            columns.append(column)
         return columns
+
+    # def __init__(self):
+    #     super().__init__(label="columns", eq=False, parens=True)
+    #     comment = StringProp("comment", eq=False).parser
+    #     self.parser = in_parens(pp.DelimitedList(ANY() + pp.Opt(comment)))("prop_value")
+
+    # def typecheck(self, prop_values):
+    #     columns = []
+    #     for col_name, comment in prop_values:
+    #         columns.append(
+    #             {
+    #                 "name": col_name,
+    #                 "comment": comment,
+    #             }
+    #         )
+    #     return columns

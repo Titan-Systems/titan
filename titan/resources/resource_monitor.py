@@ -41,7 +41,7 @@ class ResourceMonitor(Resource, AccountScoped):
         frequency=EnumProp("frequency", ResourceMonitorFrequency),
         start_timestamp=StringProp("start_timestamp", alt_tokens=["IMMEDIATELY"]),
         end_timestamp=StringProp("end_timestamp"),
-        notify_users=StringListProp("notify_users"),
+        notify_users=StringListProp("notify_users", parens=True),
     )
 
     name: str

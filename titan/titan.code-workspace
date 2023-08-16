@@ -7,5 +7,12 @@
 			"path": "../../titan-examples"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.exclude": {
+			"**/.venv": true
+		},
+		"search.exclude": {
+			"**/build": true
+		}
+	}
 }

@@ -5,7 +5,7 @@ import pyparsing as pp
 
 from .base import Resource, SchemaScoped
 from ..enums import ParseableEnum
-from ..parse import _resolve_resource_class, FullyQualifiedIdentifier, parens, _parse_props
+from ..parse import _resolve_resource_class, FullyQualifiedIdentifier, in_parens, _parse_props
 from ..props import (
     Props,
     BoolProp,
@@ -96,7 +96,7 @@ class CSVFileFormat(Resource, SchemaScoped):
         escape_unenclosed_field=StringProp("escape_unenclosed_field", alt_tokens=["NONE"]),
         trim_space=BoolProp("trim_space"),
         field_optionally_enclosed_by=StringProp("field_optionally_enclosed_by", alt_tokens=["NONE"]),
-        null_if=StringListProp("null_if"),
+        null_if=StringListProp("null_if", parens=True),
         error_on_column_count_mismatch=BoolProp("error_on_column_count_mismatch"),
         replace_invalid_characters=BoolProp("replace_invalid_characters"),
         empty_field_as_null=BoolProp("empty_field_as_null"),
@@ -167,7 +167,7 @@ class JSONFileFormat(Resource, SchemaScoped):
         timestamp_format=StringProp("timestamp_format", alt_tokens=["AUTO"]),
         binary_format=EnumProp("binary_format", BinaryFormat),
         trim_space=BoolProp("trim_space"),
-        null_if=StringListProp("null_if"),
+        null_if=StringListProp("null_if", parens=True),
         file_extension=StringProp("file_extension"),
         enable_octal=BoolProp("enable_octal"),
         allow_duplicate=BoolProp("allow_duplicate"),
@@ -221,7 +221,7 @@ class AvroFileFormat(Resource, SchemaScoped):
         compression=EnumProp("compression", Compression),
         trim_space=BoolProp("trim_space"),
         replace_invalid_characters=BoolProp("replace_invalid_characters"),
-        null_if=StringListProp("null_if"),
+        null_if=StringListProp("null_if", parens=True),
         comment=StringProp("comment"),
     )
 
@@ -254,7 +254,7 @@ class OrcFileFormat(Resource, SchemaScoped):
         type=EnumProp("type", [FileType.ORC]),
         trim_space=BoolProp("trim_space"),
         replace_invalid_characters=BoolProp("replace_invalid_characters"),
-        null_if=StringListProp("null_if"),
+        null_if=StringListProp("null_if", parens=True),
         comment=StringProp("comment"),
     )
 
@@ -292,7 +292,7 @@ class ParquetFileFormat(Resource, SchemaScoped):
         binary_as_text=BoolProp("binary_as_text"),
         trim_space=BoolProp("trim_space"),
         replace_invalid_characters=BoolProp("replace_invalid_characters"),
-        null_if=StringListProp("null_if"),
+        null_if=StringListProp("null_if", parens=True),
         comment=StringProp("comment"),
     )
 
@@ -374,7 +374,7 @@ class FileFormatProp(Prop):
 
     def __init__(self, label):
         value_expr = (
-            parens(IdentifierProp("format_name").parser("prop_value"))
+            in_parens(IdentifierProp("format_name").parser("prop_value"))
             | pp.original_text_for(pp.nested_expr())("prop_value")
             | FullyQualifiedIdentifier("prop_value")
             | pp.sgl_quoted_string("prop_value")

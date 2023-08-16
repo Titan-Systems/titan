@@ -10,7 +10,6 @@ Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
 
 Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
-# FullyQualifiedIdentifier = pp.DelimitedList(Identifier, delim=".", min=1, max=3)
 FullyQualifiedIdentifier = (
     pp.DelimitedList(Identifier, delim=".", min=3, max=3)
     ^ pp.DelimitedList(Identifier, delim=".", min=2, max=2)
@@ -48,22 +47,14 @@ def Keywords(keywords):
     words = keywords.split(" ")
     if len(words) == 1:
         return Keyword(words[0])
-    # tokens = [Keyword(word) for word in words[:-1]] + [Literal(words[-1])]
-    # make last token a Literal
-    # return pp.original_text_for()
     return pp.ungroup(pp.And([Keyword(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
-    # return pp.original_text_for(pp.And([Keyword(word) for word in words[:-1]] + [Literal(words[-1])]))
 
 
 def Literals(keywords):
     return pp.ungroup(pp.And([Literal(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
 
 
-def list_expr(expr):
-    return pp.Group(pp.DelimitedList(expr) | parens(pp.DelimitedList(expr)))
-
-
-def parens(expr):
+def in_parens(expr):
     return LPAREN + expr + RPAREN
 
 
@@ -81,7 +72,15 @@ REST_OF_STRING = pp.Word(pp.printables + " \n") | pp.StringEnd() | pp.Empty()
 STORAGE_INTEGRATION = Keywords("STORAGE INTEGRATION")
 NOTIFICATION_INTEGRATION = Keywords("NOTIFICATION INTEGRATION")
 
-COLUMN = (Identifier | pp.dbl_quoted_string)("col_name") + ANY("col_type") + pp.Opt(parens(ANY()))
+
+COLUMN = (
+    (Identifier | pp.dbl_quoted_string)("name")
+    + ANY("data_type")
+    + pp.Opt(in_parens(ANY()))("data_type_size")
+    + pp.Opt(Keywords("NOT NULL")("not_null"))
+    + pp.Opt(Keyword("COLLATE") + pp.sgl_quoted_string("collate"))
+    + pp.Opt(Keyword("COMMENT") + pp.sgl_quoted_string("comment"))
+)
 
 
 snowflake_sql_comment = pp.Regex(r"--.*").set_name("Snowflake SQL comment")

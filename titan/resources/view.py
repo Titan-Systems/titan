@@ -6,15 +6,13 @@ from . import Resource
 from .base import SchemaScoped
 from ..props import (
     BoolProp,
-    ColumnsSchemaProp,
+    ColumnNamesProp,
     FlagProp,
     Props,
     QueryProp,
     StringProp,
     TagsProp,
 )
-
-from .column import Column
 
 
 class View(Resource, SchemaScoped):
@@ -36,7 +34,7 @@ class View(Resource, SchemaScoped):
         secure=FlagProp("secure"),
         volatile=FlagProp("volatile"),
         recursive=FlagProp("recursive"),
-        columns=ColumnsSchemaProp(),
+        columns=ColumnNamesProp(),
         tags=TagsProp(),
         change_tracking=BoolProp("change_tracking"),  # Not documented
         copy_grants=FlagProp("copy grants"),
@@ -50,7 +48,7 @@ class View(Resource, SchemaScoped):
     secure: bool = None
     volatile: bool = None
     recursive: bool = None
-    columns: List[Column] = None
+    columns: List[dict] = None
     tags: Dict[str, str] = None
     change_tracking: bool = None
     copy_grants: bool = None

@@ -36,7 +36,7 @@ class ExternalFunction(Resource, AccountScoped):
         immutable=FlagProp("immutable"),
         comment=StringProp("comment"),
         api_integration=StringProp("api_integration"),
-        headers=DictProp("headers"),
+        headers=DictProp("headers", parens=True),
         max_batch_rows=IntProp("max_batch_rows"),
         compression=StringProp("compression"),
         request_translator=IdentifierProp("request_translator"),

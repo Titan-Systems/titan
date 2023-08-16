@@ -31,8 +31,8 @@ class APIIntegration(Resource, AccountScoped):
         api_provider=EnumProp("api_provider", ApiProvider),
         api_aws_role_arn=StringProp("api_aws_role_arn"),
         api_key=StringProp("api_key"),
-        api_allowed_prefixes=StringListProp("api_allowed_prefixes"),
-        api_blocked_prefixes=StringListProp("api_blocked_prefixes"),
+        api_allowed_prefixes=StringListProp("api_allowed_prefixes", parens=True),
+        api_blocked_prefixes=StringListProp("api_blocked_prefixes", parens=True),
         enabled=BoolProp("enabled"),
         comment=StringProp("comment"),
     )

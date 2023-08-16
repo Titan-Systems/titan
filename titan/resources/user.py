@@ -89,7 +89,7 @@ class User(Resource, AccountScoped):
         default_warehouse=StringProp("default_warehouse"),
         default_namespace=StringProp("default_namespace"),
         default_role=StringProp("default_role"),
-        default_secondary_roles=StringListProp("default_secondary_roles"),
+        default_secondary_roles=StringListProp("default_secondary_roles", parens=True),
         mins_to_bypass_mfa=IntProp("mins_to_bypass_mfa"),
         rsa_public_key=StringProp("rsa_public_key"),
         rsa_public_key_2=StringProp("rsa_public_key_2"),

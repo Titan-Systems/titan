@@ -38,7 +38,7 @@ class EmailNotificationIntegration(Resource, AccountScoped):
     props = Props(
         type=EnumProp("type", [NotificationType.EMAIL]),
         enabled=BoolProp("enabled"),
-        allowed_recipients=StringListProp("allowed_recipients"),
+        allowed_recipients=StringListProp("allowed_recipients", parens=True),
         comment=StringProp("comment"),
     )
 

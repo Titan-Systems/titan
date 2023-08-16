@@ -47,7 +47,7 @@ class Column(Resource):
     )
 
     name: str
-    type: DataType
+    data_type: DataType
     collate: str = None
     comment: str = None
     not_null: bool = None
@@ -55,8 +55,8 @@ class Column(Resource):
     @classmethod
     def from_sql(cls, sql):
         parse_results, start, end = _first_match(COLUMN, sql)
-        col_name = parse_results["col_name"]
-        col_type = DataType(parse_results["col_type"])
+        col_name = parse_results["name"]
+        data_type = DataType(parse_results["data_type"])
         remainder = sql[end:]
         props = _parse_props(cls.props, remainder)
-        return cls(name=col_name, type=col_type, **props)
+        return cls(name=col_name, data_type=data_type, **props)

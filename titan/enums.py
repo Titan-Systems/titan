@@ -16,6 +16,9 @@ class _Parseable(EnumMeta):
             value = _normalize_enum_value(value)
         return super().__call__(value, *args, **kw)
 
+    def __contains__(self, child):
+        raise NotImplementedError
+
 
 class ParseableEnum(Enum, metaclass=_Parseable):
     pass

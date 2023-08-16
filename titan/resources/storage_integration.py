@@ -37,8 +37,8 @@ class S3StorageIntegration(Resource, AccountScoped):
         storage_aws_role_arn=StringProp("storage_aws_role_arn"),
         storage_aws_object_acl=StringProp("storage_aws_object_acl"),
         enabled=BoolProp("enabled"),
-        storage_allowed_locations=StringListProp("storage_allowed_locations"),
-        storage_blocked_locations=StringListProp("storage_blocked_locations"),
+        storage_allowed_locations=StringListProp("storage_allowed_locations", parens=True),
+        storage_blocked_locations=StringListProp("storage_blocked_locations", parens=True),
         comment=StringProp("comment"),
     )
 
@@ -74,8 +74,8 @@ class GCSStorageIntegration(Resource, AccountScoped):
         _start_token="type = external_stage",
         storage_provider=EnumProp("storage_provider", [StorageProvider.GCS]),
         enabled=BoolProp("enabled"),
-        storage_allowed_locations=StringListProp("storage_allowed_locations"),
-        storage_blocked_locations=StringListProp("storage_blocked_locations"),
+        storage_allowed_locations=StringListProp("storage_allowed_locations", parens=True),
+        storage_blocked_locations=StringListProp("storage_blocked_locations", parens=True),
         comment=StringProp("comment"),
     )
 
@@ -110,8 +110,8 @@ class AzureStorageIntegration(Resource, AccountScoped):
         storage_provider=EnumProp("storage_provider", [StorageProvider.AZURE]),
         azure_tenant_id=StringProp("azure_tenant_id"),
         enabled=BoolProp("enabled"),
-        storage_allowed_locations=StringListProp("storage_allowed_locations"),
-        storage_blocked_locations=StringListProp("storage_blocked_locations"),
+        storage_allowed_locations=StringListProp("storage_allowed_locations", parens=True),
+        storage_blocked_locations=StringListProp("storage_blocked_locations", parens=True),
         comment=StringProp("comment"),
     )
 

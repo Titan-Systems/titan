@@ -1,10 +1,13 @@
 import unittest
 
+from pyparsing import ParseException
+
 from titan.enums import DataType
 from titan.resources import Database
 from titan.props import (
     AlertConditionProp,
     BoolProp,
+    ColumnsProp,
     EnumProp,
     FlagProp,
     IdentifierProp,
@@ -29,21 +32,44 @@ class TestProp(unittest.TestCase):
         self.assertFalse(BoolProp("bar").parse("bar = FALSE"))
         self.validate_identity(BoolProp("boolprop"), "BOOLPROP = TRUE")
 
+    def test_prop_columns(self):
+        self.assertEqual(ColumnsProp().parse("(id INT)"), [{"name": "id", "data_type": DataType.INT}])
+        self.assertEqual(ColumnsProp().parse("(somestr VARCHAR)"), [{"name": "somestr", "data_type": DataType.VARCHAR}])
+        self.assertEqual(ColumnsProp().parse("(floaty FLOAT8)"), [{"name": "floaty", "data_type": DataType.FLOAT8}])
+        self.assertEqual(
+            ColumnsProp().parse("(multiple INT, columns VARCHAR)"),
+            [
+                {"name": "multiple", "data_type": DataType.INT},
+                {"name": "columns", "data_type": DataType.VARCHAR},
+            ],
+        )
+        self.assertEqual(
+            ColumnsProp().parse("(id INT, name STRING, created_at TIMESTAMP, commented VARCHAR comment 'a comment')"),
+            [
+                {"name": "id", "data_type": DataType.INT},
+                {"name": "name", "data_type": DataType.STRING},
+                {"name": "created_at", "data_type": DataType.TIMESTAMP},
+                {"name": "commented", "data_type": DataType.VARCHAR, "comment": "a comment"},
+            ],
+        )
+
     def test_prop_enum(self):
         self.assertEqual(EnumProp("data_type", DataType).parse("DATA_TYPE = VARCHAR"), DataType.VARCHAR)
 
     def test_prop_flag(self):
         self.assertEqual(FlagProp("this is a flag").parse("this is a flag"), True)
-        self.assertEqual(FlagProp("this is another flag").parse(""), None)
+        self.assertRaises(ParseException, lambda: FlagProp("this is another flag").parse(""))
 
     def test_prop_identifier(self):
-        assert IdentifierProp("label").parse("label = value") == "value"
-        assert IdentifierProp("label").parse('label = "value"') == '"value"'
-        assert IdentifierProp("label").parse('label = "schema"."table"') == '"schema"."table"'
-        assert IdentifierProp("label").parse('label = database."schema"."table"') == 'database."schema"."table"'
-        assert (
-            IdentifierProp("request_translator").parse('request_translator = "DB"."SCHEMA".function')
-            == '"DB"."SCHEMA".function'
+        self.assertEqual(IdentifierProp("label").parse("label = value"), "value")
+        self.assertEqual(IdentifierProp("label").parse('label = "value"'), '"value"')
+        self.assertEqual(IdentifierProp("label").parse('label = "schema"."table"'), '"schema"."table"')
+        self.assertEqual(
+            IdentifierProp("label").parse('label = database."schema"."table"'), 'database."schema"."table"'
+        )
+        self.assertEqual(
+            IdentifierProp("request_translator").parse('request_translator = "DB"."SCHEMA".function'),
+            '"DB"."SCHEMA".function',
         )
 
     def test_prop_int(self):
