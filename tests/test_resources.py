@@ -34,26 +34,20 @@ from titan.resources import (
 from titan.resources.warehouse import WarehouseSize
 
 
-class TestResources(unittest.TestCase):
-    def validate_from_sql(self, resource_cls, sql):
-        try:
-            assert resource_cls.from_sql(sql)
-        except ParseException as e:
-            self.fail(f"Failed to parse {resource_cls.__name__} from SQL: {sql}")
+class TestResourceModel(unittest.TestCase):
+    def test_resource_constructors(self):
+        self.assertIsNotNone(Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh"))
+        self.assertIsNotNone(Task(name="TASK", as_="SELECT 1", warehouse=Warehouse(name="wh")))
+        self.assertIsNotNone(Task(name="TASK", as_="SELECT 1", warehouse={"name": "wh"}))
+        self.assertIsNotNone(Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}}))
 
-    def validate_dict_serde(self, resource_cls, data):
+
+class TestResourceIdentities(unittest.TestCase):
+    def validate_identity(self, resource_cls, data):
         self.assertDictEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
 
-    def test_resource_constructors(self):
-        assert Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
-        assert Task(name="TASK", as_="SELECT 1", warehouse=Warehouse(name="wh"))
-        assert Task(name="TASK", as_="SELECT 1", warehouse={"name": "wh"})
-        assert Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}})
-
     def test_alert(self):
-        for sql in load_sql_fixtures("alert.sql"):
-            self.validate_from_sql(Alert, sql)
-        self.validate_dict_serde(
+        self.validate_identity(
             Alert,
             {
                 "name": "ALERT",
@@ -64,6 +58,41 @@ class TestResources(unittest.TestCase):
                 "then": "INSERT INTO foo VALUES(1)",
             },
         )
+
+    def test_view(self):
+        self.validate_identity(
+            View,
+            {
+                "name": "MY_VIEW",
+                "owner": "SYSADMIN",
+                "volatile": True,
+                "as_": "SELECT * FROM tbl",
+            },
+        )
+
+
+class TestResources(unittest.TestCase):
+    def test_view_fails_with_empty_columns(self):
+        self.assertRaises(ValidationError, View, name="MY_VIEW", columns=[], as_="SELECT 1")
+
+    def test_view_with_columns(self):
+        view = View.from_sql("CREATE VIEW MY_VIEW (COL1) AS SELECT 1")
+        assert view.columns == [{"name": "COL1"}]
+
+    def test_enum_field_serialization(self):
+        self.assertEqual(Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size, WarehouseSize.XSMALL.value)
+
+
+class TestResourceFixtures(unittest.TestCase):
+    def validate_from_sql(self, resource_cls, sql):
+        try:
+            resource_cls.from_sql(sql)
+        except ParseException:
+            self.fail(f"Failed to parse {resource_cls.__name__} from SQL: {sql}")
+
+    def test_alert(self):
+        for sql in load_sql_fixtures("alert.sql"):
+            self.validate_from_sql(Alert, sql)
 
     def test_api_integration(self):
         for sql in load_sql_fixtures("api_integration.sql"):
@@ -152,28 +181,10 @@ class TestResources(unittest.TestCase):
     def test_view(self):
         for sql in load_sql_fixtures("view.sql"):
             self.validate_from_sql(View, sql)
-        self.validate_dict_serde(
-            View,
-            {
-                "name": "MY_VIEW",
-                "owner": "SYSADMIN",
-                "volatile": True,
-                "as_": "SELECT * FROM tbl",
-            },
-        )
-
-    def test_view_fails_with_empty_columns(self):
-        self.assertRaises(ValidationError, View, name="MY_VIEW", columns=[], as_="SELECT 1")
-
-    def test_view_with_columns(self):
-        # view = View(name="MY_VIEW", columns=[Column(name="COL1", type="VARCHAR")], as_="SELECT 1")
-        view = View.from_sql("CREATE VIEW MY_VIEW (COL1) AS SELECT 1")
-        assert view.columns == [Column(name="COL1")]
 
     def test_warehouse(self):
         for sql in load_sql_fixtures("warehouse.sql"):
             self.validate_from_sql(Warehouse, sql)
-        self.assertEqual(Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size, WarehouseSize.XSMALL.value)
 
     def test_user(self):
         for sql in load_sql_fixtures("user.sql"):
