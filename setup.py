@@ -28,4 +28,9 @@ setup(
         "snowflake-connector-python",
         "snowflake-snowpark-python",
     ],
+    extras_require={
+        "dev": [
+            "tabulate",
+        ]
+    },
 )
