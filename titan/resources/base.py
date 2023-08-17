@@ -88,23 +88,23 @@ class Resource(BaseModel, metaclass=_Resource):
             self._requires(resource)
         return self
 
-    def create_sql(self, or_replace=False, if_not_exists=False):
-        return tidy_sql(
-            "CREATE",
-            "OR REPLACE" if or_replace else "",
-            self.resource_type,
-            "IF NOT EXISTS" if if_not_exists else "",
-            self.fqn,
-            self.props.render(self),
-        )
+    # def create_sql(self, or_replace=False, if_not_exists=False):
+    #     return tidy_sql(
+    #         "CREATE",
+    #         "OR REPLACE" if or_replace else "",
+    #         self.resource_type,
+    #         "IF NOT EXISTS" if if_not_exists else "",
+    #         self.fqn,
+    #         self.props.render(self),
+    #     )
 
-    def drop_sql(self, if_exists=False):
-        return tidy_sql(
-            "DROP",
-            self.resource_type,
-            "IF EXISTS" if if_exists else "",
-            self.fqn,
-        )
+    # def drop_sql(self, if_exists=False):
+    #     return tidy_sql(
+    #         "DROP",
+    #         self.resource_type,
+    #         "IF EXISTS" if if_exists else "",
+    #         self.fqn,
+    #     )
 
     # def __format__(self, format_spec):
     #     add_ref(self)
@@ -350,6 +350,17 @@ class Schema(Resource, DatabaseScoped):
     @property
     def children(self):
         return self._children
+
+    def create_sql(self, or_replace=False, if_not_exists=False):
+        return tidy_sql(
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            "TRANSIENT" if self.transient else "",
+            "SCHEMA",
+            "IF NOT EXISTS" if if_not_exists else "",
+            self.fqn,
+            self.props.render(self),
+        )
 
     # @property
     # def tables(self):

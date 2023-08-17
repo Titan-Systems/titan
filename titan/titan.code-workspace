@@ -9,7 +9,8 @@
 	],
 	"settings": {
 		"files.exclude": {
-			"**/.venv": true
+			"**/.venv": true,
+			"**/build": true
 		},
 		"search.exclude": {
 			"**/build": true

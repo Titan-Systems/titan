@@ -1,5 +1,5 @@
 from .data_provider import DataProvider
-from .blueprint import Blueprint
+from .blueprint import Blueprint, Plan
 
 from .resources import *
 
@@ -28,6 +28,7 @@ __all__ = [
     "DataProvider",
     "ExternalFunction",
     "FileFormat",
+    "Plan",
     "Role",
     "Schema",
     "Sequence",

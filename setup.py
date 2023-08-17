@@ -31,6 +31,7 @@ setup(
     extras_require={
         "dev": [
             "tabulate",
+            "pytest",
         ]
     },
 )

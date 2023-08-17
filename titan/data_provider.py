@@ -1,4 +1,4 @@
-import os
+import re
 
 # from snowflake.snowpark import Session
 import snowflake.connector
@@ -6,8 +6,22 @@ import snowflake.connector
 from snowflake.connector.errors import ProgrammingError
 
 from .client import get_session
-from .identifiers import FQN
-from .resources import Resource, Role, RoleGrant
+from .identifiers import URN, FQN
+from .resources import AccountGrant, Resource, Role, RoleGrant
+
+# programming_error = re.Pattern(".*ProgrammingError.*")
+
+# def _parse_programming_error(err):
+
+
+ACCESS_CONTROL_ERR = 3001
+
+
+def _fail_if_not_granted(result):
+    if len(result) == 0:
+        raise Exception("Failed to create grant")
+    if len(result) == 1 and result[0]["status"] == "Grant not executed: Insufficient privileges.":
+        raise Exception(result[0]["status"])
 
 
 def execute(session, sql, use_role=None) -> list:
@@ -19,7 +33,9 @@ def execute(session, sql, use_role=None) -> list:
             result = cur.execute(sql).fetchall()
             return result
         except ProgrammingError as err:
-            raise ProgrammingError(f"failed to execute sql, [{sql}]") from err
+            # if err.errno == ACCESS_CONTROL_ERR:
+            #     raise Exception(f"Access control error: {err.msg}")
+            raise ProgrammingError(f"failed to execute sql, [{sql}]", errno=err.errno) from err
 
 
 def params_result_to_dict(params_result):
@@ -39,9 +55,26 @@ def options_result_to_list(options_result):
     return [option.strip(" ") for option in options_result.split(",")]
 
 
+def remove_none_values(d):
+    return {k: v for k, v in d.items() if v is not None}
+
+
+def fetch_remote_state(provider: "DataProvider", manifest):
+    state = {}
+    for urn_str in manifest.keys():
+        urn = URN.from_str(urn_str)
+        data = provider.fetch_resource(urn)
+        if data:
+            state[urn_str] = remove_none_values(data)
+
+    return state
+
+
 class DataProvider:
     def __init__(self, session=None):
         self.session = session or get_session()
+
+    # region Resource Fetching
 
     def fetch_resource(self, urn):
         return getattr(self, f"fetch_{urn.resource_key}")(urn.fqn)
@@ -94,6 +127,22 @@ class DataProvider:
             "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
             "default_ddl_collation": params["default_ddl_collation"],
         }
+
+    def fetch_account_grant(self, fqn):
+        show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT")
+        role_account_grants = [row for row in show_result if row["grantee_name"] == fqn.name]
+
+        if len(role_account_grants) == 0:
+            return None
+
+        return {
+            "privs": sorted([row["privilege"] for row in role_account_grants]),
+            "on": "ACCOUNT",
+            "to": fqn.name,
+        }
+
+    def fetch_priv_grant(self, fqn):
+        raise NotImplementedError
 
     def fetch_role(self, fqn):
         try:
@@ -169,10 +218,7 @@ class DataProvider:
         return grants
 
     def fetch_user(self, fqn):
-        try:
-            show_result = execute(self.session, f"SHOW USERS LIKE '{fqn.name}'")
-        except ProgrammingError:
-            return None
+        show_result = execute(self.session, f"SHOW USERS LIKE '{fqn.name}'", use_role="SECURITYADMIN")
 
         if len(show_result) == 0:
             return None
@@ -192,18 +238,13 @@ class DataProvider:
             "days_to_expiry": data["days_to_expiry"] or None,
             "comment": data["comment"] or None,
             "disabled": data["disabled"] == "true",
-            "must_change_password": data["must_change_password"] == "true",
-            "snowflake_lock": data["snowflake_lock"] == "true",
+            # "must_change_password": data["must_change_password"] == "true",
             "default_warehouse": data["default_warehouse"] or None,
             "default_namespace": data["default_namespace"] or None,
             "default_role": data["default_role"] or None,
             "default_secondary_roles": data["default_secondary_roles"] or None,
-            "ext_authn_duo": data["ext_authn_duo"] == "true",
-            "ext_authn_uid": data["ext_authn_uid"] or None,
             "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
             "owner": data["owner"],
-            "has_password": data["has_password"] == "true",
-            "has_rsa_public_key": data["has_rsa_public_key"] == "true",
         }
 
     def fetch_view(self, fqn):
@@ -273,6 +314,10 @@ class DataProvider:
             "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
         }
 
+    # endregion
+
+    # region Resource Updates
+
     def update_resource(self, urn, data):
         try:
             return getattr(self, f"update_{urn.resource_key}")(urn.fqn, data)
@@ -284,6 +329,8 @@ class DataProvider:
         if attr == "owner":
             execute(self.session, f"GRANT OWNERSHIP ON USER {fqn} TO ROLE {value}")
         else:
+            if isinstance(value, str):
+                value = f"'{value}'"
             execute(self.session, f"ALTER USER {fqn} SET {attr} = {value}", use_role="USERADMIN")
 
     def update_warehouse(self, fqn, data):
@@ -292,6 +339,8 @@ class DataProvider:
             execute(self.session, f"GRANT OWNERSHIP ON WAREHOUSE {fqn} TO ROLE {value}")
         else:
             execute(self.session, f"ALTER WAREHOUSE {fqn} SET {attr} = {value}")
+
+    # endregion
 
     # region Resource Creation
 
@@ -311,11 +360,11 @@ class DataProvider:
         execute(self.session, sql, use_role="USERADMIN")
         execute(self.session, f"GRANT OWNERSHIP ON ROLE {role.name} TO ROLE {role.owner}", use_role="USERADMIN")
 
-    def create_role(self, urn, data):
-        role = Role(**data)
-        sql = role.create_sql()
-        execute(self.session, sql, use_role="USERADMIN")
-        execute(self.session, f"GRANT OWNERSHIP ON ROLE {role.name} TO ROLE {role.owner}", use_role="USERADMIN")
+    def create_account_grant(self, urn, data):
+        grant = AccountGrant(**data)
+        sql = grant.create_sql()
+        res = execute(self.session, sql, use_role="SYSADMIN")
+        _fail_if_not_granted(res)
 
     def create_role_grant(self, urn, container):
         grants = container["to_role"] + container["to_user"]
@@ -324,7 +373,8 @@ class DataProvider:
             sql = grant.create_sql()
             # According to the docs, SECURITYADMIN should issue the GRANT ROLE command but
             # the grant itself will be owned by SYSADMIN (or maybe the role owner?), even if SECURITYADMIN runs the command
-            execute(self.session, sql, use_role="SECURITYADMIN")
+            res = execute(self.session, sql, use_role="SECURITYADMIN")
+            _fail_if_not_granted(res)
 
     # endregion
 

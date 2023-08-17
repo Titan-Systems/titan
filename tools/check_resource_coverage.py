@@ -5,7 +5,8 @@ from tabulate import tabulate
 
 def check_resource_coverage():
     table = []
-    for resource_key, resource_cls in titan.Resource.classes.items():
+    classes = sorted(titan.Resource.classes.items())
+    for resource_key, resource_cls in classes:
         if resource_cls == titan.Resource:
             continue
         from_sql = hasattr(resource_cls, "from_sql")

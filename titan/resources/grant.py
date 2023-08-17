@@ -1,7 +1,7 @@
 from typing import List
 from typing_extensions import Annotated
 
-from pydantic import BeforeValidator
+from pydantic import AfterValidator, BeforeValidator
 
 from .base import Resource, AccountScoped, Database, Schema
 from .role import T_Role
@@ -114,7 +114,7 @@ class PrivGrant(Grant):
         with_grant_option=FlagProp("with grant option"),
     )
 
-    privs: Annotated[List[str], BeforeValidator(listify)]
+    privs: Annotated[list, BeforeValidator(listify)]
     on: str
     to: T_Role
     with_grant_option: bool = None
@@ -122,6 +122,16 @@ class PrivGrant(Grant):
     @property
     def name(self):
         return f"{self.on}.{self.to.name}"
+
+    def create_sql(self):
+        privs = ", ".join([str(priv) for priv in self.privs])
+        return tidy_sql(
+            "GRANT",
+            privs,
+            "ON",
+            self.on,
+            self.props.render(self),
+        )
 
     # TODO: implement instantiating grant
     # TODO: implement fallback to grant
@@ -141,7 +151,7 @@ class AccountGrant(PrivGrant):
     [ WITH GRANT OPTION ]
     """
 
-    privs: Annotated[List[GlobalPrivs], BeforeValidator(listify)]
+    privs: Annotated[List[GlobalPrivs], BeforeValidator(listify), AfterValidator(sorted)]
     on: str = "ACCOUNT"
 
 

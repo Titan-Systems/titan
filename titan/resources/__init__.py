@@ -17,7 +17,7 @@ from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .file_format import FileFormat
-from .grant import Grant, RoleGrant
+from .grant import Grant, AccountGrant, RoleGrant, PrivGrant
 from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
@@ -51,6 +51,7 @@ from .storage_integration import (
 
 __all__ = [
     "Account",
+    "AccountGrant",
     "AccountScoped",
     "Alert",
     "APIIntegration",
@@ -78,6 +79,7 @@ __all__ = [
     "Organization",
     "OrganizationScoped",
     "Pipe",
+    "PrivGrant",
     "Resource",
     "ResourceMonitor",
     "Role",

@@ -1,24 +1,9 @@
 from dictdiffer import diff
 
-from .data_provider import DataProvider
+from .data_provider import DataProvider, fetch_remote_state
 from .enums import Scope
 from .identifiers import URN
 from .resources import RoleGrant
-
-
-def remove_none_values(d):
-    return {k: v for k, v in d.items() if v is not None}
-
-
-def fetch_remote_state(provider: DataProvider, manifest):
-    state = {}
-    for urn_str in manifest.keys():
-        urn = URN.from_str(urn_str)
-        data = provider.fetch_resource(urn)
-        if data:
-            state[urn_str] = remove_none_values(data)
-
-    return state
 
 
 def print_diffs(diffs):
@@ -94,7 +79,7 @@ class Blueprint:
                 provider.create_resource(urn, data)
             elif action == "update":
                 provider.update_resource(urn, data)
-            elif action == "delete":
+            elif action == "drop":
                 raise NotImplementedError
             else:
                 raise Exception(f"Unexpected action {action} in plan")
@@ -126,10 +111,30 @@ class Plan:
         print("~" * 120)
         for action, target, deltas in diffs:
             if action == "add":
-                for delta in deltas:
-                    urn_str = delta[0]
-                    self.changes.append(("create", urn_str, manifest[urn_str]))
+                if target:
+                    urn_str = target[0] if isinstance(target, list) else target
+                    for delta in deltas:
+                        modified_attr = delta[0]
+                        new_value = delta[1]
+                        # TODO: Plan needs to consult resource fields to determine if a field is fetchable
+                        if modified_attr == "password":
+                            continue
+                        self.changes.append(("update", urn_str, {modified_attr: new_value}))
+                else:
+                    for delta in deltas:
+                        urn_str = delta[0]
+                        self.changes.append(("create", urn_str, manifest[urn_str]))
             elif action == "change":
                 urn_str, modified_attr = target[0], target[1]
                 new_value = deltas[-1]
                 self.changes.append(("update", urn_str, {modified_attr: new_value}))
+            elif action == "remove":
+                urn_str = target
+                if deltas:
+                    for delta in deltas:
+                        modified_attr = delta[0]
+                        new_value = delta[1]
+                        self.changes.append(("update", urn_str, {modified_attr: new_value}))
+                else:
+                    # drop
+                    raise NotImplementedError

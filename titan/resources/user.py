@@ -1,9 +1,10 @@
 from typing import Dict, List
 from typing_extensions import Annotated
 
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, Field, model_validator
 
 from .base import AccountScoped, Resource, serialize_resource_by_name, coerce_from_str
+from ..builder import tidy_sql
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
 
@@ -100,7 +101,7 @@ class User(Resource, AccountScoped):
 
     name: str
     owner: str = "USERADMIN"
-    password: str = None
+    password: str = Field(default=None, fetchable=False)
     login_name: str = None
     display_name: str = None
     first_name: str = None
@@ -121,6 +122,24 @@ class User(Resource, AccountScoped):
     comment: str = None
     network_policy: str = None
     tags: Dict[str, str] = None
+
+    @model_validator(mode="after")
+    def set_name_defaults(self) -> "User":
+        if not self.login_name:
+            self.login_name = self.name
+        if not self.display_name:
+            self.display_name = self.name
+        return self
+
+    def create_sql(self, or_replace=False, if_not_exists=False):
+        return tidy_sql(
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            self.resource_type,
+            "IF NOT EXISTS" if if_not_exists else "",
+            self.fqn,
+            self.props.render(self),
+        )
 
 
 T_User = Annotated[User, BeforeValidator(coerce_from_str(User)), serialize_resource_by_name]
