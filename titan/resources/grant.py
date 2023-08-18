@@ -1,13 +1,14 @@
 from typing import List
 from typing_extensions import Annotated
 
-from pydantic import AfterValidator, BeforeValidator
+from pydantic import AfterValidator, BeforeValidator, model_validator
 
 from .base import Resource, AccountScoped, Database, Schema
 from .role import T_Role
 from .user import T_User
 from .validators import coerce_from_str, listify
 from ..builder import tidy_sql
+from ..identifiers import FQN
 from ..parse import _parse_grant, _parse_props
 from ..props import Props, IdentifierProp, FlagProp
 from ..enums import GlobalPrivs, SchemaPrivs  # SchemaObjectPrivs, AccountObjectPrivs
@@ -237,7 +238,6 @@ class FutureSchemaObjectsGrant(PrivGrant):
     privs: list
 
 
-# TODO: add a model validator to ensure to_role and to_user arent used together
 class RoleGrant(Grant):
     """
     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
@@ -255,9 +255,23 @@ class RoleGrant(Grant):
     to_user: T_User = None
     owner: str = "SYSADMIN"
 
+    @model_validator(mode="after")
+    def ensure_single_target_type(self) -> "RoleGrant":
+        if self.to_role is not None and self.to_user is not None:
+            raise ValueError("You can only grant to a role or a user, not both")
+        return self
+
+    @property
+    def fully_qualified_name(self):
+        return FQN(name=self.name)
+
     @property
     def name(self):
-        return self.role.name
+        # urn:XY54321:role_grant/CI?user=SYSADMIN
+        role = self.role.name
+        param = "user" if self.to_user else "role"
+        value = self.to_user.name if self.to_user else self.to_role.name
+        return f"{role}?{param}={value}"
 
     def create_sql(self):
         return tidy_sql(

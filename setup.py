@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="titan",
-    version="0.0.1",
+    version="0.0.2",
     description="The easy way to automate data warehouse infrastructure",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
@@ -20,7 +20,6 @@ setup(
     ],
     install_requires=[
         "click",
-        "dictdiffer",
         "inflection",
         "pydantic",
         "pyparsing",

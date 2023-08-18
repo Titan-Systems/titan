@@ -134,10 +134,7 @@ def _parse_create_header(sql, resource_cls):
         remainder = (results["_skipped"][0] + " " + results.get("remainder", "")).strip()
         return (results["resource_identifier"], remainder)
     except pp.ParseException as err:
-        print(err.explain())
-        print("❌", "failed to parse header")
-        # return None
-        raise err
+        raise pp.ParseException("Failed to parse header") from err
 
 
 def _parse_grant(sql):
@@ -175,9 +172,7 @@ def _parse_grant(sql):
             "remainder": results["remainder"],
         }
     except pp.ParseException as err:
-        print(err.explain())
-        print("❌", "failed to parse grant")
-        raise err
+        raise pp.ParseException("Failed to parse grant") from err
 
 
 def _resolve_grant_class(on_stmt):

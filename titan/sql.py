@@ -1,5 +1,5 @@
 _refs = []
-add_ref = _refs.append
+track_ref = _refs.append
 
 
 def capture_refs():
@@ -9,6 +9,13 @@ def capture_refs():
     return refs
 
 
-def SQL(sql: str):
-    capture_refs()
-    return sql
+def raise_if_hanging_refs():
+    global _refs
+    if _refs:
+        raise Exception(f"Hanging refs: {_refs}")
+
+
+class SQL:
+    def __init__(self, sql: str):
+        self.refs = capture_refs()
+        self.sql = sql

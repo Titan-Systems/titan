@@ -1,4 +1,4 @@
-from typing import ClassVar, Union, Dict, Set
+from typing import ClassVar, Union, Dict, List
 
 from typing_extensions import Annotated
 
@@ -12,7 +12,7 @@ from ..enums import Scope
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 
-# from ..sql import add_ref
+from ..sql import SQL, track_ref
 
 from ..identifiers import FQN
 from ..builder import tidy_sql
@@ -58,7 +58,26 @@ class Resource(BaseModel, metaclass=_Resource):
 
     implicit: bool = Field(exclude=True, default=False)
     stub: bool = Field(exclude=True, default=False)
-    _refs: Set["Resource"] = {}
+    _refs: List["Resource"] = []
+
+    def model_post_init(self, ctx):
+        for field_name in self.model_fields.keys():
+            field_value = getattr(self, field_name)
+            if isinstance(field_value, Resource) and not field_value.stub:
+                self._refs.append(field_value)
+            elif isinstance(field_value, SQL):
+                self._refs.extend(field_value.refs)
+                setattr(self, field_name, field_value.sql)
+
+    @classmethod
+    def fetchable_fields(cls, data):
+        data = data.copy()
+        for key in list(data.keys()):
+            field = cls.model_fields[key]
+            fetchable = field.json_schema_extra is None or field.json_schema_extra.get("fetchable", True)
+            if not fetchable:
+                del data[key]
+        return data
 
     @classmethod
     def from_sql(cls, sql):
@@ -75,7 +94,7 @@ class Resource(BaseModel, metaclass=_Resource):
             raise ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
     @property
-    def references(self):
+    def refs(self):
         return self._refs
 
     def _requires(self, resource):
@@ -106,9 +125,9 @@ class Resource(BaseModel, metaclass=_Resource):
     #         self.fqn,
     #     )
 
-    # def __format__(self, format_spec):
-    #     add_ref(self)
-    #     return self.fully_qualified_name
+    def __format__(self, format_spec):
+        track_ref(self)
+        return self.fully_qualified_name
 
 
 class ResourceChildren:

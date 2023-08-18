@@ -101,14 +101,14 @@ class User(Resource, AccountScoped):
 
     name: str
     owner: str = "USERADMIN"
-    password: str = Field(default=None, fetchable=False)
+    password: str = Field(default=None, json_schema_extra={"fetchable": False})
     login_name: str = None
     display_name: str = None
     first_name: str = None
     middle_name: str = None
     last_name: str = None
     email: str = None
-    must_change_password: bool = None
+    must_change_password: bool = False
     disabled: bool = False
     days_to_expiry: int = None
     mins_to_unlock: int = None

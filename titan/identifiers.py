@@ -1,18 +1,19 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional
 
-from .parse import FullyQualifiedIdentifier
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class FQN(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    database: str = None
-    schema_: str = Field(alias="schema", default=None)
+    database: Optional[str] = None
+    schema_: Optional[str] = Field(alias="schema", default=None)
     name: str
 
     @classmethod
     def from_str(cls, fqn_str, resource_key=None):
-        parts = FullyQualifiedIdentifier().parse_string(fqn_str).as_list()
+        # TODO: This needs to support periods in double quoted identifiers
+        parts = fqn_str.split(".")
         if len(parts) == 1:
             return cls(name=parts[0])
         elif len(parts) == 2:

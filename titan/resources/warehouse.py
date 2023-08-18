@@ -3,6 +3,8 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
+from .base import Resource, AccountScoped, serialize_resource_by_name, coerce_from_str
+from .resource_monitor import ResourceMonitor
 from ..builder import tidy_sql
 from ..enums import ParseableEnum
 from ..props import (
@@ -14,10 +16,6 @@ from ..props import (
     StringProp,
     TagsProp,
 )
-
-from .base import Resource, AccountScoped
-from .resource_monitor import ResourceMonitor
-from .validators import coerce_from_str
 
 
 class WarehouseType(ParseableEnum):
@@ -121,3 +119,6 @@ class Warehouse(Resource, AccountScoped):
             self.fqn,
             self.props.render(self),
         )
+
+
+T_Warehouse = Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse)), serialize_resource_by_name]

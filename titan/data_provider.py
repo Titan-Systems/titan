@@ -1,4 +1,4 @@
-import re
+from functools import lru_cache
 
 # from snowflake.snowpark import Session
 import snowflake.connector
@@ -9,22 +9,18 @@ from .client import get_session
 from .identifiers import URN, FQN
 from .resources import AccountGrant, Resource, Role, RoleGrant
 
-# programming_error = re.Pattern(".*ProgrammingError.*")
-
-# def _parse_programming_error(err):
-
-
 ACCESS_CONTROL_ERR = 3001
+DOEST_NOT_EXIST_ERR = 2003
 
 
-def _fail_if_not_granted(result):
+def _fail_if_not_granted(result, *args):
     if len(result) == 0:
         raise Exception("Failed to create grant")
     if len(result) == 1 and result[0]["status"] == "Grant not executed: Insufficient privileges.":
-        raise Exception(result[0]["status"])
+        raise Exception(result[0]["status"], *args)
 
 
-def execute(session, sql, use_role=None) -> list:
+def _execute(session, sql, use_role=None) -> list:
     with session.cursor(snowflake.connector.DictCursor) as cur:
         try:
             if use_role:
@@ -36,6 +32,28 @@ def execute(session, sql, use_role=None) -> list:
             # if err.errno == ACCESS_CONTROL_ERR:
             #     raise Exception(f"Access control error: {err.msg}")
             raise ProgrammingError(f"failed to execute sql, [{sql}]", errno=err.errno) from err
+
+
+@lru_cache
+def _execute_cached(session, sql, use_role=None) -> list:
+    return _execute(session, sql, use_role)
+
+
+def execute(session, sql, use_role=None, cacheable=False) -> list:
+    if cacheable:
+        return _execute_cached(session, sql, use_role)
+    return _execute(session, sql, use_role)
+
+
+def filter_result(result, **kwargs):
+    filtered = []
+    for row in result:
+        for key, value in kwargs.items():
+            if row[key] != value:
+                break
+        else:
+            filtered.append(row)
+    return filtered
 
 
 def params_result_to_dict(params_result):
@@ -61,13 +79,23 @@ def remove_none_values(d):
 
 def fetch_remote_state(provider: "DataProvider", manifest):
     state = {}
-    for urn_str in manifest.keys():
+    for urn_str in manifest["_urns"]:
         urn = URN.from_str(urn_str)
         data = provider.fetch_resource(urn)
-        if data:
+        # TODO: handle implicit and stub resources
+        if urn_str in manifest and data:
             state[urn_str] = remove_none_values(data)
 
     return state
+
+
+def audit_session_roles(session):
+    role_grants = execute(session, "SHOW GRANTS")
+    role_grants = filter_result(role_grants, granted_to="USER", grantee_name=session.user)
+    roles = [grant["role"] for grant in role_grants]
+    privs = {}
+    global_privs = execute(session, "SHOW GRANTS ON ACCOUNT")
+    return roles
 
 
 class DataProvider:
@@ -87,6 +115,10 @@ class DataProvider:
         region = execute(self.session, "SELECT CURRENT_REGION()")[0]
         return region
 
+    def fetch_alert(self):
+        # alert
+        raise NotImplementedError
+
     def fetch_columns(self, resource_type: str, fqn: FQN):
         desc_result = execute(self.session, f"DESC {resource_type} {fqn}")
         columns = []
@@ -105,7 +137,7 @@ class DataProvider:
         return columns
 
     def fetch_database(self, fqn: FQN):
-        show_result = execute(self.session, f"SHOW DATABASES LIKE '{fqn.name}'")
+        show_result = execute(self.session, f"SHOW DATABASES LIKE '{fqn.name}'", cacheable=True)
 
         if len(show_result) == 0:
             return None
@@ -129,8 +161,8 @@ class DataProvider:
         }
 
     def fetch_account_grant(self, fqn):
-        show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT")
-        role_account_grants = [row for row in show_result if row["grantee_name"] == fqn.name]
+        show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT", cacheable=True)
+        role_account_grants = filter_result(show_result, grantee_name=fqn.name)
 
         if len(role_account_grants) == 0:
             return None
@@ -145,10 +177,7 @@ class DataProvider:
         raise NotImplementedError
 
     def fetch_role(self, fqn):
-        try:
-            show_result = execute(self.session, f"SHOW ROLES LIKE '{fqn.name}'")
-        except ProgrammingError:
-            return None
+        show_result = execute(self.session, f"SHOW ROLES LIKE '{fqn.name}'", cacheable=True)
 
         if len(show_result) == 0:
             return None
@@ -194,38 +223,41 @@ class DataProvider:
         }
 
     def fetch_role_grant(self, fqn):
+        role, target = fqn.name.split("?")
+        target_type, target_name = target.split("=")
         try:
-            show_result = execute(self.session, f"SHOW GRANTS OF ROLE {fqn.name}")
-        except ProgrammingError:
-            return None
+            show_result = execute(self.session, f"SHOW GRANTS OF ROLE {role}", cacheable=True)
+        except ProgrammingError as err:
+            if err.errno == DOEST_NOT_EXIST_ERR:
+                return None
+            raise
 
         if len(show_result) == 0:
             return None
-
-        grants = {"to_role": [], "to_user": []}
 
         for data in show_result:
-            role_grant = {"role": data["role"], "owner": data["granted_by"]}
-            if data["granted_to"] == "ROLE":
-                role_grant["to_role"] = data["grantee_name"]
-                grants["to_role"].append(role_grant)
-            elif data["granted_to"] == "USER":
-                role_grant["to_user"] = data["grantee_name"]
-                grants["to_user"].append(role_grant)
-            else:
-                raise Exception(f"Unexpected role grant for role {fqn.name}", data)
+            if data["granted_to"] == target_type.upper() and data["grantee_name"] == target_name:
+                if data["granted_to"] == "ROLE":
+                    return {"role": role, "to_role": data["grantee_name"], "owner": data["granted_by"]}
+                elif data["granted_to"] == "USER":
+                    return {"role": role, "to_user": data["grantee_name"], "owner": data["granted_by"]}
+                else:
+                    raise Exception(f"Unexpected role grant for role {fqn.name}")
 
-        return grants
+        return None
 
     def fetch_user(self, fqn):
-        show_result = execute(self.session, f"SHOW USERS LIKE '{fqn.name}'", use_role="SECURITYADMIN")
+        # SHOW USERS requires the MANAGE GRANTS privilege
+        show_result = execute(self.session, "SHOW USERS", cacheable=True, use_role="SECURITYADMIN")
 
-        if len(show_result) == 0:
+        users = filter_result(show_result, name=fqn.name)
+
+        if len(users) == 0:
             return None
-        if len(show_result) > 1:
+        if len(users) > 1:
             raise Exception(f"Found multiple users matching {fqn}")
 
-        data = show_result[0]
+        data = users[0]
 
         return {
             "name": data["name"],
@@ -238,7 +270,7 @@ class DataProvider:
             "days_to_expiry": data["days_to_expiry"] or None,
             "comment": data["comment"] or None,
             "disabled": data["disabled"] == "true",
-            # "must_change_password": data["must_change_password"] == "true",
+            "must_change_password": data["must_change_password"] == "true",
             "default_warehouse": data["default_warehouse"] or None,
             "default_namespace": data["default_namespace"] or None,
             "default_role": data["default_role"] or None,
@@ -324,14 +356,41 @@ class DataProvider:
         except AttributeError:
             raise NotImplementedError(f"Updates for resource {urn.resource_key} not supported")
 
-    def update_user(self, fqn, data):
-        attr, value = data.popitem()
-        if attr == "owner":
-            execute(self.session, f"GRANT OWNERSHIP ON USER {fqn} TO ROLE {value}")
+    def update_role_grant(self, fqn, data):
+        print("ok")
+        raise NotImplementedError
+
+    def update_account_grant(self, fqn, data):
+        if "privs" in data:
+            original, new = data["privs"]
+            original, new = set(original), set(new)
+            grant = new - original
+            revoke = original - new
+            if grant:
+                for priv in grant:
+                    res = execute(self.session, f"GRANT {priv} ON ACCOUNT TO ROLE {fqn.name}", use_role="SECURITYADMIN")
+                    _fail_if_not_granted(res, priv)
+            if revoke:
+                for priv in revoke:
+                    res = execute(
+                        self.session, f"REVOKE {revoke} ON ACCOUNT FROM ROLE {fqn.name}", use_role="SECURITYADMIN"
+                    )
+                    _fail_if_not_granted(res, data)
         else:
+            raise NotImplementedError
+
+    def update_user(self, fqn, data):
+        owner = data.pop("owner") if "owner" in data else None
+
+        updates = []
+        for attr, change in data.items():
+            value = change[1]
             if isinstance(value, str):
                 value = f"'{value}'"
-            execute(self.session, f"ALTER USER {fqn} SET {attr} = {value}", use_role="USERADMIN")
+            updates.append(f"{attr} = {value}")
+        execute(self.session, f"ALTER USER {fqn} SET {','.join(updates)}", use_role="USERADMIN")
+        if owner:
+            execute(self.session, f"GRANT OWNERSHIP ON USER {fqn} TO ROLE {owner}")
 
     def update_warehouse(self, fqn, data):
         attr, value = data.popitem()
@@ -361,20 +420,25 @@ class DataProvider:
         execute(self.session, f"GRANT OWNERSHIP ON ROLE {role.name} TO ROLE {role.owner}", use_role="USERADMIN")
 
     def create_account_grant(self, urn, data):
-        grant = AccountGrant(**data)
-        sql = grant.create_sql()
-        res = execute(self.session, sql, use_role="SYSADMIN")
-        _fail_if_not_granted(res)
+        # grant = AccountGrant(**data)
+        # sql = grant.create_sql()
+        for priv in data["privs"]:
+            res = execute(self.session, f"GRANT {priv} ON ACCOUNT TO ROLE {data['to']}", use_role="SECURITYADMIN")
+            _fail_if_not_granted(res, priv)
+        # res = execute(self.session, sql, use_role="SYSADMIN")
+        # _fail_if_not_granted(res)
 
-    def create_role_grant(self, urn, container):
-        grants = container["to_role"] + container["to_user"]
-        for data in grants:
-            grant = RoleGrant(**data)
-            sql = grant.create_sql()
-            # According to the docs, SECURITYADMIN should issue the GRANT ROLE command but
-            # the grant itself will be owned by SYSADMIN (or maybe the role owner?), even if SECURITYADMIN runs the command
-            res = execute(self.session, sql, use_role="SECURITYADMIN")
-            _fail_if_not_granted(res)
+    def create_role_grant(self, urn, data):
+        """
+        According to the docs, SECURITYADMIN should issue the GRANT ROLE command but
+        the grant itself will be owned by SYSADMIN (or maybe the role owner?), even if
+        SECURITYADMIN runs the command
+        """
+        grant = RoleGrant(**data)
+        sql = grant.create_sql()
+
+        res = execute(self.session, sql, use_role="SECURITYADMIN")
+        _fail_if_not_granted(res)
 
     # endregion
 

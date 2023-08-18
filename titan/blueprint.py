@@ -1,9 +1,11 @@
-from dictdiffer import diff
+import json
+
+from queue import Queue
 
 from .data_provider import DataProvider, fetch_remote_state
 from .enums import Scope
 from .identifiers import URN
-from .resources import RoleGrant
+from .resources import Resource
 
 
 def print_diffs(diffs):
@@ -11,6 +13,45 @@ def print_diffs(diffs):
         print(f"[{action}]", target)
         for delta in deltas:
             print("\t", delta)
+
+
+def dict_delta(original, new):
+    original_keys = set(original.keys())
+    new_keys = set(new.keys())
+
+    delta = {}
+
+    for key in original_keys - new_keys:
+        delta[key] = (original[key], None)
+
+    for key in original_keys & new_keys:
+        if original[key] != new[key]:
+            delta[key] = (original[key], new[key])
+
+    for key in new_keys - original_keys:
+        delta[key] = (None, new[key])
+
+    return delta
+
+
+def diff(original, new):
+    original_keys = set(original.keys())
+    new_keys = set(new.keys())
+
+    for key in original_keys - new_keys:
+        yield "remove", key, original[key]
+
+    for key in new_keys - original_keys:
+        yield "add", key, new[key]
+
+    for key in original_keys & new_keys:
+        delta = dict_delta(original[key], new[key])
+        if delta:
+            yield "change", key, delta
+
+
+def _hash(data):
+    return hash(json.dumps(data, sort_keys=True))
 
 
 class Blueprint:
@@ -24,29 +65,27 @@ class Blueprint:
 
     def generate_manifest(self):
         manifest = {}
-        # refs = []
+        refs = []
+        urns = []
         for resource in self.staged:
             if resource.implicit:
                 continue
             self._finalize_scope(resource)
             urn = URN.from_resource(account=self.account, resource=resource)
+            urns.append(str(urn))
+            if resource.implicit:
+                continue
             data = resource.model_dump(exclude_none=True)  # mode="json",
 
             manifest_key = str(urn)
-            if isinstance(resource, RoleGrant):
-                # TODO: codesmell
-                if manifest_key not in manifest:
-                    manifest[manifest_key] = {"to_role": [], "to_user": []}
-                if "to_role" in data:
-                    manifest[manifest_key]["to_role"].append(data)
-                else:
-                    manifest[manifest_key]["to_user"].append(data)
-            else:
-                if manifest_key in manifest:
-                    raise RuntimeError(f"Duplicate resource found {manifest_key}")
-                manifest[manifest_key] = data
-            # for ref in resource.refs:
-            #     refs.append([key, urn(self.account, ref)])
+            if manifest_key in manifest and _hash(manifest[manifest_key]) != _hash(data):
+                raise RuntimeError(f"Duplicate resource found {manifest_key}")
+            manifest[manifest_key] = data
+            for ref in resource.refs:
+                ref_urn = URN.from_resource(account=self.account, resource=ref)
+                refs.append((str(urn), str(ref_urn)))
+        manifest["_refs"] = refs
+        manifest["_urns"] = urns
         return manifest
 
     def _finalize_scope(self, resource):
@@ -67,19 +106,19 @@ class Blueprint:
         provider = DataProvider(session)
         manifest = self.generate_manifest()
         remote_state = fetch_remote_state(provider, manifest)
-        return Plan(remote_state, manifest)
+        return _plan(remote_state, manifest)
 
     def apply(self, session, plan=None):
         plan = plan or self.plan(session)
 
         provider = DataProvider(session)
-        for action, urn_str, data in plan.changes:
+        for action, urn_str, data in plan:
             urn = URN.from_str(urn_str)
-            if action == "create":
+            if action == "add":
                 provider.create_resource(urn, data)
-            elif action == "update":
+            elif action == "change":
                 provider.update_resource(urn, data)
-            elif action == "drop":
+            elif action == "remove":
                 raise NotImplementedError
             else:
                 raise Exception(f"Unexpected action {action} in plan")
@@ -94,6 +133,8 @@ class Blueprint:
 
     def _add(self, resource):
         self.staged.append(resource)
+        for ref in resource.refs:
+            self._add(ref)
 
     def add(self, *resources):
         if isinstance(resources[0], list):
@@ -102,39 +143,60 @@ class Blueprint:
             self._add(resource)
 
 
-class Plan:
-    def __init__(self, remote_state, manifest):
-        self.changes = []
-        diffs = list(diff(remote_state, manifest))
-        print("~" * 120)
-        print_diffs(diffs)
-        print("~" * 120)
-        for action, target, deltas in diffs:
-            if action == "add":
-                if target:
-                    urn_str = target[0] if isinstance(target, list) else target
-                    for delta in deltas:
-                        modified_attr = delta[0]
-                        new_value = delta[1]
-                        # TODO: Plan needs to consult resource fields to determine if a field is fetchable
-                        if modified_attr == "password":
-                            continue
-                        self.changes.append(("update", urn_str, {modified_attr: new_value}))
-                else:
-                    for delta in deltas:
-                        urn_str = delta[0]
-                        self.changes.append(("create", urn_str, manifest[urn_str]))
-            elif action == "change":
-                urn_str, modified_attr = target[0], target[1]
-                new_value = deltas[-1]
-                self.changes.append(("update", urn_str, {modified_attr: new_value}))
-            elif action == "remove":
-                urn_str = target
-                if deltas:
-                    for delta in deltas:
-                        modified_attr = delta[0]
-                        new_value = delta[1]
-                        self.changes.append(("update", urn_str, {modified_attr: new_value}))
-                else:
-                    # drop
-                    raise NotImplementedError
+def topological_sort(manifest):
+    # Kahn's algorithm
+
+    # Compute in-degree (# of inbound edges) for each node
+    in_degrees = {}
+    outgoing_edges = {}
+
+    for node in manifest["_urns"]:
+        in_degrees[node] = 0
+        outgoing_edges[node] = set()
+
+    for node, ref in manifest["_refs"]:
+        in_degrees[ref] += 1
+        outgoing_edges[node].add(ref)
+
+    # Put all nodes with 0 in-degree in a queue
+    queue = Queue()
+    for node, in_degree in in_degrees.items():
+        if in_degree == 0:
+            queue.put(node)
+
+    # Create an empty node list
+    nodes = []
+
+    while not queue.empty():
+        node = queue.get()
+        nodes.append(node)
+
+        # For each of node's outgoing edges
+        empty_neighbors = set()
+        for edge in outgoing_edges[node]:
+            in_degrees[edge] -= 1
+            if in_degrees[edge] == 0:
+                queue.put(edge)
+                empty_neighbors.add(edge)
+
+        # Remove edges to empty neighbors
+        outgoing_edges[node].difference_update(empty_neighbors)
+    nodes.reverse()
+    return {value: index for index, value in enumerate(nodes)}
+
+
+def _plan(remote_state, manifest):
+    manifest = manifest.copy()
+    sort_order = topological_sort(manifest)
+    del manifest["_refs"]
+    del manifest["_urns"]
+    changes = []
+    for delta in diff(remote_state, manifest):
+        action, urn_str, data = delta
+        urn = URN.from_str(delta[1])
+        resource_cls = Resource.classes[urn.resource_key]
+        data = resource_cls.fetchable_fields(data)
+        if data:
+            changes.append((action, urn_str, data))
+            print((action, urn_str, data))
+    return sorted(changes, key=lambda change: sort_order[change[1]])
