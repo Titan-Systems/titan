@@ -7,6 +7,24 @@ from titan.identifiers import FQN
 
 resources = [
     {
+        "resource_key": "alert",
+        "setup_sql": [
+            "CREATE WAREHOUSE {name}_wh",
+            "CREATE ALERT {name} WAREHOUSE = {name}_wh SCHEDULE = '60 MINUTE' IF(EXISTS(SELECT 1)) THEN SELECT 1",
+        ],
+        "drop_sql": ["DROP ALERT {name}", "DROP WAREHOUSE {name}_wh"],
+        "fetch_method": "fetch_alert",
+        "fqn": lambda name: FQN(name=name, resource_key="alert"),
+        "data": lambda name: {
+            "name": name,
+            "warehouse": f"{name}_WH",
+            "schedule": "60 MINUTE",
+            "condition": "SELECT 1",
+            "then": "SELECT 1",
+            "owner": "SYSADMIN",
+        },
+    },
+    {
         "resource_key": "database",
         "setup_sql": "CREATE DATABASE {name}",
         "drop_sql": "DROP DATABASE {name}",
@@ -40,9 +58,7 @@ resources = [
 
 @pytest.fixture(scope="session")
 def db_session():
-    session = get_session()
-    yield session
-    session.close()
+    yield get_session()
 
 
 @pytest.fixture(
@@ -56,7 +72,11 @@ def resource(request, db_session):
     drop_sql = [config["drop_sql"]] if isinstance(config["drop_sql"], str) else config["drop_sql"]
     suffix = str(uuid.uuid4())[:8]
     resource_name = f"test_{config['resource_key']}_{suffix}".upper()
+    test_db = f"test_db_{suffix}".upper()
+
     with db_session.cursor() as cur:
+        cur.execute(f"CREATE DATABASE {test_db}")
+        cur.execute(f"USE DATABASE {test_db}")
         for sql in setup_sql:
             cur.execute(sql.format(name=resource_name))
         try:
@@ -64,6 +84,7 @@ def resource(request, db_session):
         finally:
             for sql in drop_sql:
                 cur.execute(sql.format(name=resource_name))
+            cur.execute(f"DROP DATABASE {test_db}")
 
 
 def test_fetch_resource(resource, db_session):

@@ -7,7 +7,7 @@ from snowflake.connector.errors import ProgrammingError
 
 from .client import get_session
 from .identifiers import URN, FQN
-from .resources import AccountGrant, Resource, Role, RoleGrant
+from .resources import Alert, Resource, Role, RoleGrant
 
 ACCESS_CONTROL_ERR = 3001
 DOEST_NOT_EXIST_ERR = 2003
@@ -115,9 +115,23 @@ class DataProvider:
         region = execute(self.session, "SELECT CURRENT_REGION()")[0]
         return region
 
-    def fetch_alert(self):
-        # alert
-        raise NotImplementedError
+    def fetch_alert(self, fqn):
+        show_result = execute(self.session, "SHOW ALERTS", cacheable=True)
+        alerts = filter_result(show_result, name=fqn.name)
+        if len(alerts) == 0:
+            return None
+        if len(alerts) > 1:
+            raise Exception(f"Found multiple alerts matching {fqn}")
+        data = alerts[0]
+        return {
+            "name": data["name"],
+            "warehouse": data["warehouse"],
+            "schedule": data["schedule"],
+            "comment": data["comment"] or None,
+            "condition": data["condition"],
+            "then": data["action"],
+            "owner": data["owner"],
+        }
 
     def fetch_columns(self, resource_type: str, fqn: FQN):
         desc_result = execute(self.session, f"DESC {resource_type} {fqn}")
@@ -412,6 +426,11 @@ class DataProvider:
         resource = resource_cls(**data)
         sql = resource.create_sql()
         execute(self.session, sql, use_role=use_role)
+
+    def create_alert(self, urn, data):
+        alert = Alert(**data)
+        sql = alert.create_sql()
+        execute(self.session, sql, use_role="SYSADMIN")
 
     def create_role(self, urn, data):
         role = Role(**data)
