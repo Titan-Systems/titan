@@ -16,6 +16,10 @@ FullyQualifiedIdentifier = (
     ^ Identifier
 )
 
+StringLiteral = pp.QuotedString("'", multiline=False, unquote_results=True) | pp.QuotedString(
+    "$$", multiline=True, unquote_results=True
+)
+
 ARROW = Literal("=>").suppress()
 AS = Keyword("AS").suppress()
 AT = Keyword("AT").suppress()
@@ -25,7 +29,7 @@ LPAREN = Literal("(").suppress()
 RPAREN = Literal(")").suppress()
 TAG = Keyword("TAG").suppress()
 WITH = Keyword("WITH").suppress()
-ANY = pp.Word(pp.srange("[a-zA-Z0-9_]")) | pp.sgl_quoted_string
+ANY = pp.Word(pp.srange("[a-zA-Z0-9_]")) | StringLiteral
 GRANT = Keyword("GRANT").suppress()
 ON = Keyword("ON").suppress()
 TO = Keyword("TO").suppress()
@@ -54,7 +58,7 @@ def Literals(keywords):
     return pp.ungroup(pp.And([Literal(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
 
 
-def in_parens(expr):
+def _in_parens(expr):
     return LPAREN + expr + RPAREN
 
 
@@ -76,10 +80,10 @@ NOTIFICATION_INTEGRATION = Keywords("NOTIFICATION INTEGRATION")
 COLUMN = (
     (Identifier | pp.dbl_quoted_string)("name")
     + ANY("data_type")
-    + pp.Opt(in_parens(ANY()))("data_type_size")
+    + pp.Opt(_in_parens(ANY()))("data_type_size")
     + pp.Opt(Keywords("NOT NULL")("not_null"))
-    + pp.Opt(Keyword("COLLATE") + pp.sgl_quoted_string("collate"))
-    + pp.Opt(Keyword("COMMENT") + pp.sgl_quoted_string("comment"))
+    + pp.Opt(Keyword("COLLATE") + StringLiteral("collate"))
+    + pp.Opt(Keyword("COMMENT") + StringLiteral("comment"))
 )
 
 

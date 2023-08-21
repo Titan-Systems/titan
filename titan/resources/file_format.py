@@ -5,7 +5,13 @@ import pyparsing as pp
 
 from .base import Resource, SchemaScoped
 from ..enums import ParseableEnum
-from ..parse import _resolve_resource_class, FullyQualifiedIdentifier, in_parens, _parse_props
+from ..parse import (
+    _resolve_resource_class,
+    _in_parens,
+    _parse_props,
+    FullyQualifiedIdentifier,
+    StringLiteral,
+)
 from ..props import (
     Props,
     BoolProp,
@@ -374,10 +380,10 @@ class FileFormatProp(Prop):
 
     def __init__(self, label):
         value_expr = (
-            in_parens(IdentifierProp("format_name").parser("prop_value"))
+            _in_parens(IdentifierProp("format_name").parser("prop_value"))
             | pp.original_text_for(pp.nested_expr())("prop_value")
             | FullyQualifiedIdentifier("prop_value")
-            | pp.sgl_quoted_string("prop_value")
+            | StringLiteral("prop_value")
         )
 
         super().__init__(label, value_expr, eq=True)

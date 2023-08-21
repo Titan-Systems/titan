@@ -8,11 +8,12 @@ from .enums import DataType
 from .parse import (
     _parser_has_results_name,
     _parse_props,
+    _in_parens,
     Keyword,
     Identifier,
     Keywords,
     Literals,
-    in_parens,
+    StringLiteral,
     FullyQualifiedIdentifier,
     COLUMN,
     EQUALS,
@@ -50,7 +51,7 @@ class Prop(ABC):
             value_expr = value_expr("prop_value")
 
         if parens:
-            value_expr = in_parens(value_expr)
+            value_expr = _in_parens(value_expr)
 
         expressions = []
         for expr in [consume_expr, label_expr, consume_expr, eq_expr, value_expr]:
@@ -136,7 +137,7 @@ class IntProp(Prop):
 
 class StringProp(Prop):
     def typecheck(self, prop_value):
-        return prop_value.strip("'")
+        return prop_value
 
     def render(self, value):
         if value is None:
@@ -196,7 +197,7 @@ class StringListProp(Prop):
         super().__init__(label, value_expr=value_expr, **kwargs)
 
     def typecheck(self, prop_value):
-        return [tok.strip(" '") for tok in prop_value]
+        return [tok.strip(" ") for tok in prop_value]
 
     def render(self, values):
         if values is None:
@@ -244,7 +245,7 @@ class TagsProp(Prop):
         pairs = iter(prop_value)
         tags = {}
         for key in pairs:
-            tags[key] = next(pairs).strip("'")
+            tags[key] = next(pairs)  # .strip("'")
         return tags
 
     def render(self, value: dict) -> str:
@@ -267,7 +268,7 @@ class DictProp(Prop):
         pairs = iter(prop_value)
         values = {}
         for key in pairs:
-            values[key.strip("'")] = next(pairs).strip("'")
+            values[key] = next(pairs)
         return values
 
 
@@ -275,11 +276,10 @@ class EnumProp(Prop):
     def __init__(self, label, enum_or_list, **kwargs):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
-        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | ANY
+        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | ANY()
         super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_value):
-        prop_value = prop_value.strip("'")
         prop_value = self.enum_type(prop_value)
         if prop_value not in self.valid_values:
             raise ValueError(f"Invalid value: {prop_value} must be one of {self.valid_values}")
@@ -297,11 +297,10 @@ class EnumListProp(Prop):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
         enum_values = pp.MatchFirst([Keywords(val.value) for val in self.valid_values])
-        value_expr = pp.DelimitedList(enum_values | ANY)
+        value_expr = pp.DelimitedList(enum_values | ANY())
         super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_values):
-        prop_values = [val.strip("'") for val in prop_values]
         prop_values = [self.enum_type(val) for val in prop_values]
         for value in prop_values:
             if value not in self.valid_values:
@@ -354,13 +353,12 @@ class TimeTravelProp(Prop):
     """
 
     def __init__(self, label):
-        value_expr = ANY + ARROW + ANY
+        value_expr = ANY() + ARROW + ANY()
         super().__init__(label, value_expr, eq=False, parens=True)
 
     def typecheck(self, prop_value):
         key, value = prop_value
-        value = value.strip("'")
-        return dict([(key, value)])
+        return {key: value}
 
     def render(self, value):
         if value is None:
@@ -401,7 +399,7 @@ class ColumnsProp(Prop):
             column["name"] = column["name"].strip('"')
             column["data_type"] = DataType(column["data_type"])
             if "comment" in column:
-                column["comment"] = column["comment"].strip("'")
+                column["comment"] = column["comment"]
             columns.append(column)
         return columns
 
@@ -425,22 +423,6 @@ class ColumnNamesProp(Prop):
             column = column_data.as_dict()
             column["name"] = column["name"].strip('"')
             if "comment" in column:
-                column["comment"] = column["comment"].strip("'")
+                column["comment"] = column["comment"]
             columns.append(column)
         return columns
-
-    # def __init__(self):
-    #     super().__init__(label="columns", eq=False, parens=True)
-    #     comment = StringProp("comment", eq=False).parser
-    #     self.parser = in_parens(pp.DelimitedList(ANY() + pp.Opt(comment)))("prop_value")
-
-    # def typecheck(self, prop_values):
-    #     columns = []
-    #     for col_name, comment in prop_values:
-    #         columns.append(
-    #             {
-    #                 "name": col_name,
-    #                 "comment": comment,
-    #             }
-    #         )
-    #     return columns
