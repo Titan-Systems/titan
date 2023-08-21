@@ -15,6 +15,7 @@ from titan.resources import (
     FailoverGroup,
     FileFormat,
     Grant,
+    JavascriptUDF,
     NotificationIntegration,
     Pipe,
     ResourceMonitor,
@@ -44,7 +45,12 @@ class TestResourceModel(unittest.TestCase):
 
 class TestResourceIdentities(unittest.TestCase):
     def validate_identity(self, resource_cls, data):
-        self.assertDictEqual(resource_cls(**data).model_dump(mode="json", by_alias=True, exclude_none=True), data)
+        def _dump(res):
+            return res.model_dump(mode="json", by_alias=True, exclude_none=True)
+
+        instance = resource_cls(**data)
+        self.assertDictEqual(_dump(instance), data)
+        self.assertDictEqual(_dump(resource_cls.from_sql(instance.create_sql())), data)
 
     def test_alert(self):
         self.validate_identity(
@@ -56,6 +62,21 @@ class TestResourceIdentities(unittest.TestCase):
                 "schedule": "1 minute",
                 "condition": "SELECT 1",
                 "then": "INSERT INTO foo VALUES(1)",
+            },
+        )
+
+    def test_javascript_udf(self):
+        self.validate_identity(
+            JavascriptUDF,
+            {
+                "name": "NOOP",
+                "owner": "SYSADMIN",
+                "args": [],
+                "secure": False,
+                "returns": "FLOAT",
+                "language": "JAVASCRIPT",
+                "volatility": "VOLATILE",
+                "as_": "return 42;",
             },
         )
 
@@ -129,6 +150,10 @@ class TestResourceFixtures(unittest.TestCase):
     def test_grant(self):
         for sql in load_sql_fixtures("grant.sql"):
             self.validate_from_sql(Grant, sql)
+
+    def test_javascript_udf(self):
+        for sql in load_sql_fixtures("javascript_udf.sql"):
+            self.validate_from_sql(JavascriptUDF, sql)
 
     def test_notification_integration(self):
         for sql in load_sql_fixtures("notification_integration.sql"):

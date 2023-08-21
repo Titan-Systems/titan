@@ -75,6 +75,18 @@ class DataType(ParseableEnum):
     GEOMETRY = "GEOMETRY"
 
 
+class NullHandling(ParseableEnum):
+    CALLED_ON_NULL_INPUT = "CALLED ON NULL INPUT"
+    RETURNS_NULL_ON_NULL_INPUT = "RETURNS NULL ON NULL INPUT"
+    STRICT = "STRICT"
+
+
+class Volatility(ParseableEnum):
+    VOLATILE = "VOLATILE"
+    IMMUTABLE = "IMMUTABLE"
+    STABLE = "STABLE"
+
+
 class SessionParameter(ParseableEnum):
     ABORT_DETACHED_QUERY = "ABORT_DETACHED_QUERY"
     AUTOCOMMIT = "AUTOCOMMIT"

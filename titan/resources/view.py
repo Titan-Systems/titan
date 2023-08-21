@@ -2,8 +2,8 @@ from typing import Dict, List
 
 from pydantic import field_validator
 
-from . import Resource
-from .base import SchemaScoped
+from .base import Resource, SchemaScoped
+from ..builder import tidy_sql
 from ..props import (
     BoolProp,
     ColumnNamesProp,
@@ -61,3 +61,13 @@ class View(Resource, SchemaScoped):
         if isinstance(columns, list):
             assert len(columns) > 0, "columns must not be empty"
         return columns
+
+    def create_sql(self, or_replace=False, if_not_exists=False):
+        return tidy_sql(
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            "VIEW",
+            "IF NOT EXISTS" if if_not_exists else "",
+            self.fqn,
+            self.props.render(self),
+        )

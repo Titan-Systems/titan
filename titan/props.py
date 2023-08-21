@@ -314,6 +314,25 @@ class EnumListProp(Prop):
         return f"{self.label}{eq}({values})"
 
 
+class EnumFlagProp(Prop):
+    def __init__(self, enum_or_list, **kwargs):
+        self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
+        self.valid_values = set(enum_or_list)
+        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values])
+        super().__init__(label=None, value_expr=value_expr, eq=False, **kwargs)
+
+    def typecheck(self, prop_value):
+        prop_value = self.enum_type(prop_value)
+        if prop_value not in self.valid_values:
+            raise ValueError(f"Invalid value: {prop_value} must be one of {self.valid_values}")
+        return prop_value
+
+    def render(self, value):
+        if value is None:
+            return ""
+        return value
+
+
 class QueryProp(Prop):
     def __init__(self, label):
         value_expr = pp.Word(pp.printables + " \n")
@@ -402,6 +421,12 @@ class ColumnsProp(Prop):
                 column["comment"] = column["comment"]
             columns.append(column)
         return columns
+
+    def render(self, value):
+        if value is None:
+            return "()"
+        columns = ", ".join(str(value))
+        return f"({columns})"
 
 
 class ColumnNamesProp(Prop):

@@ -31,6 +31,11 @@ from .user import User
 from .view import View
 from .warehouse import Warehouse
 
+from .user_defined_function import (
+    UserDefinedFunction,
+    JavascriptUDF,
+)
+
 from .notification_integration import (
     NotificationIntegration,
     EmailNotificationIntegration,
@@ -75,6 +80,7 @@ __all__ = [
     "GCSStorageIntegration",
     "Grant",
     "InternalStage",
+    "JavascriptUDF",
     "NotificationIntegration",
     "Organization",
     "OrganizationScoped",
@@ -98,6 +104,7 @@ __all__ = [
     "Tag",
     "Task",
     "User",
+    "UserDefinedFunction",
     "View",
     "ViewStream",
     "Warehouse",

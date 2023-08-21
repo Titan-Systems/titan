@@ -187,6 +187,30 @@ class DataProvider:
             "to": fqn.name,
         }
 
+    def fetch_javascript_udf(self, fqn):
+        show_result = execute(self.session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
+        udfs = filter_result(show_result, name=fqn.name)
+        if len(udfs) == 0:
+            return None
+        if len(udfs) > 1:
+            raise Exception(f"Found multiple roles matching {fqn}")
+
+        data = udfs[0]
+        inputs, output = data["arguments"].split(" RETURN ")
+        desc_result = execute(self.session, f"DESC FUNCTION {inputs}", cacheable=True)
+        properties = dict([(row["property"], row["value"]) for row in desc_result])
+
+        return {
+            "name": data["name"],
+            "secure": data["is_secure"] == "Y",
+            # "args": data["arguments"],
+            "returns": output,
+            "language": data["language"],
+            "comment": None if data["description"] == "user-defined function" else data["description"],
+            "volatility": properties["volatility"],
+            "as_": properties["body"],
+        }
+
     def fetch_priv_grant(self, fqn):
         raise NotImplementedError
 
@@ -439,13 +463,9 @@ class DataProvider:
         execute(self.session, f"GRANT OWNERSHIP ON ROLE {role.name} TO ROLE {role.owner}", use_role="USERADMIN")
 
     def create_account_grant(self, urn, data):
-        # grant = AccountGrant(**data)
-        # sql = grant.create_sql()
         for priv in data["privs"]:
             res = execute(self.session, f"GRANT {priv} ON ACCOUNT TO ROLE {data['to']}", use_role="SECURITYADMIN")
             _fail_if_not_granted(res, priv)
-        # res = execute(self.session, sql, use_role="SYSADMIN")
-        # _fail_if_not_granted(res)
 
     def create_role_grant(self, urn, data):
         """

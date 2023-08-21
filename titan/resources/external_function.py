@@ -1,9 +1,19 @@
 from typing import Dict
 
-from . import Resource
-from .base import AccountScoped
-from ..enums import DataType
-from ..props import Props, IntProp, StringProp, BoolProp, EnumProp, FlagProp, DictProp, ColumnsProp, IdentifierProp
+from .base import Resource, AccountScoped
+from ..enums import DataType, NullHandling, Volatility
+from ..props import (
+    BoolProp,
+    ColumnsProp,
+    DictProp,
+    EnumProp,
+    EnumFlagProp,
+    FlagProp,
+    IdentifierProp,
+    IntProp,
+    Props,
+    StringProp,
+)
 
 
 class ExternalFunction(Resource, AccountScoped):
@@ -25,15 +35,12 @@ class ExternalFunction(Resource, AccountScoped):
 
     resource_type = "EXTERNAL FUNCTION"
     props = Props(
-        secure=BoolProp("secure"),
+        secure=FlagProp("secure"),
         columns=ColumnsProp(),
         returns=EnumProp("returns", DataType, eq=False),
         # not_null=BoolProp("not_null"),
-        called_on_null_input=FlagProp("called_on_null_input"),
-        returns_null_on_null_input=FlagProp("returns_null_on_null_input"),
-        strict=FlagProp("strict"),
-        volatile=FlagProp("volatile"),
-        immutable=FlagProp("immutable"),
+        null_handling=EnumFlagProp(NullHandling),
+        volatility=EnumFlagProp(Volatility),
         comment=StringProp("comment"),
         api_integration=StringProp("api_integration"),
         headers=DictProp("headers", parens=True),
@@ -48,13 +55,9 @@ class ExternalFunction(Resource, AccountScoped):
     secure: bool = False
     columns: list = []
     returns: DataType
-    not_null: bool = False
-    on_null_input: str = None
-    called_on_null_input: bool = None
-    returns_null_on_null_input: bool = None
-    strict: bool = None
-    volatile: bool = None
-    immutable: bool = None
+    # not_null: bool = False
+    null_handling: NullHandling = None
+    volatility: Volatility = None
     comment: str = None
     api_integration: str
     headers: Dict[str, str] = {}

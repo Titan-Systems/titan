@@ -9,6 +9,7 @@ from titan.props import (
     BoolProp,
     ColumnsProp,
     EnumProp,
+    EnumFlagProp,
     FlagProp,
     IdentifierProp,
     IntProp,
@@ -59,6 +60,9 @@ class TestProp(unittest.TestCase):
     def test_prop_flag(self):
         self.assertEqual(FlagProp("this is a flag").parse("this is a flag"), True)
         self.assertRaises(ParseException, lambda: FlagProp("this is another flag").parse(""))
+
+    def test_prop_enum_flag(self):
+        self.assertEqual(EnumFlagProp(DataType).parse("VARCHAR"), DataType.VARCHAR)
 
     def test_prop_identifier(self):
         self.assertEqual(IdentifierProp("label").parse("label = value"), "value")
