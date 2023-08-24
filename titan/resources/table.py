@@ -2,8 +2,9 @@ from typing import List, Dict
 
 from pydantic import field_validator
 
-from . import Resource
-from .base import SchemaScoped
+from .base import Resource, SchemaScoped
+from ..enums import SchemaPriv, TablePriv
+from ..privs import Privs
 from ..props import (
     BoolProp,
     ColumnsProp,
@@ -42,6 +43,12 @@ class Table(Resource, SchemaScoped):
     """
 
     resource_type = "TABLE"
+    lifecycle = Privs(
+        create=SchemaPriv.CREATE_TABLE,
+        read=TablePriv.SELECT,
+        write=[TablePriv.INSERT, TablePriv.UPDATE, TablePriv.DELETE, TablePriv.TRUNCATE],
+        delete=TablePriv.OWNERSHIP,
+    )
     props = Props(
         columns=ColumnsProp(),
         volatile=FlagProp("volatile"),

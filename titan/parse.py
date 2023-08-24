@@ -157,6 +157,10 @@ def _parse_grant(sql):
     if _contains(Keywords("GRANT ROLE"), sql):
         return {"resource_key": "role_grant"}
 
+    # Check for role grant
+    if _contains(Keywords("GRANT OWNERSHIP"), sql):
+        return {"resource_key": "ownership_grant"}
+
     grant = GRANT + pp.SkipTo(ON)("privs") + ON + pp.SkipTo(TO)("on") + REST_OF_STRING("remainder")
     grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
 

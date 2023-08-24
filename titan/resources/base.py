@@ -1,14 +1,16 @@
-from typing import ClassVar, Union, Dict, List
+from typing import Any, ClassVar, Union, Dict, List
 
 from typing_extensions import Annotated
 
 from inflection import underscore
 from pydantic import BaseModel, Field, ConfigDict, BeforeValidator, PlainSerializer, field_validator
+from pydantic._internal._generics import PydanticGenericMetadata
 from pydantic.functional_validators import AfterValidator
 from pydantic._internal._model_construction import ModelMetaclass
 from pyparsing import ParseException
 
-from ..enums import Scope
+from ..privs import Privs
+from ..enums import DatabasePriv, GlobalPriv, SchemaPriv, Scope
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 
@@ -53,8 +55,9 @@ class Resource(BaseModel, metaclass=_Resource):
         populate_by_name=True,
     )
 
-    resource_type: ClassVar[str] = None
+    lifecycle: ClassVar[Privs] = None
     props: ClassVar[Props]
+    resource_type: ClassVar[str] = None
 
     implicit: bool = Field(exclude=True, default=False)
     stub: bool = Field(exclude=True, default=False)
@@ -117,13 +120,13 @@ class Resource(BaseModel, metaclass=_Resource):
     #         self.props.render(self),
     #     )
 
-    # def drop_sql(self, if_exists=False):
-    #     return tidy_sql(
-    #         "DROP",
-    #         self.resource_type,
-    #         "IF EXISTS" if if_exists else "",
-    #         self.fqn,
-    #     )
+    def drop_sql(self, if_exists=False):
+        return tidy_sql(
+            "DROP",
+            self.resource_type,
+            "IF EXISTS" if if_exists else "",
+            self.fqn,
+        )
 
     def __format__(self, format_spec):
         track_ref(self)
@@ -216,6 +219,11 @@ class AccountScoped(BaseModel):
         alias="parent", default=None, exclude=True
     )
 
+    # def __new__(*args, **kwargs):
+    #     print("ok")
+    #     # return super().__new__(cls, name, bases, attrs)
+    #     return super().__new__(*args, **kwargs)
+
     @property
     def parent(self):
         return self.account
@@ -246,6 +254,11 @@ class Database(Resource, AccountScoped):
     """
 
     resource_type = "DATABASE"
+    lifecycle = Privs(
+        create=GlobalPriv.CREATE_DATABASE,
+        read=DatabasePriv.USAGE,
+        delete=DatabasePriv.OWNERSHIP,
+    )
     props = Props(
         transient=FlagProp("transient"),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
@@ -340,6 +353,9 @@ class Schema(Resource, DatabaseScoped):
     """
 
     resource_type = "SCHEMA"
+    lifecycle = Privs(
+        create=DatabasePriv.CREATE_SCHEMA,
+    )
     props = Props(
         transient=FlagProp("transient"),
         with_managed_access=FlagProp("with managed access"),

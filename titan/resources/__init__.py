@@ -17,7 +17,7 @@ from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .file_format import FileFormat
-from .grant import Grant, AccountGrant, RoleGrant, PrivGrant
+from .grant import Grant, AccountGrant, OwnershipGrant, RoleGrant, PrivGrant
 from .pipe import Pipe
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
@@ -84,6 +84,7 @@ __all__ = [
     "NotificationIntegration",
     "Organization",
     "OrganizationScoped",
+    "OwnershipGrant",
     "Pipe",
     "PrivGrant",
     "Resource",

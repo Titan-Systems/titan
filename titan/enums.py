@@ -176,7 +176,7 @@ class SessionParameter(ParseableEnum):
     WEEK_START = "WEEK_START"
 
 
-class GlobalPrivs(ParseableEnum):
+class GlobalPriv(ParseableEnum):
     ALL = "ALL"
     CREATE_ACCOUNT = "CREATE ACCOUNT"
     CREATE_DATA_EXCHANGE_LISTING = "CREATE DATA EXCHANGE LISTING"
@@ -211,17 +211,19 @@ class GlobalPrivs(ParseableEnum):
     RESOLVE_ALL = "RESOLVE ALL"
 
 
-class DatabasePrivs(ParseableEnum):
+class DatabasePriv(ParseableEnum):
     ALL = "ALL"
     CREATE_DATABASE_ROLE = "CREATE DATABASE ROLE"
     CREATE_SCHEMA = "CREATE SCHEMA"
     IMPORTED_PRIVILEGES = "IMPORTED PRIVILEGES"
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
+    OWNERSHIP = "OWNERSHIP"
+    REFERENCE_USAGE = "REFERENCE_USAGE"
     USAGE = "USAGE"
 
 
-class SchemaPrivs(ParseableEnum):
+class SchemaPriv(ParseableEnum):
     ALL = "ALL"
     ADD_SEARCH_OPTIMIZATION = "ADD SEARCH OPTIMIZATION"
     CREATE_ALERT = "CREATE ALERT"
@@ -250,7 +252,18 @@ class SchemaPrivs(ParseableEnum):
     USAGE = "USAGE"
 
 
-class WarehousePrivs(ParseableEnum):
+class TablePriv(ParseableEnum):
+    ALL = "ALL"
+    DELETE = "DELETE"
+    INSERT = "INSERT"
+    OWNERSHIP = "OWNERSHIP"
+    REFERENCES = "REFERENCES"
+    SELECT = "SELECT"
+    TRUNCATE = "TRUNCATE"
+    UPDATE = "UPDATE"
+
+
+class WarehousePriv(ParseableEnum):
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
     USAGE = "USAGE"

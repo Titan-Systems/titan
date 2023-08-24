@@ -1,26 +1,39 @@
-from typing import List
+from typing import List, Union
 from typing_extensions import Annotated
 
-from pydantic import AfterValidator, BeforeValidator, model_validator
+from pydantic import AfterValidator, BeforeValidator, model_validator, BaseModel
 
-from .base import Resource, AccountScoped, Database, Schema
+from .base import Resource, AccountScoped, Database, Schema, serialize_resource_by_name
 from .role import T_Role
 from .user import T_User
 from .validators import coerce_from_str, listify
 from ..builder import tidy_sql
 from ..identifiers import FQN
 from ..parse import _parse_grant, _parse_props
+from ..privs import Privs
 from ..props import Props, IdentifierProp, FlagProp
-from ..enums import GlobalPrivs, SchemaPrivs  # SchemaObjectPrivs, AccountObjectPrivs
+from ..enums import GlobalPriv, SchemaPriv  # SchemaObjectPrivs, AccountObjectPrivs
 
 
 class Grant(Resource, AccountScoped):
     resource_type = "GRANT"
+    lifecycle = Privs(
+        create=GlobalPriv.MANAGE_GRANTS,
+        delete=GlobalPriv.MANAGE_GRANTS,
+    )
+
+    # def __new__(cls, **kwargs):
+    #     print("ok")
+    # file_type = FileType.parse(type)
+    # file_type_cls = FileTypeMap[file_type]
+    # return file_type_cls(type=file_type, **kwargs)
 
     @classmethod
     def from_sql(cls, sql):
         parsed = _parse_grant(sql)
         grant_cls = Resource.classes[parsed["resource_key"]]
+
+        # RoleGrants
         if grant_cls is RoleGrant:
             props = _parse_props(RoleGrant.props, sql)
             return RoleGrant(**props)
@@ -116,7 +129,7 @@ class PrivGrant(Grant):
     )
 
     privs: Annotated[list, BeforeValidator(listify)]
-    on: str
+    on: Annotated[Resource, serialize_resource_by_name]
     to: T_Role
     with_grant_option: bool = None
 
@@ -134,14 +147,33 @@ class PrivGrant(Grant):
             self.props.render(self),
         )
 
-    # TODO: implement instantiating grant
-    # TODO: implement fallback to grant
-    # def __new__(
-    #     cls, type: Union[str, Grant], **kwargs
-    # ) -> Union[...types...]:
-    #     file_type = FileType.parse(type)
-    #     file_type_cls = FileTypeMap[file_type]
-    #     return file_type_cls(type=file_type, **kwargs)
+
+class OwnershipGrant(PrivGrant):
+    """
+    -- Role
+    GRANT OWNERSHIP
+    { ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
+    | ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
+    }
+    TO ROLE <role_name>
+    [ { REVOKE | COPY } CURRENT GRANTS ]
+
+    -- Database role
+    GRANT OWNERSHIP
+    { ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
+    | ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
+    }
+    TO DATABASE ROLE <database_role_name>
+    [ { REVOKE | COPY } CURRENT GRANTS ]
+    """
+
+    props = Props(
+        to=IdentifierProp("to", eq=False, consume="role"),
+    )
+
+    privs: Annotated[list, BeforeValidator(listify)]
+    on: Annotated[Resource, serialize_resource_by_name]
+    to: T_Role
 
 
 class AccountGrant(PrivGrant):
@@ -152,7 +184,7 @@ class AccountGrant(PrivGrant):
     [ WITH GRANT OPTION ]
     """
 
-    privs: Annotated[List[GlobalPrivs], BeforeValidator(listify), AfterValidator(sorted)]
+    privs: Annotated[List[GlobalPriv], BeforeValidator(listify), AfterValidator(sorted)]
     on: str = "ACCOUNT"
 
 
@@ -175,7 +207,7 @@ class SchemaGrant(PrivGrant):
     [ WITH GRANT OPTION ]
     """
 
-    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
+    privs: Annotated[List[SchemaPriv], BeforeValidator(listify)]
     on: Annotated[Schema, BeforeValidator(coerce_from_str(Schema))]
 
 
@@ -187,7 +219,7 @@ class SchemasGrant(PrivGrant):
     [ WITH GRANT OPTION ]
     """
 
-    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
+    privs: Annotated[List[SchemaPriv], BeforeValidator(listify)]
     on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
 
 
@@ -199,7 +231,7 @@ class FutureSchemasGrant(PrivGrant):
     [ WITH GRANT OPTION ]
     """
 
-    privs: Annotated[List[SchemaPrivs], BeforeValidator(listify)]
+    privs: Annotated[List[SchemaPriv], BeforeValidator(listify)]
     on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
 
 

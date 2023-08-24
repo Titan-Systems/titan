@@ -3,8 +3,8 @@ from .blueprint import Blueprint
 
 from .resources import *
 
-
 __all__ = [
+    "ACL",
     "Alert",
     "Blueprint",
     "Database",
