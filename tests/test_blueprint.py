@@ -9,7 +9,7 @@ class TestBlueprint(unittest.TestCase):
 
         db = Database(name="DB")
         schema = Schema(name="SCHEMA", database=db)
-        table = Table(name="TABLE")
+        table = Table(name="TABLE", columns=["id INT"])
         table.parent = schema
         view = View(name="VIEW", schema=schema, as_="SELECT 1")
         blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, table, schema, view])
@@ -47,7 +47,7 @@ class TestBlueprint(unittest.TestCase):
             {
                 "name": "TABLE",
                 "owner": "SYSADMIN",
-                "columns": [],
+                "columns": [{"name": "ID", "data_type": "INT"}],
                 "volatile": False,
                 "transient": False,
                 "cluster_by": [],

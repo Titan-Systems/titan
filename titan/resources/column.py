@@ -2,7 +2,7 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
-from .base import Resource, serialize_resource_by_name
+from .base import Resource, ResourceName
 from ..enums import DataType
 from ..props import FlagProp, Props, StringProp
 from ..parse import COLUMN, _parse_props, _first_match
@@ -46,7 +46,7 @@ class Column(Resource):
         not_null=FlagProp("not null"),
     )
 
-    name: str
+    name: ResourceName
     data_type: DataType
     collate: str = None
     comment: str = None
