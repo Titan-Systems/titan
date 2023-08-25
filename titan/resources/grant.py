@@ -309,17 +309,16 @@ class RoleGrant(Grant):
         value = self.to_user.name if self.to_user else self.to_role.name
         return f"{role}?{param}={value}"
 
-    def create_sql(self):
-        return tidy_sql(
-            "GRANT",
-            self.props.render(self),
-        )
+    @classmethod
+    def lifecycle_create(cls, fqn, data):
+        return tidy_sql("GRANT", cls.props.render(data))
 
-    def drop_sql(self):
+    @classmethod
+    def lifecycle_delete(cls, fqn, data):
         return tidy_sql(
             "REVOKE ROLE",
-            self.role.name,
+            data["role"],
             "FROM",
-            "ROLE" if self.to_role else "USER",
-            self.to_role.name or self.to_user.name,
+            "ROLE" if data.get("to_role") else "USER",
+            data["to_role"] if data.get("to_role") else data["to_user"],
         )

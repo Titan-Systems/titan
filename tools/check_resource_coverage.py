@@ -22,7 +22,7 @@ def check_resource_coverage():
             continue
         from_sql = hasattr(resource_cls, "from_sql")
         create_sql = hasattr(resource_cls, "create_sql")
-        lifecycle = resource_cls.lifecycle is not None
+        lifecycle = resource_cls.lifecycle_privs is not None
         fetch = hasattr(titan.DataProvider, f"fetch_{resource_key}")
         create = hasattr(titan.DataProvider, f"create_{resource_key}")
         update = hasattr(titan.DataProvider, f"update_{resource_key}")

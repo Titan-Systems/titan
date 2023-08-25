@@ -126,20 +126,16 @@ class Resource(BaseModel, metaclass=_Resource):
         )
 
     @classmethod
-    def lifecycle_delete(cls, fqn, if_exists=False):
+    def lifecycle_delete(cls, fqn, data, if_exists=False):
         return tidy_sql("DROP", cls.resource_type, "IF EXISTS" if if_exists else "", fqn)
 
-    def create_sql(self, or_replace=False, if_not_exists=False):
+    def create_sql(self, **kwargs):
         data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return self.lifecycle_create(
-            self.fqn,
-            data,
-            or_replace=or_replace,
-            if_not_exists=if_not_exists,
-        )
+        return self.lifecycle_create(self.fqn, data, **kwargs)
 
-    def drop_sql(self, if_exists=False):
-        return self.lifecycle_delete(self.fqn, if_exists=if_exists)
+    def drop_sql(self, **kwargs):
+        data = self.model_dump(exclude_none=True, exclude_defaults=True)
+        return self.lifecycle_delete(self.fqn, data, **kwargs)
 
 
 class ResourceChildren:

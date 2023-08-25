@@ -36,6 +36,6 @@ def test_update_database(cursor, marked_for_cleanup):
     provider = DataProvider(cursor.connection)
     result = provider.fetch_database(FQN(name="test_db"))
     assert result["max_data_extension_time_in_days"] == 10
-    provider.update_database(db.fqn, {"max_data_extension_time_in_days": (10, 9)})
+    cursor.execute(Database.lifecycle_update(db.fqn, {"max_data_extension_time_in_days": 9}))
     result = provider.fetch_database(FQN(name="test_db"))
     assert result["max_data_extension_time_in_days"] == 9

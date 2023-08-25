@@ -46,8 +46,8 @@ def diff(original, new):
 
     for key in original_keys & new_keys:
         delta = dict_delta(original[key], new[key])
-        if delta:
-            yield "change", key, delta
+        for attr, value in delta.items():
+            yield "change", key, {attr: value}
 
 
 def _hash(data):
@@ -115,7 +115,7 @@ class Blueprint:
             # cursor setup, including query tag
             for action, urn_str, data in plan:
                 urn = URN.from_str(urn_str)
-                resource_cls = Resource.classes(urn.resource_key)
+                resource_cls = Resource.classes[urn.resource_key]
                 if action == "add":
                     cur.execute(resource_cls.lifecycle_create(urn.fqn, data))
                 elif action == "change":
@@ -127,11 +127,11 @@ class Blueprint:
 
     def destroy(self, session, manifest=None):
         manifest = manifest or self.generate_manifest()
-
-        provider = DataProvider(session)
-        for urn_str, data in manifest.items():
-            urn = URN.from_str(urn_str)
-            provider.drop_resource(urn, data)
+        with session.cursor() as cur:
+            for urn_str in manifest.keys():
+                urn = URN.from_str(urn_str)
+                resource_cls = Resource.classes[urn.resource_key]
+                cur.execute(resource_cls.lifecycle_delete(urn.fqn))
 
     def _add(self, resource):
         self.staged.append(resource)

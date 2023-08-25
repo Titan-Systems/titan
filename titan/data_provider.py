@@ -34,7 +34,7 @@ def _execute(session, sql, use_role=None) -> list:
             raise ProgrammingError(f"failed to execute sql, [{sql}]", errno=err.errno) from err
 
 
-@lru_cache
+# @lru_cache
 def _execute_cached(session, sql, use_role=None) -> list:
     return _execute(session, sql, use_role)
 
