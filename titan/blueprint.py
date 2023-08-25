@@ -22,14 +22,14 @@ def dict_delta(original, new):
     delta = {}
 
     for key in original_keys - new_keys:
-        delta[key] = (original[key], None)
+        delta[key] = None
 
     for key in original_keys & new_keys:
         if original[key] != new[key]:
-            delta[key] = (original[key], new[key])
+            delta[key] = new[key]
 
     for key in new_keys - original_keys:
-        delta[key] = (None, new[key])
+        delta[key] = new[key]
 
     return delta
 
@@ -145,14 +145,14 @@ class Blueprint:
             self._add(resource)
 
 
-def topological_sort(manifest):
+def topological_sort(manifest, urns):
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
     in_degrees = {}
     outgoing_edges = {}
 
-    for node in manifest["_urns"]:
+    for node in urns:
         in_degrees[node] = 0
         outgoing_edges[node] = set()
 
@@ -189,9 +189,10 @@ def topological_sort(manifest):
 
 def _plan(remote_state, manifest):
     manifest = manifest.copy()
-    sort_order = topological_sort(manifest)
+    urns = manifest.pop("_urns") + list(remote_state.keys())
+    sort_order = topological_sort(manifest, urns)
     del manifest["_refs"]
-    del manifest["_urns"]
+    # del manifest["_urns"]
     changes = []
     for delta in diff(remote_state, manifest):
         action, urn_str, data = delta
