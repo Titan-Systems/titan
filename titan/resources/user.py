@@ -131,15 +131,5 @@ class User(Resource, AccountScoped):
             self.display_name = self.name
         return self
 
-    def create_sql(self, or_replace=False, if_not_exists=False):
-        return tidy_sql(
-            "CREATE",
-            "OR REPLACE" if or_replace else "",
-            self.resource_type,
-            "IF NOT EXISTS" if if_not_exists else "",
-            self.fqn,
-            self.props.render(self),
-        )
-
 
 T_User = Annotated[User, BeforeValidator(coerce_from_str(User)), serialize_resource_by_name]

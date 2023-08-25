@@ -49,13 +49,12 @@ class Resource(BaseModel, metaclass=_Resource):
         from_attributes=True,
         extra="forbid",
         validate_assignment=True,
+        populate_by_name=True,
         # Don't use this
         use_enum_values=True,
-        # NOTE: This might be required to make SchemaScoped.schema = 'foo' work
-        populate_by_name=True,
     )
 
-    lifecycle: ClassVar[Privs] = None
+    lifecycle_privs: ClassVar[Privs] = None
     props: ClassVar[Props]
     resource_type: ClassVar[str] = None
 
@@ -100,6 +99,10 @@ class Resource(BaseModel, metaclass=_Resource):
     def refs(self):
         return self._refs
 
+    def __format__(self, format_spec):
+        track_ref(self)
+        return self.fully_qualified_name
+
     def _requires(self, resource):
         self._refs.add(resource)
 
@@ -110,27 +113,33 @@ class Resource(BaseModel, metaclass=_Resource):
             self._requires(resource)
         return self
 
-    # def create_sql(self, or_replace=False, if_not_exists=False):
-    #     return tidy_sql(
-    #         "CREATE",
-    #         "OR REPLACE" if or_replace else "",
-    #         self.resource_type,
-    #         "IF NOT EXISTS" if if_not_exists else "",
-    #         self.fqn,
-    #         self.props.render(self),
-    #     )
-
-    def drop_sql(self, if_exists=False):
+    @classmethod
+    def lifecycle_create(cls, fqn, data, or_replace=False, if_not_exists=False):
+        # TODO: modify props to split into header props and footer props
         return tidy_sql(
-            "DROP",
-            self.resource_type,
-            "IF EXISTS" if if_exists else "",
-            self.fqn,
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            cls.resource_type,
+            "IF NOT EXISTS" if if_not_exists else "",
+            fqn,
+            cls.props.render(data),
         )
 
-    def __format__(self, format_spec):
-        track_ref(self)
-        return self.fully_qualified_name
+    @classmethod
+    def lifecycle_delete(cls, fqn, if_exists=False):
+        return tidy_sql("DROP", cls.resource_type, "IF EXISTS" if if_exists else "", fqn)
+
+    def create_sql(self, or_replace=False, if_not_exists=False):
+        data = self.model_dump(exclude_none=True, exclude_defaults=True)
+        return self.lifecycle_create(
+            self.fqn,
+            data,
+            or_replace=or_replace,
+            if_not_exists=if_not_exists,
+        )
+
+    def drop_sql(self, if_exists=False):
+        return self.lifecycle_delete(self.fqn, if_exists=if_exists)
 
 
 class ResourceChildren:
@@ -219,11 +228,6 @@ class AccountScoped(BaseModel):
         alias="parent", default=None, exclude=True
     )
 
-    # def __new__(*args, **kwargs):
-    #     print("ok")
-    #     # return super().__new__(cls, name, bases, attrs)
-    #     return super().__new__(*args, **kwargs)
-
     @property
     def parent(self):
         return self.account
@@ -254,11 +258,13 @@ class Database(Resource, AccountScoped):
     """
 
     resource_type = "DATABASE"
-    lifecycle = Privs(
+
+    lifecycle_privs = Privs(
         create=GlobalPriv.CREATE_DATABASE,
         read=DatabasePriv.USAGE,
         delete=DatabasePriv.OWNERSHIP,
     )
+
     props = Props(
         transient=FlagProp("transient"),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
@@ -291,23 +297,49 @@ class Database(Resource, AccountScoped):
     def children(self):
         return self._children
 
-    def create_sql(self, or_replace=False, if_not_exists=False):
+    @classmethod
+    def lifecycle_create(cls, fqn, data, or_replace=False, if_not_exists=False):
         return tidy_sql(
             "CREATE",
             "OR REPLACE" if or_replace else "",
-            "TRANSIENT" if self.transient else "",
+            "TRANSIENT" if data.get("transient") else "",
             "DATABASE",
             "IF NOT EXISTS" if if_not_exists else "",
-            self.fqn,
-            self.props.render(self),
+            fqn,
+            cls.props.render(data),
         )
 
-    def create_or_replace_sql(self):
-        return self.create_sql(or_replace=True)
-
-    # @property
-    # def schemas(self):
-    #     return self._children.schemas
+    @classmethod
+    def lifecycle_update(cls, fqn, change, if_exists=False):
+        attr, new_value = change.popitem()
+        attr = attr.upper()
+        if new_value is None:
+            return tidy_sql(
+                "ALTER DATABASE",
+                "IF EXISTS" if if_exists else "",
+                fqn,
+                "UNSET",
+                attr,
+            )
+        elif attr == "NAME":
+            return tidy_sql(
+                "ALTER DATABASE",
+                "IF EXISTS" if if_exists else "",
+                fqn,
+                "RENAME TO",
+                new_value,
+            )
+        else:
+            new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
+            return tidy_sql(
+                "ALTER DATABASE",
+                "IF EXISTS" if if_exists else "",
+                fqn,
+                "SET",
+                attr,
+                "=",
+                new_value,
+            )
 
 
 class DatabaseScoped(BaseModel):
@@ -353,7 +385,7 @@ class Schema(Resource, DatabaseScoped):
     """
 
     resource_type = "SCHEMA"
-    lifecycle = Privs(
+    lifecycle_privs = Privs(
         create=DatabasePriv.CREATE_SCHEMA,
     )
     props = Props(
@@ -385,21 +417,6 @@ class Schema(Resource, DatabaseScoped):
     @property
     def children(self):
         return self._children
-
-    def create_sql(self, or_replace=False, if_not_exists=False):
-        return tidy_sql(
-            "CREATE",
-            "OR REPLACE" if or_replace else "",
-            "TRANSIENT" if self.transient else "",
-            "SCHEMA",
-            "IF NOT EXISTS" if if_not_exists else "",
-            self.fqn,
-            self.props.render(self),
-        )
-
-    # @property
-    # def tables(self):
-    #     return self._children.tables
 
 
 class SchemaScoped(BaseModel):

@@ -75,7 +75,7 @@ class Blueprint:
             urns.append(str(urn))
             if resource.implicit:
                 continue
-            data = resource.model_dump(exclude_none=True)  # mode="json",
+            data = resource.model_dump(exclude_none=True)
 
             manifest_key = str(urn)
             if manifest_key in manifest and _hash(manifest[manifest_key]) != _hash(data):
@@ -111,17 +111,19 @@ class Blueprint:
     def apply(self, session, plan=None):
         plan = plan or self.plan(session)
 
-        provider = DataProvider(session)
-        for action, urn_str, data in plan:
-            urn = URN.from_str(urn_str)
-            if action == "add":
-                provider.create_resource(urn, data)
-            elif action == "change":
-                provider.update_resource(urn, data)
-            elif action == "remove":
-                raise NotImplementedError
-            else:
-                raise Exception(f"Unexpected action {action} in plan")
+        with session.cursor() as cur:
+            # cursor setup, including query tag
+            for action, urn_str, data in plan:
+                urn = URN.from_str(urn_str)
+                resource_cls = Resource.classes(urn.resource_key)
+                if action == "add":
+                    cur.execute(resource_cls.lifecycle_create(urn.fqn, data))
+                elif action == "change":
+                    cur.execute(resource_cls.lifecycle_update(urn.fqn, data))
+                elif action == "remove":
+                    cur.execute(resource_cls.lifecycle_delete(urn.fqn))
+                else:
+                    raise Exception(f"Unexpected action {action} in plan")
 
     def destroy(self, session, manifest=None):
         manifest = manifest or self.generate_manifest()

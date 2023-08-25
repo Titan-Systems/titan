@@ -38,13 +38,3 @@ class Alert(Resource, SchemaScoped):
     tags: Dict[str, str] = None
     condition: str
     then: str
-
-    def create_sql(self, or_replace=False, if_not_exists=False):
-        return tidy_sql(
-            "CREATE",
-            "OR REPLACE" if or_replace else "",
-            self.resource_type,
-            "IF NOT EXISTS" if if_not_exists else "",
-            self.fqn,
-            self.props.render(self),
-        )

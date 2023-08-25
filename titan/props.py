@@ -86,19 +86,13 @@ class Props:
     def __getitem__(self, key: str) -> Prop:
         return self.props[key]
 
-    def render(self, resource):
-        resource_fields = resource.model_json_schema()["properties"]
-        data = resource.model_dump(exclude_none=True)
-
+    def render(self, data):
         rendered = []
         for prop_kwarg, prop in self.props.items():
             value = data.get(prop_kwarg)
             if value is None:
                 continue
-            field_has_default = "default" in resource_fields[prop_kwarg]
-            value_is_default = value == resource_fields[prop_kwarg].get("default")
-            if not (field_has_default and value_is_default):
-                rendered.append(prop.render(value))
+            rendered.append(prop.render(value))
         return tidy_sql(rendered)
 
 
@@ -425,8 +419,11 @@ class ColumnsProp(Prop):
     def render(self, value):
         if value is None:
             return "()"
-        columns = ", ".join(str(value))
-        return f"({columns})"
+        columns = []
+        for col in value:
+            comment = f" COMMENT '{col['comment']}'" if col.get("comment") else ""
+            columns.append(f"{col['name']} {col['data_type']}{comment}")
+        return f"({', '.join(columns)})"
 
 
 class ColumnNamesProp(Prop):

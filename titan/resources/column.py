@@ -1,11 +1,11 @@
-import pyparsing as pp
+from typing_extensions import Annotated
 
+from pydantic import BeforeValidator
+
+from .base import Resource, serialize_resource_by_name
 from ..enums import DataType
 from ..props import FlagProp, Props, StringProp
 from ..parse import COLUMN, _parse_props, _first_match
-
-
-from . import Resource
 
 
 class Column(Resource):
@@ -60,3 +60,13 @@ class Column(Resource):
         remainder = sql[end:]
         props = _parse_props(cls.props, remainder)
         return cls(name=col_name, data_type=data_type, **props)
+
+
+def _coerce(sql_or_resource):
+    if isinstance(sql_or_resource, str):
+        return Column.from_sql(sql_or_resource)
+    else:
+        return sql_or_resource
+
+
+T_Column = Annotated[Column, BeforeValidator(_coerce)]

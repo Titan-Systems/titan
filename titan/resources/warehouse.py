@@ -5,7 +5,6 @@ from pydantic import BeforeValidator
 
 from .base import Resource, AccountScoped, serialize_resource_by_name, coerce_from_str
 from .resource_monitor import ResourceMonitor
-from ..builder import tidy_sql
 from ..enums import ParseableEnum
 from ..props import (
     BoolProp,
@@ -109,16 +108,6 @@ class Warehouse(Resource, AccountScoped):
     statement_queued_timeout_in_seconds: int = 0
     statement_timeout_in_seconds: int = 172800
     tags: Dict[str, str] = None
-
-    def create_sql(self, or_replace=False, if_not_exists=False):
-        return tidy_sql(
-            "CREATE",
-            "OR REPLACE" if or_replace else "",
-            "WAREHOUSE",
-            "IF NOT EXISTS" if if_not_exists else "",
-            self.fqn,
-            self.props.render(self),
-        )
 
 
 T_Warehouse = Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse)), serialize_resource_by_name]

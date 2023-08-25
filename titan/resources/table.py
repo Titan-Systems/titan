@@ -16,7 +16,7 @@ from ..props import (
     StringListProp,
     TagsProp,
 )
-
+from .column import T_Column
 from .stage import InternalStage, copy_options
 from .file_format import FileFormatProp
 
@@ -43,7 +43,7 @@ class Table(Resource, SchemaScoped):
     """
 
     resource_type = "TABLE"
-    lifecycle = Privs(
+    lifecycle_privs = Privs(
         create=SchemaPriv.CREATE_TABLE,
         read=TablePriv.SELECT,
         write=[TablePriv.INSERT, TablePriv.UPDATE, TablePriv.DELETE, TablePriv.TRUNCATE],
@@ -68,7 +68,7 @@ class Table(Resource, SchemaScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    columns: list = []
+    columns: List[T_Column]
     volatile: bool = False
     transient: bool = False
     cluster_by: List[str] = []
@@ -98,11 +98,6 @@ class Table(Resource, SchemaScoped):
         if isinstance(columns, list):
             assert len(columns) > 0, "columns must not be empty"
         return columns
-
-    # @property
-    # def create_sql(self):
-    #     props = self.props_sql()
-    #     return f"CREATE TABLE {self.fully_qualified_name} () {props}"
 
     @property
     def select_star_sql(self):

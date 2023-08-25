@@ -17,7 +17,7 @@ from ..enums import GlobalPriv, SchemaPriv  # SchemaObjectPrivs, AccountObjectPr
 
 class Grant(Resource, AccountScoped):
     resource_type = "GRANT"
-    lifecycle = Privs(
+    lifecycle_privs = Privs(
         create=GlobalPriv.MANAGE_GRANTS,
         delete=GlobalPriv.MANAGE_GRANTS,
     )
