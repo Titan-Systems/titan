@@ -137,15 +137,19 @@ class PrivGrant(Grant):
     def name(self):
         return f"{self.on}.{self.to.name}"
 
-    def create_sql(self):
-        privs = ", ".join([str(priv) for priv in self.privs])
+    @classmethod
+    def lifecycle_create(cls, fqn, data):
         return tidy_sql(
             "GRANT",
-            privs,
+            ", ".join(data["privs"]),
             "ON",
-            self.on,
-            self.props.render(self),
+            data["on"],
+            cls.props.render(data),
         )
+
+    def create_sql(self):
+        data = self.model_dump(exclude_none=True, exclude_defaults=True)
+        return self.lifecycle_create(self.fqn, data)
 
 
 class OwnershipGrant(PrivGrant):

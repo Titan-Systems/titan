@@ -66,13 +66,3 @@ class JavascriptUDF(UserDefinedFunction):
     volatility: Volatility = None
     comment: str = None
     as_: str
-
-    def create_sql(self, or_replace=False, if_not_exists=False):
-        return tidy_sql(
-            "CREATE",
-            "OR REPLACE" if or_replace else "",
-            "FUNCTION",
-            "IF NOT EXISTS" if if_not_exists else "",
-            self.fqn,
-            self.props.render(self),
-        )
