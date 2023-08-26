@@ -129,7 +129,8 @@ class PrivGrant(Grant):
     )
 
     privs: Annotated[list, BeforeValidator(listify)]
-    on: Annotated[Resource, serialize_resource_by_name]
+    # TODO: This should probably some new annotated type like NamedResource
+    on: str  # Annotated[Resource, serialize_resource_by_name]
     to: T_Role
     with_grant_option: bool = None
 
