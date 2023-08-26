@@ -32,6 +32,13 @@ ResourceName = Annotated[str, AfterValidator(normalize_resource_name)]
 serialize_resource_by_name = PlainSerializer(lambda resource: resource.name if resource else None, return_type=str)
 
 
+def _add_child(parent, child):
+    if child.parent is not None:
+        child.parent.children._remove(child)
+    if parent is not None:
+        parent.children._add(child)
+
+
 class _Resource(ModelMetaclass):
     classes = {}
     resource_key: str = None
@@ -58,8 +65,8 @@ class Resource(BaseModel, metaclass=_Resource):
     props: ClassVar[Props]
     resource_type: ClassVar[str] = None
 
-    implicit: bool = Field(exclude=True, default=False)
-    stub: bool = Field(exclude=True, default=False)
+    implicit: bool = Field(exclude=True, default=False, repr=False)
+    stub: bool = Field(exclude=True, default=False, repr=False)
     _refs: List["Resource"] = []
 
     def model_post_init(self, ctx):
@@ -148,13 +155,9 @@ class ResourceChildren:
             self.items[child.resource_key] = []
         # TODO: dedupe?
         self.items[child.resource_key].append(child)
-        child.parent = self.parent
 
-    def add(self, *children):
-        if isinstance(children[0], list):
-            children = children[0]
-        for child in children:
-            self._add(child)
+    def _remove(self, child):
+        self.items[child.resource_key].remove(child)
 
     def __contains__(self, child):
         return child.resource_key in self.items and child in self.items[child.resource_key]
@@ -179,7 +182,7 @@ class OrganizationScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.ORGANIZATION
 
     organziation: Annotated[Organization, BeforeValidator(coerce_from_str(Organization))] = Field(
-        alias="parent", default=None, exclude=True
+        alias="parent", default=None, exclude=True, repr=False
     )
 
     @property
@@ -216,21 +219,44 @@ class Account(Resource, OrganizationScoped):
     def children(self):
         return self._children
 
+    def add(self, *children: "AccountScoped"):
+        if isinstance(children[0], list):
+            children = children[0]
+        for child in children:
+            child.account = self
+
+    def remove(self, *children: "AccountScoped"):
+        if isinstance(children[0], list):
+            children = children[0]
+        for child in children:
+            child.account = None
+
 
 class AccountScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.ACCOUNT
 
-    account: Annotated[Account, BeforeValidator(coerce_from_str(Account))] = Field(
-        alias="parent", default=None, exclude=True
-    )
+    _account: Annotated[
+        Account,
+        BeforeValidator(coerce_from_str(Account)),
+        Field(exclude=True, repr=False, alias="account"),
+    ] = None
 
     @property
     def parent(self):
-        return self.account
+        return self._account
 
     @parent.setter
-    def parent(self, value):
-        self.account = value
+    def parent(self, new_account):
+        self.account = new_account
+
+    @property
+    def account(self):
+        return self._account
+
+    @account.setter
+    def account(self, new_account):
+        _add_child(new_account, self)
+        self._account = new_account
 
     @property
     def fully_qualified_name(self):
@@ -284,7 +310,7 @@ class Database(Resource, AccountScoped):
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
         self._children = ResourceChildren(self)
-        self._children.add(
+        self.add(
             Schema(name="PUBLIC", implicit=True),
             Schema(name="INFORMATION_SCHEMA", implicit=True),
         )
@@ -337,21 +363,44 @@ class Database(Resource, AccountScoped):
                 new_value,
             )
 
+    def add(self, *children: "DatabaseScoped"):
+        if isinstance(children[0], list):
+            children = children[0]
+        for child in children:
+            child.database = self
+
+    def remove(self, *children: "DatabaseScoped"):
+        if isinstance(children[0], list):
+            children = children[0]
+        for child in children:
+            child.database = None
+
 
 class DatabaseScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.DATABASE
 
-    database: Annotated[Database, BeforeValidator(coerce_from_str(Database))] = Field(
-        alias="parent", default=None, exclude=True
-    )
+    _database: Annotated[
+        Database,
+        BeforeValidator(coerce_from_str(Database)),
+        Field(exclude=True, repr=False),
+    ] = None
 
     @property
     def parent(self):
         return self.database
 
     @parent.setter
-    def parent(self, value):
-        self.database = value
+    def parent(self, new_database):
+        self.database = new_database
+
+    @property
+    def database(self):
+        return self._database
+
+    @database.setter
+    def database(self, new_database):
+        _add_child(new_database, self)
+        self._database = new_database
 
     @property
     def fully_qualified_name(self):
@@ -360,11 +409,6 @@ class DatabaseScoped(BaseModel):
     @property
     def fqn(self):
         return self.fully_qualified_name
-
-    @field_validator("database")
-    @classmethod
-    def validate_database(cls, database: Union[str, Database]):
-        return database if isinstance(database, Database) else Database(name=database, stub=True)
 
 
 class Schema(Resource, DatabaseScoped):
@@ -414,23 +458,43 @@ class Schema(Resource, DatabaseScoped):
     def children(self):
         return self._children
 
+    def add(self, *children: "SchemaScoped"):
+        if isinstance(children[0], list):
+            children = children[0]
+        for child in children:
+            child.schema = self
+
+    def remove(self, *children: "SchemaScoped"):
+        if isinstance(children[0], list):
+            children = children[0]
+        for child in children:
+            child.schema = None
+
 
 class SchemaScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.SCHEMA
-    schema_: Union[str, Schema] = Field(alias="schema", default=None, exclude=True)
+    _schema: Annotated[
+        Schema,
+        BeforeValidator(coerce_from_str(Schema)),
+        Field(exclude=True, repr=False),
+    ] = None
 
     @property
     def parent(self):
-        return self.schema_
+        return self._schema
 
     @parent.setter
-    def parent(self, new_parent):
-        if new_parent is None:
-            return
-        if not isinstance(new_parent, Schema):
-            raise ValueError(f"Parent must be a Schema, not {new_parent}")
-        # new_parent.children.add(self)
-        self.schema_ = new_parent
+    def parent(self, new_schema):
+        self.schema = new_schema
+
+    @property
+    def schema(self):
+        return self._schema
+
+    @schema.setter
+    def schema(self, new_schema):
+        _add_child(new_schema, self)
+        self._schema = new_schema
 
     @property
     def fully_qualified_name(self):
@@ -443,8 +507,3 @@ class SchemaScoped(BaseModel):
     @property
     def fqn(self):
         return self.fully_qualified_name
-
-    @field_validator("schema_")
-    @classmethod
-    def validate_schema(cls, schema: Union[str, Schema]):
-        return schema if isinstance(schema, Schema) else Schema(name=schema, stub=True)

@@ -4,7 +4,6 @@ from typing_extensions import Annotated
 from pydantic import BeforeValidator, Field, model_validator
 
 from .base import AccountScoped, Resource, serialize_resource_by_name, coerce_from_str
-from ..builder import tidy_sql
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
 
