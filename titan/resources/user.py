@@ -3,7 +3,14 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator, Field, model_validator
 
-from .base import AccountScoped, Resource, _fix_class_documentation, serialize_resource_by_name, coerce_from_str
+from .base import (
+    AccountScoped,
+    Resource,
+    _fix_class_documentation,
+    serialize_resource_by_name,
+    coerce_from_str,
+)
+from ..privs import GlobalPriv, Privs, UserPriv
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
 
@@ -75,6 +82,10 @@ class User(Resource, AccountScoped):
     """
 
     resource_type = "USER"
+    lifecycle_privs = Privs(
+        create=GlobalPriv.CREATE_USER,
+        delete=UserPriv.OWNERSHIP,
+    )
     props = Props(
         password=StringProp("password"),
         login_name=StringProp("login_name"),

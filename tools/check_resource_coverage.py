@@ -22,11 +22,16 @@ def check_resource_coverage():
             continue
         from_sql = hasattr(resource_cls, "from_sql")
         create_sql = hasattr(resource_cls, "create_sql")
-        lifecycle = resource_cls.lifecycle_privs is not None
+        lifecycle = None
+        if resource_cls.lifecycle_privs:
+            create = len(resource_cls.lifecycle_privs.create) > 0
+            read = len(resource_cls.lifecycle_privs.read) > 0
+            write = len(resource_cls.lifecycle_privs.write) > 0
+            delete = len(resource_cls.lifecycle_privs.delete) > 0
+            lifecycle = "".join(
+                ["C" if create else "-", "R" if read else "-", "W" if write else "-", "D" if delete else "-"]
+            )
         fetch = hasattr(titan.DataProvider, f"fetch_{resource_key}")
-        create = hasattr(titan.DataProvider, f"create_{resource_key}")
-        update = hasattr(titan.DataProvider, f"update_{resource_key}")
-        drop = hasattr(titan.DataProvider, f"drop_{resource_key}")
 
         if resource_key in CRITICAL:
             add_to = critical
@@ -38,11 +43,8 @@ def check_resource_coverage():
                 resource_cls.__name__,
                 "✔" if from_sql else "-",
                 "✔" if create_sql else "-",
-                "✔" if lifecycle else "-",
+                lifecycle if lifecycle else "----",
                 "✔" if fetch else "-",
-                "✔" if create else "-",
-                "✔" if update else "-",
-                "✔" if drop else "-",
             ]
         )
 
@@ -52,9 +54,6 @@ def check_resource_coverage():
         "to SQL",
         "lifecycle",
         "fetch",
-        "create",
-        "update",
-        "drop",
     ]
 
     print(tabulate(critical + [SEPARATING_LINE] + all_others, headers=headers))

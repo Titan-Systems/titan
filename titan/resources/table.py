@@ -3,8 +3,10 @@ from typing import List, Dict
 from pydantic import field_validator
 
 from .base import Resource, SchemaScoped, _fix_class_documentation
-from ..enums import SchemaPriv, TablePriv
-from ..privs import Privs
+from .column import T_Column
+from .stage import InternalStage, copy_options
+from .file_format import FileFormatProp
+from ..privs import Privs, SchemaPriv, TablePriv
 from ..props import (
     BoolProp,
     ColumnsProp,
@@ -16,9 +18,6 @@ from ..props import (
     StringListProp,
     TagsProp,
 )
-from .column import T_Column
-from .stage import InternalStage, copy_options
-from .file_format import FileFormatProp
 
 
 @_fix_class_documentation

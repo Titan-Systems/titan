@@ -1,6 +1,9 @@
 from typing import List
+from typing_extensions import Annotated
 
-from .base import AccountScoped, Resource, _fix_class_documentation
+from pydantic import BeforeValidator
+
+from .base import AccountScoped, Resource, _fix_class_documentation, coerce_from_str, serialize_resource_by_name
 from ..enums import ParseableEnum
 from ..props import (
     EnumProp,
@@ -50,3 +53,10 @@ class ResourceMonitor(Resource, AccountScoped):
     start_timestamp: str = None
     end_timestamp: str = None
     notify_users: List[str] = None
+
+
+T_ResourceMonitor = Annotated[
+    ResourceMonitor,
+    BeforeValidator(coerce_from_str(ResourceMonitor)),
+    serialize_resource_by_name,
+]

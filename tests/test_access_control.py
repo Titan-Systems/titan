@@ -1,5 +1,5 @@
 from titan.access_control import ACL, SuperPriv
-from titan.enums import DatabasePriv, GlobalPriv, SchemaPriv, TablePriv
+from titan.privs import DatabasePriv, GlobalPriv, SchemaPriv, TablePriv
 from titan.resources import Database, OwnershipGrant, PrivGrant, Role, Schema, Table
 
 
@@ -22,19 +22,26 @@ def test_delete():
     role = Role(name="somerole")
     acl = ACL(privs=[SuperPriv.DELETE], roles=[role], resources=[db])
     grants = acl.grants()
-    assert grants == [
-        OwnershipGrant(on=db, to=role),
-    ]
+    assert len(grants) == 1
+    assert OwnershipGrant(on=db, to=role) in grants
 
 
 def test_read():
-    tbl = Table(name="sometbl")
+    tbl = Table(name="sometbl", columns=["id INT"])
     role = Role(name="somerole")
     acl = ACL(privs=[SuperPriv.READ], roles=[role], resources=[tbl])
     grants = acl.grants()
-    assert grants == [
-        PrivGrant(privs=TablePriv.INSERT, on=tbl, to=role),
-        PrivGrant(privs=TablePriv.UPDATE, on=tbl, to=role),
-        PrivGrant(privs=TablePriv.DELETE, on=tbl, to=role),
-        PrivGrant(privs=TablePriv.TRUNCATE, on=tbl, to=role),
-    ]
+    assert len(grants) == 1
+    assert PrivGrant(privs=TablePriv.SELECT, on=tbl, to=role) in grants
+
+
+def test_write():
+    tbl = Table(name="sometbl", columns=["id INT"])
+    role = Role(name="somerole")
+    acl = ACL(privs=[SuperPriv.WRITE], roles=[role], resources=[tbl])
+    grants = acl.grants()
+    assert len(grants) == 4
+    assert PrivGrant(privs=TablePriv.INSERT, on=tbl, to=role) in grants
+    assert PrivGrant(privs=TablePriv.UPDATE, on=tbl, to=role) in grants
+    assert PrivGrant(privs=TablePriv.DELETE, on=tbl, to=role) in grants
+    assert PrivGrant(privs=TablePriv.TRUNCATE, on=tbl, to=role) in grants

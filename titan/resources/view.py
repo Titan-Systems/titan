@@ -3,6 +3,7 @@ from typing import Dict, List
 from pydantic import field_validator
 
 from .base import Resource, SchemaScoped, _fix_class_documentation
+from ..privs import Privs, SchemaPriv, ViewPriv
 from ..props import (
     BoolProp,
     ColumnNamesProp,
@@ -30,6 +31,11 @@ class View(Resource, SchemaScoped):
     """
 
     resource_type = "VIEW"
+    lifecycle_privs = Privs(
+        create=SchemaPriv.CREATE_VIEW,
+        read=ViewPriv.SELECT,
+        delete=ViewPriv.OWNERSHIP,
+    )
     props = Props(
         secure=FlagProp("secure"),
         volatile=FlagProp("volatile"),

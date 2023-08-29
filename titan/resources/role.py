@@ -11,6 +11,7 @@ from .base import (
     serialize_resource_by_name,
     coerce_from_str,
 )
+from ..privs import GlobalPriv, Privs, RolePriv
 from ..props import Props, StringProp, TagsProp
 
 
@@ -23,6 +24,10 @@ class Role(Resource, AccountScoped):
     """
 
     resource_type = "ROLE"
+    lifecycle_privs = Privs(
+        create=GlobalPriv.CREATE_ROLE,
+        delete=RolePriv.OWNERSHIP,
+    )
     props = Props(
         tags=TagsProp(),
         comment=StringProp("comment"),

@@ -14,9 +14,9 @@ def coerce_from_str(cls: "Resource") -> callable:
     return _coerce
 
 
-def listify(value):
-    if value is None:
-        return []
-    if isinstance(value, list):
-        return value
-    return [value]
+def serialize_as_named_resource(name_or_resource) -> "Resource":
+    if isinstance(name_or_resource, str):
+        return name_or_resource
+    else:
+        res = name_or_resource
+        return f"{res.resource_type} {res.name}"

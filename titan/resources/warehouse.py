@@ -4,8 +4,9 @@ from typing_extensions import Annotated
 from pydantic import BeforeValidator
 
 from .base import Resource, AccountScoped, _fix_class_documentation, serialize_resource_by_name, coerce_from_str
-from .resource_monitor import ResourceMonitor
+from .resource_monitor import T_ResourceMonitor
 from ..enums import ParseableEnum
+from ..privs import GlobalPriv, Privs, WarehousePriv
 from ..props import (
     BoolProp,
     EnumProp,
@@ -71,6 +72,10 @@ class Warehouse(Resource, AccountScoped):
     """
 
     resource_type = "WAREHOUSE"
+    lifecycle_privs = Privs(
+        create=GlobalPriv.CREATE_WAREHOUSE,
+        delete=WarehousePriv.OWNERSHIP,
+    )
     props = Props(
         _start_token="WITH",
         warehouse_type=EnumProp("warehouse_type", WarehouseType),
@@ -101,7 +106,7 @@ class Warehouse(Resource, AccountScoped):
     auto_suspend: int = 600
     auto_resume: bool = True
     initially_suspended: bool = None
-    resource_monitor: Annotated[ResourceMonitor, BeforeValidator(coerce_from_str(ResourceMonitor))] = None
+    resource_monitor: T_ResourceMonitor = None
     comment: str = None
     enable_query_acceleration: bool = None
     query_acceleration_max_scale_factor: int = None
@@ -111,4 +116,8 @@ class Warehouse(Resource, AccountScoped):
     tags: Dict[str, str] = None
 
 
-T_Warehouse = Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse)), serialize_resource_by_name]
+T_Warehouse = Annotated[
+    Warehouse,
+    BeforeValidator(coerce_from_str(Warehouse)),
+    serialize_resource_by_name,
+]

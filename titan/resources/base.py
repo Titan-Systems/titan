@@ -8,8 +8,8 @@ from pydantic.functional_validators import AfterValidator
 from pydantic._internal._model_construction import ModelMetaclass
 from pyparsing import ParseException
 
-from ..privs import Privs
-from ..enums import DatabasePriv, GlobalPriv, SchemaPriv, Scope
+from ..privs import DatabasePriv, GlobalPriv, Privs, SchemaPriv
+from ..enums import Scope
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 from ..sql import SQL, track_ref
@@ -349,6 +349,8 @@ class Schema(Resource, DatabaseScoped):
     resource_type = "SCHEMA"
     lifecycle_privs = Privs(
         create=DatabasePriv.CREATE_SCHEMA,
+        read=SchemaPriv.USAGE,
+        delete=SchemaPriv.OWNERSHIP,
     )
     props = Props(
         transient=FlagProp("transient"),
