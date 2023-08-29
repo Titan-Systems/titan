@@ -10,6 +10,7 @@ from .base import (
     serialize_resource_by_name,
     coerce_from_str,
 )
+from ..builder import tidy_sql
 from ..privs import GlobalPriv, Privs, UserPriv
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
@@ -141,6 +142,38 @@ class User(Resource, AccountScoped):
         if not self.display_name:
             self.display_name = self.name
         return self
+
+    @classmethod
+    def lifecycle_update(cls, fqn, change, if_exists=False):
+        attr, new_value = change.popitem()
+        attr = attr.upper()
+        if new_value is None:
+            return tidy_sql(
+                "ALTER USER",
+                "IF EXISTS" if if_exists else "",
+                fqn,
+                "UNSET",
+                attr,
+            )
+        elif attr == "NAME":
+            return tidy_sql(
+                "ALTER USER",
+                "IF EXISTS" if if_exists else "",
+                fqn,
+                "RENAME TO",
+                new_value,
+            )
+        else:
+            new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
+            return tidy_sql(
+                "ALTER USER",
+                "IF EXISTS" if if_exists else "",
+                fqn,
+                "SET",
+                attr,
+                "=",
+                new_value,
+            )
 
 
 T_User = Annotated[User, BeforeValidator(coerce_from_str(User)), serialize_resource_by_name]

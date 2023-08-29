@@ -2,8 +2,8 @@ import json
 
 from queue import Queue
 
+from .client import execute
 from .data_provider import DataProvider, fetch_remote_state
-from .enums import Scope
 from .identifiers import URN
 from .resources.base import Resource, AccountScoped, DatabaseScoped, SchemaScoped
 
@@ -111,27 +111,29 @@ class Blueprint:
     def apply(self, session, plan=None):
         plan = plan or self.plan(session)
 
-        with session.cursor() as cur:
-            # cursor setup, including query tag
-            for action, urn_str, data in plan:
-                urn = URN.from_str(urn_str)
-                resource_cls = Resource.classes[urn.resource_key]
+        # with session.cursor() as cur:
+        # TODO: cursor setup, including query tag
+        for action, urn_str, data in plan:
+            urn = URN.from_str(urn_str)
+            resource_cls = Resource.classes[urn.resource_key]
+            try:
                 if action == "add":
-                    cur.execute(resource_cls.lifecycle_create(urn.fqn, data))
+                    execute(session, resource_cls.lifecycle_create(urn.fqn, data))
                 elif action == "change":
-                    cur.execute(resource_cls.lifecycle_update(urn.fqn, data))
+                    execute(session, resource_cls.lifecycle_update(urn.fqn, data))
                 elif action == "remove":
-                    cur.execute(resource_cls.lifecycle_delete(urn.fqn))
+                    execute(session, resource_cls.lifecycle_delete(urn.fqn))
                 else:
                     raise Exception(f"Unexpected action {action} in plan")
+            except AttributeError as err:
+                raise AttributeError(f"Resource {resource_cls.__name__} missing lifecycle action") from err
 
     def destroy(self, session, manifest=None):
         manifest = manifest or self.generate_manifest()
-        with session.cursor() as cur:
-            for urn_str in manifest.keys():
-                urn = URN.from_str(urn_str)
-                resource_cls = Resource.classes[urn.resource_key]
-                cur.execute(resource_cls.lifecycle_delete(urn.fqn))
+        for urn_str in manifest.keys():
+            urn = URN.from_str(urn_str)
+            resource_cls = Resource.classes[urn.resource_key]
+            execute(session, resource_cls.lifecycle_delete(urn.fqn))
 
     def _add(self, resource):
         self.staged.append(resource)

@@ -5,6 +5,7 @@ from tabulate import tabulate, SEPARATING_LINE
 CRITICAL = [
     "database",
     "schema",
+    "shared_database",
     "table",
     "view",
     "user",

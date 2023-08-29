@@ -74,6 +74,18 @@ resources = [
         },
     },
     {
+        "resource_key": "shared_database",
+        "setup_sql": [
+            "CALL SYSTEM$ACCEPT_LEGAL_TERMS('DATA_EXCHANGE_LISTING', 'GZSOZ1LLE9')",
+            """CREATE DATABASE {name} FROM SHARE WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709" """,
+        ],
+        "teardown_sql": "DROP DATABASE {name}",
+        "data": lambda name: {
+            "name": name,
+            "from_share": "WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1.WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
+        },
+    },
+    {
         "resource_key": "table",
         "setup_sql": "CREATE TABLE {name} (id INT)",
         "teardown_sql": "DROP TABLE {name}",

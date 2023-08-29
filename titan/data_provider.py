@@ -1,13 +1,9 @@
-from functools import lru_cache
-
-# from snowflake.snowpark import Session
-import snowflake.connector
+import json
 
 from snowflake.connector.errors import ProgrammingError
 
-from .client import get_session
+from .client import get_session, execute
 from .identifiers import URN, FQN
-from .resources import Alert, Resource, Role, RoleGrant
 
 ACCESS_CONTROL_ERR = 3001
 DOEST_NOT_EXIST_ERR = 2003
@@ -18,31 +14,6 @@ def _fail_if_not_granted(result, *args):
         raise Exception("Failed to create grant")
     if len(result) == 1 and result[0]["status"] == "Grant not executed: Insufficient privileges.":
         raise Exception(result[0]["status"], *args)
-
-
-def _execute(session, sql, use_role=None) -> list:
-    with session.cursor(snowflake.connector.DictCursor) as cur:
-        try:
-            if use_role:
-                cur.execute(f"USE ROLE {use_role}")
-            print(f"[{session.role}] >>>", sql)
-            result = cur.execute(sql).fetchall()
-            return result
-        except ProgrammingError as err:
-            # if err.errno == ACCESS_CONTROL_ERR:
-            #     raise Exception(f"Access control error: {err.msg}")
-            raise ProgrammingError(f"failed to execute sql, [{sql}]", errno=err.errno) from err
-
-
-# @lru_cache
-def _execute_cached(session, sql, use_role=None) -> list:
-    return _execute(session, sql, use_role)
-
-
-def execute(session, sql, use_role=None, cacheable=False) -> list:
-    if cacheable:
-        return _execute_cached(session, sql, use_role)
-    return _execute(session, sql, use_role)
 
 
 def _filter_result(result, **kwargs):
@@ -87,15 +58,6 @@ def fetch_remote_state(provider: "DataProvider", manifest):
             state[urn_str] = remove_none_values(data)
 
     return state
-
-
-# def audit_session_roles(session):
-#     role_grants = execute(session, "SHOW GRANTS")
-#     role_grants = _filter_result(role_grants, granted_to="USER", grantee_name=session.user)
-#     roles = [grant["role"] for grant in role_grants]
-#     privs = {}
-#     global_privs = execute(session, "SHOW GRANTS ON ACCOUNT")
-#     return roles
 
 
 def update_list_for_changes_data(data):
@@ -294,6 +256,23 @@ class DataProvider:
             "max_data_extension_time_in_days": params["data_retention_time_in_days"],
             "default_ddl_collation": params["default_ddl_collation"],
             "comment": data["comment"] or None,
+        }
+
+    def fetch_shared_database(self, fqn: FQN):
+        show_result = execute(self.session, "SELECT SYSTEM$SHOW_IMPORTED_DATABASES()", cacheable=True)
+        show_result = json.loads(show_result[0]["SYSTEM$SHOW_IMPORTED_DATABASES()"])
+
+        shares = _filter_result(show_result, name=fqn.name)
+
+        if len(shares) == 0:
+            return None
+        if len(shares) > 1:
+            raise Exception(f"Found multiple shares matching {fqn}")
+
+        data = shares[0]
+        return {
+            "name": data["name"],
+            "from_share": data["origin"],
         }
 
     def fetch_table(self, fqn: FQN):
