@@ -1,6 +1,8 @@
 import os
 import snowflake.connector
 
+from snowflake.connector.errors import ProgrammingError
+
 connection_params = {
     "account": os.environ.get("SNOWFLAKE_ACCOUNT"),
     "user": os.environ.get("SNOWFLAKE_USER"),
