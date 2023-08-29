@@ -2,7 +2,7 @@ from typing import List, Dict
 
 from pydantic import field_validator
 
-from .base import Resource, SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..enums import SchemaPriv, TablePriv
 from ..privs import Privs
 from ..props import (
@@ -21,6 +21,7 @@ from .stage import InternalStage, copy_options
 from .file_format import FileFormatProp
 
 
+@_fix_class_documentation
 class Table(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ]
@@ -81,12 +82,11 @@ class Table(Resource, SchemaScoped):
     tags: Dict[str, str] = None
     comment: str = None
 
-    _table_stage: InternalStage
-
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
-        self._table_stage = InternalStage(name=f"@%{self.name}", implicit=True)
-        self._table_stage.parent = self.parent
+        self._table_stage: InternalStage = InternalStage(name=f"@%{self.name}", implicit=True)
+        if self.schema:
+            self._table_stage.schema = self.schema
 
     @property
     def table_stage(self):

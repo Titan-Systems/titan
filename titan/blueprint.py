@@ -5,7 +5,7 @@ from queue import Queue
 from .data_provider import DataProvider, fetch_remote_state
 from .enums import Scope
 from .identifiers import URN
-from .resources import Resource
+from .resources.base import Resource, AccountScoped, DatabaseScoped, SchemaScoped
 
 
 def print_diffs(diffs):
@@ -90,14 +90,14 @@ class Blueprint:
 
     def _finalize_scope(self, resource):
         # TODO: connect stubs
-        if resource.parent is None:
-            if resource.scope == Scope.ACCOUNT:
+        if isinstance(resource, (AccountScoped, DatabaseScoped, SchemaScoped)) and not resource.has_scope():
+            if isinstance(resource, AccountScoped):
                 resource.account = self.account
-            elif resource.scope == Scope.DATABASE:
+            elif isinstance(resource, DatabaseScoped):
                 if self.database is None:
                     raise Exception(f"Orphaned resource found {resource}")
                 resource.database = self.database
-            elif resource.scope == Scope.SCHEMA:
+            elif isinstance(resource, SchemaScoped):
                 if self.schema is None:
                     raise Exception(f"Orphaned resource found {resource}")
                 resource.schema = self.schema

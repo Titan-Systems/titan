@@ -8,7 +8,7 @@ from titan.resources import Database, OwnershipGrant, PrivGrant, Role, Schema, T
 def test_create():
     db = Database(name="somedb")
     sch = Schema(name="someschema")
-    tbl = Table(name="sometable")
+    tbl = Table(name="sometable", columns=["id INT"])
     role = Role(name="somerole")
     acl = ACL(privs=[SuperPriv.CREATE], roles=[role], resources=[db, sch, tbl])
     grants = acl.grants()
