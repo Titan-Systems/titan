@@ -1,7 +1,7 @@
+from abc import ABC
 from typing import Dict, Union
 
-from . import Resource
-from .base import SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..enums import ParseableEnum
 from ..props import Props, FlagProp, StringProp, BoolProp, TimeTravelProp
 from ..parse import _resolve_resource_class
@@ -14,6 +14,7 @@ class StreamType(ParseableEnum):
     VIEW = "VIEW"
 
 
+@_fix_class_documentation
 class TableStream(Resource, SchemaScoped):
     """
     -- table
@@ -50,6 +51,7 @@ class TableStream(Resource, SchemaScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class ExternalTableStream(Resource, SchemaScoped):
     """
     -- External table
@@ -82,6 +84,7 @@ class ExternalTableStream(Resource, SchemaScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class StageStream(Resource, SchemaScoped):
     """
     -- Directory table
@@ -149,10 +152,7 @@ StreamTypeMap = {
 }
 
 
-class Stream(Resource):
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
+class Stream(Resource, ABC):
     def __new__(
         cls, type: Union[str, StreamType], **kwargs
     ) -> Union[TableStream, ExternalTableStream, StageStream, ViewStream]:

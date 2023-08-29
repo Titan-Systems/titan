@@ -1,7 +1,7 @@
+from abc import ABC
 from typing import List
 
-from . import Resource
-from .base import AccountScoped
+from .base import AccountScoped, Resource, _fix_class_documentation
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
 from ..enums import ParseableEnum
 from ..parse import _resolve_resource_class
@@ -24,6 +24,7 @@ class NotificationDirection(ParseableEnum):
     OUTBOUND = "OUTBOUND"
 
 
+@_fix_class_documentation
 class EmailNotificationIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
@@ -50,6 +51,7 @@ class EmailNotificationIntegration(Resource, AccountScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class AWSOutboundNotificationIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
@@ -89,6 +91,7 @@ class AWSOutboundNotificationIntegration(Resource, AccountScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class GCPOutboundNotificationIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
@@ -124,6 +127,7 @@ class GCPOutboundNotificationIntegration(Resource, AccountScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class AzureOutboundNotificationIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
@@ -162,6 +166,7 @@ class AzureOutboundNotificationIntegration(Resource, AccountScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class GCPInboundNotificationIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
@@ -195,6 +200,7 @@ class GCPInboundNotificationIntegration(Resource, AccountScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class AzureInboundNotificationIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
@@ -231,10 +237,7 @@ class AzureInboundNotificationIntegration(Resource, AccountScoped):
     comment: str = None
 
 
-class NotificationIntegration(Resource):
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
+class NotificationIntegration(Resource, ABC):
     def __new__(
         cls,
         type: NotificationType,

@@ -1,7 +1,6 @@
 from typing import List
 
-from . import Resource
-from .base import AccountScoped
+from .base import AccountScoped, Resource, _fix_class_documentation
 from ..enums import ParseableEnum
 from ..props import (
     EnumProp,
@@ -20,6 +19,7 @@ class ResourceMonitorFrequency(ParseableEnum):
     NEVER = "NEVER"
 
 
+@_fix_class_documentation
 class ResourceMonitor(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] RESOURCE MONITOR <name> WITH

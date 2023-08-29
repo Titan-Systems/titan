@@ -1,16 +1,10 @@
-from typing import Dict
-
-from .base import Resource, SchemaScoped
-from ..builder import tidy_sql
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..enums import DataType, NullHandling, ParseableEnum, Volatility
 from ..props import (
-    BoolProp,
     ColumnsProp,
-    DictProp,
     EnumFlagProp,
     EnumProp,
     FlagProp,
-    IdentifierProp,
     Props,
     StringProp,
 )
@@ -28,6 +22,7 @@ class UserDefinedFunction(Resource, SchemaScoped):
     resource_type = "FUNCTION"
 
 
+@_fix_class_documentation
 class JavascriptUDF(UserDefinedFunction):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] [ SECURE ] FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )

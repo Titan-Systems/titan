@@ -1,9 +1,9 @@
+from abc import ABC
 from typing import Dict, Union, Any
 
 from ..enums import ParseableEnum
 from ..parse import _resolve_resource_class
-from . import Resource
-from .base import SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..props import (
     BoolProp,
     EnumProp,
@@ -55,6 +55,7 @@ copy_options = Props(
 )
 
 
+@_fix_class_documentation
 class InternalStage(Resource, SchemaScoped):
     """
     -- Internal stage
@@ -101,6 +102,7 @@ class InternalStage(Resource, SchemaScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class ExternalStage(Resource, SchemaScoped):
     """
     -- External stage
@@ -180,10 +182,7 @@ StageTypeMap = {
 }
 
 
-class Stage(Resource):
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
+class Stage(Resource, ABC):
     def __new__(cls, type: Union[str, StageType], **kwargs) -> Union[InternalStage, ExternalStage]:
         stage_type = StageType.parse(type)
         stage_cls = StageTypeMap[stage_type]

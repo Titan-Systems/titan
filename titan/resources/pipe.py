@@ -1,8 +1,8 @@
-from . import Resource
-from .base import SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..props import BoolProp, Props, StringProp, QueryProp
 
 
+@_fix_class_documentation
 class Pipe(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] PIPE [ IF NOT EXISTS ] <name>

@@ -2,7 +2,7 @@ from typing import Dict, List
 
 from pydantic import field_validator
 
-from .base import Resource, SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..props import (
     BoolProp,
     ColumnNamesProp,
@@ -14,6 +14,7 @@ from ..props import (
 )
 
 
+@_fix_class_documentation
 class View(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ SECURE ] [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE } ] [ RECURSIVE ] VIEW [ IF NOT EXISTS ] <name>

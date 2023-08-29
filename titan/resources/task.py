@@ -3,7 +3,7 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
-from .base import Resource, AccountScoped
+from .base import Resource, AccountScoped, _fix_class_documentation
 from ..props import (
     BoolProp,
     EnumProp,
@@ -20,6 +20,7 @@ from .validators import coerce_from_str
 from .warehouse import Warehouse, WarehouseSize
 
 
+@_fix_class_documentation
 class Task(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] TASK [ IF NOT EXISTS ] <name>

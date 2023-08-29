@@ -1,5 +1,3 @@
-import pytest
-
 from titan.access_control import ACL, SuperPriv
 from titan.enums import DatabasePriv, GlobalPriv, SchemaPriv, TablePriv
 from titan.resources import Database, OwnershipGrant, PrivGrant, Role, Schema, Table

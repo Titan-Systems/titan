@@ -3,10 +3,11 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator, Field, model_validator
 
-from .base import AccountScoped, Resource, serialize_resource_by_name, coerce_from_str
+from .base import AccountScoped, Resource, _fix_class_documentation, serialize_resource_by_name, coerce_from_str
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
 
+@_fix_class_documentation
 class User(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] USER [ IF NOT EXISTS ] <name>

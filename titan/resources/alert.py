@@ -1,11 +1,11 @@
 from typing import Dict
 
-from .base import Resource, SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from .warehouse import T_Warehouse
-from ..builder import tidy_sql
 from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 
+@_fix_class_documentation
 class Alert(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] ALERT [ IF NOT EXISTS ] <name>

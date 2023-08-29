@@ -1,6 +1,6 @@
 from typing import List
 
-from .base import Resource, AccountScoped
+from .base import Resource, AccountScoped, _fix_class_documentation
 from ..enums import ParseableEnum
 from ..props import Props, EnumListProp, StringListProp, FlagProp, StringProp, IdentifierListProp
 
@@ -23,6 +23,7 @@ class IntegrationTypes(ParseableEnum):
     NOTIFICATION_INTEGRATIONS = "NOTIFICATION INTEGRATIONS"
 
 
+@_fix_class_documentation
 class FailoverGroup(Resource, AccountScoped):
     """
     CREATE FAILOVER GROUP [ IF NOT EXISTS ] <name>

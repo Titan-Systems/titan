@@ -2,12 +2,13 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
-from .base import Resource, ResourceName
+from .base import Resource, ResourceName, _fix_class_documentation
 from ..enums import DataType
 from ..props import FlagProp, Props, StringProp
 from ..parse import COLUMN, _parse_props, _first_match
 
 
+@_fix_class_documentation
 class Column(Resource):
     """
     <col_name> <col_type>

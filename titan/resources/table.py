@@ -102,35 +102,3 @@ class Table(Resource, SchemaScoped):
     @property
     def select_star_sql(self):
         return f"SELECT * FROM {self.fully_qualified_name}"
-
-    # # https://github.com/python/mypy/issues/5936
-    # @SchemaLevelResource.schema.setter  # type: ignore[attr-defined]
-    # def schema(self, schema_: Optional["Schema"]):
-    #     self._schema = schema_
-    #     if self._schema is not None:
-    #         self.requires(self._schema)
-    #         self.table_stage.schema = self._schema
-
-    # def create(self, session):
-    #     super().create(session)
-    #     if self.autoload:
-    #         raise NotImplementedError
-    # Needs a refactor via dependencies
-    # # Does this need to be a pipe we refresh, or should we just call the COPY INTO command each time?
-    # pipe = Pipe(
-    #     sql=rf"""
-    #     CREATE PIPE {self.name}_autoload_pipe
-    #         AS
-    #         COPY INTO {self.name}
-    #         FROM {self.table_stage}
-    #         FILE_FORMAT = (
-    #             TYPE = CSV
-    #             SKIP_HEADER = 1
-    #             COMPRESSION = GZIP
-    #             FIELD_OPTIONALLY_ENCLOSED_BY = '\042'
-    #             NULL_IF = '\N'
-    #             NULL_IF = 'NULL'
-    #         )
-    #     """,
-    # )
-    # pipe.create(session)

@@ -3,7 +3,7 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
-from .base import Resource, AccountScoped, serialize_resource_by_name, coerce_from_str
+from .base import Resource, AccountScoped, _fix_class_documentation, serialize_resource_by_name, coerce_from_str
 from .resource_monitor import ResourceMonitor
 from ..enums import ParseableEnum
 from ..props import (
@@ -41,6 +41,7 @@ class WarehouseScalingPolicy(ParseableEnum):
     ECONOMY = "ECONOMY"
 
 
+@_fix_class_documentation
 class Warehouse(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] WAREHOUSE [ IF NOT EXISTS ] <name>

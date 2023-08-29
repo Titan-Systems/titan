@@ -1,8 +1,8 @@
-from . import Resource
-from .base import AccountScoped
+from .base import AccountScoped, Resource, _fix_class_documentation
 from ..props import Props, StringProp, StringListProp
 
 
+@_fix_class_documentation
 class Tag(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] TAG [ IF NOT EXISTS ] <name> [ COMMENT = '<string_literal>' ]

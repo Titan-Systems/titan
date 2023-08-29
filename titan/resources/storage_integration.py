@@ -1,7 +1,7 @@
+from abc import ABC
 from typing import List, Union
 
-from . import Resource
-from .base import AccountScoped
+from .base import AccountScoped, Resource, _fix_class_documentation
 from ..parse import _resolve_resource_class
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
 from ..enums import ParseableEnum
@@ -13,6 +13,7 @@ class StorageProvider(ParseableEnum):
     GCS = "GCS"
 
 
+@_fix_class_documentation
 class S3StorageIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
@@ -53,6 +54,7 @@ class S3StorageIntegration(Resource, AccountScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class GCSStorageIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
@@ -88,6 +90,7 @@ class GCSStorageIntegration(Resource, AccountScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class AzureStorageIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
@@ -132,10 +135,7 @@ StorageIntegrationMap = {
 }
 
 
-class StorageIntegration(Resource):
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError
-
+class StorageIntegration(Resource, ABC):
     def __new__(
         cls, storage_provider: Union[str, StorageProvider], **kwargs
     ) -> Union[S3StorageIntegration, GCSStorageIntegration, AzureStorageIntegration]:

@@ -22,6 +22,7 @@ from titan.resources import (
     Role,
     Schema,
     Sequence,
+    SharedDatabase,
     Stage,
     StorageIntegration,
     Stream,
@@ -178,6 +179,10 @@ class TestResourceFixtures(unittest.TestCase):
     def test_sequence(self):
         for sql in load_sql_fixtures("sequence.sql"):
             self.validate_from_sql(Sequence, sql)
+
+    def test_shared_database(self):
+        for sql in load_sql_fixtures("share.sql"):
+            self.validate_from_sql(SharedDatabase, sql)
 
     def test_stage(self):
         for sql in load_sql_fixtures("stage.sql"):

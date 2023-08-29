@@ -3,11 +3,12 @@ from typing_extensions import Annotated
 from pydantic import BeforeValidator
 
 from ..props import Props, StringProp, IdentifierProp, QueryProp
-from .base import Resource, SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from .validators import coerce_from_str
 from .warehouse import Warehouse
 
 
+@_fix_class_documentation
 class DynamicTable(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] DYNAMIC TABLE <name>

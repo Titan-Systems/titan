@@ -1,8 +1,8 @@
-from . import Resource
-from .base import SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..props import Props, IntProp, StringProp
 
 
+@_fix_class_documentation
 class Sequence(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] SEQUENCE [ IF NOT EXISTS ] <name>

@@ -1,7 +1,6 @@
 from typing import List
 
-from . import Resource
-from .base import AccountScoped
+from .base import AccountScoped, Resource, _fix_class_documentation
 from ..enums import ParseableEnum
 from ..props import Props, EnumProp, StringProp, BoolProp, StringListProp
 
@@ -13,6 +12,7 @@ class ApiProvider(ParseableEnum):
     AWS_GOV_PRIVATE_API_GATEWAY = "AWS_GOV_PRIVATE_API_GATEWAY"
 
 
+@_fix_class_documentation
 class APIIntegration(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] API INTEGRATION [ IF NOT EXISTS ] <integration_name>

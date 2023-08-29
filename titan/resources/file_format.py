@@ -3,7 +3,7 @@ from typing import List, Union
 
 import pyparsing as pp
 
-from .base import Resource, SchemaScoped
+from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..enums import ParseableEnum
 from ..parse import (
     _resolve_resource_class,
@@ -52,6 +52,7 @@ class BinaryFormat(ParseableEnum):
     UTF8 = "UTF8"
 
 
+@_fix_class_documentation
 class CSVFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
@@ -113,7 +114,7 @@ class CSVFileFormat(Resource, SchemaScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    type: FileType
+    type: FileType = FileType.CSV
     compression: Compression = None
     record_delimiter: str = None
     field_delimiter: str = None
@@ -138,6 +139,7 @@ class CSVFileFormat(Resource, SchemaScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class JSONFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
@@ -187,7 +189,7 @@ class JSONFileFormat(Resource, SchemaScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    type: FileType
+    type: FileType = FileType.JSON
     compression: Compression = None
     date_format: str = None
     time_format: str = None
@@ -206,6 +208,7 @@ class JSONFileFormat(Resource, SchemaScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class AvroFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
@@ -233,7 +236,7 @@ class AvroFileFormat(Resource, SchemaScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    type: FileType
+    type: FileType = FileType.AVRO
     compression: Compression = None
     trim_space: bool = None
     replace_invalid_characters: bool = None
@@ -241,6 +244,7 @@ class AvroFileFormat(Resource, SchemaScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class OrcFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
@@ -266,13 +270,14 @@ class OrcFileFormat(Resource, SchemaScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    type: FileType
+    type: FileType = FileType.ORC
     trim_space: bool = None
     replace_invalid_characters: bool = None
     null_if: List[str] = []
     comment: str = None
 
 
+@_fix_class_documentation
 class ParquetFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
@@ -304,7 +309,7 @@ class ParquetFileFormat(Resource, SchemaScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    type: FileType
+    type: FileType = FileType.PARQUET
     compression: Compression = None
     snappy_compression: bool = None
     binary_as_text: bool = None
@@ -314,6 +319,7 @@ class ParquetFileFormat(Resource, SchemaScoped):
     comment: str = None
 
 
+@_fix_class_documentation
 class XMLFileFormat(Resource, SchemaScoped):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
@@ -349,7 +355,7 @@ class XMLFileFormat(Resource, SchemaScoped):
 
     name: str
     owner: str = "SYSADMIN"
-    type: FileType
+    type: FileType = FileType.XML
     compression: Compression = None
     ignore_utf8_errors: bool = None
     preserve_space: bool = None

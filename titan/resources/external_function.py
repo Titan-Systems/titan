@@ -1,9 +1,8 @@
 from typing import Dict
 
-from .base import Resource, AccountScoped
+from .base import Resource, AccountScoped, _fix_class_documentation
 from ..enums import DataType, NullHandling, Volatility
 from ..props import (
-    BoolProp,
     ColumnsProp,
     DictProp,
     EnumProp,
@@ -16,6 +15,7 @@ from ..props import (
 )
 
 
+@_fix_class_documentation
 class ExternalFunction(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] [ SECURE ] EXTERNAL FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )

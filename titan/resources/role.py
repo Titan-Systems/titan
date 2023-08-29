@@ -3,11 +3,18 @@ from typing_extensions import Annotated
 
 from pydantic import BeforeValidator
 
-from . import Resource
-from .base import AccountScoped, DatabaseScoped, serialize_resource_by_name, coerce_from_str
+from .base import (
+    AccountScoped,
+    DatabaseScoped,
+    Resource,
+    _fix_class_documentation,
+    serialize_resource_by_name,
+    coerce_from_str,
+)
 from ..props import Props, StringProp, TagsProp
 
 
+@_fix_class_documentation
 class Role(Resource, AccountScoped):
     """
     CREATE [ OR REPLACE ] ROLE [ IF NOT EXISTS ] <name>
