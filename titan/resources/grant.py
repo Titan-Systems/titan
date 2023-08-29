@@ -6,13 +6,14 @@ from pydantic import AfterValidator, BeforeValidator, model_validator, BaseModel
 from .base import Resource, AccountScoped, Database, Schema, serialize_resource_by_name
 from .role import T_Role
 from .user import T_User
-from .validators import coerce_from_str, listify
+from .validators import coerce_from_str, serialize_as_named_resource
 from ..builder import tidy_sql
+from ..helpers import listify
 from ..identifiers import FQN
 from ..parse import _parse_grant, _parse_props
 from ..privs import Privs
 from ..props import Props, IdentifierProp, FlagProp
-from ..enums import GlobalPriv, SchemaPriv  # SchemaObjectPrivs, AccountObjectPrivs
+from ..privs import GlobalPriv, SchemaPriv
 
 
 class Grant(Resource, AccountScoped):
@@ -130,7 +131,8 @@ class PrivGrant(Grant):
 
     privs: Annotated[list, BeforeValidator(listify)]
     # TODO: This should probably some new annotated type like NamedResource
-    on: str  # Annotated[Resource, serialize_resource_by_name]
+    # on: Annotated[Resource, serialize_resource_by_name]
+    on: Annotated[str, BeforeValidator(serialize_as_named_resource)]
     to: T_Role
     with_grant_option: bool = None
 
@@ -153,7 +155,7 @@ class PrivGrant(Grant):
         return self.lifecycle_create(self.fqn, data)
 
 
-class OwnershipGrant(PrivGrant):
+class OwnershipGrant(Grant):
     """
     -- Role
     GRANT OWNERSHIP
@@ -176,7 +178,6 @@ class OwnershipGrant(PrivGrant):
         to=IdentifierProp("to", eq=False, consume="role"),
     )
 
-    privs: Annotated[list, BeforeValidator(listify)]
     on: Annotated[Resource, serialize_resource_by_name]
     to: T_Role
 
