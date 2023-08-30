@@ -1,5 +1,6 @@
 from .base import Resource, AccountScoped, _fix_class_documentation
 from ..props import Props, IdentifierProp
+from ..privs import DatabasePriv, GlobalPriv, Privs
 
 
 @_fix_class_documentation
@@ -9,6 +10,13 @@ class SharedDatabase(Resource, AccountScoped):
     """
 
     resource_type = "DATABASE"
+
+    lifecycle_privs = Privs(
+        create=[GlobalPriv.CREATE_DATABASE, GlobalPriv.IMPORT_SHARE],
+        read=DatabasePriv.IMPORTED_PRIVILEGES,
+        delete=DatabasePriv.OWNERSHIP,
+    )
+
     props = Props(
         from_share=IdentifierProp("from share", eq=False),
     )
