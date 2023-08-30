@@ -9,8 +9,8 @@ from pydantic._internal._model_construction import ModelMetaclass
 from pyparsing import ParseException
 
 from ..privs import DatabasePriv, GlobalPriv, Privs, SchemaPriv
-from ..enums import Scope
-from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
+from ..enums import AccountEdition, Scope
+from ..props import BoolProp, EnumProp, Props, IntProp, StringProp, TagsProp, FlagProp
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 from ..sql import SQL, track_ref
 from ..identifiers import FQN
@@ -172,9 +172,70 @@ class OrganizationScoped(BaseModel):
 
 @_fix_class_documentation
 class Account(Resource, OrganizationScoped):
+    """
+    CREATE ACCOUNT <name>
+        ADMIN_NAME = <string>
+        { ADMIN_PASSWORD = '<string_literal>' | ADMIN_RSA_PUBLIC_KEY = <string> }
+        [ FIRST_NAME = <string> ]
+        [ LAST_NAME = <string> ]
+        EMAIL = '<string>'
+        [ MUST_CHANGE_PASSWORD = { TRUE | FALSE } ]
+        EDITION = { STANDARD | ENTERPRISE | BUSINESS_CRITICAL }
+        [ REGION_GROUP = <region_group_id> ]
+        [ REGION = <snowflake_region_id> ]
+        [ COMMENT = '<string_literal>' ]
+    """
+
     resource_type = "ACCOUNT"
 
+    lifecycle_privs = Privs(
+        create=GlobalPriv.CREATE_ACCOUNT,
+    )
+
+    props = Props(
+        admin_name=StringProp("admin_name"),
+        admin_password=StringProp("admin_password"),
+        admin_rsa_public_key=StringProp("admin_rsa_public_key"),
+        first_name=StringProp("first_name"),
+        last_name=StringProp("last_name"),
+        email=StringProp("email"),
+        must_change_password=BoolProp("must_change_password"),
+        edition=EnumProp("edition", AccountEdition),
+        region_group=StringProp("region_group"),
+        region=StringProp("region"),
+        comment=StringProp("comment"),
+    )
+
     name: ResourceName
+    admin_name: str = Field(default=None, json_schema_extra={"fetchable": False})
+    admin_password: str = Field(default=None, json_schema_extra={"fetchable": False})
+    admin_rsa_public_key: str = Field(default=None, json_schema_extra={"fetchable": False})
+    first_name: str = Field(default=None, json_schema_extra={"fetchable": False})
+    last_name: str = Field(default=None, json_schema_extra={"fetchable": False})
+    email: str = Field(default=None, json_schema_extra={"fetchable": False})
+    must_change_password: bool = Field(default=None, json_schema_extra={"fetchable": False})
+    edition: AccountEdition = None
+    region_group: str = None
+    region: str = None
+    comment: str = None
+
+    @classmethod
+    def lifecycle_create(cls, fqn, data):
+        return tidy_sql(
+            "CREATE ACCOUNT",
+            fqn,
+            cls.props.render(data),
+        )
+
+    @classmethod
+    def lifecycle_delete(cls, fqn, data, if_exists=False, grace_period_in_days=3):
+        return tidy_sql(
+            "DROP ACCOUNT",
+            "IF EXISTS" if if_exists else "",
+            fqn,
+            "GRACE_PERIOD_IN_DAYS = ",
+            grace_period_in_days,
+        )
 
     def add(self, *resources: "AccountScoped"):
         if isinstance(resources[0], list):

@@ -87,6 +87,23 @@ class DataProvider:
         region = execute(self.session, "SELECT CURRENT_REGION()")[0]
         return region
 
+    def fetch_account(self, fqn: FQN):
+        show_result = execute(self.session, "SHOW ORGANIZATION ACCOUNTS", cacheable=True)
+        accounts = _filter_result(show_result, name=fqn.name)
+        if len(accounts) == 0:
+            return None
+        if len(accounts) > 1:
+            raise Exception(f"Found multiple alerts matching {fqn}")
+        data = accounts[0]
+        return {
+            "name": data["account_name"],
+            "edition": data["edition"],
+            # This column is only displayed for organizations that span multiple region groups.
+            "region_group": data.get("region_group"),
+            "region": data["snowflake_region"],
+            "comment": data["comment"],
+        }
+
     def fetch_alert(self, fqn: FQN):
         show_result = execute(self.session, "SHOW ALERTS", cacheable=True)
         alerts = _filter_result(show_result, name=fqn.name)

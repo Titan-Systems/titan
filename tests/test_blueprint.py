@@ -9,7 +9,7 @@ class TestBlueprint(unittest.TestCase):
 
         db = Database(name="DB")
         schema = Schema(name="SCHEMA", database=db)
-        table = Table(name="TABLE", columns=["id INT"])  # , schema_=schema
+        table = Table(name="TABLE", columns=["id INT"])
         table.schema = schema
         view = View(name="VIEW", schema_=schema, as_="SELECT 1")
         blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, table, schema, view])

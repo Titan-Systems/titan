@@ -3,6 +3,7 @@ import titan
 from tabulate import tabulate, SEPARATING_LINE
 
 CRITICAL = [
+    "account",
     "database",
     "schema",
     "shared_database",
@@ -53,7 +54,7 @@ def check_resource_coverage():
         "Resource Name",
         "from SQL",
         "to SQL",
-        "lifecycle",
+        "privs",
         "fetch",
     ]
 

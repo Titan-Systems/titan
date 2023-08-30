@@ -37,7 +37,9 @@ TO = Keyword("TO").suppress()
 
 def ScopedIdentifier(scope):
     dot = Literal(".").suppress()
-    if scope == Scope.ACCOUNT:
+    if scope == Scope.ORGANIZATION:
+        return pp.Group(Identifier("name"))
+    elif scope == Scope.ACCOUNT:
         return pp.Group(Identifier("name"))
     elif scope == Scope.DATABASE:
         return pp.Group(pp.Opt(Identifier("database") + dot) + Identifier("name"))

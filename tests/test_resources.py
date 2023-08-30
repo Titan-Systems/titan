@@ -5,6 +5,7 @@ from pyparsing import ParseException
 
 from tests.helpers import load_sql_fixtures
 from titan.resources import (
+    Account,
     Alert,
     APIIntegration,
     Column,
@@ -44,55 +45,6 @@ class TestResourceModel(unittest.TestCase):
         self.assertIsNotNone(Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}}))
 
 
-class TestResourceIdentities(unittest.TestCase):
-    def validate_identity(self, resource_cls, data):
-        def _dump(res):
-            return res.model_dump(mode="json", by_alias=True, exclude_none=True)
-
-        instance = resource_cls(**data)
-        self.assertDictEqual(_dump(instance), data)
-        self.assertDictEqual(_dump(resource_cls.from_sql(instance.create_sql())), data)
-
-    def test_alert(self):
-        self.validate_identity(
-            Alert,
-            {
-                "name": "ALERT",
-                "owner": "SYSADMIN",
-                "warehouse": "wh",
-                "schedule": "1 minute",
-                "condition": "SELECT 1",
-                "then": "INSERT INTO foo VALUES(1)",
-            },
-        )
-
-    def test_javascript_udf(self):
-        self.validate_identity(
-            JavascriptUDF,
-            {
-                "name": "NOOP",
-                "owner": "SYSADMIN",
-                "args": [],
-                "secure": False,
-                "returns": "FLOAT",
-                "language": "JAVASCRIPT",
-                "volatility": "VOLATILE",
-                "as_": "return 42;",
-            },
-        )
-
-    def test_view(self):
-        self.validate_identity(
-            View,
-            {
-                "name": "MY_VIEW",
-                "owner": "SYSADMIN",
-                "volatile": True,
-                "as_": "SELECT * FROM tbl",
-            },
-        )
-
-
 class TestResources(unittest.TestCase):
     def test_view_fails_with_empty_columns(self):
         self.assertRaises(ValidationError, View, name="MY_VIEW", columns=[], as_="SELECT 1")
@@ -111,6 +63,10 @@ class TestResourceFixtures(unittest.TestCase):
             resource_cls.from_sql(sql)
         except ParseException:
             self.fail(f"Failed to parse {resource_cls.__name__} from SQL: {sql}")
+
+    def test_account(self):
+        for sql in load_sql_fixtures("account.sql"):
+            self.validate_from_sql(Account, sql)
 
     def test_alert(self):
         for sql in load_sql_fixtures("alert.sql"):

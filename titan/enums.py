@@ -32,6 +32,12 @@ class Scope(ParseableEnum):
     TABLE = "TABLE"
 
 
+class AccountEdition(ParseableEnum):
+    STANDARD = "STANDARD"
+    ENTERPRISE = "ENTERPRISE"
+    BUSINESS_CRITICAL = "BUSINESS-CRITICAL"
+
+
 class DataType(ParseableEnum):
     NUMBER = "NUMBER"
     DECIMAL = "DECIMAL"
