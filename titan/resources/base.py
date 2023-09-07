@@ -1,4 +1,4 @@
-from typing import ClassVar, Dict, List, TYPE_CHECKING
+from typing import ClassVar, Dict, List, Type, Union, TYPE_CHECKING
 
 from typing_extensions import Annotated
 
@@ -39,7 +39,7 @@ serialize_resource_by_name = PlainSerializer(lambda resource: resource.name if r
 
 
 class _Resource(ModelMetaclass):
-    classes = {}
+    classes: Dict[str, Type["Resource"]] = {}
     resource_key: str = None
 
     def __new__(cls, name, bases, attrs):
@@ -63,6 +63,7 @@ class Resource(BaseModel, metaclass=_Resource):
     lifecycle_privs: ClassVar[Privs] = None
     props: ClassVar[Props]
     resource_type: ClassVar[str] = None
+    serialize_as_list: ClassVar[bool] = False
 
     implicit: bool = Field(exclude=True, default=False, repr=False)
     stub: bool = Field(exclude=True, default=False, repr=False)
@@ -153,7 +154,7 @@ class Organization(Resource):
 class OrganizationScoped(BaseModel):
     scope: ClassVar[Scope] = Scope.ORGANIZATION
 
-    organziation: Annotated[
+    organization: Annotated[
         Organization,
         BeforeValidator(coerce_from_str(Organization)),
     ] = Field(default=None, exclude=True, repr=False)
@@ -168,6 +169,8 @@ class OrganizationScoped(BaseModel):
 
     def has_scope(self):
         return self.organization is not None
+
+    name: str
 
 
 @_fix_class_documentation
@@ -214,9 +217,9 @@ class Account(Resource, OrganizationScoped):
     last_name: str = Field(default=None, json_schema_extra={"fetchable": False})
     email: str = Field(default=None, json_schema_extra={"fetchable": False})
     must_change_password: bool = Field(default=None, json_schema_extra={"fetchable": False})
-    edition: AccountEdition = None
-    region_group: str = None
-    region: str = None
+    # edition: AccountEdition = None
+    # region_group: str = None
+    # region: str = None
     comment: str = None
 
     @classmethod

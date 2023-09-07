@@ -54,8 +54,12 @@ def fetch_remote_state(provider: "DataProvider", manifest):
         urn = URN.from_str(urn_str)
         data = provider.fetch_resource(urn)
         # TODO: handle implicit and stub resources
-        if urn_str in manifest and data:
-            state[urn_str] = remove_none_values(data)
+        if urn_str in manifest and data is not None:
+            if isinstance(data, list):
+                compacted = [remove_none_values(d) for d in data]
+            else:
+                compacted = remove_none_values(data)
+            state[urn_str] = compacted
 
     return state
 
@@ -88,8 +92,8 @@ class DataProvider:
         return region
 
     def fetch_account(self, fqn: FQN):
-        show_result = execute(self.session, "SHOW ORGANIZATION ACCOUNTS", cacheable=True)
-        accounts = _filter_result(show_result, name=fqn.name)
+        show_result = execute(self.session, "SHOW ORGANIZATION ACCOUNTS", use_role="ORGADMIN", cacheable=True)
+        accounts = _filter_result(show_result, account_name=fqn.name)
         if len(accounts) == 0:
             return None
         if len(accounts) > 1:
@@ -97,10 +101,10 @@ class DataProvider:
         data = accounts[0]
         return {
             "name": data["account_name"],
-            "edition": data["edition"],
+            # "edition": data["edition"],
             # This column is only displayed for organizations that span multiple region groups.
             "region_group": data.get("region_group"),
-            "region": data["snowflake_region"],
+            # "region": data["snowflake_region"],
             "comment": data["comment"],
         }
 
@@ -165,18 +169,18 @@ class DataProvider:
             "default_ddl_collation": params["default_ddl_collation"],
         }
 
-    def fetch_account_grant(self, fqn: FQN):
-        show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT", cacheable=True)
-        role_account_grants = _filter_result(show_result, grantee_name=fqn.name)
+    # def fetch_account_grant(self, fqn: FQN):
+    #     show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT", cacheable=True)
+    #     role_account_grants = _filter_result(show_result, grantee_name=fqn.name)
 
-        if len(role_account_grants) == 0:
-            return None
+    #     if len(role_account_grants) == 0:
+    #         return None
 
-        return {
-            "privs": sorted([row["privilege"] for row in role_account_grants]),
-            "on": "ACCOUNT",
-            "to": fqn.name,
-        }
+    #     return {
+    #         "privs": sorted([row["privilege"] for row in role_account_grants]),
+    #         "on": "ACCOUNT",
+    #         "to": fqn.name,
+    #     }
 
     def fetch_javascript_udf(self, fqn: FQN):
         show_result = execute(self.session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
@@ -202,8 +206,31 @@ class DataProvider:
             "as_": properties["body"],
         }
 
-    def fetch_priv_grant(self, fqn: FQN):
-        raise NotImplementedError
+    def fetch_grant(self, fqn: FQN):
+        show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT")
+        priv = fqn.name.replace("_", " ")
+        grants = _filter_result(show_result, privilege=priv, grantee_name=fqn.params["to"])
+
+        if len(grants) == 0:
+            return []
+
+        return sorted(
+            [
+                {
+                    "grant_option": row["grant_option"] == "true",
+                    "owner": row["granted_by"],
+                }
+                for row in grants
+            ],
+            key=lambda g: g["owner"],
+        )
+
+        # data = grants[0]
+
+        # return {
+        #     "grant_option": data["grant_option"] == "true",
+        #     "grantors": sorted([row["granted_by"] for row in grants]),
+        # }
 
     def fetch_role(self, fqn: FQN):
         show_result = execute(self.session, f"SHOW ROLES LIKE '{fqn.name}'", cacheable=True)
@@ -290,6 +317,7 @@ class DataProvider:
         return {
             "name": data["name"],
             "from_share": data["origin"],
+            "owner": data["owner"],
         }
 
     def fetch_table(self, fqn: FQN):

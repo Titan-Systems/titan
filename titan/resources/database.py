@@ -23,3 +23,4 @@ class SharedDatabase(Resource, AccountScoped):
 
     name: str
     from_share: str
+    owner: str = "ACCOUNTADMIN"

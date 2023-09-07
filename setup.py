@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="titan",
-    version="0.0.4",
+    version="0.0.5",
     description="The easy way to automate data warehouse infrastructure",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",

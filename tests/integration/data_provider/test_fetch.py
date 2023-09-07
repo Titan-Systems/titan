@@ -82,6 +82,7 @@ resources = [
         "teardown_sql": "DROP DATABASE {name}",
         "data": lambda name: {
             "name": name,
+            "owner": "ACCOUNTADMIN",
             "from_share": "WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1.WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
         },
     },

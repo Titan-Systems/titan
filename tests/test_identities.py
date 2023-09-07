@@ -1,6 +1,17 @@
 import pytest
 
-from titan.resources import Account, Alert, JavascriptUDF, View
+from titan.resources import (
+    Account,
+    Alert,
+    Database,
+    JavascriptUDF,
+    Role,
+    Schema,
+    SharedDatabase,
+    Table,
+    User,
+    View,
+)
 
 resources = [
     {
@@ -23,6 +34,17 @@ resources = [
         },
     },
     {
+        "test": "database",
+        "resource_cls": Database,
+        "data": {
+            "name": "SOMEDB",
+            "owner": "SYSADMIN",
+            "data_retention_time_in_days": 1,
+            "max_data_extension_time_in_days": 14,
+            "transient": False,
+        },
+    },
+    {
         "test": "javascript_udf",
         "resource_cls": JavascriptUDF,
         "data": {
@@ -34,6 +56,48 @@ resources = [
             "language": "JAVASCRIPT",
             "volatility": "VOLATILE",
             "as_": "return 42;",
+        },
+    },
+    {
+        "test": "role",
+        "resource_cls": Role,
+        "data": {"name": "SOMEROLE", "owner": "SYSADMIN"},
+    },
+    {
+        "test": "schema",
+        "resource_cls": Schema,
+        "data": {"name": "SOMESCHEMA", "owner": "SYSADMIN", "transient": False},
+    },
+    {
+        "test": "shared_database",
+        "resource_cls": SharedDatabase,
+        "data": {"name": "SOMESHARENAME", "owner": "ACCOUNTADMIN", "from_share": "SOMEACCOUNT.SOMESHARE"},
+    },
+    {
+        "test": "table",
+        "resource_cls": Table,
+        "data": {
+            "name": "SOMESHARENAME",
+            "owner": "SYSADMIN",
+            "columns": [{"data_type": "INT", "name": "ID"}],
+            "change_tracking": False,
+            "cluster_by": [],
+            "copy_grants": False,
+            "enable_schema_evolution": False,
+            "transient": False,
+            "volatile": False,
+        },
+    },
+    {
+        "test": "user",
+        "resource_cls": User,
+        "data": {
+            "name": "SOMEUSER",
+            "owner": "USERADMIN",
+            "disabled": False,
+            "display_name": "SOMEUSER",
+            "login_name": "SOMEUSER",
+            "must_change_password": False,
         },
     },
     {

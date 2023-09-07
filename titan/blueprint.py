@@ -1,11 +1,19 @@
 import json
 
+from typing import List
 from queue import Queue
 
 from .client import execute
 from .data_provider import DataProvider, fetch_remote_state
 from .identifiers import URN
-from .resources.base import Resource, AccountScoped, DatabaseScoped, SchemaScoped
+from .resources.base import (
+    Account,
+    AccountScoped,
+    DatabaseScoped,
+    OrganizationScoped,
+    Resource,
+    SchemaScoped,
+)
 
 
 def print_diffs(diffs):
@@ -45,9 +53,17 @@ def diff(original, new):
         yield "add", key, new[key]
 
     for key in original_keys & new_keys:
-        delta = dict_delta(original[key], new[key])
-        for attr, value in delta.items():
-            yield "change", key, {attr: value}
+        if isinstance(original[key], dict):
+            delta = dict_delta(original[key], new[key])
+            for attr, value in delta.items():
+                yield "change", key, {attr: value}
+        elif isinstance(original[key], list):
+            for item in original[key]:
+                if item not in new[key]:
+                    yield "remove", key, item
+            for item in new[key]:
+                if item not in original[key]:
+                    yield "add", key, item
 
 
 def _hash(data):
@@ -55,13 +71,14 @@ def _hash(data):
 
 
 class Blueprint:
-    def __init__(self, name, account, database=None, schema=None, resources=[]) -> None:
-        self.staged = []
+    def __init__(self, name, organization=None, account=None, database=None, schema=None, resources=[]) -> None:
+        self.staged: List[Resource] = []
         self.add(resources or [])
         # NOTE: might want a resolution function here
-        self.account = account
-        self.database = database
-        self.schema = schema
+        self.organization = organization or ""
+        self.account = account or ""
+        self.database = database or ""
+        self.schema = schema or ""
 
     def generate_manifest(self):
         manifest = {}
@@ -71,27 +88,40 @@ class Blueprint:
             if resource.implicit:
                 continue
             self._finalize_scope(resource)
-            urn = URN.from_resource(account=self.account, resource=resource)
-            urns.append(str(urn))
+            urn = URN.from_resource(organization=self.organization, account=self.account, resource=resource)
+
             if resource.implicit:
                 continue
             data = resource.model_dump(exclude_none=True)
 
             manifest_key = str(urn)
-            if manifest_key in manifest and _hash(manifest[manifest_key]) != _hash(data):
-                raise RuntimeError(f"Duplicate resource found {manifest_key}")
-            manifest[manifest_key] = data
+
+            if resource.serialize_as_list:
+                if manifest_key not in manifest:
+                    manifest[manifest_key] = []
+                manifest[manifest_key].append(data)
+            else:
+                if manifest_key in manifest:  # and _hash(manifest[manifest_key]) != _hash(data):
+                    # raise RuntimeError(f"Duplicate resource found {manifest_key}")
+                    continue
+                manifest[manifest_key] = data
+            urns.append(manifest_key)
+
             for ref in resource.refs:
-                ref_urn = URN.from_resource(account=self.account, resource=ref)
+                self._finalize_scope(ref)
+                ref_urn = URN.from_resource(organization=self.organization, account=self.account, resource=ref)
                 refs.append((str(urn), str(ref_urn)))
         manifest["_refs"] = refs
         manifest["_urns"] = urns
         return manifest
 
-    def _finalize_scope(self, resource):
+    def _finalize_scope(self, resource: Resource):
         # TODO: connect stubs
-        if isinstance(resource, (AccountScoped, DatabaseScoped, SchemaScoped)) and not resource.has_scope():
-            if isinstance(resource, AccountScoped):
+        is_scoped = isinstance(resource, (OrganizationScoped, AccountScoped, DatabaseScoped, SchemaScoped))
+        if is_scoped and not resource.has_scope():
+            if isinstance(resource, OrganizationScoped):
+                resource.organization = self.organization
+            elif isinstance(resource, AccountScoped):
                 resource.account = self.account
             elif isinstance(resource, DatabaseScoped):
                 if self.database is None:
@@ -118,13 +148,14 @@ class Blueprint:
             resource_cls = Resource.classes[urn.resource_key]
             try:
                 if action == "add":
-                    execute(session, resource_cls.lifecycle_create(urn.fqn, data))
+                    sql = resource_cls.lifecycle_create(urn.fqn, data)
                 elif action == "change":
-                    execute(session, resource_cls.lifecycle_update(urn.fqn, data))
+                    sql = resource_cls.lifecycle_update(urn.fqn, data)
                 elif action == "remove":
-                    execute(session, resource_cls.lifecycle_delete(urn.fqn))
+                    sql = resource_cls.lifecycle_delete(urn.fqn, data)
                 else:
                     raise Exception(f"Unexpected action {action} in plan")
+                execute(session, sql)
             except AttributeError as err:
                 raise AttributeError(f"Resource {resource_cls.__name__} missing lifecycle action") from err
 
@@ -136,6 +167,12 @@ class Blueprint:
             execute(session, resource_cls.lifecycle_delete(urn.fqn))
 
     def _add(self, resource):
+        if isinstance(resource, Account):
+            if self.account == "":
+                self.account = resource.name
+            else:
+                # TODO: out of scope exception
+                raise Exception("Account already set")
         self.staged.append(resource)
         for ref in resource.refs:
             self._add(ref)
@@ -196,12 +233,10 @@ def _plan(remote_state, manifest):
     del manifest["_refs"]
     # del manifest["_urns"]
     changes = []
-    for delta in diff(remote_state, manifest):
-        action, urn_str, data = delta
-        urn = URN.from_str(delta[1])
+    for action, urn_str, data in diff(remote_state, manifest):
+        urn = URN.from_str(urn_str)
         resource_cls = Resource.classes[urn.resource_key]
         data = resource_cls.fetchable_fields(data)
         if data:
             changes.append((action, urn_str, data))
-            print((action, urn_str, data))
     return sorted(changes, key=lambda change: sort_order[change[1]])

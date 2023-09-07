@@ -15,9 +15,9 @@ class TestBlueprint(unittest.TestCase):
         blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, table, schema, view])
         manifest = blueprint.generate_manifest()
 
-        self.assertIn("urn:ABCD123:database/DB", manifest)
+        self.assertIn("urn::ABCD123:database/DB", manifest)
         self.assertDictEqual(
-            manifest["urn:ABCD123:database/DB"],
+            manifest["urn::ABCD123:database/DB"],
             {
                 "name": "DB",
                 "owner": "SYSADMIN",
@@ -27,23 +27,23 @@ class TestBlueprint(unittest.TestCase):
             },
         )
 
-        self.assertIn("urn:ABCD123:schema/DB.SCHEMA", manifest)
+        self.assertIn("urn::ABCD123:schema/DB.SCHEMA", manifest)
         self.assertDictEqual(
-            manifest["urn:ABCD123:schema/DB.SCHEMA"],
+            manifest["urn::ABCD123:schema/DB.SCHEMA"],
             {
                 "name": "SCHEMA",
                 "owner": "SYSADMIN",
                 "transient": False,
             },
         )
-        self.assertIn("urn:ABCD123:view/DB.SCHEMA.VIEW", manifest)
+        self.assertIn("urn::ABCD123:view/DB.SCHEMA.VIEW", manifest)
         self.assertDictEqual(
-            manifest["urn:ABCD123:view/DB.SCHEMA.VIEW"],
+            manifest["urn::ABCD123:view/DB.SCHEMA.VIEW"],
             {"name": "VIEW", "owner": "SYSADMIN", "as_": "SELECT 1"},
         )
-        self.assertIn("urn:ABCD123:table/DB.SCHEMA.TABLE", manifest)
+        self.assertIn("urn::ABCD123:table/DB.SCHEMA.TABLE", manifest)
         self.assertDictEqual(
-            manifest["urn:ABCD123:table/DB.SCHEMA.TABLE"],
+            manifest["urn::ABCD123:table/DB.SCHEMA.TABLE"],
             {
                 "name": "TABLE",
                 "owner": "SYSADMIN",

@@ -6,7 +6,7 @@ from titan.blueprint import _plan
 @pytest.fixture(scope="session")
 def remote_state(removed_db):
     state = {
-        "urn:XYZ123:database/EXISTING_DB": {
+        "urn::XYZ123:database/EXISTING_DB": {
             "name": "EXISTING_DB",
             "transient": False,
             "owner": "SYSADMIN",
@@ -19,7 +19,7 @@ def remote_state(removed_db):
 @pytest.fixture(scope="session")
 def new_db():
     return {
-        "urn:XYZ123:database/NEW_DB": {
+        "urn::XYZ123:database/NEW_DB": {
             "name": "NEW_DB",
             "transient": False,
             "owner": "SYSADMIN",
@@ -30,7 +30,7 @@ def new_db():
 @pytest.fixture(scope="session")
 def changed_db():
     return {
-        "urn:XYZ123:database/EXISTING_DB": {
+        "urn::XYZ123:database/EXISTING_DB": {
             "name": "EXISTING_DB",
             "transient": False,
             "owner": "SYSADMIN",
@@ -42,7 +42,7 @@ def changed_db():
 @pytest.fixture(scope="session")
 def removed_db():
     return {
-        "urn:XYZ123:database/REMOVED_DB": {
+        "urn::XYZ123:database/REMOVED_DB": {
             "name": "REMOVED_DB",
             "transient": False,
             "owner": "SYSADMIN",
@@ -54,8 +54,8 @@ def removed_db():
 def manifest(new_db, changed_db):
     manifest = {
         "_urns": [
-            "urn:XYZ123:database/EXISTING_DB",
-            "urn:XYZ123:database/NEW_DB",
+            "urn::XYZ123:database/EXISTING_DB",
+            "urn::XYZ123:database/NEW_DB",
         ],
         "_refs": [],
     }
