@@ -249,10 +249,9 @@ class DataProvider:
         }
 
     def fetch_role_grant(self, fqn: FQN):
-        role, target = fqn.name.split("?")
-        target_type, target_name = target.split("=")
+        subject, name = fqn.params.copy().popitem()
         try:
-            show_result = execute(self.session, f"SHOW GRANTS OF ROLE {role}", cacheable=True)
+            show_result = execute(self.session, f"SHOW GRANTS OF ROLE {fqn.name}", cacheable=True)
         except ProgrammingError as err:
             if err.errno == DOEST_NOT_EXIST_ERR:
                 return None
@@ -262,11 +261,11 @@ class DataProvider:
             return None
 
         for data in show_result:
-            if data["granted_to"] == target_type.upper() and data["grantee_name"] == target_name:
+            if data["granted_to"] == subject.upper() and data["grantee_name"] == name:
                 if data["granted_to"] == "ROLE":
-                    return {"role": role, "to_role": data["grantee_name"], "owner": data["granted_by"]}
+                    return {"role": fqn.name, "to_role": data["grantee_name"], "owner": data["granted_by"]}
                 elif data["granted_to"] == "USER":
-                    return {"role": role, "to_user": data["grantee_name"], "owner": data["granted_by"]}
+                    return {"role": fqn.name, "to_user": data["grantee_name"], "owner": data["granted_by"]}
                 else:
                     raise Exception(f"Unexpected role grant for role {fqn.name}")
 

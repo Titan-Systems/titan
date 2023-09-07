@@ -1,7 +1,9 @@
+import os
 import uuid
 
 import pytest
-from titan.client import get_session
+import snowflake.connector
+
 from titan.resources import (
     Database,
     Role,
@@ -11,6 +13,15 @@ from titan.resources import (
     View,
     Warehouse,
 )
+
+TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
+
+connection_params = {
+    "account": os.environ.get("TEST_SNOWFLAKE_ACCOUNT"),
+    "user": os.environ.get("TEST_SNOWFLAKE_USER"),
+    "password": os.environ.get("TEST_SNOWFLAKE_PASSWORD"),
+    "role": TEST_ROLE,
+}
 
 
 @pytest.fixture(scope="session")
@@ -31,11 +42,11 @@ def marked_for_cleanup():
 
 @pytest.fixture(scope="session")
 def cursor(suffix, test_db, marked_for_cleanup):
-    session = get_session()
+    session = snowflake.connector.connect(**connection_params)
     with session.cursor() as cur:
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
         cur.execute(f"CREATE DATABASE {test_db}")
-        cur.execute("USE ROLE ACCOUNTADMIN")
+        cur.execute(f"USE ROLE {TEST_ROLE}")
         yield cur
         for res in marked_for_cleanup:
             cur.execute(res.drop_sql(if_exists=True))

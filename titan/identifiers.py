@@ -6,8 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class FQN(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    database: str = None
-    schema_: str = Field(alias="schema", default=None)
+    database: Optional[str] = None
+    schema_: Optional[str] = Field(alias="schema", default=None)
     name: str
     params: dict = {}
 

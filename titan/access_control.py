@@ -2,7 +2,7 @@ from typing import List
 
 from pydantic import BaseModel
 
-from .resources import Resource, PrivGrant, OwnershipGrant
+from .resources import Resource, Grant
 from .resources.role import T_Role
 from .enums import ParseableEnum
 
@@ -45,7 +45,8 @@ class ACL(BaseModel):
                     privs = _resolve_privs(super_priv, resource)
                     for priv in privs:
                         if _is_ownership_priv(priv):
-                            grants.append(OwnershipGrant(on=resource, to=role))
+                            # grants.append(OwnershipGrant(on=resource, to=role))
+                            raise Exception("OwnershipGrant is deprecated")
                         else:
-                            grants.append(PrivGrant(privs=priv, on=resource, to=role))
+                            grants.append(Grant(priv=priv, on=resource, to=role))
         return grants

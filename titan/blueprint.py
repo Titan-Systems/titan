@@ -139,7 +139,8 @@ class Blueprint:
         return _plan(remote_state, manifest)
 
     def apply(self, session, plan=None):
-        plan = plan or self.plan(session)
+        if plan is None:
+            plan = self.plan(session)
 
         # with session.cursor() as cur:
         # TODO: cursor setup, including query tag

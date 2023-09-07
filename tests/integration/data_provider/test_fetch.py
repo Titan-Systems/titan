@@ -1,12 +1,22 @@
+import os
 import uuid
 
 import pytest
+import snowflake.connector
+
 from titan.data_provider import DataProvider, remove_none_values
-from titan.client import get_session
 from titan.enums import Scope
 from titan.identifiers import FQN
 from titan.resources import Resource
 
+TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
+
+connection_params = {
+    "account": os.environ.get("TEST_SNOWFLAKE_ACCOUNT"),
+    "user": os.environ.get("TEST_SNOWFLAKE_USER"),
+    "password": os.environ.get("TEST_SNOWFLAKE_PASSWORD"),
+    "role": TEST_ROLE,
+}
 
 resources = [
     {
@@ -22,7 +32,7 @@ resources = [
             "schedule": "60 MINUTE",
             "condition": "SELECT 1",
             "then": "SELECT 1",
-            "owner": "ACCOUNTADMIN",
+            "owner": TEST_ROLE,
         },
     },
     {
@@ -31,7 +41,7 @@ resources = [
         "teardown_sql": "DROP DATABASE {name}",
         "data": lambda name: {
             "name": name,
-            "owner": "ACCOUNTADMIN",
+            "owner": TEST_ROLE,
             "data_retention_time_in_days": 1,
             "max_data_extension_time_in_days": 14,
             "transient": False,
@@ -57,7 +67,7 @@ resources = [
         "teardown_sql": "DROP ROLE {name}",
         "data": lambda name: {
             "name": name,
-            "owner": "ACCOUNTADMIN",
+            "owner": TEST_ROLE,
         },
     },
     {
@@ -66,7 +76,7 @@ resources = [
         "teardown_sql": "DROP SCHEMA {name}",
         "data": lambda name: {
             "name": name,
-            "owner": "ACCOUNTADMIN",
+            "owner": TEST_ROLE,
             "data_retention_time_in_days": 1,
             "max_data_extension_time_in_days": 1,
             "transient": True,
@@ -82,7 +92,7 @@ resources = [
         "teardown_sql": "DROP DATABASE {name}",
         "data": lambda name: {
             "name": name,
-            "owner": "ACCOUNTADMIN",
+            "owner": TEST_ROLE,
             "from_share": "WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1.WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
         },
     },
@@ -92,7 +102,7 @@ resources = [
         "teardown_sql": "DROP TABLE {name}",
         "data": lambda name: {
             "name": name,
-            "owner": "ACCOUNTADMIN",
+            "owner": TEST_ROLE,
             "columns": [{"name": "ID", "nullable": True, "data_type": "NUMBER(38,0)"}],
         },
     },
@@ -121,14 +131,14 @@ def test_db(suffix):
 
 @pytest.fixture(scope="session")
 def db_session(suffix):
-    return get_session()
+    return snowflake.connector.connect(**connection_params)
 
 
 @pytest.fixture(scope="session")
 def cursor(db_session, suffix, test_db):
     with db_session.cursor() as cur:
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
-        cur.execute("USE ROLE ACCOUNTADMIN")
+        cur.execute(f"USE ROLE {TEST_ROLE}")
         cur.execute(f"CREATE DATABASE {test_db}")
         yield cur
         cur.execute(f"DROP DATABASE {test_db}")
