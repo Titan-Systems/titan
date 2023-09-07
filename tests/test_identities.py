@@ -6,6 +6,7 @@ from titan.resources import (
     Database,
     JavascriptUDF,
     Role,
+    RoleGrant,
     Schema,
     SharedDatabase,
     Table,
@@ -62,6 +63,11 @@ resources = [
         "test": "role",
         "resource_cls": Role,
         "data": {"name": "SOMEROLE", "owner": "SYSADMIN"},
+    },
+    {
+        "test": "role_grant",
+        "resource_cls": RoleGrant,
+        "data": {"role": "SOMEROLE", "to_user": "SOMEUSER", "owner": "SYSADMIN"},
     },
     {
         "test": "schema",
