@@ -1,7 +1,7 @@
 from typing import List, Union
 from typing_extensions import Annotated
 
-from pydantic import AfterValidator, BeforeValidator, Field, model_validator, BaseModel
+from pydantic import BeforeValidator, Field, PlainSerializer, model_validator
 
 from .base import Resource, AccountScoped, Database, Schema, serialize_resource_by_name
 from .role import T_Role
@@ -30,18 +30,18 @@ from ..privs import GlobalPriv, SchemaPriv
 #     # file_type_cls = FileTypeMap[file_type]
 #     # return file_type_cls(type=file_type, **kwargs)
 
-#     @classmethod
-#     def from_sql(cls, sql):
-#         parsed = _parse_grant(sql)
-#         grant_cls = Resource.classes[parsed["resource_key"]]
+# @classmethod
+# def from_sql(cls, sql):
+#     parsed = _parse_grant(sql)
+#     grant_cls = Resource.classes[parsed["resource_key"]]
 
-#         # RoleGrants
-#         if grant_cls is RoleGrant:
-#             props = _parse_props(RoleGrant.props, sql)
-#             return RoleGrant(**props)
+#     # RoleGrants
+#     if grant_cls is RoleGrant:
+#         props = _parse_props(RoleGrant.props, sql)
+#         return RoleGrant(**props)
 
-#         props = _parse_props(grant_cls.props, parsed["remainder"])
-#         return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
+#     props = _parse_props(grant_cls.props, parsed["remainder"])
+#     return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
 
 
 class Grant(Resource, AccountScoped):
@@ -132,54 +132,60 @@ class Grant(Resource, AccountScoped):
         grant_option=FlagProp("with grant option"),
     )
 
-    # privs: Annotated[list, BeforeValidator(listify)]
-    priv: ParseableEnum = Field(exclude=True)
+    priv: Annotated[ParseableEnum, PlainSerializer(lambda en: en.value if en else None)] = None
+
     # TODO: This should probably some new annotated type like NamedResource
     # on: Annotated[Resource, serialize_resource_by_name]
-    on: Annotated[str, BeforeValidator(serialize_as_named_resource)] = Field(exclude=True)
-    to: T_Role = Field(exclude=True)
+    on: Annotated[str, BeforeValidator(serialize_as_named_resource)] = None
+    to: T_Role = None
     grant_option: bool = False
     owner: str = None
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
         if self.owner is None:
-            self.owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(GlobalPriv(self.priv), "SYSADMIN")
+            self.owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(self.priv, "SYSADMIN")
+
+    @classmethod
+    def from_sql(cls, sql):
+        parsed = _parse_grant(sql)
+        raise NotImplementedError("TODO: implement Grant.from_sql")
+        # props = _parse_props(cls.props, parsed["remainder"])
+        # return cls(privs=parsed["privs"], on=parsed["on"], **props)
 
     @property
     def name(self):
         priv = self.priv if isinstance(self.priv, str) else self.priv.value
-        return priv.upper().replace(" ", "_")
+        if " " in priv:
+            priv = f'"{priv}"'
+        return priv
 
     @property
     def fully_qualified_name(self):
-        return FQN(name=self.name, params={"on": self.on, "to": self.to.name})
+        return FQN(name=self.to.name, params={"on": self.on})
 
     @classmethod
     def lifecycle_create(cls, fqn: FQN, data):
-        # TODO: put the params back into data, duplication is fine
-        priv = fqn.name.replace("_", " ")
         return SQL(
             "GRANT",
-            priv,
+            data["priv"],
             "ON",
-            fqn.params["on"],
-            "TO",
-            fqn.params["to"],
+            data["on"],
+            # "TO",
+            # data["to"],
             cls.props.render(data),
             _use_role=data["owner"],
         )
 
     @classmethod
     def lifecycle_delete(cls, fqn: FQN, data, cascade=False):
-        priv = fqn.name.replace("_", " ")
         return SQL(
             "REVOKE",
-            priv,
+            data["priv"],
             "ON",
-            fqn.params["on"],
+            data["on"],
             "FROM",
-            fqn.params["to"],
+            data["to"],
             "CASCADE" if cascade else "RESTRICT",
             _use_role=data["owner"],
         )
@@ -214,22 +220,6 @@ class Grant(Resource, AccountScoped):
 
 #     on: Annotated[Resource, serialize_resource_by_name]
 #     to: T_Role
-
-
-# class AccountGrant(PrivGrant):
-#     """
-#     GRANT { globalPrivileges | ALL [ PRIVILEGES ] }
-#     ON ACCOUNT
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: Annotated[List[GlobalPriv], BeforeValidator(listify), AfterValidator(sorted)]
-#     on: str = "ACCOUNT"
-
-#     @property
-#     def name(self):
-#         return self.to.name
 
 
 # class AccountObjectGrant(PrivGrant):
@@ -337,6 +327,11 @@ class RoleGrant(Resource, AccountScoped):
         if self.to_role is not None and self.to_user is not None:
             raise ValueError("You can only grant to a role or a user, not both")
         return self
+
+    @classmethod
+    def from_sql(cls, sql):
+        props = _parse_props(cls.props, sql)
+        return RoleGrant(**props)
 
     @property
     def fully_qualified_name(self):

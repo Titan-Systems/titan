@@ -1,9 +1,11 @@
 import pytest
 
+from titan.privs import GlobalPriv
 from titan.resources import (
     Account,
     Alert,
     Database,
+    Grant,
     JavascriptUDF,
     Role,
     RoleGrant,
@@ -43,6 +45,17 @@ resources = [
             "data_retention_time_in_days": 1,
             "max_data_extension_time_in_days": 14,
             "transient": False,
+        },
+    },
+    {
+        "test": "grant",
+        "resource_cls": Grant,
+        "data": {
+            "priv": GlobalPriv.CREATE_DATABASE,
+            "to": "SOMEROLE",
+            "owner": "SYSADMIN",
+            "on": "ACCOUNT",
+            "grant_option": False,
         },
     },
     {

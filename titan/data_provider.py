@@ -169,19 +169,6 @@ class DataProvider:
             "default_ddl_collation": params["default_ddl_collation"],
         }
 
-    # def fetch_account_grant(self, fqn: FQN):
-    #     show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT", cacheable=True)
-    #     role_account_grants = _filter_result(show_result, grantee_name=fqn.name)
-
-    #     if len(role_account_grants) == 0:
-    #         return None
-
-    #     return {
-    #         "privs": sorted([row["privilege"] for row in role_account_grants]),
-    #         "on": "ACCOUNT",
-    #         "to": fqn.name,
-    #     }
-
     def fetch_javascript_udf(self, fqn: FQN):
         show_result = execute(self.session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
         udfs = _filter_result(show_result, name=fqn.name)
@@ -207,9 +194,10 @@ class DataProvider:
         }
 
     def fetch_grant(self, fqn: FQN):
-        show_result = execute(self.session, "SHOW GRANTS ON ACCOUNT")
-        priv = fqn.name.replace("_", " ")
-        grants = _filter_result(show_result, privilege=priv, grantee_name=fqn.params["to"])
+        show_result = execute(self.session, f"SHOW GRANTS TO ROLE {fqn.name}")
+        on = fqn.params["on"]
+        to = fqn.name
+        grants = _filter_result(show_result, granted_on=on, grantee_name=to)
 
         if len(grants) == 0:
             return []
@@ -217,20 +205,16 @@ class DataProvider:
         return sorted(
             [
                 {
+                    "priv": row["privilege"],
+                    "on": row["granted_on"],
+                    "to": row["grantee_name"],
                     "grant_option": row["grant_option"] == "true",
                     "owner": row["granted_by"],
                 }
                 for row in grants
             ],
-            key=lambda g: g["owner"],
+            key=lambda g: (g["priv"], g["owner"]),
         )
-
-        # data = grants[0]
-
-        # return {
-        #     "grant_option": data["grant_option"] == "true",
-        #     "grantors": sorted([row["granted_by"] for row in grants]),
-        # }
 
     def fetch_role(self, fqn: FQN):
         show_result = execute(self.session, f"SHOW ROLES LIKE '{fqn.name}'", cacheable=True)
