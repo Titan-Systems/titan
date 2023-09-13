@@ -35,20 +35,6 @@ ON = Keyword("ON").suppress()
 TO = Keyword("TO").suppress()
 
 
-def ScopedIdentifier(scope):
-    dot = Literal(".").suppress()
-    if scope == Scope.ORGANIZATION:
-        return pp.Group(Identifier("name"))
-    elif scope == Scope.ACCOUNT:
-        return pp.Group(Identifier("name"))
-    elif scope == Scope.DATABASE:
-        return pp.Group(pp.Opt(Identifier("database") + dot) + Identifier("name"))
-    elif scope == Scope.SCHEMA:
-        return pp.Group(pp.Opt(pp.Opt(Identifier("database") + dot) + Identifier("schema") + dot) + Identifier("name"))
-    else:
-        raise Exception(f"Unsupported scope: {scope}")
-
-
 def Keywords(keywords):
     words = keywords.split(" ")
     if len(words) == 1:
@@ -122,6 +108,20 @@ def _split_statements(sql_text):
     return results
 
 
+def _make_scoped_identifier(identifier_list, scope):
+    if len(identifier_list) == 1:
+        return {"name": identifier_list[0]}
+    elif len(identifier_list) == 2:
+        if scope == Scope.DATABASE:
+            return {"database": identifier_list[0], "name": identifier_list[1]}
+        elif scope == Scope.SCHEMA:
+            return {"schema": identifier_list[0], "name": identifier_list[1]}
+    elif len(identifier_list) == 3:
+        return {"database": identifier_list[0], "schema": identifier_list[1], "name": identifier_list[2]}
+    else:
+        raise Exception(f"Unsupported identifier list: {identifier_list}")
+
+
 def _parse_create_header(sql, resource_cls):
     header = pp.And(
         [
@@ -131,14 +131,15 @@ def _parse_create_header(sql, resource_cls):
             ...,
             Keywords(resource_cls.resource_type)("resource_type"),
             pp.Opt(IF_NOT_EXISTS)("if_not_exists"),
-            ScopedIdentifier(resource_cls.scope)("resource_identifier"),
+            FullyQualifiedIdentifier("resource_identifier"),
             REST_OF_STRING("remainder"),
         ]
     )
     try:
         results = header.parse_string(sql, parse_all=True).as_dict()
         remainder = (results["_skipped"][0] + " " + results.get("remainder", "")).strip()
-        return (results["resource_identifier"], remainder)
+        identifier = _make_scoped_identifier(results["resource_identifier"], resource_cls.scope)
+        return (identifier, remainder)
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse header") from err
 
