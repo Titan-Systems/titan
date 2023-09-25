@@ -19,4 +19,4 @@ def serialize_as_named_resource(name_or_resource) -> "Resource":
         return name_or_resource
     else:
         res = name_or_resource
-        return f"{res.resource_type} {res.name}"
+        return f"{res.resource_type} {res.fqn}"

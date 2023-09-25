@@ -24,7 +24,7 @@ __all__ = [
     "Warehouse",
 ]
 
-__version__ = "0.0.6"
+__version__ = "0.0.7"
 
 
 LOGO = r"""

@@ -51,7 +51,7 @@ resources = [
         "test": "grant",
         "resource_cls": Grant,
         "data": {
-            "priv": GlobalPriv.CREATE_DATABASE,
+            "priv": GlobalPriv.CREATE_DATABASE.value,
             "to": "SOMEROLE",
             "owner": "SYSADMIN",
             "on": "ACCOUNT",
@@ -149,4 +149,5 @@ def test_data_identity(resource):
 def test_sql_identity(resource):
     instance = resource["resource_cls"](**resource["data"])
     sql = instance.create_sql()
-    assert resource["resource_cls"].from_sql(sql) == instance
+    new = resource["resource_cls"].from_sql(sql)
+    assert new == instance

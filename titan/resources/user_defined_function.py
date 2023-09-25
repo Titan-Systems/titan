@@ -1,7 +1,7 @@
 from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..enums import DataType, NullHandling, ParseableEnum, Volatility
 from ..props import (
-    ColumnsProp,
+    ArgsProp,
     EnumFlagProp,
     EnumProp,
     FlagProp,
@@ -38,7 +38,7 @@ class JavascriptUDF(UserDefinedFunction):
 
     props = Props(
         secure=FlagProp("secure"),
-        args=ColumnsProp(),
+        args=ArgsProp(),
         # Specifies to retain the access privileges from the original function when a new
         # function is created using CREATE OR REPLACE FUNCTION.
         # copy_grants=FlagProp("copy_grants"),

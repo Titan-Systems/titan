@@ -3,7 +3,7 @@ from typing import Dict
 from .base import Resource, AccountScoped, _fix_class_documentation
 from ..enums import DataType, NullHandling, Volatility
 from ..props import (
-    ColumnsProp,
+    ArgsProp,
     DictProp,
     EnumProp,
     EnumFlagProp,
@@ -36,7 +36,7 @@ class ExternalFunction(Resource, AccountScoped):
     resource_type = "EXTERNAL FUNCTION"
     props = Props(
         secure=FlagProp("secure"),
-        columns=ColumnsProp(),
+        args=ArgsProp(),
         returns=EnumProp("returns", DataType, eq=False),
         # not_null=BoolProp("not_null"),
         null_handling=EnumFlagProp(NullHandling),
@@ -53,7 +53,7 @@ class ExternalFunction(Resource, AccountScoped):
 
     name: str
     secure: bool = False
-    columns: list = []
+    args: list = []
     returns: DataType
     # not_null: bool = False
     null_handling: NullHandling = None

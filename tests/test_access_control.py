@@ -17,16 +17,6 @@ def test_create():
     ]
 
 
-# TODO: OwnershipGrant is deprecated
-# def test_delete():
-#     db = Database(name="somedb")
-#     role = Role(name="somerole")
-#     acl = ACL(privs=[SuperPriv.DELETE], roles=[role], resources=[db])
-#     grants = acl.grants()
-#     assert len(grants) == 1
-#     assert OwnershipGrant(on=db, to=role) in grants
-
-
 def test_read():
     tbl = Table(name="sometbl", columns=["id INT"])
     role = Role(name="somerole")

@@ -4,7 +4,9 @@ import pyparsing as pp
 
 from pyparsing import ParseException
 
+from .builder import SQL
 from .enums import Scope
+
 
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
@@ -63,16 +65,6 @@ REST_OF_STRING = pp.Word(pp.printables + " \n") | pp.StringEnd() | pp.Empty()
 
 STORAGE_INTEGRATION = Keywords("STORAGE INTEGRATION")
 NOTIFICATION_INTEGRATION = Keywords("NOTIFICATION INTEGRATION")
-
-
-COLUMN = (
-    (Identifier | pp.dbl_quoted_string)("name")
-    + ANY("data_type")
-    + pp.Opt(_in_parens(ANY()))("data_type_size")
-    + pp.Opt(Keywords("NOT NULL")("not_null"))
-    + pp.Opt(Keyword("COLLATE") + StringLiteral("collate"))
-    + pp.Opt(Keyword("COMMENT") + StringLiteral("comment"))
-)
 
 
 snowflake_sql_comment = pp.Regex(r"--.*").set_name("Snowflake SQL comment")
@@ -137,14 +129,14 @@ def _parse_create_header(sql, resource_cls):
     )
     try:
         results = header.parse_string(sql, parse_all=True).as_dict()
-        remainder = (results["_skipped"][0] + " " + results.get("remainder", "")).strip()
+        remainder = (results["_skipped"][0] + " " + results.get("remainder", "")).strip(" ;")
         identifier = _make_scoped_identifier(results["resource_identifier"], resource_cls.scope)
         return (identifier, remainder)
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse header") from err
 
 
-def _parse_grant(sql):
+def _parse_grant(sql: Union[str, SQL]):
     """
     GRANT {
           { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
@@ -154,15 +146,20 @@ def _parse_grant(sql):
         | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
         | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
     }
+    TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
     """
+
+    if isinstance(sql, SQL):
+        sql = str(sql)
 
     # Check for role grant
     if _contains(Keywords("GRANT ROLE"), sql):
         return {"resource_key": "role_grant"}
 
-    # Check for role grant
+    # Check for ownership grant
     if _contains(Keywords("GRANT OWNERSHIP"), sql):
-        return {"resource_key": "ownership_grant"}
+        raise NotImplementedError("Ownership grant not supported")
+        # return {"resource_key": "ownership_grant"}
 
     grant = GRANT + pp.SkipTo(ON)("privs") + ON + pp.SkipTo(TO)("on") + REST_OF_STRING("remainder")
     grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
@@ -473,7 +470,6 @@ def _parse_props(props, sql):
     for parse_results, start, end in parser.scan_string(sql):
         # Check if we skipped any text
         if len(sql[prev_end:start].strip()) > 0:
-            # raise Exception(f"Failed to parse prop {sql[prev_end:start]}")
             raise ParseException(f"Failed to parse prop {sql[prev_end:start]}")
 
         prop_kwarg = parse_results[-1]
@@ -508,3 +504,44 @@ def _format_props(props):
     for prop_kwarg, prop in props.props.items():
         buf.append(f"{type(prop).__name__}('{prop_kwarg}') -> {str(prop.parser)}")
     return "\n".join(buf)
+
+
+def _parse_column(sql):
+    collate = Keyword("COLLATE").suppress() + ANY("collate")
+    comment = Keyword("COMMENT").suppress() + ANY("comment")
+    not_null = Keywords("NOT NULL").set_parse_action(lambda _: True)("not_null")
+    constraint = Keyword("UNIQUE") ^ Keywords("PRIMARY KEY") ^ (Keyword("CONSTRAINT").suppress() + ANY())
+    # TODO: rest of column properties
+    constraint = constraint("constraint")
+    column = (
+        Identifier("name")
+        + pp.ungroup((ANY() + _in_parens(ANY())) ^ ANY())("data_type")
+        + pp.Opt(collate)
+        + pp.Opt(comment)
+        + pp.Opt(not_null)
+        + pp.Opt(constraint)
+        + REST_OF_STRING("remainder")
+    )
+    try:
+        results = column.parse_string(sql, parse_all=True)
+        return results.as_dict()
+    except pp.ParseException as err:
+        raise pp.ParseException("Failed to parse column") from err
+
+
+def _parse_table_schema(sql):
+    columns_blob, start, end = _first_match(pp.original_text_for(pp.nested_expr()), sql)
+    columns_blob = columns_blob[0].strip("()")
+    columns = []
+    while columns_blob:
+        col = _parse_column(columns_blob)
+        columns_blob = col.pop("remainder", "")
+        columns.append(col)
+        if columns_blob and columns_blob[0] == ",":
+            columns_blob = columns_blob[1:]
+
+    # TODO: outofline constraints
+
+    remainder = sql[0:start] + " " + sql[end:]
+    table_schema = {"columns": columns, "constraints": []}
+    return (table_schema, remainder)

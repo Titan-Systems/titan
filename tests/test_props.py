@@ -7,7 +7,7 @@ from titan.resources import Database
 from titan.props import (
     AlertConditionProp,
     BoolProp,
-    ColumnsProp,
+    ArgsProp,
     EnumProp,
     EnumFlagProp,
     FlagProp,
@@ -33,24 +33,23 @@ class TestProp(unittest.TestCase):
         self.assertFalse(BoolProp("bar").parse("bar = FALSE"))
         self.validate_identity(BoolProp("boolprop"), "BOOLPROP = TRUE")
 
-    def test_prop_columns(self):
-        self.assertEqual(ColumnsProp().parse("(id INT)"), [{"name": "id", "data_type": DataType.INT}])
-        self.assertEqual(ColumnsProp().parse("(somestr VARCHAR)"), [{"name": "somestr", "data_type": DataType.VARCHAR}])
-        self.assertEqual(ColumnsProp().parse("(floaty FLOAT8)"), [{"name": "floaty", "data_type": DataType.FLOAT8}])
+    def test_prop_args(self):
+        self.assertEqual(ArgsProp().parse("(id INT)"), [{"name": "id", "data_type": DataType.INT}])
+        self.assertEqual(ArgsProp().parse("(somestr VARCHAR)"), [{"name": "somestr", "data_type": DataType.VARCHAR}])
+        self.assertEqual(ArgsProp().parse("(floaty FLOAT8)"), [{"name": "floaty", "data_type": DataType.FLOAT8}])
         self.assertEqual(
-            ColumnsProp().parse("(multiple INT, columns VARCHAR)"),
+            ArgsProp().parse("(multiple INT, columns VARCHAR)"),
             [
                 {"name": "multiple", "data_type": DataType.INT},
                 {"name": "columns", "data_type": DataType.VARCHAR},
             ],
         )
         self.assertEqual(
-            ColumnsProp().parse("(id INT, name STRING, created_at TIMESTAMP, commented VARCHAR comment 'a comment')"),
+            ArgsProp().parse("(id INT, name STRING, created_at TIMESTAMP)"),
             [
                 {"name": "id", "data_type": DataType.INT},
                 {"name": "name", "data_type": DataType.STRING},
                 {"name": "created_at", "data_type": DataType.TIMESTAMP},
-                {"name": "commented", "data_type": DataType.VARCHAR, "comment": "a comment"},
             ],
         )
 

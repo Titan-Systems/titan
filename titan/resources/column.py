@@ -5,7 +5,7 @@ from pydantic import BeforeValidator
 from .base import Resource, ResourceName, _fix_class_documentation
 from ..enums import DataType
 from ..props import FlagProp, Props, StringProp
-from ..parse import COLUMN, _parse_props, _first_match
+from ..parse import _parse_column, _parse_props
 
 
 @_fix_class_documentation
@@ -20,9 +20,10 @@ class Column(Resource):
       [ [ WITH ] MASKING POLICY <policy_name> [ USING ( <col_name> , <cond_col1> , ... ) ] ]
       [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
       [ inlineConstraint ]
-      [ , <col_name> <col_type> [ ... ] ]
-      [ , outoflineConstraint ]
-      [ , ... ]
+
+      # [ , <col_name> <col_type> [ ... ] ]
+      # [ , outoflineConstraint ]
+      # [ , ... ]
 
     inlineConstraint ::=
       [ CONSTRAINT <constraint_name> ]
@@ -48,19 +49,18 @@ class Column(Resource):
     )
 
     name: ResourceName
-    data_type: DataType
+    data_type: str  # DataType
     collate: str = None
     comment: str = None
     not_null: bool = None
+    constraint: str = None
 
     @classmethod
     def from_sql(cls, sql):
-        parse_results, start, end = _first_match(COLUMN, sql)
-        col_name = parse_results["name"]
-        data_type = DataType(parse_results["data_type"])
-        remainder = sql[end:]
+        parse_results = _parse_column(sql)
+        remainder = parse_results.pop("remainder", "")
         props = _parse_props(cls.props, remainder)
-        return cls(name=col_name, data_type=data_type, **props)
+        return cls(**parse_results, **props)
 
 
 def _coerce(sql_or_resource):

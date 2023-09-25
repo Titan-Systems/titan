@@ -15,7 +15,6 @@ from .parse import (
     Literals,
     StringLiteral,
     FullyQualifiedIdentifier,
-    COLUMN,
     EQUALS,
     ARROW,
     ANY,
@@ -398,32 +397,36 @@ class SessionParametersProp(Prop):
     pass
 
 
-class ColumnsProp(Prop):
+class ArgsProp(Prop):
     def __init__(self):
         value_expr = pp.original_text_for(pp.nested_expr())
         super().__init__(label=None, value_expr=value_expr, eq=False)
 
     def typecheck(self, prop_values):
+        arg_parser = pp.DelimitedList(
+            pp.Group(
+                (Identifier | pp.dbl_quoted_string)("name")
+                + ANY("data_type")
+                + pp.Opt(_in_parens(ANY()))("data_type_size")
+            )
+        )
         prop_values = prop_values.strip("()")
-        parsed = pp.DelimitedList(pp.Group(COLUMN())).parse_string(prop_values)
-        columns = []
-        for column_data in parsed:
-            column = column_data.as_dict()
-            column["name"] = column["name"].strip('"')
-            column["data_type"] = DataType(column["data_type"])
-            if "comment" in column:
-                column["comment"] = column["comment"]
-            columns.append(column)
-        return columns
+        parsed = arg_parser.parse_string(prop_values)
+        args = []
+        for arg_data in parsed:
+            arg = arg_data.as_dict()
+            arg["name"] = arg["name"].strip('"')
+            arg["data_type"] = DataType(arg["data_type"])
+            args.append(arg)
+        return args
 
     def render(self, value):
         if value is None:
             return "()"
-        columns = []
-        for col in value:
-            comment = f" COMMENT '{col['comment']}'" if col.get("comment") else ""
-            columns.append(f"{col['name']} {col['data_type']}{comment}")
-        return f"({', '.join(columns)})"
+        args = []
+        for arg in value:
+            args.append(f"{arg['name']} {arg['data_type']}")
+        return f"({', '.join(args)})"
 
 
 class ColumnNamesProp(Prop):
@@ -448,3 +451,12 @@ class ColumnNamesProp(Prop):
                 column["comment"] = column["comment"]
             columns.append(column)
         return columns
+
+
+class ColumnsProp(Prop):
+    def __init__(self):
+        value_expr = pp.original_text_for(pp.nested_expr())
+        super().__init__(label=None, value_expr=value_expr, eq=False)
+
+    def typecheck(self, prop_values):
+        prop_values = prop_values.strip("()")

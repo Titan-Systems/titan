@@ -33,6 +33,7 @@ def normalize_resource_name(name: str):
     return name.upper()
 
 
+# Consider making resource names immutable with Field(frozen=True)
 ResourceName = Annotated[str, "str", AfterValidator(normalize_resource_name)]
 
 serialize_resource_by_name = PlainSerializer(lambda resource: resource.name if resource else None, return_type=str)
@@ -447,6 +448,9 @@ class Schema(Resource, DatabaseScoped):
             resources = resources[0]
         for resource in resources:
             resource.schema = None
+
+
+T_Schema = Annotated[Schema, BeforeValidator(coerce_from_str(Schema)), serialize_resource_by_name]
 
 
 class SchemaScoped(BaseModel):

@@ -1,9 +1,9 @@
-from typing import List, Union
+from typing import Any, List, Union, Type
 from typing_extensions import Annotated
 
 from pydantic import BeforeValidator, Field, PlainSerializer, model_validator
 
-from .base import Resource, AccountScoped, Database, Schema, serialize_resource_by_name
+from .base import Resource, AccountScoped, T_Schema, _fix_class_documentation
 from .role import T_Role
 from .user import T_User
 from .validators import coerce_from_str, serialize_as_named_resource
@@ -17,33 +17,7 @@ from ..props import Props, IdentifierProp, FlagProp
 from ..privs import GlobalPriv, SchemaPriv
 
 
-# class Grant(Resource, AccountScoped):
-#     resource_type = "GRANT"
-#     lifecycle_privs = Privs(
-#         create=GlobalPriv.MANAGE_GRANTS,
-#         delete=GlobalPriv.MANAGE_GRANTS,
-#     )
-
-#     # def __new__(cls, **kwargs):
-#     #     print("ok")
-#     # file_type = FileType.parse(type)
-#     # file_type_cls = FileTypeMap[file_type]
-#     # return file_type_cls(type=file_type, **kwargs)
-
-# @classmethod
-# def from_sql(cls, sql):
-#     parsed = _parse_grant(sql)
-#     grant_cls = Resource.classes[parsed["resource_key"]]
-
-#     # RoleGrants
-#     if grant_cls is RoleGrant:
-#         props = _parse_props(RoleGrant.props, sql)
-#         return RoleGrant(**props)
-
-#     props = _parse_props(grant_cls.props, parsed["remainder"])
-#     return grant_cls(privs=parsed["privs"], on=parsed["on"], **props)
-
-
+@_fix_class_documentation
 class Grant(Resource, AccountScoped):
     """
     GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
@@ -132,23 +106,97 @@ class Grant(Resource, AccountScoped):
         grant_option=FlagProp("with grant option"),
     )
 
-    priv: Annotated[ParseableEnum, PlainSerializer(lambda en: en.value if en else None)] = None
-
-    # TODO: This should probably some new annotated type like NamedResource
-    # on: Annotated[Resource, serialize_resource_by_name]
-    on: Annotated[str, BeforeValidator(serialize_as_named_resource)] = None
+    priv: str = None
+    on: Any = None
+    on_all: Any = None
+    on_future: Any = None
+    on_scope: str = None
     to: T_Role = None
     grant_option: bool = False
     owner: str = None
 
-    def model_post_init(self, ctx):
-        super().model_post_init(ctx)
-        if self.owner is None:
-            self.owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(self.priv, "SYSADMIN")
+    def __init__(
+        self,
+        priv: str = None,
+        on: Any = None,
+        to: T_Role = None,
+        grant_option: bool = False,
+        owner: str = None,
+        **kwargs,
+    ):
+        """
+
+        Usage
+        -----
+
+        Global Privs:
+        >>> Grant(priv="ALL", on="ACCOUNT", to="somerole")
+
+        Warehouse Privs:
+        >>> Grant(priv="OPERATE", on=Warehouse(name="foo"), to="somerole")
+        >>> Grant(priv="OPERATE", on_warehouse="foo", to="somerole")
+
+        Schema Privs:
+        >>> Grant(priv="CREATE TABLE", on=Schema(name="foo"), to="somerole")
+        >>> Grant(priv="CREATE TABLE", on_schema="foo", to="somerole")
+        >>> Grant(priv="CREATE TABLE", on_all_schemas_in_database="somedb", to="somerole")
+        >>> Grant(priv="CREATE TABLE", on_future_schemas_in=Database(name="somedb"), to="somerole")
+
+        Table Privs:
+        >>> Grant(priv="SELECT", on_all_tables_in_schema="sch", to="somerole")
+        >>> Grant(priv="SELECT", on_future_tables_in_schema="sch", to="somerole")
+        >>> Grant(priv="SELECT", on_future_tables_in=Database(name="somedb"), to="somerole")
+
+        """
+        on_all = None
+        on_future = None
+
+        for keyword, arg in kwargs.items():
+            if keyword.startswith("on_"):
+                if on is not None:
+                    raise ValueError("You can only specify one 'on' parameter, multiple found")
+
+                is_scoped_grant = "_in_" in keyword or keyword.endswith("_in")
+
+                if is_scoped_grant:
+                    if keyword.endswith("_in"):
+                        keyword = keyword[:-3]
+                        on = arg
+                    elif "_in_" in keyword:
+                        keyword, resource_key = keyword.split("_in_")
+                        resource_cls = Resource.classes[resource_key]
+                        on = resource_cls(name=arg, stub=True)
+
+                    if keyword.startswith("on_all"):
+                        on_all = keyword[7:].replace("_", " ").upper()
+                    elif keyword.startswith("on_future"):
+                        on_future = keyword[10:].replace("_", " ").upper()
+                else:
+                    # Grant targeting a specific resource
+                    # on_{resource} kwargs
+                    # on_schema="foo" -> on=Schema(name="foo", stub=True)
+                    resource_cls = Resource.classes[keyword[3:]]
+                    resource_name = arg
+                    on = resource_cls(name=resource_name, stub=True)
+
+        if owner is None and on == "ACCOUNT" and isinstance(priv, GlobalPriv):
+            owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
+
+        super().__init__(
+            priv=priv.value if isinstance(priv, ParseableEnum) else priv,
+            on=on,
+            on_all=on_all,
+            on_future=on_future,
+            to=to,
+            grant_option=grant_option,
+            owner=owner or "SYSADMIN",
+        )
 
     @classmethod
     def from_sql(cls, sql):
         parsed = _parse_grant(sql)
+        if len(parsed["privs"]) > 1:
+            raise NotImplementedError("Multi-priv grants are not currently supported")
         raise NotImplementedError("TODO: implement Grant.from_sql")
         # props = _parse_props(cls.props, parsed["remainder"])
         # return cls(privs=parsed["privs"], on=parsed["on"], **props)
@@ -171,8 +219,6 @@ class Grant(Resource, AccountScoped):
             data["priv"],
             "ON",
             data["on"],
-            # "TO",
-            # data["to"],
             cls.props.render(data),
             _use_role=data["owner"],
         )
@@ -195,115 +241,7 @@ class Grant(Resource, AccountScoped):
         return self.lifecycle_create(self.fqn, data)
 
 
-# class OwnershipGrant(Grant):
-#     """
-#     -- Role
-#     GRANT OWNERSHIP
-#     { ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
-#     | ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
-#     }
-#     TO ROLE <role_name>
-#     [ { REVOKE | COPY } CURRENT GRANTS ]
-
-#     -- Database role
-#     GRANT OWNERSHIP
-#     { ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
-#     | ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
-#     }
-#     TO DATABASE ROLE <database_role_name>
-#     [ { REVOKE | COPY } CURRENT GRANTS ]
-#     """
-
-#     props = Props(
-#         to=IdentifierProp("to", eq=False, consume="role"),
-#     )
-
-#     on: Annotated[Resource, serialize_resource_by_name]
-#     to: T_Role
-
-
-# class AccountObjectGrant(PrivGrant):
-#     """
-#     GRANT { accountObjectPrivileges | ALL [ PRIVILEGES ] }
-#     ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: list
-
-
-# class SchemaGrant(PrivGrant):
-#     """
-#     GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
-#     ON SCHEMA <schema_name>
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: Annotated[List[SchemaPriv], BeforeValidator(listify)]
-#     on: Annotated[Schema, BeforeValidator(coerce_from_str(Schema))]
-
-
-# class SchemasGrant(PrivGrant):
-#     """
-#     GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
-#     ON ALL SCHEMAS IN DATABASE <db_name>
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: Annotated[List[SchemaPriv], BeforeValidator(listify)]
-#     on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
-
-
-# class FutureSchemasGrant(PrivGrant):
-#     """
-#     GRANT { schemaPrivileges | ALL [ PRIVILEGES ] }
-#     ON FUTURE SCHEMAS IN DATABASE <db_name>
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: Annotated[List[SchemaPriv], BeforeValidator(listify)]
-#     on: Annotated[Database, BeforeValidator(coerce_from_str(Database))]
-
-
-# class SchemaObjectGrant(PrivGrant):
-#     """
-#     GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
-#     ON <object_type> <object_name>
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: list
-
-
-# class SchemaObjectsGrant(PrivGrant):
-#     """
-#     GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
-#     ON ALL <object_type>
-#     IN { DATABASE <db_name> | SCHEMA <schema_name> }
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: list
-
-
-# class FutureSchemaObjectsGrant(PrivGrant):
-#     """
-#     GRANT { schemaObjectPrivileges | ALL [ PRIVILEGES ] }
-#     ON FUTURE <object_type>
-#     IN { DATABASE <db_name> | SCHEMA <schema_name> }
-#     TO [ ROLE ] <role_name>
-#     [ WITH GRANT OPTION ]
-#     """
-
-#     privs: list
-
-
+@_fix_class_documentation
 class RoleGrant(Resource, AccountScoped):
     """
     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
@@ -341,12 +279,6 @@ class RoleGrant(Resource, AccountScoped):
 
     @property
     def name(self):
-        # Deprecated
-        # urn:XY54321:role_grant/CI?user=SYSADMIN
-        # role = self.role.name
-        # param = "user" if self.to_user else "role"
-        # value = self.to_user.name if self.to_user else self.to_role.name
-        # return f"{role}?{param}={value}"
         return self.role.name
 
     @classmethod
