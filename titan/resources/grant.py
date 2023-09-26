@@ -195,11 +195,7 @@ class Grant(Resource, AccountScoped):
     @classmethod
     def from_sql(cls, sql):
         parsed = _parse_grant(sql)
-        if len(parsed["privs"]) > 1:
-            raise NotImplementedError("Multi-priv grants are not currently supported")
-        raise NotImplementedError("TODO: implement Grant.from_sql")
-        # props = _parse_props(cls.props, parsed["remainder"])
-        # return cls(privs=parsed["privs"], on=parsed["on"], **props)
+        return cls(**parsed)
 
     @property
     def name(self):

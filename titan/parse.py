@@ -154,112 +154,49 @@ def _parse_grant(sql: Union[str, SQL]):
 
     # Check for role grant
     if _contains(Keywords("GRANT ROLE"), sql):
-        return {"resource_key": "role_grant"}
+        raise NotImplementedError("Role grant not supported")
+        # return {"resource_key": "role_grant"}
 
     # Check for ownership grant
     if _contains(Keywords("GRANT OWNERSHIP"), sql):
         raise NotImplementedError("Ownership grant not supported")
         # return {"resource_key": "ownership_grant"}
 
-    grant = GRANT + pp.SkipTo(ON)("privs") + ON + pp.SkipTo(TO)("on") + REST_OF_STRING("remainder")
+    grant = (
+        GRANT
+        + pp.SkipTo(ON)("privs")
+        + ON
+        + pp.SkipTo(TO)("on_stmt")
+        + TO
+        + pp.Opt(Keyword("ROLE").suppress())
+        + Identifier("to")
+        + pp.Opt(Keywords("WITH GRANT OPTION").suppress())
+    )
     grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
 
     try:
         results = grant.parse_string(sql, parse_all=True)
         results = results.as_dict()
+
         privs = [priv.strip(" ") for priv in results["privs"].split(",")]
-        if "ALL" in privs or "ALL PRIVILEGES" in privs:
-            if len(privs) > 1:
-                raise ValueError("ALL PRIVILEGES cannot be combined with other privileges")
-            privs = ["ALL"]
-        grant_cls = _resolve_grant_class(results["on"])
+        if len(privs) > 1:
+            raise NotImplementedError("Multi-priv grants are not supported")
+
+        on_stmt = results.pop("on_stmt").strip()
+        if on_stmt == "ACCOUNT":
+            on_keyword = "on"
+            on_arg = on_stmt
+        else:
+            on_keyword = "on_" + "_".join(on_stmt.split(" ")[:-1]).lower()
+            on_arg = on_stmt.split(" ")[-1]
+
         return {
-            "privs": privs,
-            "on": results["on"],
-            "resource_key": grant_cls,
-            "remainder": results["remainder"],
+            "priv": privs[0],
+            on_keyword: on_arg,
+            "to": results["to"],
         }
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse grant") from err
-
-
-def _resolve_grant_class(on_stmt):
-    on_stmt = on_stmt.strip(" ")
-
-    account_object = (
-        Keyword("USER")
-        | Keywords("RESOURCE MONITOR")
-        | Keyword("WAREHOUSE")
-        | Keyword("DATABASE")
-        | Keyword("INTEGRATION")
-        | Keywords("FAILOVER GROUP")
-        | Keywords("REPLICATION GROUP")
-    )
-
-    schema_object = (
-        Keyword("ALERT")
-        | Keywords("DYNAMIC TABLE")
-        | Keywords("EVENT TABLE")
-        | Keywords("EXTERNAL TABLE")
-        | Keywords("FILE FORMAT")
-        | Keyword("FUNCTION")
-        | Keywords("MASKING POLICY")
-        | Keywords("MATERIALIZED VIEW")
-        | Keywords("PASSWORD POLICY")
-        | Keyword("PIPE")
-        | Keyword("PROCEDURE")
-        | Keywords("ROW ACCESS POLICY")
-        | Keyword("SECRET")
-        | Keywords("SESSION POLICY")
-        | Keyword("SEQUENCE")
-        | Keyword("STAGE")
-        | Keyword("STREAM")
-        | Keyword("TABLE")
-        | Keyword("TASK")
-        | Keyword("VIEW")
-    )
-
-    schema_objects = (
-        Keyword("ALERTS")
-        | Keywords("DYNAMIC TABLES")
-        | Keywords("EVENT TABLES")
-        | Keywords("EXTERNAL TABLES")
-        | Keywords("FILE FORMATS")
-        | Keyword("FUNCTIONS")
-        | Keywords("MASKING POLICIES")
-        | Keywords("MATERIALIZED VIEWS")
-        | Keywords("PASSWORD POLICIES")
-        | Keyword("PIPES")
-        | Keyword("PROCEDURES")
-        | Keywords("ROW ACCESS POLICIES")
-        | Keyword("SECRETS")
-        | Keywords("SESSION POLICIES")
-        | Keyword("SEQUENCES")
-        | Keyword("STAGES")
-        | Keyword("STREAMS")
-        | Keyword("TABLES")
-        | Keyword("TASKS")
-        | Keyword("VIEWS")
-    )
-
-    lexicon = Lexicon(
-        {
-            "ACCOUNT": "account_grant",
-            account_object: "account_object_grant",
-            "SCHEMA": "schema_grant",
-            "ALL SCHEMAS IN DATABASE": "schemas_grant",
-            "FUTURE SCHEMAS IN DATABASE": "future_schemas_grant",
-            schema_object: "schema_object_grant",
-            Keyword("ALL") + schema_objects: "schema_objects_grant",
-            Keyword("FUTURE") + schema_objects: "future_schema_objects_grant",
-        }
-    )
-
-    try:
-        resource_key = convert_match(lexicon, on_stmt)
-        return resource_key
-    except ParseException as err:
-        raise ParseException(f"Could not resolve resource class for SQL: {on_stmt}") from err
 
 
 def _first_match(parser, text):
@@ -343,7 +280,6 @@ def _resolve_resource_class(sql):
             "DYNAMIC TABLE": "dynamic_table",
             "EXTERNAL FUNCTION": "external_function",
             "FILE FORMAT": _resolve_file_format,
-            # "GRANT": lambda _: "grant",
             "NOTIFICATION INTEGRATION": _resolve_notification_integration,
             "PIPE": "pipe",
             "RESOURCE MONITOR": "resource_monitor",

@@ -19,6 +19,7 @@ from .failover_group import FailoverGroup
 from .file_format import FileFormat
 from .grant import Grant, RoleGrant
 from .pipe import Pipe
+from .replication_group import ReplicationGroup
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .sequence import Sequence
@@ -84,6 +85,7 @@ __all__ = [
     "Organization",
     "OrganizationScoped",
     "Pipe",
+    "ReplicationGroup",
     "Resource",
     "ResourceMonitor",
     "Role",
