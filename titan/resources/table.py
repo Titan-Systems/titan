@@ -3,9 +3,11 @@ from typing import List, Dict
 from pydantic import field_validator
 
 from .base import Resource, Schema, SchemaScoped, _fix_class_documentation
-from .column import T_Column
+from .column import Column, T_Column
 from .stage import InternalStage, copy_options
 from .file_format import FileFormatProp
+from ..builder import SQL
+from ..identifiers import FQN
 from ..parse import _parse_create_header, _parse_props, _parse_table_schema
 from ..privs import Privs, SchemaPriv, TablePriv
 from ..props import (
@@ -25,7 +27,7 @@ class Table(Resource, SchemaScoped):
     resource_type = "TABLE"
     lifecycle_privs = Privs(
         create=SchemaPriv.CREATE_TABLE,
-        read=TablePriv.SELECT,
+        read=[SchemaPriv.USAGE, TablePriv.SELECT],
         write=[TablePriv.INSERT, TablePriv.UPDATE, TablePriv.DELETE, TablePriv.TRUNCATE],
         delete=TablePriv.OWNERSHIP,
     )
@@ -107,6 +109,23 @@ class Table(Resource, SchemaScoped):
             identifier["schema"] = schema
         props = _parse_props(cls.props, remainder)
         return cls(**identifier, **table_schema, **props)
+
+    @classmethod
+    def lifecycle_create(cls, fqn: FQN, data, or_replace=False, if_not_exists=False, temporary=False):
+        return SQL(
+            "CREATE",
+            "OR REPLACE" if or_replace else "",
+            "TEMPORARY" if temporary else "",
+            "VOLATILE" if data.get("volatile") else "",
+            "TRANSIENT" if data.get("transient") else "",
+            "TABLE",
+            "IF NOT EXISTS" if if_not_exists else "",
+            fqn,
+            "(",
+            *[Column.lifecycle_create(FQN(name=col["name"]), col) for col in data["columns"]],
+            ")",
+            cls.props.render(data),
+        )
 
     @property
     def table_stage(self):

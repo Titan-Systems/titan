@@ -103,10 +103,6 @@ class Resource(BaseModel, metaclass=_Resource):
         except ParseException as err:
             raise ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
-    @property
-    def refs(self):
-        return self._refs
-
     def __format__(self, format_spec):
         track_ref(self)
         return self.fully_qualified_name
@@ -120,6 +116,18 @@ class Resource(BaseModel, metaclass=_Resource):
         for resource in resources:
             self._requires(resource)
         return self
+
+    @property
+    def fully_qualified_name(self):
+        return FQN(name=self.name.upper())
+
+    @property
+    def fqn(self):
+        return self.fully_qualified_name
+
+    @property
+    def refs(self):
+        return self._refs
 
     @classmethod
     def lifecycle_create(cls, fqn, data, or_replace=False, if_not_exists=False):
@@ -139,7 +147,7 @@ class Resource(BaseModel, metaclass=_Resource):
 
     def create_sql(self, **kwargs):
         data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return self.lifecycle_create(self.fqn, data, **kwargs)
+        return str(self.lifecycle_create(self.fqn, data, **kwargs))
 
     def drop_sql(self, **kwargs):
         data = self.model_dump(exclude_none=True, exclude_defaults=True)
@@ -163,10 +171,6 @@ class OrganizationScoped(BaseModel):
     @property
     def fully_qualified_name(self):
         return FQN(name=self.name.upper())
-
-    @property
-    def fqn(self):
-        return self.fully_qualified_name
 
     def has_scope(self):
         return self.organization is not None
@@ -321,7 +325,7 @@ class Database(Resource, AccountScoped):
         )
 
     @classmethod
-    def lifecycle_create(cls, fqn, data, or_replace=False, if_not_exists=False):
+    def lifecycle_create(cls, fqn: FQN, data, or_replace=False, if_not_exists=False):
         return tidy_sql(
             "CREATE",
             "OR REPLACE" if or_replace else "",

@@ -234,7 +234,7 @@ class Grant(Resource, AccountScoped):
 
     def create_sql(self):
         data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return self.lifecycle_create(self.fqn, data)
+        return str(self.lifecycle_create(self.fqn, data))
 
 
 @_fix_class_documentation

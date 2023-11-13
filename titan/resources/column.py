@@ -3,7 +3,9 @@ from typing_extensions import Annotated
 from pydantic import BeforeValidator
 
 from .base import Resource, ResourceName, _fix_class_documentation
+from ..builder import SQL
 from ..enums import DataType
+from ..identifiers import FQN
 from ..props import FlagProp, Props, StringProp
 from ..parse import _parse_column, _parse_props
 
@@ -21,23 +23,9 @@ class Column(Resource):
       [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
       [ inlineConstraint ]
 
-      # [ , <col_name> <col_type> [ ... ] ]
-      # [ , outoflineConstraint ]
-      # [ , ... ]
-
     inlineConstraint ::=
       [ CONSTRAINT <constraint_name> ]
       { UNIQUE | PRIMARY KEY | { [ FOREIGN KEY ] REFERENCES <ref_table_name> [ ( <ref_col_name> ) ] } }
-      [ <constraint_properties> ]
-
-    outoflineConstraint ::=
-      [ CONSTRAINT <constraint_name> ]
-      {
-         UNIQUE [ ( <col_name> [ , <col_name> , ... ] ) ]
-       | PRIMARY KEY [ ( <col_name> [ , <col_name> , ... ] ) ]
-       | [ FOREIGN KEY ] [ ( <col_name> [ , <col_name> , ... ] ) ]
-                         REFERENCES <ref_table_name> [ ( <ref_col_name> [ , <ref_col_name> , ... ] ) ]
-      }
       [ <constraint_properties> ]
     """
 
@@ -61,6 +49,14 @@ class Column(Resource):
         remainder = parse_results.pop("remainder", "")
         props = _parse_props(cls.props, remainder)
         return cls(**parse_results, **props)
+
+    @classmethod
+    def lifecycle_create(cls, fqn: FQN, data):
+        return SQL(
+            fqn.name,
+            data["data_type"],
+            cls.props.render(data),
+        )
 
 
 def _coerce(sql_or_resource):
