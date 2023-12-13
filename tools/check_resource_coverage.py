@@ -1,4 +1,5 @@
 import titan
+import titan.data_provider
 
 from tabulate import tabulate, SEPARATING_LINE
 
@@ -33,7 +34,7 @@ def check_resource_coverage():
             lifecycle = "".join(
                 ["C" if create else "-", "R" if read else "-", "W" if write else "-", "D" if delete else "-"]
             )
-        fetch = hasattr(titan.DataProvider, f"fetch_{resource_key}")
+        fetch = hasattr(titan.data_provider, f"fetch_{resource_key}")
 
         if resource_key in CRITICAL:
             add_to = critical

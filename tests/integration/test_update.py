@@ -1,7 +1,8 @@
 import uuid
 
 import pytest
-from titan.data_provider import DataProvider
+
+from titan import data_provider
 from titan.client import get_session
 from titan.identifiers import FQN
 from titan.resources import Database
@@ -32,9 +33,9 @@ def test_update_database(cursor, marked_for_cleanup):
     db = Database(name="test_db", max_data_extension_time_in_days=10)
     cursor.execute(db.create_sql())
     marked_for_cleanup.append(db)
-    provider = DataProvider(cursor.connection)
-    result = provider.fetch_database(FQN(name="test_db"))
+    conn = cursor.connection
+    result = data_provider.fetch_database(conn, FQN(name="test_db"))
     assert result["max_data_extension_time_in_days"] == 10
     cursor.execute(Database.lifecycle_update(db.fqn, {"max_data_extension_time_in_days": 9}))
-    result = provider.fetch_database(FQN(name="test_db"))
+    result = data_provider.fetch_database(conn, FQN(name="test_db"))
     assert result["max_data_extension_time_in_days"] == 9

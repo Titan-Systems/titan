@@ -1,3 +1,5 @@
+import json
+
 from abc import ABC
 from typing import Dict
 
@@ -84,6 +86,9 @@ class Props:
 
     def __getitem__(self, key: str) -> Prop:
         return self.props[key]
+
+    def to_json(self):
+        return json.dumps(self, default=lambda obj: obj.__dict__)
 
     def render(self, data):
         rendered = []
@@ -174,7 +179,7 @@ class IdentifierProp(Prop):
 # FIXME
 class IdentifierListProp(Prop):
     def __init__(self, label, **kwargs):
-        value_expr = pp.DelimitedList(pp.Group(FullyQualifiedIdentifier()))
+        value_expr = pp.delimited_list(pp.Group(FullyQualifiedIdentifier()))
         super().__init__(label, value_expr=value_expr, **kwargs)
 
     def typecheck(self, prop_values):
@@ -186,7 +191,7 @@ class IdentifierListProp(Prop):
 
 class StringListProp(Prop):
     def __init__(self, label, **kwargs):
-        value_expr = pp.DelimitedList(ANY())
+        value_expr = pp.delimited_list(ANY())
         super().__init__(label, value_expr=value_expr, **kwargs)
 
     def typecheck(self, prop_value):
@@ -231,7 +236,7 @@ class TagsProp(Prop):
 
     def __init__(self):
         label = "TAG"
-        value_expr = pp.DelimitedList(ANY() + EQUALS() + ANY())
+        value_expr = pp.delimited_list(ANY() + EQUALS() + ANY())
         super().__init__(label, value_expr=value_expr, eq=False, parens=True, consume="WITH")
 
     def typecheck(self, prop_value: list) -> dict:
@@ -254,7 +259,7 @@ class DictProp(Prop):
     """
 
     def __init__(self, label, **kwargs):
-        value_expr = pp.DelimitedList(ANY() + EQUALS() + ANY())
+        value_expr = pp.delimited_list(ANY() + EQUALS() + ANY())
         super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_value):
@@ -290,7 +295,7 @@ class EnumListProp(Prop):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
         enum_values = pp.MatchFirst([Keywords(val.value) for val in self.valid_values])
-        value_expr = pp.DelimitedList(enum_values | ANY())
+        value_expr = pp.delimited_list(enum_values | ANY())
         super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_values):
@@ -403,7 +408,7 @@ class ArgsProp(Prop):
         super().__init__(label=None, value_expr=value_expr, eq=False)
 
     def typecheck(self, prop_values):
-        arg_parser = pp.DelimitedList(
+        arg_parser = pp.delimited_list(
             pp.Group(
                 (Identifier | pp.dbl_quoted_string)("name")
                 + ANY("data_type")
@@ -436,7 +441,7 @@ class ColumnNamesProp(Prop):
 
     def typecheck(self, prop_values):
         prop_values = prop_values.strip("()")
-        column_name_parser = pp.DelimitedList(
+        column_name_parser = pp.delimited_list(
             pp.Group(
                 (Identifier() | pp.dbl_quoted_string)("name")
                 + pp.Opt(Keyword("COMMENT") + pp.sgl_quoted_string("comment"))

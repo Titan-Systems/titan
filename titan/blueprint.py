@@ -3,8 +3,10 @@ import json
 from typing import List
 from queue import Queue
 
+from . import data_provider
+
 from .client import execute
-from .data_provider import DataProvider, fetch_remote_state
+from .diff import diff, DiffAction
 from .identifiers import URN
 from .resources.base import (
     Account,
@@ -21,49 +23,6 @@ def print_diffs(diffs):
         print(f"[{action}]", target)
         for delta in deltas:
             print("\t", delta)
-
-
-def dict_delta(original, new):
-    original_keys = set(original.keys())
-    new_keys = set(new.keys())
-
-    delta = {}
-
-    for key in original_keys - new_keys:
-        delta[key] = None
-
-    for key in original_keys & new_keys:
-        if original[key] != new[key]:
-            delta[key] = new[key]
-
-    for key in new_keys - original_keys:
-        delta[key] = new[key]
-
-    return delta
-
-
-def diff(original, new):
-    original_keys = set(original.keys())
-    new_keys = set(new.keys())
-
-    for key in original_keys - new_keys:
-        yield "remove", key, original[key]
-
-    for key in new_keys - original_keys:
-        yield "add", key, new[key]
-
-    for key in original_keys & new_keys:
-        if isinstance(original[key], dict):
-            delta = dict_delta(original[key], new[key])
-            for attr, value in delta.items():
-                yield "change", key, {attr: value}
-        elif isinstance(original[key], list):
-            for item in original[key]:
-                if item not in new[key]:
-                    yield "remove", key, item
-            for item in new[key]:
-                if item not in original[key]:
-                    yield "add", key, item
 
 
 def _hash(data):
@@ -133,9 +92,8 @@ class Blueprint:
                 resource.schema = self.schema
 
     def plan(self, session):
-        provider = DataProvider(session)
         manifest = self.generate_manifest()
-        remote_state = fetch_remote_state(provider, manifest)
+        remote_state = data_provider.fetch_remote_state(session, manifest)
         return _plan(remote_state, manifest)
 
     def apply(self, session, plan=None):
@@ -148,11 +106,11 @@ class Blueprint:
             urn = URN.from_str(urn_str)
             resource_cls = Resource.classes[urn.resource_key]
             try:
-                if action == "add":
+                if action == DiffAction.ADD:
                     sql = resource_cls.lifecycle_create(urn.fqn, data)
-                elif action == "change":
+                elif action == DiffAction.CHANGE:
                     sql = resource_cls.lifecycle_update(urn.fqn, data)
-                elif action == "remove":
+                elif action == DiffAction.REMOVE:
                     sql = resource_cls.lifecycle_delete(urn.fqn, data)
                 else:
                     raise Exception(f"Unexpected action {action} in plan")

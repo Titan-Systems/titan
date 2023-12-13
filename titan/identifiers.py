@@ -1,15 +1,18 @@
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
 
-
-class FQN(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
-    database: Optional[str] = None
-    schema_: Optional[str] = Field(alias="schema", default=None)
-    name: str
-    params: dict = {}
+class FQN:
+    def __init__(
+        self,
+        name: str,
+        database: Optional[str] = None,
+        schema: Optional[str] = None,
+        params: dict = {},
+    ) -> None:
+        self.name = name
+        self.database = database
+        self.schema = schema
+        self.params = params
 
     @classmethod
     def from_str(cls, fqn_str, resource_key=None):
@@ -34,12 +37,12 @@ class FQN(BaseModel):
 
     def __str__(self):
         db = f"{self.database}." if self.database else ""
-        schema = f"{self.schema_}." if self.schema_ else ""
+        schema = f"{self.schema}." if self.schema else ""
         params = "?" + "&".join([f"{k.lower()}={v}" for k, v in self.params.items()]) if self.params else ""
         return f"{db}{schema}{self.name}{params}"
 
 
-class URN(BaseModel):
+class URN:
     """
     Universal Resource Name
 
@@ -57,10 +60,11 @@ class URN(BaseModel):
                              Fully Qualified Name
     """
 
-    account: str = ""
-    organization: str = ""
-    resource_key: str
-    fqn: FQN
+    def __init__(self, resource_key: str, fqn: FQN, account: str = "", organization: str = "") -> None:
+        self.resource_key = resource_key
+        self.fqn = fqn
+        self.account = account
+        self.organization = organization
 
     def __str__(self):
         return f"urn:{self.organization}:{self.account}:{self.resource_key}/{self.fqn}"

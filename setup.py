@@ -19,10 +19,10 @@ setup(
         "Framework :: Titan",
     ],
     install_requires=[
-        "click",
-        "inflection",
+        "click==8.1.7",
+        "inflection==0.5.1",
         "pydantic",
-        "pyparsing",
+        "pyparsing==3.0.9",
         "pyyaml",
         "snowflake-connector-python",
         "snowflake-snowpark-python",
@@ -31,6 +31,7 @@ setup(
         "dev": [
             "tabulate",
             "pytest",
+            "snowflake-cli-labs",
         ]
     },
 )

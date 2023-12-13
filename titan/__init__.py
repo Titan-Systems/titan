@@ -1,4 +1,3 @@
-from .data_provider import DataProvider
 from .blueprint import Blueprint
 
 from .resources import *
@@ -8,7 +7,6 @@ __all__ = [
     "Alert",
     "Blueprint",
     "Database",
-    "DataProvider",
     "ExternalFunction",
     "FileFormat",
     "Role",
@@ -24,7 +22,7 @@ __all__ = [
     "Warehouse",
 ]
 
-__version__ = "0.0.7"
+__version__ = "0.0.8"
 
 
 LOGO = r"""

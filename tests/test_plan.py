@@ -1,6 +1,7 @@
 import pytest
 
 from titan.blueprint import _plan
+from titan.diff import DiffAction
 
 
 @pytest.fixture(scope="session")
@@ -67,16 +68,16 @@ def manifest(new_db, changed_db):
 def test_plan_add_action(remote_state, manifest, new_db):
     changes = _plan(remote_state, manifest)
     key, data = new_db.popitem()
-    assert ("add", key, data) in changes
+    assert (DiffAction.ADD, key, data) in changes
 
 
 def test_plan_change_action(remote_state, manifest, changed_db):
     changes = _plan(remote_state, manifest)
     key, data = changed_db.popitem()
-    assert ("change", key, {"default_ddl_collation": "UTF8"}) in changes
+    assert (DiffAction.CHANGE, key, {"default_ddl_collation": "UTF8"}) in changes
 
 
 def test_plan_remove_action(remote_state, manifest, removed_db):
     changes = _plan(remote_state, manifest)
     key, data = removed_db.popitem()
-    assert ("remove", key, data) in changes
+    assert (DiffAction.REMOVE, key, data) in changes

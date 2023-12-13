@@ -4,7 +4,7 @@ import uuid
 import pytest
 import snowflake.connector
 
-from titan.data_provider import DataProvider, remove_none_values
+from titan import data_provider
 from titan.enums import Scope
 from titan.identifiers import FQN
 from titan.resources import Resource
@@ -112,11 +112,11 @@ resources = [
 def _generate_fqn(resource, test_db):
     resource_cls = Resource.classes[resource["resource_key"]]
     if resource_cls.scope == Scope.ACCOUNT:
-        return FQN(name=resource["name"], resource_key=resource["resource_key"])
+        return FQN(name=resource["name"])
     elif resource_cls.scope == Scope.DATABASE:
-        return FQN(name=resource["name"], database=test_db, resource_key=resource["resource_key"])
+        return FQN(name=resource["name"], database=test_db)
     elif resource_cls.scope == Scope.SCHEMA:
-        return FQN(name=resource["name"], schema="PUBLIC", resource_key=resource["resource_key"])
+        return FQN(name=resource["name"], schema="PUBLIC")
 
 
 @pytest.fixture(scope="session")
@@ -173,10 +173,9 @@ def resource(request, cursor, suffix, test_db):
 
 
 def test_fetch_resource(resource, db_session, test_db):
-    provider = DataProvider(db_session)
-    fetch = getattr(provider, resource["fetch_method"])
+    fetch = getattr(data_provider, resource["fetch_method"])
     fqn = _generate_fqn(resource, test_db)
-    result = fetch(fqn)
+    result = fetch(db_session, fqn)
     assert result is not None
-    result = remove_none_values(result)
+    result = data_provider.remove_none_values(result)
     assert result == resource["data"]
