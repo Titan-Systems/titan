@@ -48,13 +48,8 @@ def create_or_update_schema(sp_session, config: dict = None, yaml: str = None):
     res = {urn: remove_none_values(fetch_schema(sf_session, fqn))}
     data = {urn: config}
     sql = []
+    # TODO: clean this up
     if res:
-        # return {
-        #     "action": action,
-        #     "res": res,
-        #     "config": config,
-        #     "diff": [[str(action), urn_str, change] for action, urn_str, change in diff(res, data)],
-        # }
         for action, urn_str, change in diff(res, data):
             sql.append(update_schema_sql(fqn, change))
         action = "update"
