@@ -41,6 +41,11 @@ class FQN:
         params = "?" + "&".join([f"{k.lower()}={v}" for k, v in self.params.items()]) if self.params else ""
         return f"{db}{schema}{self.name}{params}"
 
+    def __repr__(self):
+        db = f", db={self.database}." if self.database else ""
+        schema = f", schema={self.schema}." if self.schema else ""
+        return f"FQN(name={self.name}{db}{schema})"
+
 
 class URN:
     """
