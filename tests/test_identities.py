@@ -85,7 +85,13 @@ resources = [
     {
         "test": "schema",
         "resource_cls": Schema,
-        "data": {"name": "SOMESCHEMA", "owner": "SYSADMIN", "transient": False},
+        "data": {
+            "name": "SOMESCHEMA",
+            "owner": "SYSADMIN",
+            "transient": False,
+            "managed_access": False,
+            "max_data_extension_time_in_days": 14,
+        },
     },
     {
         "test": "shared_database",
@@ -96,7 +102,7 @@ resources = [
         "test": "table",
         "resource_cls": Table,
         "data": {
-            "name": "SOMESHARENAME",
+            "name": "SOMETABLE",
             "owner": "SYSADMIN",
             "columns": [{"data_type": "INT", "name": "ID"}],
             "change_tracking": False,

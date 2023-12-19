@@ -275,9 +275,9 @@ def fetch_schema(session, fqn: FQN):
         "name": data["name"],
         "transient": "TRANSIENT" in options,
         "owner": data["owner"],
-        "with_managed_access": "MANAGED ACCESS" in options,
+        "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
-        "max_data_extension_time_in_days": params["data_retention_time_in_days"],
+        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
         "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
     }

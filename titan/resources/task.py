@@ -21,7 +21,7 @@ from .warehouse import Warehouse, WarehouseSize
 
 
 @_fix_class_documentation
-class Task(Resource, AccountScoped):
+class Task(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] TASK [ IF NOT EXISTS ] <name>
       [ { WAREHOUSE = <string> } | { USER_TASK_MANAGED_INITIAL_WAREHOUSE_SIZE = <string> } ]

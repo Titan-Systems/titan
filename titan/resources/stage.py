@@ -56,7 +56,7 @@ copy_options = Props(
 
 
 @_fix_class_documentation
-class InternalStage(Resource, SchemaScoped):
+class InternalStage(SchemaScoped, Resource):
     """
     -- Internal stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <internal_stage_name>
@@ -103,7 +103,7 @@ class InternalStage(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class ExternalStage(Resource, SchemaScoped):
+class ExternalStage(SchemaScoped, Resource):
     """
     -- External stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <external_stage_name>

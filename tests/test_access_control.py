@@ -18,12 +18,14 @@ def test_create():
 
 
 def test_read():
-    tbl = Table(name="sometbl", columns=["id INT"])
+    sch = Schema(name="someschema")
+    tbl = Table(name="sometbl", columns=["id INT"], schema=sch)
     role = Role(name="somerole")
     acl = ACL(privs=[SuperPriv.READ], roles=[role], resources=[tbl])
     grants = acl.grants()
-    assert len(grants) == 1
+    assert len(grants) == 2
     assert Grant(priv=TablePriv.SELECT, on=tbl, to=role) in grants
+    assert Grant(priv=SchemaPriv.USAGE, on=sch, to=role) in grants
 
 
 def test_write():

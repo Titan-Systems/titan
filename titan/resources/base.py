@@ -179,7 +179,7 @@ class OrganizationScoped(BaseModel):
 
 
 @_fix_class_documentation
-class Account(Resource, OrganizationScoped):
+class Account(OrganizationScoped, Resource):
     """
     CREATE ACCOUNT <name>
         ADMIN_NAME = <string>
@@ -279,7 +279,7 @@ class AccountScoped(BaseModel):
 
 
 @_fix_class_documentation
-class Database(Resource, AccountScoped):
+class Database(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
         [ CLONE <source_db>
@@ -402,7 +402,7 @@ class DatabaseScoped(BaseModel):
 
 
 @_fix_class_documentation
-class Schema(Resource, DatabaseScoped):
+class Schema(DatabaseScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] SCHEMA [ IF NOT EXISTS ] <name>
       [ CLONE <source_schema>
@@ -423,7 +423,7 @@ class Schema(Resource, DatabaseScoped):
     )
     props = Props(
         transient=FlagProp("transient"),
-        with_managed_access=FlagProp("with managed access"),
+        managed_access=FlagProp("with managed access"),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
         max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
         default_ddl_collation=StringProp("default_ddl_collation"),
@@ -434,9 +434,9 @@ class Schema(Resource, DatabaseScoped):
     name: ResourceName
     transient: bool = False
     owner: str = "SYSADMIN"
-    with_managed_access: bool = None
+    managed_access: bool = False
     data_retention_time_in_days: int = None
-    max_data_extension_time_in_days: int = None
+    max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
     tags: Dict[str, str] = None
     comment: str = None

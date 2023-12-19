@@ -16,7 +16,7 @@ from ..props import (
 
 
 @_fix_class_documentation
-class ExternalFunction(Resource, AccountScoped):
+class ExternalFunction(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ SECURE ] EXTERNAL FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )
       RETURNS <result_data_type>

@@ -18,12 +18,12 @@ class UDFLanguage(ParseableEnum):
     SQL = "SQL"
 
 
-class UserDefinedFunction(Resource, SchemaScoped):
+class Function(SchemaScoped, Resource):
     resource_type = "FUNCTION"
 
 
 @_fix_class_documentation
-class JavascriptUDF(UserDefinedFunction):
+class JavascriptUDF(Function):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] [ SECURE ] FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )
     [ COPY GRANTS ]

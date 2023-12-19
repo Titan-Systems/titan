@@ -479,5 +479,5 @@ def _parse_table_schema(sql):
     # TODO: outofline constraints
 
     remainder = sql[0:start] + " " + sql[end:]
-    table_schema = {"columns": columns, "constraints": []}
+    table_schema = {"columns": columns}
     return (table_schema, remainder)

@@ -78,9 +78,9 @@ resources = [
             "name": name,
             "owner": TEST_ROLE,
             "data_retention_time_in_days": 1,
-            "max_data_extension_time_in_days": 1,
+            "max_data_extension_time_in_days": 14,
             "transient": True,
-            "with_managed_access": False,
+            "managed_access": False,
         },
     },
     {

@@ -23,7 +23,7 @@ class ResourceMonitorFrequency(ParseableEnum):
 
 
 @_fix_class_documentation
-class ResourceMonitor(Resource, AccountScoped):
+class ResourceMonitor(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] RESOURCE MONITOR <name> WITH
                           [ CREDIT_QUOTA = <number> ]

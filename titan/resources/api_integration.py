@@ -13,7 +13,7 @@ class ApiProvider(ParseableEnum):
 
 
 @_fix_class_documentation
-class APIIntegration(Resource, AccountScoped):
+class APIIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] API INTEGRATION [ IF NOT EXISTS ] <integration_name>
         API_PROVIDER = { aws_api_gateway | aws_private_api_gateway | aws_gov_api_gateway | aws_gov_private_api_gateway }

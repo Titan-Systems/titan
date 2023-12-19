@@ -9,7 +9,7 @@ from .warehouse import Warehouse
 
 
 @_fix_class_documentation
-class DynamicTable(Resource, SchemaScoped):
+class DynamicTable(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] DYNAMIC TABLE <name>
       TARGET_LAG = { '<num> { seconds | minutes | hours | days }' | DOWNSTREAM }

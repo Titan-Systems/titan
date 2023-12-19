@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="titan",
-    version="0.0.7",
+    version="0.0.14",
     description="The easy way to automate data warehouse infrastructure",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
@@ -21,11 +21,12 @@ setup(
     install_requires=[
         "click==8.1.7",
         "inflection==0.5.1",
-        "pydantic",
+        "pydantic>=2.0",
         "pyparsing==3.0.9",
         "pyyaml",
         "snowflake-connector-python",
         "snowflake-snowpark-python",
+        "requests",
     ],
     extras_require={
         "dev": [

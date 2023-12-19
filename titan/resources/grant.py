@@ -18,7 +18,7 @@ from ..privs import GlobalPriv, SchemaPriv
 
 
 @_fix_class_documentation
-class Grant(Resource, AccountScoped):
+class Grant(AccountScoped, Resource):
     """
     GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
         | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
@@ -238,7 +238,7 @@ class Grant(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class RoleGrant(Resource, AccountScoped):
+class RoleGrant(AccountScoped, Resource):
     """
     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
     """

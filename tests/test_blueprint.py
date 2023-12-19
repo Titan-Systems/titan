@@ -34,6 +34,8 @@ class TestBlueprint(unittest.TestCase):
                 "name": "SCHEMA",
                 "owner": "SYSADMIN",
                 "transient": False,
+                "managed_access": False,
+                "max_data_extension_time_in_days": 14,
             },
         )
         self.assertIn("urn::ABCD123:view/DB.SCHEMA.VIEW", manifest)

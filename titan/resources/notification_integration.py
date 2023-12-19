@@ -25,7 +25,7 @@ class NotificationDirection(ParseableEnum):
 
 
 @_fix_class_documentation
-class EmailNotificationIntegration(Resource, AccountScoped):
+class EmailNotificationIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -52,7 +52,7 @@ class EmailNotificationIntegration(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class AWSOutboundNotificationIntegration(Resource, AccountScoped):
+class AWSOutboundNotificationIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -92,7 +92,7 @@ class AWSOutboundNotificationIntegration(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class GCPOutboundNotificationIntegration(Resource, AccountScoped):
+class GCPOutboundNotificationIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -128,7 +128,7 @@ class GCPOutboundNotificationIntegration(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class AzureOutboundNotificationIntegration(Resource, AccountScoped):
+class AzureOutboundNotificationIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -167,7 +167,7 @@ class AzureOutboundNotificationIntegration(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class GCPInboundNotificationIntegration(Resource, AccountScoped):
+class GCPInboundNotificationIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -201,7 +201,7 @@ class GCPInboundNotificationIntegration(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class AzureInboundNotificationIntegration(Resource, AccountScoped):
+class AzureInboundNotificationIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>

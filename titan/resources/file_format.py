@@ -53,7 +53,7 @@ class BinaryFormat(ParseableEnum):
 
 
 @_fix_class_documentation
-class CSVFileFormat(Resource, SchemaScoped):
+class CSVFileFormat(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = CSV
@@ -140,7 +140,7 @@ class CSVFileFormat(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class JSONFileFormat(Resource, SchemaScoped):
+class JSONFileFormat(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = JSON
@@ -209,7 +209,7 @@ class JSONFileFormat(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class AvroFileFormat(Resource, SchemaScoped):
+class AvroFileFormat(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = AVRO
@@ -245,7 +245,7 @@ class AvroFileFormat(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class OrcFileFormat(Resource, SchemaScoped):
+class OrcFileFormat(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = ORC
@@ -278,7 +278,7 @@ class OrcFileFormat(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class ParquetFileFormat(Resource, SchemaScoped):
+class ParquetFileFormat(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = PARQUET
@@ -320,7 +320,7 @@ class ParquetFileFormat(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class XMLFileFormat(Resource, SchemaScoped):
+class XMLFileFormat(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY | VOLATILE } ] FILE FORMAT [ IF NOT EXISTS ] <name>
       TYPE = XML

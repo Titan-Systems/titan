@@ -33,7 +33,7 @@ from .view import View
 from .warehouse import Warehouse
 
 from .user_defined_function import (
-    UserDefinedFunction,
+    Function,
     JavascriptUDF,
 )
 
@@ -104,7 +104,7 @@ __all__ = [
     "Tag",
     "Task",
     "User",
-    "UserDefinedFunction",
+    "Function",
     "View",
     "ViewStream",
     "Warehouse",

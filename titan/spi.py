@@ -42,16 +42,30 @@ def _update_schema_sql(fqn, change):
         raise NotImplementedError
     elif attr == "transient":
         raise Exception("Cannot change transient property of schema")
-    elif attr == "with_managed_access":
+    elif attr == "managed_access":
         return tidy_sql("ALTER SCHEMA", fqn, "ENABLE" if new_value else "DISABLE", "MANAGED ACCESS")
     else:
         new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
         return tidy_sql("ALTER SCHEMA", fqn, "SET", attr, "=", new_value)
 
 
+_schema_defaults = {
+    "database": None,
+    "transient": False,
+    "owner": "SYSADMIN",
+    "managed_access": False,
+    "data_retention_time_in_days": None,
+    "max_data_extension_time_in_days": 14,
+    "default_ddl_collation": None,
+    "tags": None,
+    "comment": None,
+}
+
+
 def create_or_update_schema(sp_session, config: dict = None, yaml: str = None, dry_run: bool = False):
     """
-    Create or update a schema in Snowflake.
+    Takes configuration (either as an OBJECT or a YAML string) and creates or updates a schema.
+    Use the `dry_run` parameter to test the operation without executing any SQL.
 
     Parameters
     ----------
@@ -80,33 +94,32 @@ def create_or_update_schema(sp_session, config: dict = None, yaml: str = None, d
         The name of the user or role that owns the schema
     transient : BOOLEAN
         If True, the schema is transient
-    with_managed_access : BOOLEAN
+    managed_access : BOOLEAN
         If True, the schema is managed
     """
     if yaml and config is None:
         config = safe_load(yaml)
-    sf_session = sp_session.connection
     db = config.get("database", sp_session.get_current_database())
     fqn = FQN(database=db, name=config["name"])
     urn = str(URN(resource_key="schema", fqn=fqn))
-    res = {urn: dp.remove_none_values(dp.fetch_schema(sf_session, fqn))}
-    data = {urn: config}
+    schema = dp.fetch_schema(sp_session.connection, fqn)
     sql = []
-    dd = []
-    if res:
-        for action, urn_str, change in diff(res, data):
-            dd.append((str(action), urn_str, change.copy()))
+    if schema:
+        resource = {urn: dp.remove_none_values(schema)}
+        data = {urn: dp.remove_none_values(_schema_defaults | config)}
+        # return {"res": resource, "data": data}
+        for _, _, change in diff(resource, data):
             sql.append(_update_schema_sql(fqn, change))
     else:
         sql = [_create_schema_sql(fqn, config, if_not_exists=True)]
     if not dry_run:
         _execute(sp_session, sql)
-    return {"sql": sql, "diff": dd, "data": data, "res": res}
+    return {"sql": sql}
 
 
 def fetch_schema(sp_session, name) -> dict:
     """
-    Fetch a schema's configuration from Snowflake.
+    Returns a schema's configuration.
     """
     fqn = FQN.from_str(name, resource_key="schema")
     if fqn.database is None:
