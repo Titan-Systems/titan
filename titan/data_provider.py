@@ -275,6 +275,7 @@ def fetch_schema(session, fqn: FQN):
         "name": data["name"],
         "transient": "TRANSIENT" in options,
         "owner": data["owner"],
+        "database": data["database_name"],
         "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
         "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],

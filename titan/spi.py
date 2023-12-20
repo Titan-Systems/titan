@@ -2,11 +2,14 @@
 
 from yaml import safe_load
 
+import _snowflake
+
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
-import titan.data_provider as dp
-import titan.resource_props as props
 
+from . import data_provider as dp
+from . import resource_props as props
+from . import git
 from .builder import tidy_sql
 from .diff import diff
 from .identifiers import FQN, URN
@@ -125,3 +128,22 @@ def fetch_schema(sp_session, name) -> dict:
     if fqn.database is None:
         fqn.database = sp_session.get_current_database()
     return dp.fetch_schema(sp_session.connection, fqn)
+
+
+def fetch_database(sp_session, name) -> dict:
+    """
+    Returns a database's configuration.
+    """
+    fqn = FQN.from_str(name, resource_key="database")
+    return dp.fetch_database(sp_session.connection, fqn)
+
+
+def git_export(sp_session, locator: str, repo: str, path: str) -> dict:
+    access_token = _snowflake.get_generic_secret_string("github_access_token")
+    return git.export(
+        sp_session.connection,
+        repo=repo,  # Can this be configured?
+        path=path,
+        locator_str="database:TITAN",
+        access_token=access_token,
+    )

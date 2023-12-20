@@ -26,7 +26,7 @@ setup(
         "pyyaml",
         "snowflake-connector-python",
         "snowflake-snowpark-python",
-        "requests",
+        "pygithub==1.55",
     ],
     extras_require={
         "dev": [
