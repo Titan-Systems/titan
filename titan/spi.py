@@ -22,7 +22,7 @@ except ModuleNotFoundError as err:
 
 
 def install(sp_session):
-    
+    pass
 
 
 def _execute(sp_session, sql: list):
