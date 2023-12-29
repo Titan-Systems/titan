@@ -27,6 +27,7 @@ resources = [
         ],
         "teardown_sql": ["DROP ALERT {name}", "DROP WAREHOUSE {name}_wh"],
         "data": lambda name: {
+            "resource_key": "alert",
             "name": name,
             "warehouse": f"{name}_WH",
             "schedule": "60 MINUTE",
@@ -75,7 +76,9 @@ resources = [
         "setup_sql": "CREATE TRANSIENT SCHEMA {name}",
         "teardown_sql": "DROP SCHEMA {name}",
         "data": lambda name: {
+            "resource_key": "schema",
             "name": name,
+            "database": "FIXME",
             "owner": TEST_ROLE,
             "data_retention_time_in_days": 1,
             "max_data_extension_time_in_days": 14,

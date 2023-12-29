@@ -15,6 +15,7 @@ IDENTIFIER_TEST_CASES = [
     ('db."schema"."tbl"', ["db", '"schema"', '"tbl"']),
     ('"db".schema."tbl"', ['"db"', "schema", '"tbl"']),
     ('"db"."schema".tbl', ['"db"', '"schema"', "tbl"]),
+    ('db."this.is:schema".tbl', ["db", '"this.is:schema"', "tbl"]),
 ]
 
 

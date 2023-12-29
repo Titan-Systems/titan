@@ -1,6 +1,8 @@
 import json
 import sys
 
+from inflection import pluralize
+
 from snowflake.connector.errors import ProgrammingError
 
 from .client import execute
@@ -81,6 +83,8 @@ def fetch_region(session):
 
 
 def fetch_account(session, fqn: FQN):
+    # TODO: rewrite to not use ORGADMIN
+
     show_result = execute(session, "SHOW ORGANIZATION ACCOUNTS", use_role="ORGADMIN", cacheable=True)
     accounts = _filter_result(show_result, account_name=fqn.name)
     if len(accounts) == 0:
@@ -89,6 +93,7 @@ def fetch_account(session, fqn: FQN):
         raise Exception(f"Found multiple alerts matching {fqn}")
     data = accounts[0]
     return {
+        "resource_key": "account",
         "name": data["account_name"],
         # "edition": data["edition"],
         # This column is only displayed for organizations that span multiple region groups.
@@ -107,6 +112,7 @@ def fetch_alert(session, fqn: FQN):
         raise Exception(f"Found multiple alerts matching {fqn}")
     data = alerts[0]
     return {
+        "resource_key": "alert",
         "name": data["name"],
         "warehouse": data["warehouse"],
         "schedule": data["schedule"],
@@ -272,6 +278,7 @@ def fetch_schema(session, fqn: FQN):
     params = params_result_to_dict(show_params_result)
 
     return {
+        "resource_key": "schema",
         "name": data["name"],
         "transient": "TRANSIENT" in options,
         "owner": data["owner"],
@@ -426,3 +433,21 @@ def fetch_warehouse(session, fqn: FQN):
         "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
         "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
     }
+
+
+################ List functions
+
+
+def list_resource(session, resource_key):
+    data_provider = sys.modules[__name__]
+    return getattr(data_provider, f"list_{pluralize(resource_key)}")(session)
+
+
+def list_databases(session):
+    show_result = execute(session, "SHOW DATABASES")
+    return [row["name"] for row in show_result]
+
+
+def list_schemas(session):
+    show_result = execute(session, "SHOW SCHEMAS")
+    return [f"{row['database_name']}.{row['name']}" for row in show_result]

@@ -2,10 +2,9 @@
 
 from yaml import safe_load
 
-import _snowflake
-
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
+from . import SNOWPARK_TELEMETRY_ID
 
 from . import data_provider as dp
 from . import resource_props as props
@@ -13,6 +12,17 @@ from . import git
 from .builder import tidy_sql
 from .diff import diff
 from .identifiers import FQN, URN
+
+try:
+    import _snowflake
+
+    _snowflake.snowflake_partner_attribution().append(SNOWPARK_TELEMETRY_ID)
+except ModuleNotFoundError as err:
+    raise ModuleNotFoundError("The titan spi module must be run from a Snowpark UDF or stored procedure") from err
+
+
+def install(sp_session):
+    
 
 
 def _execute(sp_session, sql: list):
@@ -136,6 +146,19 @@ def fetch_database(sp_session, name) -> dict:
     """
     fqn = FQN.from_str(name, resource_key="database")
     return dp.fetch_database(sp_session.connection, fqn)
+
+
+def fetch(sp_session, name) -> dict:
+    """
+    Returns a resource's configuration.
+    """
+    fqn = FQN.from_str(name)
+    if fqn.resource_key == "schema":
+        return fetch_schema(sp_session, name)
+    elif fqn.resource_key == "database":
+        return fetch_database(sp_session, name)
+    else:
+        raise Exception(f"Unsupported resource type: {fqn.resource_key}")
 
 
 def git_export(sp_session, locator: str, repo: str, path: str) -> dict:

@@ -94,6 +94,12 @@ class URN:
     def from_resource(cls, resource, **kwargs):
         return cls(resource_key=resource.resource_key, fqn=resource.fqn, **kwargs)
 
+    @classmethod
+    def from_locator(cls, locator: "ResourceLocator"):
+        if locator.star:
+            raise Exception("Cannot create URN from a wildcard locator")
+        return cls(resource_key=locator.resource_key, fqn=FQN.from_str(locator.locator))
+
 
 class ResourceLocator:
     """
@@ -105,6 +111,7 @@ class ResourceLocator:
     def __init__(self, resource_key: str, locator: str) -> None:
         self.resource_key = resource_key
         self.locator = locator
+        self.star = self.locator == "*"
 
     @classmethod
     def from_str(cls, resource_str: str) -> "ResourceLocator":
@@ -124,9 +131,13 @@ class ResourceLocator:
         Locate all resources of a given type:
         >>> ResourceLocator.from_str("database:*")
 
-        Locate all resources of a given type within a given scope:
+        Locate all resources within a given scope:
         >>> ResourceLocator.from_str("database:mydb.*")
         """
+
+        if resource_str == "*":
+            return cls(resource_key="account", locator="*")
+
         parts = resource_str.split(":")
         if len(parts) != 2:
             raise Exception(f"Invalid resource locator string: {resource_str}")
@@ -136,4 +147,4 @@ class ResourceLocator:
         return f"{self.resource_key}:{self.locator}"
 
     def __repr__(self):
-        return f"ResourceLocator(resource_key={self.resource_key}, locator={self.locator})"
+        return f"ResourceLocator(resource_key='{self.resource_key}', locator='{self.locator}')"

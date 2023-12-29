@@ -93,6 +93,12 @@ class Volatility(ParseableEnum):
     STABLE = "STABLE"
 
 
+# https://docs.snowflake.com/developer-guide/stored-procedure/stored-procedures-rights
+class ExecutionRights(ParseableEnum):
+    CALLER = "CALLER"
+    OWNER = "OWNER"
+
+
 class SessionParameter(ParseableEnum):
     ABORT_DETACHED_QUERY = "ABORT_DETACHED_QUERY"
     AUTOCOMMIT = "AUTOCOMMIT"

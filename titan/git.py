@@ -3,8 +3,10 @@ import yaml
 
 from github import Github, InputGitTreeElement
 
-from . import data_provider as dp
 from .identifiers import ResourceLocator, FQN
+from .search import crawl_resources
+
+CREATE_MODE = "100644"
 
 
 def _git_path_for_resource(resource):
@@ -16,43 +18,13 @@ def _git_path_for_resource(resource):
         return "UNKNOWN"
 
 
-def crawl_resources(session, locator: ResourceLocator):
-    return [
-        {
-            "resource_key": "database",
-            "comment": None,
-            "data_retention_time_in_days": 1,
-            "default_ddl_collation": None,
-            "max_data_extension_time_in_days": 14,
-            "name": "TITAN",
-            "owner": "ACCOUNTADMIN",
-            "transient": None,
-        },
-        dp.fetch_schema(session, FQN(database="TITAN", name="SPROCS")) | {"resource_key": "schema"},
-        # {
-        #     "resource_key": "schema",
-        #     "comment": None,
-        #     "data_retention_time_in_days": 1,
-        #     "default_ddl_collation": None,
-        #     "managed_access": None,
-        #     "max_data_extension_time_in_days": 14,
-        #     "name": "SPROCS",
-        #     "database": "TITAN",
-        #     "owner": "ACCOUNTADMIN",
-        #     "transient": None,
-        # },
-    ]
-
-
 def export(session, repo: str, path: str, locator_str: str, access_token: str):
     """
-    Imports resources from a git repository.
+    Export resources from a Snowflake account to a GitHub repository.
 
         repo (str): The name of the repository to import from. Ex: "teej/titan"
     """
     locator = ResourceLocator.from_str(locator_str)
-    # auth = Auth.Token(access_token)
-    # gh = GitHub(auth=auth)
 
     gh = Github(access_token)
     repo = gh.get_repo(repo)
@@ -66,8 +38,7 @@ def export(session, repo: str, path: str, locator_str: str, access_token: str):
     tree_elements = []
     for file_change in changes:
         blob = repo.create_git_blob(file_change["content"], "utf-8")
-        # tree_elements.append(repo.create_git_tree_element(file_change["path"], "100644", blob, sha=blob.sha))
-        tree_elements.append(InputGitTreeElement(file_change["path"], "100644", "blob", sha=blob.sha))
+        tree_elements.append(InputGitTreeElement(path=file_change["path"], mode=CREATE_MODE, type="blob", sha=blob.sha))
 
     # Create a tree
     tree = repo.create_git_tree(tree_elements)
