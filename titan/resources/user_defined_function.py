@@ -1,5 +1,5 @@
 from .base import Resource, SchemaScoped, _fix_class_documentation
-from ..enums import DataType, NullHandling, ParseableEnum, Volatility
+from ..enums import DataType, Language, NullHandling, Volatility
 from ..props import (
     ArgsProp,
     EnumFlagProp,
@@ -8,14 +8,6 @@ from ..props import (
     Props,
     StringProp,
 )
-
-
-class UDFLanguage(ParseableEnum):
-    JAVA = "JAVA"
-    JAVASCRIPT = "JAVASCRIPT"
-    PYTHON = "PYTHON"
-    SCALA = "SCALA"
-    SQL = "SQL"
 
 
 class Function(SchemaScoped, Resource):
@@ -44,7 +36,7 @@ class JavascriptUDF(Function):
         # copy_grants=FlagProp("copy_grants"),
         returns=EnumProp("returns", DataType, eq=False),
         # not_null=BoolProp("not_null"),
-        language=EnumProp("language", [UDFLanguage.JAVASCRIPT], eq=False),
+        language=EnumProp("language", [Language.JAVASCRIPT], eq=False),
         null_handling=EnumFlagProp(NullHandling),
         volatility=EnumFlagProp(Volatility),
         comment=StringProp("comment"),
@@ -56,7 +48,7 @@ class JavascriptUDF(Function):
     secure: bool = False
     args: list = []
     returns: DataType
-    language: UDFLanguage = UDFLanguage.JAVASCRIPT
+    language: Language = Language.JAVASCRIPT
     null_handling: NullHandling = None
     volatility: Volatility = None
     comment: str = None

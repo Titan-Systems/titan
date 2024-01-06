@@ -21,7 +21,9 @@ class _Parseable(EnumMeta):
 
 
 class ParseableEnum(Enum, metaclass=_Parseable):
-    pass
+    # Why not??
+    def __str__(self):
+        return str(self.value)
 
 
 class Scope(ParseableEnum):
@@ -79,6 +81,14 @@ class DataType(ParseableEnum):
     VARIANT = "VARIANT"
     GEOGRAPHY = "GEOGRAPHY"
     GEOMETRY = "GEOMETRY"
+
+
+class Language(ParseableEnum):
+    JAVA = "JAVA"
+    JAVASCRIPT = "JAVASCRIPT"
+    PYTHON = "PYTHON"
+    SCALA = "SCALA"
+    SQL = "SQL"
 
 
 class NullHandling(ParseableEnum):

@@ -105,7 +105,10 @@ class Resource(BaseModel, metaclass=_Resource):
 
     def __format__(self, format_spec):
         track_ref(self)
-        return self.fully_qualified_name
+        return str(self.fully_qualified_name)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self.fully_qualified_name)})"
 
     def _requires(self, resource):
         self._refs.add(resource)
@@ -224,8 +227,9 @@ class Account(OrganizationScoped, Resource):
     must_change_password: bool = Field(default=None, json_schema_extra={"fetchable": False})
     # edition: AccountEdition = None
     # region_group: str = None
-    # region: str = None
     comment: str = None
+
+    _children: List["AccountScoped"] = []
 
     @classmethod
     def lifecycle_create(cls, fqn, data):
@@ -249,13 +253,37 @@ class Account(OrganizationScoped, Resource):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
+            if resource.account is not None and resource.account != self:
+                raise Exception(
+                    f"Cannot add resource {resource} to account {self} because it already belongs to {resource.account}"
+                )
             resource.account = self
+            # TODO: check namespace collision
+            self._children.append(resource)
 
     def remove(self, *resources: "AccountScoped"):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
             resource.account = None
+            self._children.remove(resource)
+
+    def find(self, database: Union[None, str, "Database"] = None):
+        # TODO: support other AccountScoped resources
+        # Consider refactoring this into a generic find method
+        if database is None:
+            return None
+        elif isinstance(database, str):
+            database_name = database
+        elif isinstance(database, Database):
+            database_name = database.name
+        for child in self._children:
+            if child.name == database_name and isinstance(child, Database):
+                return child
+        return None
+
+    def databases(self) -> List["Database"]:
+        return [child for child in self._children if isinstance(child, Database)]
 
 
 class AccountScoped(BaseModel):
@@ -317,6 +345,8 @@ class Database(AccountScoped, Resource):
     tags: Dict[str, str] = None
     comment: str = None
 
+    _children: List["DatabaseScoped"] = []
+
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
         self.add(
@@ -372,13 +402,31 @@ class Database(AccountScoped, Resource):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
+            if resource.database is not None and resource.database != self:
+                raise Exception(
+                    f"Cannot add resource {resource} to database {self} because it already belongs to {resource.database}"
+                )
             resource.database = self
+            self._children.append(resource)
 
     def remove(self, *resources: "DatabaseScoped"):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
             resource.database = None
+            self._children.remove(resource)
+
+    def find(self, schema: Union[None, str, "Schema"] = None):
+        if schema is None:
+            return None
+        elif isinstance(schema, str):
+            schema_name = schema
+        elif isinstance(schema, Schema):
+            schema_name = schema.name
+        for child in self._children:
+            if child.name == schema_name and isinstance(child, Schema):
+                return child
+        return None
 
 
 class DatabaseScoped(BaseModel):
@@ -445,6 +493,10 @@ class Schema(DatabaseScoped, Resource):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
+            if resource.schema is not None and resource.schema != self:
+                raise Exception(
+                    f"Cannot add resource {resource} to schema {self} because it already belongs to {resource.schema}"
+                )
             resource.schema = self
 
     def remove(self, *resources: "SchemaScoped"):

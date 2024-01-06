@@ -9,4 +9,4 @@ PACKAGES = ('snowflake-snowpark-python')
 IMPORTS = ('@TITAN/titan-0.0.15.zip')
 HANDLER = 'titan.spi.install'
 EXECUTE AS CALLER
-AS '';
+;

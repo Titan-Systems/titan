@@ -11,7 +11,9 @@ from . import resource_props as props
 from . import git
 from .builder import tidy_sql
 from .diff import diff
+from .enums import DataType
 from .identifiers import FQN, URN
+from .resources import PythonStoredProcedure
 
 try:
     import _snowflake
@@ -22,7 +24,35 @@ except ModuleNotFoundError as err:
 
 
 def install(sp_session):
-    pass
+    """
+    Installs the titan spi functions and procedures into the current database.
+    """
+    # CREATE STORED PROCEDURE titan.public.install()
+    # RETURNS OBJECT NOT NULL
+    # LANGUAGE PYTHON
+    # RUNTIME_VERSION = '3.9'
+    # PACKAGES = ('snowflake-snowpark-python')
+    # IMPORTS = ('@TITAN/titan-0.0.15.zip')
+    # HANDLER = 'titan.spi.install'
+    # EXECUTE AS CALLER
+    # AS '';
+    # blueprint = Blueprint("titan", database="titan")
+    # blueprint.add(
+    #     PythonStoredProcedure(
+    #         name="fetch_database",
+    #         args=[("name", DataType.VARCHAR)],
+    #         returns=DataType.OBJECT,
+    #         runtime_version="3.9",
+    #         packages=["snowflake-snowpark-python"],
+    #         imports=["@TITAN/titan-0.0.13.zip"],
+    #         handler="titan.spi.fetch_database",
+    #         execute_as="CALLER",
+    #     )
+    # )
+    # plan = blueprint.plan(sp_session)
+    # blueprint.apply(sp_session, plan)
+
+    # _execute(sp_session, sql)
 
 
 def _execute(sp_session, sql: list):

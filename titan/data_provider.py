@@ -82,6 +82,33 @@ def fetch_region(session):
     return region
 
 
+def fetch_session(session):
+    session_obj = execute(
+        session,
+        """
+        SELECT
+            CURRENT_ACCOUNT() as account,
+            CURRENT_USER() as user,
+            CURRENT_ROLE() as role,
+            CURRENT_AVAILABLE_ROLES() as available_roles,
+            CURRENT_SECONDARY_ROLES() as secondary_roles,
+            CURRENT_DATABASE() as database,
+            CURRENT_SCHEMAS() as schemas,
+            CURRENT_WAREHOUSE() as warehouse
+        """,
+    )[0]
+    return {
+        "account": session_obj["ACCOUNT"],
+        "user": session_obj["USER"],
+        "role": session_obj["ROLE"],
+        "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
+        "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
+        "database": session_obj["DATABASE"],
+        "schemas": json.loads(session_obj["SCHEMAS"]),
+        "warehouse": session_obj["WAREHOUSE"],
+    }
+
+
 def fetch_account(session, fqn: FQN):
     # TODO: rewrite to not use ORGADMIN
 
@@ -215,6 +242,36 @@ def fetch_grant(session, fqn: FQN):
         ],
         key=lambda g: (g["priv"], g["owner"]),
     )
+
+
+def fetch_python_stored_procedure(session, fqn: FQN):
+    # SHOW PROCEDURES IN SCHEMA {}.{}
+    show_result = execute(session, "SHOW PROCEDURES IN SCHEMA", cacheable=True)
+    sprocs = _filter_result(show_result, name=fqn.name)
+    if len(sprocs) == 0:
+        return None
+    if len(sprocs) > 1:
+        raise Exception(f"Found multiple stored procedures matching {fqn}")
+
+    data = sprocs[0]
+    inputs, output = data["arguments"].split(" RETURN ")
+    desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+    properties = dict([(row["property"], row["value"]) for row in desc_result])
+
+    return {
+        "name": data["name"],
+        "secure": data["is_secure"] == "Y",
+        # "args": data["arguments"],
+        "returns": output,
+        "language": properties["language"],
+        "runtime_version": properties["runtime_version"],
+        "null_handling": properties["null_handling"],
+        "packages": properties["packages"],
+        "comment": None if data["description"] == "user-defined function" else data["description"],
+        "handler": properties["handler"],
+        "execute_as": properties["execute as"],
+        "as_": properties["body"],
+    }
 
 
 def fetch_role(session, fqn: FQN):

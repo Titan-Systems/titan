@@ -287,7 +287,7 @@ class EnumProp(Prop):
         if value is None:
             return ""
         eq = " = " if self.eq else " "
-        return f"{self.label}{eq}{value}"
+        return f"{self.label}{eq}{str(value)}"
 
 
 class EnumListProp(Prop):
@@ -432,7 +432,7 @@ class ArgsProp(Prop):
             return "()"
         args = []
         for arg in value:
-            args.append(f"{arg['name']} {arg['data_type']}")
+            args.append(f"{arg['name']} {str(arg['data_type'])}")
         return f"({', '.join(args)})"
 
 

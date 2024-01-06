@@ -1,5 +1,5 @@
 from .base import Resource, SchemaScoped, _fix_class_documentation
-from ..enums import DataType, ExecutionRights, NullHandling, ParseableEnum, Volatility
+from ..enums import DataType, ExecutionRights, NullHandling, Language
 from ..props import (
     ArgsProp,
     EnumFlagProp,
@@ -10,14 +10,6 @@ from ..props import (
     StringProp,
     StringListProp,
 )
-
-
-class SprocLanguage(ParseableEnum):
-    JAVA = "JAVA"
-    JAVASCRIPT = "JAVASCRIPT"
-    PYTHON = "PYTHON"
-    SCALA = "SCALA"
-    SQL = "SQL"
 
 
 class StoredProcedure(SchemaScoped, Resource):
@@ -50,12 +42,12 @@ class PythonStoredProcedure(StoredProcedure):
         args=ArgsProp(),
         copy_grants=FlagProp("copy_grants"),
         returns=EnumProp("returns", DataType, eq=False),
-        language=EnumProp("language", [SprocLanguage.PYTHON], eq=False),
+        language=EnumProp("language", [Language.PYTHON], eq=False),
         runtime_version=StringProp("runtime_version"),
         packages=StringListProp("packages", parens=True),
         imports=StringListProp("imports", parens=True),
         handler=StringProp("handler"),
-        external_access_integrations=IdentifierListProp("external_access_integrations"),
+        # external_access_integrations=IdentifierListProp("external_access_integrations"),
         # secrets
         null_handling=EnumFlagProp(NullHandling),
         comment=StringProp("comment"),
@@ -69,7 +61,7 @@ class PythonStoredProcedure(StoredProcedure):
     args: list
     returns: DataType
     copy_grants: bool = False
-    language: SprocLanguage = SprocLanguage.PYTHON
+    language: Language = Language.PYTHON
     runtime_version: str
     # FIXME: this is a situation where scrubbing defaults when an object is serialized is bad
     packages: list  # = ["snowflake-snowpark-python"]
