@@ -188,6 +188,7 @@ class Blueprint:
 
         # TODO: cursor setup, including query tag
         for action, urn_str, data in plan:
+            # TODO: eliminate the need to do resource class lookups. Probably by refactoring the lifecycle methods
             urn = URN.from_str(urn_str)
             resource_cls = Resource.classes[urn.resource_key]
             try:

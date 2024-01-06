@@ -33,6 +33,7 @@ setup(
             "tabulate",
             "pytest",
             "snowflake-cli-labs",
+            "pytest-xdist",
         ]
     },
 )

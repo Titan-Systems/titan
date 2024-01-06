@@ -15,3 +15,6 @@ venv = ''
 
 [tool.ruff]
 line-length = 120
+
+[tool.pytest.ini_options]
+addopts="-n 4"
