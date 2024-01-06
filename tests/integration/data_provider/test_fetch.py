@@ -78,7 +78,6 @@ resources = [
         "data": lambda name: {
             "resource_key": "schema",
             "name": name,
-            "database": "FIXME",
             "owner": TEST_ROLE,
             "data_retention_time_in_days": 1,
             "max_data_extension_time_in_days": 14,

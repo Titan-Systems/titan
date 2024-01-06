@@ -177,4 +177,4 @@ def test_sql_identity(resource):
     instance = resource["resource_cls"](**resource["data"])
     sql = instance.create_sql()
     new = resource["resource_cls"].from_sql(sql)
-    assert new == instance
+    assert dump(new) == dump(instance)

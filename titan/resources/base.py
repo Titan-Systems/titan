@@ -80,16 +80,6 @@ class Resource(BaseModel, metaclass=_Resource):
                 setattr(self, field_name, field_value.sql)
 
     @classmethod
-    def fetchable_fields(cls, data):
-        data = data.copy()
-        for key in list(data.keys()):
-            field = cls.model_fields[key]
-            fetchable = field.json_schema_extra is None or field.json_schema_extra.get("fetchable", True)
-            if not fetchable:
-                del data[key]
-        return data
-
-    @classmethod
     def from_sql(cls, sql):
         resource_cls = cls
         if resource_cls == Resource:

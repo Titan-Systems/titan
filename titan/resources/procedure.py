@@ -1,23 +1,22 @@
+from abc import ABC
+from typing import Union
+
 from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..enums import DataType, ExecutionRights, NullHandling, Language
+from ..parse import _resolve_resource_class
 from ..props import (
     ArgsProp,
     EnumFlagProp,
     EnumProp,
     FlagProp,
-    IdentifierListProp,
     Props,
     StringProp,
     StringListProp,
 )
 
 
-class StoredProcedure(SchemaScoped, Resource):
-    resource_type = "PROCEDURE"
-
-
 @_fix_class_documentation
-class PythonStoredProcedure(StoredProcedure):
+class PythonStoredProcedure(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ SECURE ] PROCEDURE <name> (
         [ <arg_name> <arg_data_type> [ DEFAULT <default_value> ] ] [ , ... ] )
@@ -36,6 +35,8 @@ class PythonStoredProcedure(StoredProcedure):
     [ EXECUTE AS { CALLER | OWNER } ]
     AS '<procedure_definition>'
     """
+
+    resource_type = "PROCEDURE"
 
     props = Props(
         secure=FlagProp("secure"),
@@ -72,3 +73,20 @@ class PythonStoredProcedure(StoredProcedure):
     comment: str = None
     execute_as: ExecutionRights = None
     as_: str = None
+
+
+ProcedureMap = {
+    Language.PYTHON: PythonStoredProcedure,
+}
+
+
+class Procedure(Resource, ABC):
+    def __new__(cls, type: Union[str, Language], **kwargs) -> PythonStoredProcedure:
+        language = Language.parse(type)
+        sproc_cls = ProcedureMap[language]
+        return sproc_cls(language=language, **kwargs)
+
+    @classmethod
+    def from_sql(cls, sql):
+        resource_cls = Resource.classes[_resolve_resource_class(sql)]
+        return resource_cls.from_sql(sql)

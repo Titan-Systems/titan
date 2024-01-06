@@ -69,7 +69,7 @@ def fetch_remote_state(session, manifest):
 
 def fetch_resource(session, urn):
     data_provider = sys.modules[__name__]
-    return getattr(data_provider, f"fetch_{urn.resource_key}")(session, urn.fqn)
+    return getattr(data_provider, f"fetch_{urn.resource_type}")(session, urn.fqn)
 
 
 def fetch_account_locator(session):
@@ -244,7 +244,7 @@ def fetch_grant(session, fqn: FQN):
     )
 
 
-def fetch_python_stored_procedure(session, fqn: FQN):
+def fetch_procedure(session, fqn: FQN):
     # SHOW PROCEDURES IN SCHEMA {}.{}
     show_result = execute(session, "SHOW PROCEDURES IN SCHEMA", cacheable=True)
     sprocs = _filter_result(show_result, name=fqn.name)
@@ -339,7 +339,6 @@ def fetch_schema(session, fqn: FQN):
         "name": data["name"],
         "transient": "TRANSIENT" in options,
         "owner": data["owner"],
-        "database": data["database_name"],
         "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
         "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],

@@ -1,5 +1,7 @@
 from typing import Optional
 
+from inflection import underscore
+
 
 class FQN:
     def __init__(
@@ -65,14 +67,17 @@ class URN:
                              Fully Qualified Name
     """
 
-    def __init__(self, resource_key: str, fqn: FQN, account: str = "", organization: str = "") -> None:
-        self.resource_key = resource_key
+    def __init__(self, resource_type: str, fqn: FQN, account: str = "", organization: str = "") -> None:
+        self.resource_type = underscore(resource_type)
         self.fqn = fqn
         self.account = account
         self.organization = organization
 
     def __str__(self):
-        return f"urn:{self.organization}:{self.account}:{self.resource_key}/{self.fqn}"
+        return f"urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn}"
+
+    def __repr__(self):
+        return f"URN(urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn})"
 
     @classmethod
     def from_str(cls, urn_str):
@@ -81,24 +86,25 @@ class URN:
             raise Exception(f"Invalid URN string: {urn_str}")
         if parts[0] != "urn":
             raise Exception(f"Invalid URN string: {urn_str}")
-        resource_key, fqn_str = parts[3].split("/")
-        fqn = FQN.from_str(fqn_str, resource_key=resource_key)
+        resource_type, fqn_str = parts[3].split("/")
+        # FIXME: This is a hack to get around the fact that we don't have a resource class yet
+        fqn = FQN.from_str(fqn_str, resource_key=resource_type)
         return cls(
             organization=parts[1],
             account=parts[2],
-            resource_key=resource_key,
+            resource_type=resource_type,
             fqn=fqn,
         )
 
     @classmethod
     def from_resource(cls, resource, **kwargs):
-        return cls(resource_key=resource.resource_key, fqn=resource.fqn, **kwargs)
+        return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
 
     @classmethod
     def from_locator(cls, locator: "ResourceLocator"):
         if locator.star:
             raise Exception("Cannot create URN from a wildcard locator")
-        return cls(resource_key=locator.resource_key, fqn=FQN.from_str(locator.locator))
+        return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
 
 
 class ResourceLocator:

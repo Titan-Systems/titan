@@ -30,7 +30,7 @@ def test_grant_account_obj_priv_with_resource():
 def test_grant_account_obj_priv_with_kwarg():
     grant = Grant(priv="MODIFY", on_warehouse="somewh", to="somerole")
     assert grant.priv == "MODIFY"
-    assert grant.on == Warehouse(name="somewh", stub=True)
+    assert grant.on == "warehouse somewh"
     assert grant.to == Role(name="somerole", stub=True)
 
 
@@ -44,7 +44,7 @@ def test_grant_schema_priv_with_resource():
 def test_grant_schema_priv_with_kwarg():
     grant = Grant(priv="CREATE VIEW", on_schema="someschema", to="somerole")
     assert grant.priv == "CREATE VIEW"
-    assert grant.on == Schema(name="someschema", stub=True)
+    assert grant.on == "schema someschema"
     assert grant.to == Role(name="somerole", stub=True)
 
 

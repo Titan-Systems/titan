@@ -13,7 +13,7 @@ class TestBlueprint(unittest.TestCase):
         table.schema = schema
         view = View(name="VIEW", schema_=schema, as_="SELECT 1")
         blueprint = Blueprint(name="blueprint", account="ABCD123", resources=[db, table, schema, view])
-        manifest = blueprint.generate_manifest()
+        manifest = blueprint.generate_manifest({"account": "ABCD123"})
 
         self.assertIn("urn::ABCD123:database/DB", manifest)
         self.assertDictEqual(

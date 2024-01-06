@@ -175,9 +175,8 @@ class Grant(AccountScoped, Resource):
                     # Grant targeting a specific resource
                     # on_{resource} kwargs
                     # on_schema="foo" -> on=Schema(name="foo", stub=True)
-                    resource_cls = Resource.classes[keyword[3:]]
-                    resource_name = arg
-                    on = resource_cls(name=resource_name, stub=True)
+                    # TODO: find a different way to create a reference pointer to the ON resource
+                    on = f"{keyword[3:]} {arg}"
 
         if owner is None and on == "ACCOUNT" and isinstance(priv, GlobalPriv):
             owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
@@ -191,6 +190,9 @@ class Grant(AccountScoped, Resource):
             grant_option=grant_option,
             owner=owner or "SYSADMIN",
         )
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(priv={getattr(self, 'priv', '')}, on={getattr(self, 'on', '')}, to={getattr(self, 'to', '')})"
 
     @classmethod
     def from_sql(cls, sql):

@@ -452,7 +452,7 @@ def _parse_column(sql):
     not_null = Keywords("NOT NULL").set_parse_action(lambda _: True)("not_null")
     constraint = Keyword("UNIQUE") ^ Keywords("PRIMARY KEY") ^ (Keyword("CONSTRAINT").suppress() + ANY())
     # TODO: rest of column properties
-    constraint = constraint("constraint")
+    constraint = constraint.set_parse_action(lambda toks: toks[0])("constraint")
     column = (
         Identifier("name")
         + pp.ungroup((ANY() + _in_parens(ANY())) ^ ANY())("data_type")

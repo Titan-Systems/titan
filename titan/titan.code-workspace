@@ -16,9 +16,11 @@
 			"**/build": true
 		},
 		"search.exclude": {
+			"**/.venv": true,
 			"**/build": true
 		},
 		"python.analysis.exclude": [
+			"**/.venv",
 			"**/build"
 		]
 	}
