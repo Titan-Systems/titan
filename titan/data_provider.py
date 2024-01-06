@@ -139,7 +139,6 @@ def fetch_alert(session, fqn: FQN):
         raise Exception(f"Found multiple alerts matching {fqn}")
     data = alerts[0]
     return {
-        "resource_key": "alert",
         "name": data["name"],
         "warehouse": data["warehouse"],
         "schedule": data["schedule"],
@@ -335,7 +334,6 @@ def fetch_schema(session, fqn: FQN):
     params = params_result_to_dict(show_params_result)
 
     return {
-        "resource_key": "schema",
         "name": data["name"],
         "transient": "TRANSIENT" in options,
         "owner": data["owner"],
