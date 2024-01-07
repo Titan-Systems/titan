@@ -34,7 +34,6 @@ jobs:
     strategy:
       matrix:
         environment: [snowflake-aws-enterprise]
-    environment: ${{ matrix.environment }}
     steps:
     - uses: actions/checkout@v3
     - name: Set up Python 3.9
@@ -58,3 +57,4 @@ jobs:
         TEST_SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
         TEST_SNOWFLAKE_PASSWORD: ${{ secrets.TEST_SNOWFLAKE_PASSWORD }}
         TEST_SNOWFLAKE_ROLE: ACCOUNTADMIN
+        TEST_SNOWFLAKE_REGION: ${{ env.SNOWFLAKE_CLOUD_REGION }}
