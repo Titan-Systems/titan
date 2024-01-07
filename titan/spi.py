@@ -38,7 +38,7 @@ def install(sp_session):
             returns=DataType.OBJECT,
             runtime_version="3.9",
             packages=["snowflake-snowpark-python"],
-            imports=["@TITAN/titan-0.0.13.zip"],
+            imports=["@TITAN/titan-latest.zip"],
             handler="titan.spi.fetch_database",
             execute_as="CALLER",
         )

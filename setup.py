@@ -30,8 +30,10 @@ setup(
     ],
     extras_require={
         "dev": [
+            "black",
             "tabulate",
             "pytest",
+            "ruff",
             "snowflake-cli-labs",
             "pytest-xdist",
         ]
