@@ -3,7 +3,7 @@ from ..props import Props, StringProp, StringListProp
 
 
 @_fix_class_documentation
-class Tag(Resource, AccountScoped):
+class Tag(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] TAG [ IF NOT EXISTS ] <name> [ COMMENT = '<string_literal>' ]
 

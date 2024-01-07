@@ -3,7 +3,7 @@ from ..props import Props, IntProp, StringProp
 
 
 @_fix_class_documentation
-class Sequence(Resource, SchemaScoped):
+class Sequence(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] SEQUENCE [ IF NOT EXISTS ] <name>
       [ WITH ]

@@ -19,6 +19,7 @@ from titan.resources import (
     JavascriptUDF,
     NotificationIntegration,
     Pipe,
+    PythonStoredProcedure,
     ResourceMonitor,
     Role,
     Schema,
@@ -119,6 +120,10 @@ class TestResourceFixtures(unittest.TestCase):
     def test_pipe(self):
         for sql in load_sql_fixtures("pipe.sql"):
             self.validate_from_sql(Pipe, sql)
+
+    def test_stored_procedure(self):
+        for sql in load_sql_fixtures("stored_procedure.sql"):
+            self.validate_from_sql(PythonStoredProcedure, sql)
 
     def test_resource_monitor(self):
         for sql in load_sql_fixtures("resource_monitor.sql"):

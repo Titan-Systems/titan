@@ -80,16 +80,6 @@ class Resource(BaseModel, metaclass=_Resource):
                 setattr(self, field_name, field_value.sql)
 
     @classmethod
-    def fetchable_fields(cls, data):
-        data = data.copy()
-        for key in list(data.keys()):
-            field = cls.model_fields[key]
-            fetchable = field.json_schema_extra is None or field.json_schema_extra.get("fetchable", True)
-            if not fetchable:
-                del data[key]
-        return data
-
-    @classmethod
     def from_sql(cls, sql):
         resource_cls = cls
         if resource_cls == Resource:
@@ -105,7 +95,10 @@ class Resource(BaseModel, metaclass=_Resource):
 
     def __format__(self, format_spec):
         track_ref(self)
-        return self.fully_qualified_name
+        return str(self.fully_qualified_name)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self.fully_qualified_name)})"
 
     def _requires(self, resource):
         self._refs.add(resource)
@@ -179,7 +172,7 @@ class OrganizationScoped(BaseModel):
 
 
 @_fix_class_documentation
-class Account(Resource, OrganizationScoped):
+class Account(OrganizationScoped, Resource):
     """
     CREATE ACCOUNT <name>
         ADMIN_NAME = <string>
@@ -224,8 +217,9 @@ class Account(Resource, OrganizationScoped):
     must_change_password: bool = Field(default=None, json_schema_extra={"fetchable": False})
     # edition: AccountEdition = None
     # region_group: str = None
-    # region: str = None
     comment: str = None
+
+    _children: List["AccountScoped"] = []
 
     @classmethod
     def lifecycle_create(cls, fqn, data):
@@ -249,13 +243,37 @@ class Account(Resource, OrganizationScoped):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
+            if resource.account is not None and resource.account != self:
+                raise Exception(
+                    f"Cannot add resource {resource} to account {self} because it already belongs to {resource.account}"
+                )
             resource.account = self
+            # TODO: check namespace collision
+            self._children.append(resource)
 
     def remove(self, *resources: "AccountScoped"):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
             resource.account = None
+            self._children.remove(resource)
+
+    def find(self, database: Union[None, str, "Database"] = None):
+        # TODO: support other AccountScoped resources
+        # Consider refactoring this into a generic find method
+        if database is None:
+            return None
+        elif isinstance(database, str):
+            database_name = database
+        elif isinstance(database, Database):
+            database_name = database.name
+        for child in self._children:
+            if child.name == database_name and isinstance(child, Database):
+                return child
+        return None
+
+    def databases(self) -> List["Database"]:
+        return [child for child in self._children if isinstance(child, Database)]
 
 
 class AccountScoped(BaseModel):
@@ -279,7 +297,7 @@ class AccountScoped(BaseModel):
 
 
 @_fix_class_documentation
-class Database(Resource, AccountScoped):
+class Database(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
         [ CLONE <source_db>
@@ -316,6 +334,8 @@ class Database(Resource, AccountScoped):
     default_ddl_collation: str = None
     tags: Dict[str, str] = None
     comment: str = None
+
+    _children: List["DatabaseScoped"] = []
 
     def model_post_init(self, ctx):
         super().model_post_init(ctx)
@@ -372,13 +392,31 @@ class Database(Resource, AccountScoped):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
+            if resource.database is not None and resource.database != self:
+                raise Exception(
+                    f"Cannot add resource {resource} to database {self} because it already belongs to {resource.database}"
+                )
             resource.database = self
+            self._children.append(resource)
 
     def remove(self, *resources: "DatabaseScoped"):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
             resource.database = None
+            self._children.remove(resource)
+
+    def find(self, schema: Union[None, str, "Schema"] = None):
+        if schema is None:
+            return None
+        elif isinstance(schema, str):
+            schema_name = schema
+        elif isinstance(schema, Schema):
+            schema_name = schema.name
+        for child in self._children:
+            if child.name == schema_name and isinstance(child, Schema):
+                return child
+        return None
 
 
 class DatabaseScoped(BaseModel):
@@ -402,7 +440,7 @@ class DatabaseScoped(BaseModel):
 
 
 @_fix_class_documentation
-class Schema(Resource, DatabaseScoped):
+class Schema(DatabaseScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ TRANSIENT ] SCHEMA [ IF NOT EXISTS ] <name>
       [ CLONE <source_schema>
@@ -423,7 +461,7 @@ class Schema(Resource, DatabaseScoped):
     )
     props = Props(
         transient=FlagProp("transient"),
-        with_managed_access=FlagProp("with managed access"),
+        managed_access=FlagProp("with managed access"),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
         max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
         default_ddl_collation=StringProp("default_ddl_collation"),
@@ -434,9 +472,9 @@ class Schema(Resource, DatabaseScoped):
     name: ResourceName
     transient: bool = False
     owner: str = "SYSADMIN"
-    with_managed_access: bool = None
+    managed_access: bool = False
     data_retention_time_in_days: int = None
-    max_data_extension_time_in_days: int = None
+    max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
     tags: Dict[str, str] = None
     comment: str = None
@@ -445,6 +483,10 @@ class Schema(Resource, DatabaseScoped):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
+            if resource.schema is not None and resource.schema != self:
+                raise Exception(
+                    f"Cannot add resource {resource} to schema {self} because it already belongs to {resource.schema}"
+                )
             resource.schema = self
 
     def remove(self, *resources: "SchemaScoped"):

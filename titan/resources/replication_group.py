@@ -1,7 +1,7 @@
 from .base import Resource, AccountScoped
 
 
-class ReplicationGroup(Resource, AccountScoped):
+class ReplicationGroup(AccountScoped, Resource):
     """
     CREATE REPLICATION GROUP [ IF NOT EXISTS ] <name>
         OBJECT_TYPES = <object_type> [ , <object_type> , ... ]

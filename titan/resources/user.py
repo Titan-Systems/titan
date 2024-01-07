@@ -16,7 +16,7 @@ from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsPr
 
 
 @_fix_class_documentation
-class User(Resource, AccountScoped):
+class User(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] USER [ IF NOT EXISTS ] <name>
         [ objectProperties ]

@@ -16,7 +16,7 @@ from .database import SharedDatabase
 from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
-from .file_format import FileFormat
+from .file_format import FileFormat, CSVFileFormat
 from .grant import Grant, RoleGrant
 from .pipe import Pipe
 from .replication_group import ReplicationGroup
@@ -24,6 +24,7 @@ from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .sequence import Sequence
 from .stage import Stage, InternalStage, ExternalStage
+from .procedure import Procedure, PythonStoredProcedure
 from .stream import Stream, TableStream, ExternalTableStream, ViewStream, StageStream
 from .table import Table
 from .tag import Tag
@@ -32,10 +33,7 @@ from .user import User
 from .view import View
 from .warehouse import Warehouse
 
-from .user_defined_function import (
-    UserDefinedFunction,
-    JavascriptUDF,
-)
+from .function import Function, JavascriptUDF
 
 from .notification_integration import (
     NotificationIntegration,
@@ -65,6 +63,7 @@ __all__ = [
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
     "Column",
+    "CSVFileFormat",
     "Database",
     "DatabaseRole",
     "DatabaseScoped",
@@ -85,6 +84,8 @@ __all__ = [
     "Organization",
     "OrganizationScoped",
     "Pipe",
+    "Procedure",
+    "PythonStoredProcedure",
     "ReplicationGroup",
     "Resource",
     "ResourceMonitor",
@@ -104,7 +105,7 @@ __all__ = [
     "Tag",
     "Task",
     "User",
-    "UserDefinedFunction",
+    "Function",
     "View",
     "ViewStream",
     "Warehouse",

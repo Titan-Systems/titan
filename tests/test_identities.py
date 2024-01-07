@@ -4,6 +4,7 @@ from titan.privs import GlobalPriv
 from titan.resources import (
     Account,
     Alert,
+    CSVFileFormat,
     Database,
     Grant,
     JavascriptUDF,
@@ -11,6 +12,7 @@ from titan.resources import (
     RoleGrant,
     Schema,
     SharedDatabase,
+    PythonStoredProcedure,
     Table,
     User,
     View,
@@ -85,7 +87,13 @@ resources = [
     {
         "test": "schema",
         "resource_cls": Schema,
-        "data": {"name": "SOMESCHEMA", "owner": "SYSADMIN", "transient": False},
+        "data": {
+            "name": "SOMESCHEMA",
+            "owner": "SYSADMIN",
+            "transient": False,
+            "managed_access": False,
+            "max_data_extension_time_in_days": 14,
+        },
     },
     {
         "test": "shared_database",
@@ -93,10 +101,29 @@ resources = [
         "data": {"name": "SOMESHARENAME", "owner": "ACCOUNTADMIN", "from_share": "SOMEACCOUNT.SOMESHARE"},
     },
     {
+        "test": "python_stored_procedure",
+        "resource_cls": PythonStoredProcedure,
+        "data": {
+            "name": "MY_PYTHON_SPROC",
+            "owner": "SYSADMIN",
+            "args": [],
+            "secure": False,
+            "returns": "INT",
+            "language": "PYTHON",
+            "runtime_version": "3.8",
+            "packages": ["snowflake-snowpark-python"],
+            "handler": "main",
+            "as_": "def main(_): return 42;",
+            "copy_grants": False,
+            "external_access_integrations": [],
+            "imports": [],
+        },
+    },
+    {
         "test": "table",
         "resource_cls": Table,
         "data": {
-            "name": "SOMESHARENAME",
+            "name": "SOMETABLE",
             "owner": "SYSADMIN",
             "columns": [{"data_type": "INT", "name": "ID"}],
             "change_tracking": False,
@@ -150,4 +177,4 @@ def test_sql_identity(resource):
     instance = resource["resource_cls"](**resource["data"])
     sql = instance.create_sql()
     new = resource["resource_cls"].from_sql(sql)
-    assert new == instance
+    assert dump(new) == dump(instance)

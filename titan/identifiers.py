@@ -1,5 +1,7 @@
 from typing import Optional
 
+from inflection import underscore
+
 
 class FQN:
     def __init__(
@@ -65,14 +67,17 @@ class URN:
                              Fully Qualified Name
     """
 
-    def __init__(self, resource_key: str, fqn: FQN, account: str = "", organization: str = "") -> None:
-        self.resource_key = resource_key
+    def __init__(self, resource_type: str, fqn: FQN, account: str = "", organization: str = "") -> None:
+        self.resource_type = underscore(resource_type)
         self.fqn = fqn
         self.account = account
         self.organization = organization
 
     def __str__(self):
-        return f"urn:{self.organization}:{self.account}:{self.resource_key}/{self.fqn}"
+        return f"urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn}"
+
+    def __repr__(self):
+        return f"URN(urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn})"
 
     @classmethod
     def from_str(cls, urn_str):
@@ -81,15 +86,71 @@ class URN:
             raise Exception(f"Invalid URN string: {urn_str}")
         if parts[0] != "urn":
             raise Exception(f"Invalid URN string: {urn_str}")
-        resource_key, fqn_str = parts[3].split("/")
-        fqn = FQN.from_str(fqn_str, resource_key=resource_key)
+        resource_type, fqn_str = parts[3].split("/")
+        # FIXME: This is a hack to get around the fact that we don't have a resource class yet
+        fqn = FQN.from_str(fqn_str, resource_key=resource_type)
         return cls(
             organization=parts[1],
             account=parts[2],
-            resource_key=resource_key,
+            resource_type=resource_type,
             fqn=fqn,
         )
 
     @classmethod
     def from_resource(cls, resource, **kwargs):
-        return cls(resource_key=resource.resource_key, fqn=resource.fqn, **kwargs)
+        return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
+
+    @classmethod
+    def from_locator(cls, locator: "ResourceLocator"):
+        if locator.star:
+            raise Exception("Cannot create URN from a wildcard locator")
+        return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
+
+
+class ResourceLocator:
+    """
+    ResourceLocator
+
+    A simple query language for locating resources within a Snowflake account.
+    """
+
+    def __init__(self, resource_key: str, locator: str) -> None:
+        self.resource_key = resource_key
+        self.locator = locator
+        self.star = self.locator == "*"
+
+    @classmethod
+    def from_str(cls, resource_str: str) -> "ResourceLocator":
+        """
+        Parse a resource locator string.
+
+        Usage
+        -----
+        Locate all resources:
+        >>> ResourceLocator.from_str("*")
+
+        Locate a specific resource:
+        >>> ResourceLocator.from_str("database:mydb")
+        >>> ResourceLocator.from_str("schema:mydb.my_schema")
+        >>> ResourceLocator.from_str("table:mydb.my_schema.my_table")
+
+        Locate all resources of a given type:
+        >>> ResourceLocator.from_str("database:*")
+
+        Locate all resources within a given scope:
+        >>> ResourceLocator.from_str("database:mydb.*")
+        """
+
+        if resource_str == "*":
+            return cls(resource_key="account", locator="*")
+
+        parts = resource_str.split(":")
+        if len(parts) != 2:
+            raise Exception(f"Invalid resource locator string: {resource_str}")
+        return cls(resource_key=parts[0], locator=parts[1])
+
+    def __str__(self):
+        return f"{self.resource_key}:{self.locator}"
+
+    def __repr__(self):
+        return f"ResourceLocator(resource_key='{self.resource_key}', locator='{self.locator}')"

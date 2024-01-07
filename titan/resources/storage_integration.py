@@ -14,7 +14,7 @@ class StorageProvider(ParseableEnum):
 
 
 @_fix_class_documentation
-class S3StorageIntegration(Resource, AccountScoped):
+class S3StorageIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
       <name>
@@ -55,7 +55,7 @@ class S3StorageIntegration(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class GCSStorageIntegration(Resource, AccountScoped):
+class GCSStorageIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
       <name>
@@ -91,7 +91,7 @@ class GCSStorageIntegration(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class AzureStorageIntegration(Resource, AccountScoped):
+class AzureStorageIntegration(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
       <name>

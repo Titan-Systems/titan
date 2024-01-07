@@ -21,7 +21,9 @@ class _Parseable(EnumMeta):
 
 
 class ParseableEnum(Enum, metaclass=_Parseable):
-    pass
+    # Why not??
+    def __str__(self):
+        return str(self.value)
 
 
 class Scope(ParseableEnum):
@@ -81,6 +83,14 @@ class DataType(ParseableEnum):
     GEOMETRY = "GEOMETRY"
 
 
+class Language(ParseableEnum):
+    JAVA = "JAVA"
+    JAVASCRIPT = "JAVASCRIPT"
+    PYTHON = "PYTHON"
+    SCALA = "SCALA"
+    SQL = "SQL"
+
+
 class NullHandling(ParseableEnum):
     CALLED_ON_NULL_INPUT = "CALLED ON NULL INPUT"
     RETURNS_NULL_ON_NULL_INPUT = "RETURNS NULL ON NULL INPUT"
@@ -91,6 +101,12 @@ class Volatility(ParseableEnum):
     VOLATILE = "VOLATILE"
     IMMUTABLE = "IMMUTABLE"
     STABLE = "STABLE"
+
+
+# https://docs.snowflake.com/developer-guide/stored-procedure/stored-procedures-rights
+class ExecutionRights(ParseableEnum):
+    CALLER = "CALLER"
+    OWNER = "OWNER"
 
 
 class SessionParameter(ParseableEnum):

@@ -16,7 +16,7 @@ from ..props import (
 
 
 @_fix_class_documentation
-class View(Resource, SchemaScoped):
+class View(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] [ SECURE ] [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE } ] [ RECURSIVE ] VIEW [ IF NOT EXISTS ] <name>
       [ ( <column_list> ) ]

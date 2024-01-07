@@ -6,7 +6,7 @@ from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 
 @_fix_class_documentation
-class Alert(Resource, SchemaScoped):
+class Alert(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] ALERT [ IF NOT EXISTS ] <name>
       WAREHOUSE = <warehouse_name>

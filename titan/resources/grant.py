@@ -18,7 +18,7 @@ from ..privs import GlobalPriv, SchemaPriv
 
 
 @_fix_class_documentation
-class Grant(Resource, AccountScoped):
+class Grant(AccountScoped, Resource):
     """
     GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
         | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
@@ -175,9 +175,8 @@ class Grant(Resource, AccountScoped):
                     # Grant targeting a specific resource
                     # on_{resource} kwargs
                     # on_schema="foo" -> on=Schema(name="foo", stub=True)
-                    resource_cls = Resource.classes[keyword[3:]]
-                    resource_name = arg
-                    on = resource_cls(name=resource_name, stub=True)
+                    # TODO: find a different way to create a reference pointer to the ON resource
+                    on = f"{keyword[3:]} {arg}"
 
         if owner is None and on == "ACCOUNT" and isinstance(priv, GlobalPriv):
             owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
@@ -191,6 +190,9 @@ class Grant(Resource, AccountScoped):
             grant_option=grant_option,
             owner=owner or "SYSADMIN",
         )
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(priv={getattr(self, 'priv', '')}, on={getattr(self, 'on', '')}, to={getattr(self, 'to', '')})"
 
     @classmethod
     def from_sql(cls, sql):
@@ -238,7 +240,7 @@ class Grant(Resource, AccountScoped):
 
 
 @_fix_class_documentation
-class RoleGrant(Resource, AccountScoped):
+class RoleGrant(AccountScoped, Resource):
     """
     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
     """

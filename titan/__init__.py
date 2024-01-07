@@ -1,5 +1,4 @@
 from .blueprint import Blueprint
-
 from .resources import *
 
 __all__ = [
@@ -22,8 +21,7 @@ __all__ = [
     "Warehouse",
 ]
 
-__version__ = "0.0.13"
-
+__version__ = "0.0.15"
 
 LOGO = r"""
     __  _ __          
@@ -35,3 +33,5 @@ LOGO = r"""
 """.strip(
     "\n"
 )
+
+SNOWPARK_TELEMETRY_ID = "titan_titan"

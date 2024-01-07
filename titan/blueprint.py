@@ -1,6 +1,6 @@
 import json
 
-from typing import List
+from typing import List, Optional, Tuple, Type, Union
 from queue import Queue
 
 from . import data_provider
@@ -11,11 +11,14 @@ from .identifiers import URN
 from .resources.base import (
     Account,
     AccountScoped,
+    Database,
     DatabaseScoped,
     OrganizationScoped,
     Resource,
     SchemaScoped,
+    Schema,
 )
+from .resources.validators import coerce_from_str
 
 
 def print_diffs(diffs):
@@ -29,25 +32,125 @@ def _hash(data):
     return hash(json.dumps(data, sort_keys=True))
 
 
-class Blueprint:
-    def __init__(self, name, organization=None, account=None, database=None, schema=None, resources=[]) -> None:
-        self.staged: List[Resource] = []
-        self.add(resources or [])
-        # NOTE: might want a resolution function here
-        self.organization = organization or ""
-        self.account = account or ""
-        self.database = database or ""
-        self.schema = schema or ""
+def _split_by_scope(
+    resources: List[Resource],
+) -> Tuple[List[OrganizationScoped], List[AccountScoped], List[DatabaseScoped], List[SchemaScoped]]:
+    org_scoped = []
+    acct_scoped = []
+    db_scoped = []
+    schema_scoped = []
+    for resource in resources:
+        if isinstance(resource, OrganizationScoped):
+            org_scoped.append(resource)
+        elif isinstance(resource, AccountScoped):
+            acct_scoped.append(resource)
+        elif isinstance(resource, DatabaseScoped):
+            db_scoped.append(resource)
+        elif isinstance(resource, SchemaScoped):
+            schema_scoped.append(resource)
+        else:
+            raise Exception(f"Unsupported resource type {type(resource)}")
+    return org_scoped, acct_scoped, db_scoped, schema_scoped
 
-    def generate_manifest(self):
+
+def _filter_unfetchable_fields(data):
+    filtered = data.copy()
+    for key in list(filtered.keys()):
+        # field = cls.model_fields[key]
+        # fetchable = field.json_schema_extra is None or field.json_schema_extra.get("fetchable", True)
+        # FIXME
+        fetchable = True
+        if not fetchable:
+            del filtered[key]
+    return filtered
+
+
+def _plan(remote_state, manifest):
+    manifest = manifest.copy()
+    urns = manifest.pop("_urns") + list(remote_state.keys())
+    sort_order = topological_sort(manifest, urns)
+    del manifest["_refs"]
+    changes = []
+    for action, urn_str, data in diff(remote_state, manifest):
+        data = _filter_unfetchable_fields(data)
+        if data:
+            changes.append((action, urn_str, data))
+    return sorted(changes, key=lambda change: sort_order[change[1]])
+
+
+class Blueprint:
+    def __init__(
+        self,
+        name: str,
+        account: Union[None, str, Account] = None,
+        database: Union[None, str, Database] = None,
+        schema: Union[None, str, Schema] = None,
+        resources: List[Resource] = [],
+    ) -> None:
+        self._finalized = False
+        self.name = name
+        self.staged: List[Resource] = []
+        self.account: Optional[Account] = coerce_from_str(Account)(account) if account else None
+        self.database: Optional[Database] = coerce_from_str(Database)(database) if database else None
+        self.schema: Optional[Schema] = coerce_from_str(Schema)(schema) if schema else None
+
+        self.add(resources or [])
+        self.add([res for res in [self.account, self.database, self.schema] if res is not None])
+
+    def _finalize(self, session_context: dict):
+        if self._finalized:
+            return
+        self._finalized = True
+
+        org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self.staged)
+
+        if len(org_scoped) > 1:
+            raise Exception("Only one account allowed")
+        elif len(org_scoped) == 1:
+            # If we have a staged account, use it
+            root = org_scoped[0]
+        else:
+            # Otherwise, use the session context to create a new account
+            root = Account(name=session_context["account"], stub=True)
+            self.account = root
+
+        # Add all databases and other account scoped resources to the root account
+        for resource in acct_scoped:
+            root.add(resource)
+        if session_context.get("database") is not None:
+            root.add(Database(name=session_context["database"], stub=True))
+
+        root_databases = root.databases()
+
+        # Add all schemas and database roles to their respective databases
+        for resource in db_scoped:
+            if resource.database is None:
+                if len(root_databases) == 1:
+                    root_databases[0].add(resource)
+                else:
+                    raise Exception(f"Database [{resource.database}] for resource {resource} not found")
+
+        for resource in schema_scoped:
+            if resource.schema is None:
+                if len(root_databases) == 1:
+                    public_schema = root_databases[0].find(schema="PUBLIC")
+                    if public_schema:
+                        public_schema.add(resource)
+                else:
+                    raise Exception(f"No schema for resource {repr(resource)} found")
+
+    def generate_manifest(self, session_context: dict = {}):
         manifest = {}
         refs = []
         urns = []
+
+        self._finalize(session_context)
+
+        # TODO: move this out into it's own function without the session
         for resource in self.staged:
             if resource.implicit:
                 continue
-            self._finalize_scope(resource)
-            urn = URN.from_resource(organization=self.organization, account=self.account, resource=resource)
+            urn = URN.from_resource(account=self.account, resource=resource)
 
             if resource.implicit:
                 continue
@@ -67,32 +170,15 @@ class Blueprint:
             urns.append(manifest_key)
 
             for ref in resource.refs:
-                self._finalize_scope(ref)
-                ref_urn = URN.from_resource(organization=self.organization, account=self.account, resource=ref)
+                ref_urn = URN.from_resource(account=self.account, resource=ref)
                 refs.append((str(urn), str(ref_urn)))
         manifest["_refs"] = refs
         manifest["_urns"] = urns
         return manifest
 
-    def _finalize_scope(self, resource: Resource):
-        # TODO: connect stubs
-        is_scoped = isinstance(resource, (OrganizationScoped, AccountScoped, DatabaseScoped, SchemaScoped))
-        if is_scoped and not resource.has_scope():
-            if isinstance(resource, OrganizationScoped):
-                resource.organization = self.organization
-            elif isinstance(resource, AccountScoped):
-                resource.account = self.account
-            elif isinstance(resource, DatabaseScoped):
-                if self.database is None:
-                    raise Exception(f"Orphaned resource found {resource}")
-                resource.database = self.database
-            elif isinstance(resource, SchemaScoped):
-                if self.schema is None:
-                    raise Exception(f"Orphaned resource found {resource}")
-                resource.schema = self.schema
-
     def plan(self, session):
-        manifest = self.generate_manifest()
+        session_ctx = data_provider.fetch_session(session)
+        manifest = self.generate_manifest(session_ctx)
         remote_state = data_provider.fetch_remote_state(session, manifest)
         return _plan(remote_state, manifest)
 
@@ -100,9 +186,9 @@ class Blueprint:
         if plan is None:
             plan = self.plan(session)
 
-        # with session.cursor() as cur:
         # TODO: cursor setup, including query tag
         for action, urn_str, data in plan:
+            # TODO: eliminate the need to do resource class lookups. Probably by refactoring the lifecycle methods
             urn = URN.from_str(urn_str)
             resource_cls = Resource.classes[urn.resource_key]
             try:
@@ -119,19 +205,16 @@ class Blueprint:
                 raise AttributeError(f"Resource {resource_cls.__name__} missing lifecycle action") from err
 
     def destroy(self, session, manifest=None):
-        manifest = manifest or self.generate_manifest()
+        session_ctx = data_provider.fetch_session(session)
+        manifest = manifest or self.generate_manifest(session_ctx)
         for urn_str in manifest.keys():
             urn = URN.from_str(urn_str)
             resource_cls = Resource.classes[urn.resource_key]
             execute(session, resource_cls.lifecycle_delete(urn.fqn))
 
     def _add(self, resource):
-        if isinstance(resource, Account):
-            if self.account == "":
-                self.account = resource.name
-            else:
-                # TODO: out of scope exception
-                raise Exception("Account already set")
+        if self._finalized:
+            raise Exception("Cannot add resources to a finalized blueprint")
         self.staged.append(resource)
         for ref in resource.refs:
             self._add(ref)
@@ -183,19 +266,3 @@ def topological_sort(manifest, urns):
         outgoing_edges[node].difference_update(empty_neighbors)
     nodes.reverse()
     return {value: index for index, value in enumerate(nodes)}
-
-
-def _plan(remote_state, manifest):
-    manifest = manifest.copy()
-    urns = manifest.pop("_urns") + list(remote_state.keys())
-    sort_order = topological_sort(manifest, urns)
-    del manifest["_refs"]
-    # del manifest["_urns"]
-    changes = []
-    for action, urn_str, data in diff(remote_state, manifest):
-        urn = URN.from_str(urn_str)
-        resource_cls = Resource.classes[urn.resource_key]
-        data = resource_cls.fetchable_fields(data)
-        if data:
-            changes.append((action, urn_str, data))
-    return sorted(changes, key=lambda change: sort_order[change[1]])

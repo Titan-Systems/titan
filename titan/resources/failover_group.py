@@ -24,7 +24,7 @@ class IntegrationTypes(ParseableEnum):
 
 
 @_fix_class_documentation
-class FailoverGroup(Resource, AccountScoped):
+class FailoverGroup(AccountScoped, Resource):
     """
     CREATE FAILOVER GROUP [ IF NOT EXISTS ] <name>
         OBJECT_TYPES = <object_type> [ , <object_type> , ... ]

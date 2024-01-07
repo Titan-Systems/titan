@@ -43,7 +43,7 @@ class WarehouseScalingPolicy(ParseableEnum):
 
 
 @_fix_class_documentation
-class Warehouse(Resource, AccountScoped):
+class Warehouse(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] WAREHOUSE [ IF NOT EXISTS ] <name>
         [ [ WITH ] objectProperties ]

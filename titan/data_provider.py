@@ -1,6 +1,8 @@
 import json
 import sys
 
+from inflection import pluralize
+
 from snowflake.connector.errors import ProgrammingError
 
 from .client import execute
@@ -67,7 +69,7 @@ def fetch_remote_state(session, manifest):
 
 def fetch_resource(session, urn):
     data_provider = sys.modules[__name__]
-    return getattr(data_provider, f"fetch_{urn.resource_key}")(session, urn.fqn)
+    return getattr(data_provider, f"fetch_{urn.resource_type}")(session, urn.fqn)
 
 
 def fetch_account_locator(session):
@@ -80,7 +82,36 @@ def fetch_region(session):
     return region
 
 
+def fetch_session(session):
+    session_obj = execute(
+        session,
+        """
+        SELECT
+            CURRENT_ACCOUNT() as account,
+            CURRENT_USER() as user,
+            CURRENT_ROLE() as role,
+            CURRENT_AVAILABLE_ROLES() as available_roles,
+            CURRENT_SECONDARY_ROLES() as secondary_roles,
+            CURRENT_DATABASE() as database,
+            CURRENT_SCHEMAS() as schemas,
+            CURRENT_WAREHOUSE() as warehouse
+        """,
+    )[0]
+    return {
+        "account": session_obj["ACCOUNT"],
+        "user": session_obj["USER"],
+        "role": session_obj["ROLE"],
+        "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
+        "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
+        "database": session_obj["DATABASE"],
+        "schemas": json.loads(session_obj["SCHEMAS"]),
+        "warehouse": session_obj["WAREHOUSE"],
+    }
+
+
 def fetch_account(session, fqn: FQN):
+    # TODO: rewrite to not use ORGADMIN
+
     show_result = execute(session, "SHOW ORGANIZATION ACCOUNTS", use_role="ORGADMIN", cacheable=True)
     accounts = _filter_result(show_result, account_name=fqn.name)
     if len(accounts) == 0:
@@ -89,6 +120,7 @@ def fetch_account(session, fqn: FQN):
         raise Exception(f"Found multiple alerts matching {fqn}")
     data = accounts[0]
     return {
+        "resource_key": "account",
         "name": data["account_name"],
         # "edition": data["edition"],
         # This column is only displayed for organizations that span multiple region groups.
@@ -211,6 +243,36 @@ def fetch_grant(session, fqn: FQN):
     )
 
 
+def fetch_procedure(session, fqn: FQN):
+    # SHOW PROCEDURES IN SCHEMA {}.{}
+    show_result = execute(session, "SHOW PROCEDURES IN SCHEMA", cacheable=True)
+    sprocs = _filter_result(show_result, name=fqn.name)
+    if len(sprocs) == 0:
+        return None
+    if len(sprocs) > 1:
+        raise Exception(f"Found multiple stored procedures matching {fqn}")
+
+    data = sprocs[0]
+    inputs, output = data["arguments"].split(" RETURN ")
+    desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+    properties = dict([(row["property"], row["value"]) for row in desc_result])
+
+    return {
+        "name": data["name"],
+        "secure": data["is_secure"] == "Y",
+        # "args": data["arguments"],
+        "returns": output,
+        "language": properties["language"],
+        "runtime_version": properties["runtime_version"],
+        "null_handling": properties["null_handling"],
+        "packages": properties["packages"],
+        "comment": None if data["description"] == "user-defined function" else data["description"],
+        "handler": properties["handler"],
+        "execute_as": properties["execute as"],
+        "as_": properties["body"],
+    }
+
+
 def fetch_role(session, fqn: FQN):
     show_result = execute(session, f"SHOW ROLES LIKE '{fqn.name}'", cacheable=True)
 
@@ -275,9 +337,9 @@ def fetch_schema(session, fqn: FQN):
         "name": data["name"],
         "transient": "TRANSIENT" in options,
         "owner": data["owner"],
-        "with_managed_access": "MANAGED ACCESS" in options,
+        "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
-        "max_data_extension_time_in_days": params["data_retention_time_in_days"],
+        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
         "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
     }
@@ -425,3 +487,21 @@ def fetch_warehouse(session, fqn: FQN):
         "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
         "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
     }
+
+
+################ List functions
+
+
+def list_resource(session, resource_key):
+    data_provider = sys.modules[__name__]
+    return getattr(data_provider, f"list_{pluralize(resource_key)}")(session)
+
+
+def list_databases(session):
+    show_result = execute(session, "SHOW DATABASES")
+    return [row["name"] for row in show_result]
+
+
+def list_schemas(session):
+    show_result = execute(session, "SHOW SCHEMAS")
+    return [f"{row['database_name']}.{row['name']}" for row in show_result]

@@ -404,7 +404,8 @@ def _parse_props(props, sql):
     prev_end = 0
 
     for parse_results, start, end in parser.scan_string(sql):
-        # Check if we skipped any text
+        # Check if we skipped any text. Since `parser` is a MatchFirst, skipped text is a sign
+        # that our SQL is invalid or our parser is incomplete.
         if len(sql[prev_end:start].strip()) > 0:
             raise ParseException(f"Failed to parse prop {sql[prev_end:start]}")
 
@@ -419,11 +420,14 @@ def _parse_props(props, sql):
         if isinstance(prop_value, pp.ParseResults):
             prop_value = prop_value.as_list()
 
-        found_props[prop_kwarg] = prop.typecheck(prop_value)
+        try:
+            found_props[prop_kwarg] = prop.typecheck(prop_value)
+        except ValueError as err:
+            raise ValueError(f"Parsed prop {prop_kwarg} with value {prop_value} failed typechecking") from err
+        except ParseException:
+            raise ValueError(f"Parsed prop {prop_kwarg}={prop} with value {prop_value} failed typechecking")
         remainder = sql[end:].strip(" ")
         prev_end = end
-
-        print("ok")
         if remainder == "":
             break
 
@@ -448,7 +452,7 @@ def _parse_column(sql):
     not_null = Keywords("NOT NULL").set_parse_action(lambda _: True)("not_null")
     constraint = Keyword("UNIQUE") ^ Keywords("PRIMARY KEY") ^ (Keyword("CONSTRAINT").suppress() + ANY())
     # TODO: rest of column properties
-    constraint = constraint("constraint")
+    constraint = constraint.set_parse_action(lambda toks: toks[0])("constraint")
     column = (
         Identifier("name")
         + pp.ungroup((ANY() + _in_parens(ANY())) ^ ANY())("data_type")
@@ -479,5 +483,5 @@ def _parse_table_schema(sql):
     # TODO: outofline constraints
 
     remainder = sql[0:start] + " " + sql[end:]
-    table_schema = {"columns": columns, "constraints": []}
+    table_schema = {"columns": columns}
     return (table_schema, remainder)

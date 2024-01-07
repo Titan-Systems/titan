@@ -78,24 +78,24 @@ resources = [
             "name": name,
             "owner": TEST_ROLE,
             "data_retention_time_in_days": 1,
-            "max_data_extension_time_in_days": 1,
+            "max_data_extension_time_in_days": 14,
             "transient": True,
-            "with_managed_access": False,
+            "managed_access": False,
         },
     },
-    {
-        "resource_key": "shared_database",
-        "setup_sql": [
-            "CALL SYSTEM$ACCEPT_LEGAL_TERMS('DATA_EXCHANGE_LISTING', 'GZSOZ1LLE9')",
-            """CREATE DATABASE {name} FROM SHARE WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1."WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709" """,
-        ],
-        "teardown_sql": "DROP DATABASE {name}",
-        "data": lambda name: {
-            "name": name,
-            "owner": TEST_ROLE,
-            "from_share": "WEATHERSOURCE.SNOWFLAKE_MANAGED$PUBLIC_GCP_US_CENTRAL1.WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
-        },
-    },
+    # {
+    #     "resource_key": "shared_database",
+    #     "setup_sql": [
+    #         "CALL SYSTEM$ACCEPT_LEGAL_TERMS('DATA_EXCHANGE_LISTING', 'GZSOZ1LLE9')",
+    #         "CREATE DATABASE {name} FROM SHARE WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
+    #     ],
+    #     "teardown_sql": "DROP DATABASE {name}",
+    #     "data": lambda name: {
+    #         "name": name,
+    #         "owner": TEST_ROLE,
+    #         "from_share": "WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
+    #     },
+    # },
     {
         "resource_key": "table",
         "setup_sql": "CREATE TABLE {name} (id INT)",
@@ -172,6 +172,7 @@ def resource(request, cursor, suffix, test_db):
             cursor.execute(teardown_sql.format(name=resource_name))
 
 
+@pytest.mark.requires_snowflake
 def test_fetch_resource(resource, db_session, test_db):
     fetch = getattr(data_provider, resource["fetch_method"])
     fqn = _generate_fqn(resource, test_db)

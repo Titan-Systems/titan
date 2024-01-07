@@ -23,7 +23,7 @@ from ..props import (
 
 
 @_fix_class_documentation
-class Table(Resource, SchemaScoped):
+class Table(SchemaScoped, Resource):
     resource_type = "TABLE"
     lifecycle_privs = Privs(
         create=SchemaPriv.CREATE_TABLE,

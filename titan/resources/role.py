@@ -16,7 +16,7 @@ from ..props import Props, StringProp, TagsProp
 
 
 @_fix_class_documentation
-class Role(Resource, AccountScoped):
+class Role(AccountScoped, Resource):
     """
     CREATE [ OR REPLACE ] ROLE [ IF NOT EXISTS ] <name>
       [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
@@ -39,7 +39,7 @@ class Role(Resource, AccountScoped):
     comment: str = None
 
 
-class DatabaseRole(Resource, DatabaseScoped):
+class DatabaseRole(DatabaseScoped, Resource):
     """
     CREATE [ OR REPLACE ] DATABASE ROLE [ IF NOT EXISTS ] <name>
       [ COMMENT = '<string_literal>' ]

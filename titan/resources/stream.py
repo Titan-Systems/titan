@@ -15,7 +15,7 @@ class StreamType(ParseableEnum):
 
 
 @_fix_class_documentation
-class TableStream(Resource, SchemaScoped):
+class TableStream(SchemaScoped, Resource):
     """
     -- table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -52,7 +52,7 @@ class TableStream(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class ExternalTableStream(Resource, SchemaScoped):
+class ExternalTableStream(SchemaScoped, Resource):
     """
     -- External table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -85,7 +85,7 @@ class ExternalTableStream(Resource, SchemaScoped):
 
 
 @_fix_class_documentation
-class StageStream(Resource, SchemaScoped):
+class StageStream(SchemaScoped, Resource):
     """
     -- Directory table
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
@@ -109,7 +109,7 @@ class StageStream(Resource, SchemaScoped):
     comment: str = None
 
 
-class ViewStream(Resource, SchemaScoped):
+class ViewStream(SchemaScoped, Resource):
     """
     -- View
     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]

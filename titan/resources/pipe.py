@@ -3,7 +3,7 @@ from ..props import BoolProp, Props, StringProp, QueryProp
 
 
 @_fix_class_documentation
-class Pipe(Resource, SchemaScoped):
+class Pipe(SchemaScoped, Resource):
     """
     CREATE [ OR REPLACE ] PIPE [ IF NOT EXISTS ] <name>
       [ AUTO_INGEST = [ TRUE | FALSE ] ]

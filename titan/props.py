@@ -200,7 +200,7 @@ class StringListProp(Prop):
     def render(self, values):
         if values is None:
             return ""
-        value_list = ", ".join(values)
+        value_list = ", ".join([f"'{v}'" for v in values])
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
@@ -287,7 +287,7 @@ class EnumProp(Prop):
         if value is None:
             return ""
         eq = " = " if self.eq else " "
-        return f"{self.label}{eq}{value}"
+        return f"{self.label}{eq}{str(value)}"
 
 
 class EnumListProp(Prop):
@@ -415,7 +415,9 @@ class ArgsProp(Prop):
                 + pp.Opt(_in_parens(ANY()))("data_type_size")
             )
         )
-        prop_values = prop_values.strip("()")
+        prop_values = prop_values.strip("()".strip())
+        if prop_values == "":
+            return []
         parsed = arg_parser.parse_string(prop_values)
         args = []
         for arg_data in parsed:
@@ -426,11 +428,11 @@ class ArgsProp(Prop):
         return args
 
     def render(self, value):
-        if value is None:
+        if value is None or len(value) == 0:
             return "()"
         args = []
         for arg in value:
-            args.append(f"{arg['name']} {arg['data_type']}")
+            args.append(f"{arg['name']} {str(arg['data_type'])}")
         return f"({', '.join(args)})"
 
 

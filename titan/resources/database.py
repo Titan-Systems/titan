@@ -4,7 +4,7 @@ from ..privs import DatabasePriv, GlobalPriv, Privs
 
 
 @_fix_class_documentation
-class SharedDatabase(Resource, AccountScoped):
+class SharedDatabase(AccountScoped, Resource):
     """
     CREATE DATABASE <name> FROM SHARE <provider_account>.<share_name>
     """
