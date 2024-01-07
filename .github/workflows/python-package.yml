@@ -52,3 +52,8 @@ jobs:
       run: |
         source ./.venv/bin/activate
         make integration
+      env:
+        TEST_SNOWFLAKE_ACCOUNT: ${{ secrets.TEST_SNOWFLAKE_ACCOUNT }}
+        TEST_SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
+        TEST_SNOWFLAKE_PASSWORD: ${{ secrets.TEST_SNOWFLAKE_PASSWORD }}
+        TEST_SNOWFLAKE_ROLE: ACCOUNTADMIN
