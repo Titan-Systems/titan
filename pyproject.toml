@@ -19,3 +19,6 @@ line-length = 120
 [tool.pytest.ini_options]
 addopts = "-n 4"
 markers = "requires_snowflake"
+filterwarnings = [
+    "ignore:.*urllib3.contrib.pyopenssl.*:DeprecationWarning"
+]

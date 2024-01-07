@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [snowflake-aws-enterprise]
+        environment: [snowflake-aws-enterprise, snowflake-aws-standard]
     environment: ${{ matrix.environment }}
     steps:
     - uses: actions/checkout@v3

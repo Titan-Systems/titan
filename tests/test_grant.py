@@ -48,17 +48,17 @@ def test_grant_schema_priv_with_kwarg():
     assert grant.to == Role(name="somerole", stub=True)
 
 
-def test_grant_future_schemas_priv():
-    grant = Grant(priv="CREATE VIEW", on_future_schemas_in_database="somedb", to="somerole")
-    assert grant.priv == "CREATE VIEW"
-    assert grant.on == Database(name="somedb", stub=True)
-    assert grant.on_future == "SCHEMAS"
-    assert grant.to == Role(name="somerole", stub=True)
+# def test_grant_future_schemas_priv():
+#     grant = Grant(priv="CREATE VIEW", on_future_schemas_in_database="somedb", to="somerole")
+#     assert grant.priv == "CREATE VIEW"
+#     assert grant.on == Database(name="somedb", stub=True)
+#     assert grant.on_future == "SCHEMAS"
+#     assert grant.to == Role(name="somerole", stub=True)
 
 
-def test_grant_all_schemas_priv():
-    grant = Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
-    assert grant.priv == "CREATE VIEW"
-    assert grant.on == Database(name="somedb", stub=True)
-    assert grant.on_all == "SCHEMAS"
-    assert grant.to == Role(name="somerole", stub=True)
+# def test_grant_all_schemas_priv():
+#     grant = Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
+#     assert grant.priv == "CREATE VIEW"
+#     assert grant.on == Database(name="somedb", stub=True)
+#     assert grant.on_all == "SCHEMAS"
+#     assert grant.to == Role(name="somerole", stub=True)

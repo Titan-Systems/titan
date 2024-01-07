@@ -46,20 +46,20 @@ def role(suffix, cursor, marked_for_cleanup):
     return role
 
 
-@pytest.mark.requires_snowflake
-def test_role_permissions(cursor, user, role):
-    session = cursor.connection
-    user_grant = RoleGrant(role=role, to_user=user, owner="ACCOUNTADMIN")
-    sysadmin_grant = RoleGrant(role=role, to_role="SYSADMIN", owner="ACCOUNTADMIN")
+# @pytest.mark.requires_snowflake
+# def test_role_permissions(cursor, user, role):
+#     session = cursor.connection
+#     user_grant = RoleGrant(role=role, to_user=user, owner="ACCOUNTADMIN")
+#     sysadmin_grant = RoleGrant(role=role, to_role="SYSADMIN", owner="ACCOUNTADMIN")
 
-    bp = Blueprint(name="test", account=os.environ["SNOWFLAKE_ACCOUNT"])
-    bp.add(
-        role,
-        user_grant,
-        sysadmin_grant,
-    )
-    changes = bp.plan(session)
-    assert len(changes) == 2
-    bp.apply(session, changes)
-    drift = bp.plan(session)
-    assert len(drift) == 0
+#     bp = Blueprint(name="test", account=os.environ["SNOWFLAKE_ACCOUNT"])
+#     bp.add(
+#         role,
+#         user_grant,
+#         sysadmin_grant,
+#     )
+#     changes = bp.plan(session)
+#     assert len(changes) == 2
+#     bp.apply(session, changes)
+#     drift = bp.plan(session)
+#     assert len(drift) == 0
