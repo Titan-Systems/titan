@@ -45,6 +45,7 @@ def cursor(suffix, marked_for_cleanup):
             cur.execute(res.drop_sql())
 
 
+@pytest.mark.requires_snowflake
 def test_update_database(cursor, test_db, marked_for_cleanup):
     db = Database(name=test_db, max_data_extension_time_in_days=10)
     cursor.execute(db.create_sql())

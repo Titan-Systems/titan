@@ -32,7 +32,7 @@ setup(
         "dev": [
             "black",
             "tabulate",
-            "pytest",
+            "pytest>=6.0",
             "ruff",
             "snowflake-cli-labs",
             "pytest-xdist",

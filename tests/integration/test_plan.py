@@ -46,6 +46,7 @@ def role(suffix, cursor, marked_for_cleanup):
     return role
 
 
+@pytest.mark.requires_snowflake
 def test_role_permissions(cursor, user, role):
     session = cursor.connection
     user_grant = RoleGrant(role=role, to_user=user, owner="ACCOUNTADMIN")

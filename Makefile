@@ -1,4 +1,4 @@
-.PHONY: install install-dev test style check
+.PHONY: install install-dev test integration style check
 
 install:
 	pip install -e .
@@ -8,6 +8,9 @@ install-dev:
 
 test:
 	python -m pytest
+
+integration:
+	python -m pytest --snowflake
 
 style:
 	python -m black .

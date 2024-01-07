@@ -78,6 +78,7 @@ def resource(request, suffix, marked_for_cleanup):
     yield res
 
 
+@pytest.mark.requires_snowflake
 def test_create_drop(resource, test_db, cursor):
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute(resource.create_sql())

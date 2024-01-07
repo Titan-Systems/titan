@@ -172,6 +172,7 @@ def resource(request, cursor, suffix, test_db):
             cursor.execute(teardown_sql.format(name=resource_name))
 
 
+@pytest.mark.requires_snowflake
 def test_fetch_resource(resource, db_session, test_db):
     fetch = getattr(data_provider, resource["fetch_method"])
     fqn = _generate_fqn(resource, test_db)
