@@ -9,7 +9,11 @@ on:
     secrets:
       TEST_SNOWFLAKE_ACCOUNT:
         required: true
-    
+      TEST_SNOWFLAKE_USER:
+        required: true
+      TEST_SNOWFLAKE_PASSWORD:
+        required: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
