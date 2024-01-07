@@ -5,6 +5,11 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_call:
+    secrets:
+      TEST_SNOWFLAKE_ACCOUNT:
+        required: true
+    
 jobs:
   build:
     runs-on: ubuntu-latest
