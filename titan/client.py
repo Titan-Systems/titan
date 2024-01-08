@@ -5,6 +5,10 @@ from snowflake.connector.errors import ProgrammingError
 
 from .builder import SQL
 
+ACCESS_CONTROL_ERR = 3001
+DOEST_NOT_EXIST_ERR = 2003
+ALREADY_EXISTS_ERR = 3041  # Not sure this is correct
+
 connection_params = {
     "account": os.environ.get("SNOWFLAKE_ACCOUNT"),
     "user": os.environ.get("SNOWFLAKE_USER"),
@@ -27,9 +31,9 @@ def _execute(session, sql, use_role=None) -> list:
     with session.cursor(snowflake.connector.DictCursor) as cur:
         try:
             if use_role:
-                print(f"[{session.user}:{session.role}] >>>", f"USE ROLE {use_role}")
+                print(f"[{session.user}:{session.role}] »", f"USE ROLE {use_role}")
                 cur.execute(f"USE ROLE {use_role}")
-            print(f"[{session.user}:{session.role}] >>>", sql_text)
+            print(f"[{session.user}:{session.role}] »", sql_text)
             result = cur.execute(sql_text).fetchall()
             return result
         except ProgrammingError as err:

@@ -34,10 +34,15 @@ def diff(original, new):
         yield DiffAction.REMOVE, key, original[key]
 
     for key in new_keys - original_keys:
+        if new[key].get("_stub", False):
+            raise Exception(f"Stubbed resource doesn't exist or isn't visible in session: {key}")
         yield DiffAction.ADD, key, new[key]
 
     for key in original_keys & new_keys:
         if isinstance(original[key], dict):
+            # We don't diff stubbed resources
+            if new[key].get("_stub", False):
+                continue
             delta = dict_delta(original[key], new[key])
             for attr, value in delta.items():
                 yield DiffAction.CHANGE, key, {attr: value}

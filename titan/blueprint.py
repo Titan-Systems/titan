@@ -3,7 +3,7 @@ import json
 from typing import List, Optional, Tuple, Type, Union
 from queue import Queue
 
-from . import data_provider
+from . import data_provider, lifecycle
 
 from .client import execute
 from .diff import diff, DiffAction
@@ -32,6 +32,10 @@ def _hash(data):
     return hash(json.dumps(data, sort_keys=True))
 
 
+def _is_container(resource):
+    return hasattr(resource, "children") and callable(resource.children)
+
+
 def _split_by_scope(
     resources: List[Resource],
 ) -> Tuple[List[OrganizationScoped], List[AccountScoped], List[DatabaseScoped], List[SchemaScoped]]:
@@ -39,7 +43,9 @@ def _split_by_scope(
     acct_scoped = []
     db_scoped = []
     schema_scoped = []
-    for resource in resources:
+
+    def route(resource):
+        """The sorting hat"""
         if isinstance(resource, OrganizationScoped):
             org_scoped.append(resource)
         elif isinstance(resource, AccountScoped):
@@ -50,6 +56,12 @@ def _split_by_scope(
             schema_scoped.append(resource)
         else:
             raise Exception(f"Unsupported resource type {type(resource)}")
+
+    for resource in resources:
+        route(resource)
+        if _is_container(resource):
+            for child in resource.children():
+                route(child)
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
@@ -65,17 +77,37 @@ def _filter_unfetchable_fields(data):
     return filtered
 
 
+# TODO: plan should include a permissions analysis (grant map)
 def _plan(remote_state, manifest):
     manifest = manifest.copy()
-    urns = manifest.pop("_urns") + list(remote_state.keys())
-    sort_order = topological_sort(manifest, urns)
+
+    # Generate a list of all URNs we're concerned with
+    resource_set = set(manifest["_urns"] + list(remote_state.keys()))
+
+    for ref in manifest["_refs"]:
+        resource_set.add(ref[0])
+        resource_set.add(ref[1])
+
+    # Calculate a topological sort order for the URNs
+    sort_order = topological_sort(resource_set, manifest["_refs"])
+
+    # Once sorting is done, remove the _refs and _urns keys from the manifest
     del manifest["_refs"]
+    del manifest["_urns"]
+
     changes = []
     for action, urn_str, data in diff(remote_state, manifest):
         data = _filter_unfetchable_fields(data)
         if data:
             changes.append((action, urn_str, data))
     return sorted(changes, key=lambda change: sort_order[change[1]])
+
+
+def _walk(resource: Resource):
+    yield resource
+    if _is_container(resource):
+        for child in resource.children():
+            yield from _walk(child)
 
 
 class Blueprint:
@@ -88,8 +120,9 @@ class Blueprint:
         resources: List[Resource] = [],
     ) -> None:
         self._finalized = False
+        self._staged: List[Resource] = []
+        self._root: Account = None
         self.name = name
-        self.staged: List[Resource] = []
         self.account: Optional[Account] = coerce_from_str(Account)(account) if account else None
         self.database: Optional[Database] = coerce_from_str(Database)(database) if database else None
         self.schema: Optional[Schema] = coerce_from_str(Schema)(schema) if schema else None
@@ -98,42 +131,45 @@ class Blueprint:
         self.add([res for res in [self.account, self.database, self.schema] if res is not None])
 
     def _finalize(self, session_context: dict):
+        """
+        Convert the staged resources into a tree of resources
+        """
         if self._finalized:
             return
         self._finalized = True
 
-        org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self.staged)
+        org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
 
         if len(org_scoped) > 1:
             raise Exception("Only one account allowed")
         elif len(org_scoped) == 1:
             # If we have a staged account, use it
-            root = org_scoped[0]
+            self._root = org_scoped[0]
         else:
-            # Otherwise, use the session context to create a new account
-            root = Account(name=session_context["account"], stub=True)
-            self.account = root
+            # Otherwise, create a stub account from the session context
+            self._root = Account(name=session_context["account"], stub=True)
+            self.account = self._root
 
-        # Add all databases and other account scoped resources to the root account
+        # Add all databases and other account scoped resources to the root
         for resource in acct_scoped:
-            root.add(resource)
+            self._root.add(resource)
         if session_context.get("database") is not None:
-            root.add(Database(name=session_context["database"], stub=True))
+            self._root.add(Database(name=session_context["database"], stub=True))
 
-        root_databases = root.databases()
+        databases = self._root.databases()
 
         # Add all schemas and database roles to their respective databases
         for resource in db_scoped:
             if resource.database is None:
-                if len(root_databases) == 1:
-                    root_databases[0].add(resource)
+                if len(databases) == 1:
+                    databases[0].add(resource)
                 else:
                     raise Exception(f"Database [{resource.database}] for resource {resource} not found")
 
         for resource in schema_scoped:
             if resource.schema is None:
-                if len(root_databases) == 1:
-                    public_schema = root_databases[0].find(schema="PUBLIC")
+                if len(databases) == 1:
+                    public_schema = databases[0].find(schema="PUBLIC")
                     if public_schema:
                         public_schema.add(resource)
                 else:
@@ -146,15 +182,15 @@ class Blueprint:
 
         self._finalize(session_context)
 
-        # TODO: move this out into it's own function without the session
-        for resource in self.staged:
+        for resource in _walk(self._root):
             if resource.implicit:
                 continue
-            urn = URN.from_resource(account=self.account, resource=resource)
 
-            if resource.implicit:
-                continue
+            urn = URN.from_resource(account=self.account, resource=resource)
             data = resource.model_dump(exclude_none=True)
+
+            if resource.stub:
+                data["_stub"] = True
 
             manifest_key = str(urn)
 
@@ -188,21 +224,14 @@ class Blueprint:
 
         # TODO: cursor setup, including query tag
         for action, urn_str, data in plan:
-            # TODO: eliminate the need to do resource class lookups. Probably by refactoring the lifecycle methods
             urn = URN.from_str(urn_str)
-            resource_cls = Resource.classes[urn.resource_key]
-            try:
-                if action == DiffAction.ADD:
-                    sql = resource_cls.lifecycle_create(urn.fqn, data)
-                elif action == DiffAction.CHANGE:
-                    sql = resource_cls.lifecycle_update(urn.fqn, data)
-                elif action == DiffAction.REMOVE:
-                    sql = resource_cls.lifecycle_delete(urn.fqn, data)
-                else:
-                    raise Exception(f"Unexpected action {action} in plan")
-                execute(session, sql)
-            except AttributeError as err:
-                raise AttributeError(f"Resource {resource_cls.__name__} missing lifecycle action") from err
+            if action == DiffAction.ADD:
+                sql = lifecycle.create_resource(urn, data)
+            elif action == DiffAction.CHANGE:
+                sql = lifecycle.update_resource(urn, data)
+            elif action == DiffAction.REMOVE:
+                sql = lifecycle.drop_resource(urn, data)
+            execute(session, sql)
 
     def destroy(self, session, manifest=None):
         session_ctx = data_provider.fetch_session(session)
@@ -215,9 +244,7 @@ class Blueprint:
     def _add(self, resource):
         if self._finalized:
             raise Exception("Cannot add resources to a finalized blueprint")
-        self.staged.append(resource)
-        for ref in resource.refs:
-            self._add(ref)
+        self._staged.append(resource)
 
     def add(self, *resources):
         if isinstance(resources[0], list):
@@ -226,18 +253,18 @@ class Blueprint:
             self._add(resource)
 
 
-def topological_sort(manifest, urns):
+def topological_sort(resource_set: set, references: list):
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
     in_degrees = {}
     outgoing_edges = {}
 
-    for node in urns:
+    for node in resource_set:
         in_degrees[node] = 0
         outgoing_edges[node] = set()
 
-    for node, ref in manifest["_refs"]:
+    for node, ref in references:
         in_degrees[ref] += 1
         outgoing_edges[node].add(ref)
 

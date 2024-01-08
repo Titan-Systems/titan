@@ -5,11 +5,8 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .client import execute
+from .client import execute, DOEST_NOT_EXIST_ERR
 from .identifiers import URN, FQN
-
-ACCESS_CONTROL_ERR = 3001
-DOEST_NOT_EXIST_ERR = 2003
 
 
 def _fail_if_not_granted(result, *args):
@@ -87,7 +84,8 @@ def fetch_session(session):
         session,
         """
         SELECT
-            CURRENT_ACCOUNT() as account,
+            CURRENT_ACCOUNT_NAME() as account,
+            CURRENT_ACCOUNT() as account_locator,
             CURRENT_USER() as user,
             CURRENT_ROLE() as role,
             CURRENT_AVAILABLE_ROLES() as available_roles,
@@ -99,6 +97,7 @@ def fetch_session(session):
     )[0]
     return {
         "account": session_obj["ACCOUNT"],
+        "account_locator": session_obj["ACCOUNT_LOCATOR"],
         "user": session_obj["USER"],
         "role": session_obj["ROLE"],
         "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
@@ -110,24 +109,8 @@ def fetch_session(session):
 
 
 def fetch_account(session, fqn: FQN):
-    # TODO: rewrite to not use ORGADMIN
-
-    show_result = execute(session, "SHOW ORGANIZATION ACCOUNTS", use_role="ORGADMIN", cacheable=True)
-    accounts = _filter_result(show_result, account_name=fqn.name)
-    if len(accounts) == 0:
-        return None
-    if len(accounts) > 1:
-        raise Exception(f"Found multiple alerts matching {fqn}")
-    data = accounts[0]
-    return {
-        "resource_key": "account",
-        "name": data["account_name"],
-        # "edition": data["edition"],
-        # This column is only displayed for organizations that span multiple region groups.
-        "region_group": data.get("region_group"),
-        # "region": data["snowflake_region"],
-        "comment": data["comment"],
-    }
+    # raise NotImplementedError()
+    return {}
 
 
 def fetch_alert(session, fqn: FQN):

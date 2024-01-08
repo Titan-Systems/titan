@@ -23,6 +23,7 @@ def check_resource_coverage():
     for resource_key, resource_cls in classes:
         if resource_cls == titan.Resource:
             continue
+        resource_type = getattr(resource_cls, "resource_type", "--")
         from_sql = hasattr(resource_cls, "from_sql")
         create_sql = hasattr(resource_cls, "create_sql")
         lifecycle = None
@@ -44,6 +45,7 @@ def check_resource_coverage():
         add_to.append(
             [
                 resource_cls.__name__,
+                resource_type,
                 "✔" if from_sql else "-",
                 "✔" if create_sql else "-",
                 lifecycle if lifecycle else "----",
@@ -53,8 +55,9 @@ def check_resource_coverage():
 
     headers = [
         "Resource Name",
-        "from SQL",
-        "to SQL",
+        "type",
+        "< SQL",
+        "> SQL",
         "privs",
         "fetch",
     ]

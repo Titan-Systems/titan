@@ -101,7 +101,7 @@ class Resource(BaseModel, metaclass=_Resource):
         return f"{self.__class__.__name__}({str(self.fully_qualified_name)})"
 
     def _requires(self, resource):
-        self._refs.add(resource)
+        self._refs.append(resource)
 
     def requires(self, *resources):
         if isinstance(resources[0], list):
@@ -122,21 +122,21 @@ class Resource(BaseModel, metaclass=_Resource):
     def refs(self):
         return self._refs
 
-    @classmethod
-    def lifecycle_create(cls, fqn, data, or_replace=False, if_not_exists=False):
-        # TODO: modify props to split into header props and footer props
-        return tidy_sql(
-            "CREATE",
-            "OR REPLACE" if or_replace else "",
-            cls.resource_type,
-            "IF NOT EXISTS" if if_not_exists else "",
-            fqn,
-            cls.props.render(data),
-        )
+    # @classmethod
+    # def lifecycle_create(cls, fqn, data, or_replace=False, if_not_exists=False):
+    #     # TODO: modify props to split into header props and footer props
+    #     return tidy_sql(
+    #         "CREATE",
+    #         "OR REPLACE" if or_replace else "",
+    #         cls.resource_type,
+    #         "IF NOT EXISTS" if if_not_exists else "",
+    #         fqn,
+    #         cls.props.render(data),
+    #     )
 
-    @classmethod
-    def lifecycle_delete(cls, fqn, data, if_exists=False):
-        return tidy_sql("DROP", cls.resource_type, "IF EXISTS" if if_exists else "", fqn)
+    # @classmethod
+    # def lifecycle_delete(cls, fqn, data, if_exists=False):
+    #     return tidy_sql("DROP", cls.resource_type, "IF EXISTS" if if_exists else "", fqn)
 
     def create_sql(self, **kwargs):
         data = self.model_dump(exclude_none=True, exclude_defaults=True)
@@ -217,27 +217,10 @@ class Account(OrganizationScoped, Resource):
     must_change_password: bool = Field(default=None, json_schema_extra={"fetchable": False})
     # edition: AccountEdition = None
     # region_group: str = None
+    # locator: str = None
     comment: str = None
 
     _children: List["AccountScoped"] = []
-
-    @classmethod
-    def lifecycle_create(cls, fqn, data):
-        return tidy_sql(
-            "CREATE ACCOUNT",
-            fqn,
-            cls.props.render(data),
-        )
-
-    @classmethod
-    def lifecycle_delete(cls, fqn, data, if_exists=False, grace_period_in_days=3):
-        return tidy_sql(
-            "DROP ACCOUNT",
-            "IF EXISTS" if if_exists else "",
-            fqn,
-            "GRACE_PERIOD_IN_DAYS = ",
-            grace_period_in_days,
-        )
 
     def add(self, *resources: "AccountScoped"):
         if isinstance(resources[0], list):
@@ -248,6 +231,7 @@ class Account(OrganizationScoped, Resource):
                     f"Cannot add resource {resource} to account {self} because it already belongs to {resource.account}"
                 )
             resource.account = self
+            resource.requires(self)
             # TODO: check namespace collision
             self._children.append(resource)
 
@@ -271,6 +255,9 @@ class Account(OrganizationScoped, Resource):
             if child.name == database_name and isinstance(child, Database):
                 return child
         return None
+
+    def children(self) -> List["AccountScoped"]:
+        return self._children
 
     def databases(self) -> List["Database"]:
         return [child for child in self._children if isinstance(child, Database)]
@@ -397,6 +384,7 @@ class Database(AccountScoped, Resource):
                     f"Cannot add resource {resource} to database {self} because it already belongs to {resource.database}"
                 )
             resource.database = self
+            resource.requires(self)
             self._children.append(resource)
 
     def remove(self, *resources: "DatabaseScoped"):
@@ -417,6 +405,9 @@ class Database(AccountScoped, Resource):
             if child.name == schema_name and isinstance(child, Schema):
                 return child
         return None
+
+    def children(self) -> List["DatabaseScoped"]:
+        return self._children
 
 
 class DatabaseScoped(BaseModel):
@@ -479,6 +470,8 @@ class Schema(DatabaseScoped, Resource):
     tags: Dict[str, str] = None
     comment: str = None
 
+    _children: List["SchemaScoped"] = []
+
     def add(self, *resources: "SchemaScoped"):
         if isinstance(resources[0], list):
             resources = resources[0]
@@ -488,12 +481,18 @@ class Schema(DatabaseScoped, Resource):
                     f"Cannot add resource {resource} to schema {self} because it already belongs to {resource.schema}"
                 )
             resource.schema = self
+            resource.requires(self)
+            self._children.append(resource)
 
     def remove(self, *resources: "SchemaScoped"):
         if isinstance(resources[0], list):
             resources = resources[0]
         for resource in resources:
             resource.schema = None
+            self._children.remove(resource)
+
+    def children(self) -> List["SchemaScoped"]:
+        return self._children
 
 
 T_Schema = Annotated[Schema, BeforeValidator(coerce_from_str(Schema)), serialize_resource_by_name]

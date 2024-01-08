@@ -27,5 +27,5 @@ EXECUTE IMMEDIATE
 Python package via pip
 
 ```sh
-pip install https://github.com/teej/titan/archive/main.zip
+python -m pip install git+https://github.com/teej/titan.git
 ```
