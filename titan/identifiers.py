@@ -67,17 +67,17 @@ class URN:
                              Fully Qualified Name
     """
 
-    def __init__(self, resource_type: str, fqn: FQN, account: str = "", organization: str = "") -> None:
+    def __init__(self, resource_type: str, fqn: FQN, account_locator: str = "", organization: str = "") -> None:
         self.resource_type = underscore(resource_type)
         self.fqn = fqn
-        self.account = account
+        self.account_locator = account_locator
         self.organization = organization
 
     def __str__(self):
-        return f"urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn}"
+        return f"urn:{self.organization}:{self.account_locator}:{self.resource_type}/{self.fqn}"
 
     def __repr__(self):
-        return f"URN(urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn})"
+        return f"URN(urn:{self.organization}:{self.account_locator}:{self.resource_type}/{self.fqn})"
 
     @classmethod
     def from_str(cls, urn_str):
@@ -91,7 +91,7 @@ class URN:
         fqn = FQN.from_str(fqn_str, resource_key=resource_type)
         return cls(
             organization=parts[1],
-            account=parts[2],
+            account_locator=parts[2],
             resource_type=resource_type,
             fqn=fqn,
         )

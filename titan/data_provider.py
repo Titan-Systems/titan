@@ -1,6 +1,9 @@
 import json
 import sys
 
+from collections import defaultdict
+from functools import cache
+
 from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
@@ -25,6 +28,17 @@ def _filter_result(result, **kwargs):
         else:
             filtered.append(row)
     return filtered
+
+
+def _urn_from_grant(row, session_ctx):
+    granted_on = row["granted_on"].lower()
+    if granted_on == "account":
+        fqn = FQN(name=session_ctx["account"])
+        urn = URN(resource_type=granted_on, account_locator=row["name"], fqn=fqn)
+    else:
+        fqn = FQN(name=row["name"])
+        urn = URN(resource_type=granted_on, account_locator=session_ctx["account_locator"], fqn=fqn)
+    return urn
 
 
 def params_result_to_dict(params_result):
@@ -79,6 +93,7 @@ def fetch_region(session):
     return region
 
 
+@cache
 def fetch_session(session):
     session_obj = execute(
         session,
@@ -224,6 +239,25 @@ def fetch_grant(session, fqn: FQN):
         ],
         key=lambda g: (g["priv"], g["owner"]),
     )
+
+
+def fetch_role_privs(session, role: str):
+    show_result = execute(session, f"SHOW GRANTS TO ROLE {role}")
+    session_ctx = fetch_session(session)
+
+    priv_map = defaultdict(list)
+
+    for row in show_result:
+        urn = _urn_from_grant(row, session_ctx)
+        priv_map[str(urn)].append(
+            {
+                "priv": row["privilege"],
+                "grant_option": row["grant_option"] == "true",
+                "owner": row["granted_by"],
+            }
+        )
+
+    return dict(priv_map)
 
 
 def fetch_procedure(session, fqn: FQN):

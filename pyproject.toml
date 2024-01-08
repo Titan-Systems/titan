@@ -24,6 +24,11 @@ filterwarnings = [
 ]
 
 [tool.codespell]
+ignore-words-list = [
+    "priv",
+    "sproc",
+    "snowpark",
+]
 skip = [
     "./build/",
 ]

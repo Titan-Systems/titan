@@ -77,7 +77,6 @@ def _filter_unfetchable_fields(data):
     return filtered
 
 
-# TODO: plan should include a permissions analysis (grant map)
 def _plan(remote_state, manifest):
     manifest = manifest.copy()
 
@@ -108,6 +107,15 @@ def _walk(resource: Resource):
     if _is_container(resource):
         for child in resource.children():
             yield from _walk(child)
+
+
+def _collect_privs(plan):
+    privs = {}
+    for action, urn_str, data in plan:
+        urn = URN.from_str(urn_str)
+        if action == DiffAction.ADD:
+            privs |= lifecycle.create_resource_privs(urn, data)
+    return privs
 
 
 class Blueprint:
@@ -147,7 +155,11 @@ class Blueprint:
             self._root = org_scoped[0]
         else:
             # Otherwise, create a stub account from the session context
-            self._root = Account(name=session_context["account"], stub=True)
+            self._root = Account(
+                name=session_context["account"],
+                locator=session_context["account_locator"],
+                stub=True,
+            )
             self.account = self._root
 
         # Add all databases and other account scoped resources to the root
@@ -186,7 +198,7 @@ class Blueprint:
             if resource.implicit:
                 continue
 
-            urn = URN.from_resource(account=self.account, resource=resource)
+            urn = URN.from_resource(account_locator=self.account.locator, resource=resource)
             data = resource.model_dump(exclude_none=True)
 
             if resource.stub:
@@ -206,7 +218,7 @@ class Blueprint:
             urns.append(manifest_key)
 
             for ref in resource.refs:
-                ref_urn = URN.from_resource(account=self.account, resource=ref)
+                ref_urn = URN.from_resource(account_locator=self.account.locator, resource=ref)
                 refs.append((str(urn), str(ref_urn)))
         manifest["_refs"] = refs
         manifest["_urns"] = urns
@@ -223,8 +235,35 @@ class Blueprint:
             plan = self.plan(session)
 
         # TODO: cursor setup, including query tag
+
+        """
+            At this point, we have a list of actions as a part of the plan. Each action is one of:
+                1. [ADD] action (CREATE command)
+                2. [CHANGE] action (one or many ALTER or SET PARAMETER commands)
+                3. [REMOVE] action (DROP command, REVOKE command, or a rename operation)
+
+            Each action requires:
+                • a set of privileges necessary to run commands
+                • the appropriate role to execute commands
+
+            Once we've determined those things, we can compare the list of required roles and privileges
+            against what we have access to in the session and the role tree.
+        """
+
+        # TODO: perform a privilege analysis (grant map)
+        required_privs = _collect_privs(plan)
+        session_ctx = data_provider.fetch_session(session)
+        available_privs = {}
+        for role in session_ctx["available_roles"]:
+            role_privs = data_provider.fetch_role_privs(session, role)
+            available_privs[role] = role_privs
+            # available_privs |= role_privs
+        print(required_privs)
+        print(available_privs)
+
         for action, urn_str, data in plan:
             urn = URN.from_str(urn_str)
+
             if action == DiffAction.ADD:
                 sql = lifecycle.create_resource(urn, data)
             elif action == DiffAction.CHANGE:

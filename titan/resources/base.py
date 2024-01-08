@@ -208,6 +208,7 @@ class Account(OrganizationScoped, Resource):
     )
 
     name: ResourceName
+    locator: str
     admin_name: str = Field(default=None, json_schema_extra={"fetchable": False})
     admin_password: str = Field(default=None, json_schema_extra={"fetchable": False})
     admin_rsa_public_key: str = Field(default=None, json_schema_extra={"fetchable": False})
@@ -217,7 +218,6 @@ class Account(OrganizationScoped, Resource):
     must_change_password: bool = Field(default=None, json_schema_extra={"fetchable": False})
     # edition: AccountEdition = None
     # region_group: str = None
-    # locator: str = None
     comment: str = None
 
     _children: List["AccountScoped"] = []
