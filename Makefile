@@ -14,5 +14,6 @@ integration:
 
 style:
 	python -m black .
+	codespell .
 
 check: style test

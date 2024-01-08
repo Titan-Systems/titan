@@ -22,3 +22,8 @@ markers = "requires_snowflake"
 filterwarnings = [
     "ignore:.*urllib3.contrib.pyopenssl.*:DeprecationWarning"
 ]
+
+[tool.codespell]
+skip = [
+    "./build/",
+]

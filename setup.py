@@ -9,6 +9,7 @@ setup(
     url="https://github.com/teej/titan",
     author="TJ Murphy",
     packages=find_packages(include=["titan", "titan.*"]),
+    python_requires=">=3.9",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
@@ -36,6 +37,8 @@ setup(
             "ruff",
             "snowflake-cli-labs",
             "pytest-xdist",
+            "pre-commit==3.6.0",
+            "codespell==2.2.6",
         ]
     },
 )
