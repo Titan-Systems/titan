@@ -1,22 +1,26 @@
 # Stored Procedure Interface (spi)
+import pydoc
+import re
+import sys
 
 from yaml import safe_load
 
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
-from . import SNOWPARK_TELEMETRY_ID
-
 from . import data_provider as dp
 from . import resource_props as props
-from . import git
+
+# from . import git
 from .builder import tidy_sql
 from .diff import diff
 from .enums import DataType
 from .identifiers import FQN, URN
 
 # TODO: spi can't import from Resources due to Pydantic version conflicts
-from .blueprint import Blueprint
-from .resources import PythonStoredProcedure
+# from .blueprint import Blueprint
+# from .resources import PythonStoredProcedure
+
+SNOWPARK_TELEMETRY_ID = "titan_titan"
 
 try:
     import _snowflake
@@ -24,6 +28,8 @@ try:
     _snowflake.snowflake_partner_attribution().append(SNOWPARK_TELEMETRY_ID)
 except ModuleNotFoundError as err:
     raise ModuleNotFoundError("The titan spi module must be run from a Snowpark UDF or stored procedure") from err
+
+__this__ = sys.modules[__name__]
 
 
 def install(sp_session):
@@ -185,12 +191,18 @@ def fetch(sp_session, name) -> dict:
         raise Exception(f"Unsupported resource type: {fqn.resource_key}")
 
 
-def git_export(sp_session, locator: str, repo: str, path: str) -> dict:
-    access_token = _snowflake.get_generic_secret_string("github_access_token")
-    return git.export(
-        sp_session.connection,
-        repo=repo,  # Can this be configured?
-        path=path,
-        locator_str="database:TITAN",
-        access_token=access_token,
-    )
+# def git_export(sp_session, locator: str, repo: str, path: str) -> dict:
+#     access_token = _snowflake.get_generic_secret_string("github_access_token")
+#     return git.export(
+#         sp_session.connection,
+#         repo=repo,  # Can this be configured?
+#         path=path,
+#         locator_str="database:TITAN",
+#         access_token=access_token,
+#     )
+
+
+def help(_):
+    txt = re.sub("[^\b]\b", "", pydoc.render_doc(__this__, "Help on %s"))
+    txt = txt.split("\n\nNAME\n    ")[1].split("\n\nFILE\n")[0]
+    return txt

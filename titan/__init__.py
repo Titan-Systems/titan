@@ -33,5 +33,3 @@ LOGO = r"""
 """.strip(
     "\n"
 )
-
-SNOWPARK_TELEMETRY_ID = "titan_titan"
