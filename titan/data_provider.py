@@ -12,6 +12,9 @@ from .client import execute, DOEST_NOT_EXIST_ERR
 from .identifiers import URN, FQN
 
 
+__this__ = sys.modules[__name__]
+
+
 def _fail_if_not_granted(result, *args):
     if len(result) == 0:
         raise Exception("Failed to create grant")
@@ -77,8 +80,7 @@ def fetch_remote_state(session, manifest):
 
 
 def fetch_resource(session, urn):
-    data_provider = sys.modules[__name__]
-    return getattr(data_provider, f"fetch_{urn.resource_type}")(session, urn.fqn)
+    return getattr(__this__, f"fetch_{urn.resource_type}")(session, urn.fqn)
 
 
 def fetch_account_locator(session):
@@ -508,8 +510,7 @@ def fetch_warehouse(session, fqn: FQN):
 
 
 def list_resource(session, resource_key):
-    data_provider = sys.modules[__name__]
-    return getattr(data_provider, f"list_{pluralize(resource_key)}")(session)
+    return getattr(__this__, f"list_{pluralize(resource_key)}")(session)
 
 
 def list_databases(session):

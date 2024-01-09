@@ -334,6 +334,7 @@ class Blueprint:
             plan = self.plan(session)
 
         # TODO: cursor setup, including query tag
+        # TODO: clean up urn vs urn_str madness
 
         """
             At this point, we have a list of actions as a part of the plan. Each action is one of:

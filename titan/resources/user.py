@@ -14,6 +14,8 @@ from ..builder import tidy_sql
 from ..privs import GlobalPriv, Privs, UserPriv
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 
+# TODO: Users have an implicit stage called @~
+
 
 @_fix_class_documentation
 class User(AccountScoped, Resource):

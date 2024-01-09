@@ -7,7 +7,6 @@ from pyparsing import ParseException
 from .builder import SQL
 from .enums import Scope
 
-
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
 
@@ -485,3 +484,16 @@ def _parse_table_schema(sql):
     remainder = sql[0:start] + " " + sql[end:]
     table_schema = {"columns": columns}
     return (table_schema, remainder)
+
+
+def _parse_stage_path(stage_path_str):
+    stage_path = {}
+    if not stage_path_str.startswith("@"):
+        raise Exception(f"Import location must be a stage: {stage_path_str} does not start with @")
+    if "/" in stage_path_str:
+        stage_path["stage_name"] = stage_path_str[1:].split("/")[0]
+        stage_path["path"] = "/".join(stage_path_str[1:].split("/")[1:])
+    else:
+        stage_path["stage_name"] = stage_path_str[1:]
+        stage_path["path"] = ""
+    return stage_path

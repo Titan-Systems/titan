@@ -3,12 +3,13 @@ import sys
 from .builder import tidy_sql
 from .identifiers import URN
 from .privs import GlobalPriv, DatabasePriv, SchemaPriv
+from .props import render_props
 
-lifecycle = sys.modules[__name__]
+__this__ = sys.modules[__name__]
 
 
 def create_resource(urn: URN, data: dict):
-    return getattr(lifecycle, f"create_{urn.resource_type}", create__default)(urn, data)
+    return getattr(__this__, f"create_{urn.resource_type}", create__default)(urn, data)
 
 
 def create__default(urn: URN, data: dict):
@@ -16,12 +17,12 @@ def create__default(urn: URN, data: dict):
         "CREATE",
         urn.resource_type,
         urn.fqn,
-        # cls.props.render(data),
+        render_props(urn, data),
     )
 
 
 def update_resource(urn: URN, data: dict):
-    return getattr(lifecycle, f"update_{urn.resource_type}", "update__default")(urn, data)
+    return getattr(__this__, f"update_{urn.resource_type}", "update__default")(urn, data)
 
 
 def update__default(urn: URN, data: dict):
@@ -34,7 +35,7 @@ def update__default(urn: URN, data: dict):
 
 
 def drop_resource(urn: URN, data: dict):
-    return getattr(lifecycle, f"drop_{urn.resource_type}", "drop__default")(urn, data)
+    return getattr(__this__, f"drop_{urn.resource_type}", "drop__default")(urn, data)
 
 
 def drop__default(urn: URN, data: dict):

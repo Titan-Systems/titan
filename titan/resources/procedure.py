@@ -3,7 +3,7 @@ from typing import Union
 
 from .base import Resource, SchemaScoped, _fix_class_documentation
 from ..enums import DataType, ExecutionRights, NullHandling, Language
-from ..parse import _resolve_resource_class
+from ..parse import _resolve_resource_class, _parse_stage_path
 from ..props import (
     ArgsProp,
     EnumFlagProp,
@@ -13,6 +13,7 @@ from ..props import (
     StringProp,
     StringListProp,
 )
+from .stage import Stage
 
 
 @_fix_class_documentation
@@ -73,6 +74,49 @@ class PythonStoredProcedure(SchemaScoped, Resource):
     comment: str = None
     execute_as: ExecutionRights = None
     as_: str = None
+
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        secure: bool = False,
+        args: list = None,
+        returns: DataType = None,
+        copy_grants: bool = False,
+        language: Language = Language.PYTHON,
+        runtime_version: str = None,
+        packages: list = None,
+        imports: list = None,
+        handler: str = None,
+        external_access_integrations: list = None,
+        null_handling: NullHandling = None,
+        comment: str = None,
+        execute_as: ExecutionRights = None,
+        as_: str = None,
+    ):
+        for import_location in imports:
+            stage = _parse_stage_path(import_location)
+            # TODO: fix polymorphic resources
+            # self.requires(Stage(name="stage", stub=True))
+
+        super().__init__(
+            name=name,
+            owner=owner,
+            secure=secure,
+            args=args,
+            returns=returns,
+            copy_grants=copy_grants,
+            language=language,
+            runtime_version=runtime_version,
+            packages=packages,
+            imports=imports,
+            handler=handler,
+            external_access_integrations=external_access_integrations,
+            null_handling=null_handling,
+            comment=comment,
+            execute_as=execute_as,
+            as_=as_,
+        )
 
 
 ProcedureMap = {

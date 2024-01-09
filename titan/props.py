@@ -1,4 +1,5 @@
 import json
+import sys
 
 from abc import ABC
 from typing import Dict
@@ -6,7 +7,8 @@ from typing import Dict
 import pyparsing as pp
 
 from .builder import tidy_sql
-from .enums import DataType
+from .enums import DataType, Language, ExecutionRights, NullHandling
+from .identifiers import URN
 from .parse import (
     _parser_has_results_name,
     _parse_props,
@@ -21,6 +23,9 @@ from .parse import (
     ARROW,
     ANY,
 )
+
+
+__this__ = sys.modules[__name__]
 
 
 class Prop(ABC):
@@ -467,3 +472,48 @@ class ColumnsProp(Prop):
 
     def typecheck(self, prop_values):
         prop_values = prop_values.strip("()")
+
+
+PROPS_MAP = {
+    "database": Props(
+        transient=FlagProp("transient"),
+        data_retention_time_in_days=IntProp("data_retention_time_in_days"),
+        max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
+        default_ddl_collation=StringProp("default_ddl_collation"),
+        tags=TagsProp(),
+        comment=StringProp("comment"),
+    ),
+    "procedure": Props(
+        secure=FlagProp("secure"),
+        args=ArgsProp(),
+        copy_grants=FlagProp("copy_grants"),
+        returns=EnumProp("returns", DataType, eq=False),
+        language=EnumProp("language", [Language.PYTHON], eq=False),
+        runtime_version=StringProp("runtime_version"),
+        packages=StringListProp("packages", parens=True),
+        imports=StringListProp("imports", parens=True),
+        handler=StringProp("handler"),
+        # external_access_integrations=IdentifierListProp("external_access_integrations"),
+        # secrets
+        null_handling=EnumFlagProp(NullHandling),
+        comment=StringProp("comment"),
+        execute_as=EnumProp("execute as", ExecutionRights, eq=False),
+        as_=StringProp("as", eq=False),
+    ),
+    "schema": Props(
+        transient=FlagProp("transient"),
+        managed_access=FlagProp("with managed access"),
+        data_retention_time_in_days=IntProp("data_retention_time_in_days"),
+        max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
+        default_ddl_collation=StringProp("default_ddl_collation"),
+        tags=TagsProp(),
+        comment=StringProp("comment"),
+    ),
+}
+
+
+def render_props(urn: URN, data: dict):
+    if urn.resource_type not in PROPS_MAP:
+        raise Exception(f"Unsupported resource: {urn}")
+    props = PROPS_MAP[urn.resource_type]
+    return props.render(data)
