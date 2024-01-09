@@ -1,5 +1,6 @@
 from .helpers import listify
 from .enums import ParseableEnum
+from .identifiers import URN
 
 
 class Privs:
@@ -99,6 +100,12 @@ class DatabasePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class ProcedurePriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
 class RolePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
@@ -164,3 +171,39 @@ class WarehousePriv(ParseableEnum):
     OPERATE = "OPERATE"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
+
+
+def priv_for_principal(principal: URN, priv: str):
+    if principal.resource_type == "account":
+        return GlobalPriv(priv)
+    elif principal.resource_type == "database":
+        return DatabasePriv(priv)
+    elif principal.resource_type == "schema":
+        return SchemaPriv(priv)
+    elif principal.resource_type == "table":
+        return TablePriv(priv)
+    elif principal.resource_type == "view":
+        return ViewPriv(priv)
+    elif principal.resource_type == "warehouse":
+        return WarehousePriv(priv)
+    elif principal.resource_type == "procedure":
+        return ProcedurePriv(priv)
+    raise Exception("Missing")
+
+
+def create_priv_for_resource_type(resource_type):
+    if resource_type == "database":
+        return GlobalPriv.CREATE_DATABASE
+    elif resource_type == "schema":
+        return DatabasePriv.CREATE_SCHEMA
+    elif resource_type == "table":
+        return SchemaPriv.CREATE_TABLE
+    elif resource_type == "view":
+        return SchemaPriv.CREATE_VIEW
+    elif resource_type == "procedure":
+        return SchemaPriv.CREATE_PROCEDURE
+    raise Exception("Missing")
+
+
+def is_ownership_priv(priv):
+    return str(priv) == "OWNERSHIP"

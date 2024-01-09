@@ -33,8 +33,7 @@ def _filter_result(result, **kwargs):
 def _urn_from_grant(row, session_ctx):
     granted_on = row["granted_on"].lower()
     if granted_on == "account":
-        fqn = FQN(name=session_ctx["account"])
-        urn = URN(resource_type=granted_on, account_locator=row["name"], fqn=fqn)
+        urn = URN.from_session_ctx(session_ctx)
     else:
         fqn = FQN(name=row["name"])
         urn = URN(resource_type=granted_on, account_locator=session_ctx["account_locator"], fqn=fqn)
@@ -67,7 +66,6 @@ def fetch_remote_state(session, manifest):
     for urn_str in manifest["_urns"]:
         urn = URN.from_str(urn_str)
         data = fetch_resource(session, urn)
-        # TODO: handle implicit and stub resources
         if urn_str in manifest and data is not None:
             if isinstance(data, list):
                 compacted = [remove_none_values(d) for d in data]
@@ -241,7 +239,7 @@ def fetch_grant(session, fqn: FQN):
     )
 
 
-def fetch_role_privs(session, role: str):
+def fetch_role_grants(session, role: str):
     show_result = execute(session, f"SHOW GRANTS TO ROLE {role}")
     session_ctx = fetch_session(session)
 

@@ -1,4 +1,6 @@
 import os
+import time
+
 import snowflake.connector
 
 from snowflake.connector.errors import ProgrammingError
@@ -33,12 +35,15 @@ def _execute(session, sql, use_role=None) -> list:
             if use_role:
                 print(f"[{session.user}:{session.role}] »", f"USE ROLE {use_role}")
                 cur.execute(f"USE ROLE {use_role}")
-            print(f"[{session.user}:{session.role}] »", sql_text)
+            print(f"[{session.user}:{session.role}] »", sql_text, end="")
+            start = time.time()
             result = cur.execute(sql_text).fetchall()
+            print(f"    \033[94m({len(result)} rows, {time.time() - start:.2f}s)\033[0m", flush=True)
             return result
         except ProgrammingError as err:
             # if err.errno == ACCESS_CONTROL_ERR:
             #     raise Exception(f"Access control error: {err.msg}")
+            print(f"    \033[31m(err {err.errno}, {time.time() - start:.2f}s)\033[0m", flush=True)
             raise ProgrammingError(f"failed to execute sql, [{sql_text}]", errno=err.errno) from err
 
 

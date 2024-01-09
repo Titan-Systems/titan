@@ -2,7 +2,7 @@ import sys
 
 from .builder import tidy_sql
 from .identifiers import URN
-from .privs import GlobalPriv, Privs, WarehousePriv
+from .privs import GlobalPriv, DatabasePriv, SchemaPriv
 
 lifecycle = sys.modules[__name__]
 
@@ -47,17 +47,15 @@ def drop__default(urn: URN, data: dict):
 
 
 CREATE_RESOURCE_PRIV_MAP = {
-    "database": GlobalPriv.CREATE_DATABASE,
+    "database": [GlobalPriv.CREATE_DATABASE],
+    "schema": [DatabasePriv.CREATE_SCHEMA],
+    "table": [SchemaPriv.CREATE_TABLE, SchemaPriv.USAGE, DatabasePriv.USAGE],
+    "procedure": [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],
 }
 
 
-def create_resource_privs(urn: URN, data: dict):
+def privs_for_create(urn: URN, data: dict):
     if urn.resource_type not in CREATE_RESOURCE_PRIV_MAP:
-        # raise Exception(f"Unsupported resource: {urn}")
-        return {}
-    return {
-        "account": str(CREATE_RESOURCE_PRIV_MAP[urn.resource_type]),
-    }
-
-    # if urn.resource_type == "DATABASE":
-    #     return create_database_privs(urn, data)
+        raise Exception(f"Unsupported resource: {urn}")
+        # return []
+    return CREATE_RESOURCE_PRIV_MAP[urn.resource_type]

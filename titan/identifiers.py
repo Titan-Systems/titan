@@ -67,7 +67,7 @@ class URN:
                              Fully Qualified Name
     """
 
-    def __init__(self, resource_type: str, fqn: FQN, account_locator: str = "", organization: str = "") -> None:
+    def __init__(self, resource_type: str, fqn: FQN, account_locator: str, organization: str = "") -> None:
         self.resource_type = underscore(resource_type)
         self.fqn = fqn
         self.account_locator = account_locator
@@ -105,6 +105,32 @@ class URN:
         if locator.star:
             raise Exception("Cannot create URN from a wildcard locator")
         return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
+
+    @classmethod
+    def from_session_ctx(cls, session_ctx):
+        return cls(
+            resource_type="account",
+            fqn=FQN(name=session_ctx["account"]),
+            account_locator=session_ctx["account_locator"],
+        )
+
+    def database(self):
+        if not self.fqn.database:
+            raise Exception(f"URN does not have a database: {self}")
+        return URN(
+            resource_type="database",
+            account_locator=self.account_locator,
+            fqn=FQN(name=self.fqn.database),
+        )
+
+    def schema(self):
+        if not self.fqn.schema:
+            raise Exception(f"URN does not have a schema: {self}")
+        return URN(
+            resource_type="schema",
+            account_locator=self.account_locator,
+            fqn=FQN(name=self.fqn.schema, database=self.fqn.database),
+        )
 
 
 class ResourceLocator:

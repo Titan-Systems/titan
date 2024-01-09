@@ -1,5 +1,6 @@
 import json
 
+from collections import defaultdict
 from typing import List, Optional, Tuple, Type, Union
 from queue import Queue
 
@@ -7,7 +8,15 @@ from . import data_provider, lifecycle
 
 from .client import execute
 from .diff import diff, DiffAction
-from .identifiers import URN
+from .identifiers import URN, FQN
+from .privs import (
+    GlobalPriv,
+    DatabasePriv,
+    SchemaPriv,
+    priv_for_principal,
+    is_ownership_priv,
+    create_priv_for_resource_type,
+)
 from .resources.base import (
     Account,
     AccountScoped,
@@ -109,13 +118,104 @@ def _walk(resource: Resource):
             yield from _walk(child)
 
 
-def _collect_privs(plan):
-    privs = {}
+def _collect_required_privs(session_ctx, plan):
+    priv_map = defaultdict(set)
+
+    def _add(urn, priv):
+        priv_map[str(urn)].add(priv)
+
+    account_urn = URN.from_session_ctx(session_ctx)
+
     for action, urn_str, data in plan:
         urn = URN.from_str(urn_str)
+        privs = []
         if action == DiffAction.ADD:
-            privs |= lifecycle.create_resource_privs(urn, data)
-    return privs
+            privs = lifecycle.privs_for_create(urn, data)
+
+        for priv in privs:
+            if isinstance(priv, GlobalPriv):
+                _add(account_urn, priv)
+            elif isinstance(priv, DatabasePriv):
+                _add(urn.database(), priv)
+            elif isinstance(priv, SchemaPriv):
+                _add(urn.schema(), priv)
+
+    return dict(priv_map)
+
+
+def _collect_available_privs(session_ctx, session, plan):
+    priv_map = {}
+
+    def _add(role, principal, priv):
+        if role not in priv_map:
+            priv_map[role] = {}
+        if principal not in priv_map[role]:
+            priv_map[role][principal] = set()
+        priv_map[role][principal].add(priv)
+
+    def _contains(role, principal, priv):
+        if role not in priv_map:
+            return False
+        if principal not in priv_map[role]:
+            return False
+        return priv in priv_map[role][principal]
+
+    account_urn = URN.from_session_ctx(session_ctx)
+
+    for role in session_ctx["available_roles"]:
+        priv_map[role] = {}
+
+        # Existing privilege grants
+        role_grants = data_provider.fetch_role_grants(session, role)
+        for principal, grant_list in role_grants.items():
+            for grant in grant_list:
+                priv = priv_for_principal(URN.from_str(principal), grant["priv"])
+                _add(role, principal, priv)
+
+        # Implied privilege grants in the context of our plan
+        for action, urn_str, _ in plan:
+            urn = URN.from_str(urn_str)
+            if action == DiffAction.ADD:
+                create_priv = create_priv_for_resource_type(urn.resource_type)
+                ownership_priv = priv_for_principal(urn, "OWNERSHIP")
+                if urn.resource_type == "database":
+                    parent_urn = account_urn
+                elif urn.resource_type == "schema":
+                    parent_urn = urn.database()
+                else:
+                    parent_urn = urn.schema()
+                if _contains(role, str(parent_urn), create_priv):
+                    _add(role, urn_str, ownership_priv)
+                    if urn.resource_type == "database":
+                        public_schema = URN(
+                            account_locator=account_urn.account_locator,
+                            resource_type="schema",
+                            fqn=FQN(name="PUBLIC", database=urn.fqn.name),
+                        )
+                        information_schema = URN(
+                            account_locator=account_urn.account_locator,
+                            resource_type="schema",
+                            fqn=FQN(name="PUBLIC", database=urn.fqn.name),
+                        )
+                        _add(role, str(public_schema), priv_for_principal(public_schema, "OWNERSHIP"))
+                        _add(role, str(information_schema), priv_for_principal(information_schema, "OWNERSHIP"))
+
+    return priv_map
+
+
+def _raise_if_missing_privs(required, available):
+    for principal, privs in required.items():
+        required_privs = privs.copy()
+        for priv_map in available.values():
+            if principal in priv_map:
+                # If OWNERSHIP in priv_map[principal], we can assume we pass requirements
+                for priv in priv_map[principal]:
+                    if is_ownership_priv(priv):
+                        required_privs = set()
+                        break
+                required_privs -= priv_map[principal]
+        if required_privs:
+            raise Exception(f"Missing privileges for {principal}: {required_privs}")
 
 
 class Blueprint:
@@ -211,8 +311,7 @@ class Blueprint:
                     manifest[manifest_key] = []
                 manifest[manifest_key].append(data)
             else:
-                if manifest_key in manifest:  # and _hash(manifest[manifest_key]) != _hash(data):
-                    # raise RuntimeError(f"Duplicate resource found {manifest_key}")
+                if manifest_key in manifest:
                     continue
                 manifest[manifest_key] = data
             urns.append(manifest_key)
@@ -250,16 +349,11 @@ class Blueprint:
             against what we have access to in the session and the role tree.
         """
 
-        # TODO: perform a privilege analysis (grant map)
-        required_privs = _collect_privs(plan)
         session_ctx = data_provider.fetch_session(session)
-        available_privs = {}
-        for role in session_ctx["available_roles"]:
-            role_privs = data_provider.fetch_role_privs(session, role)
-            available_privs[role] = role_privs
-            # available_privs |= role_privs
-        print(required_privs)
-        print(available_privs)
+        required_privs = _collect_required_privs(session_ctx, plan)
+        available_privs = _collect_available_privs(session_ctx, session, plan)
+
+        _raise_if_missing_privs(required_privs, available_privs)
 
         for action, urn_str, data in plan:
             urn = URN.from_str(urn_str)
