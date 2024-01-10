@@ -8,13 +8,14 @@ from pydantic.functional_validators import AfterValidator
 from pydantic._internal._model_construction import ModelMetaclass
 from pyparsing import ParseException
 
-from ..privs import DatabasePriv, GlobalPriv, Privs, SchemaPriv
-from ..enums import AccountEdition, Scope
-from ..props import BoolProp, EnumProp, Props, IntProp, StringProp, TagsProp, FlagProp
-from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
-from ..sql import SQL, track_ref
-from ..identifiers import FQN
 from ..builder import tidy_sql
+from ..enums import AccountEdition, Scope
+from ..identifiers import FQN, URN
+from ..lifecycle import create_resource, drop_resource
+from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..privs import DatabasePriv, GlobalPriv, Privs, SchemaPriv
+from ..props import BoolProp, EnumProp, Props, IntProp, StringProp, TagsProp, FlagProp
+from ..sql import SQL, track_ref
 from .validators import coerce_from_str
 
 
@@ -122,29 +123,16 @@ class Resource(BaseModel, metaclass=_Resource):
     def refs(self):
         return self._refs
 
-    # @classmethod
-    # def lifecycle_create(cls, fqn, data, or_replace=False, if_not_exists=False):
-    #     # TODO: modify props to split into header props and footer props
-    #     return tidy_sql(
-    #         "CREATE",
-    #         "OR REPLACE" if or_replace else "",
-    #         cls.resource_type,
-    #         "IF NOT EXISTS" if if_not_exists else "",
-    #         fqn,
-    #         cls.props.render(data),
-    #     )
-
-    # @classmethod
-    # def lifecycle_delete(cls, fqn, data, if_exists=False):
-    #     return tidy_sql("DROP", cls.resource_type, "IF EXISTS" if if_exists else "", fqn)
+    @property
+    def urn(self):
+        return URN.from_resource(self, account_locator="")
 
     def create_sql(self, **kwargs):
         data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return str(self.lifecycle_create(self.fqn, data, **kwargs))
+        return str(create_resource(self.urn, data, **kwargs))
 
     def drop_sql(self, **kwargs):
-        data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return self.lifecycle_delete(self.fqn, data, **kwargs)
+        return str(drop_resource(self.urn))
 
 
 @_fix_class_documentation

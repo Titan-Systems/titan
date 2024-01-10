@@ -475,14 +475,6 @@ class ColumnsProp(Prop):
 
 
 PROPS_MAP = {
-    "database": Props(
-        transient=FlagProp("transient"),
-        data_retention_time_in_days=IntProp("data_retention_time_in_days"),
-        max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
-        default_ddl_collation=StringProp("default_ddl_collation"),
-        tags=TagsProp(),
-        comment=StringProp("comment"),
-    ),
     "procedure": Props(
         secure=FlagProp("secure"),
         args=ArgsProp(),

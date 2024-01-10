@@ -9,6 +9,7 @@ from . import data_provider, lifecycle
 from .client import execute
 from .diff import diff, DiffAction
 from .identifiers import URN, FQN
+from .lifecycle import drop_resource
 from .privs import (
     GlobalPriv,
     DatabasePriv,
@@ -364,7 +365,7 @@ class Blueprint:
             elif action == DiffAction.CHANGE:
                 sql = lifecycle.update_resource(urn, data)
             elif action == DiffAction.REMOVE:
-                sql = lifecycle.drop_resource(urn, data)
+                sql = lifecycle.drop_resource(urn)
             execute(session, sql)
 
     def destroy(self, session, manifest=None):
@@ -373,7 +374,7 @@ class Blueprint:
         for urn_str in manifest.keys():
             urn = URN.from_str(urn_str)
             resource_cls = Resource.classes[urn.resource_key]
-            execute(session, resource_cls.lifecycle_delete(urn.fqn))
+            execute(session, drop_resource(urn.fqn))
 
     def _add(self, resource):
         if self._finalized:

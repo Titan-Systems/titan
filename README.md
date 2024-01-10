@@ -11,8 +11,6 @@ Titan is made up of many parts:
   
 - **Titan Blueprint**. Define infrastructure with code.
 
-- **Titan Access Control** [WIP]. Use ACLs to manage permissions and RBAC. Easily automate access control deployments.
-
 
 ## Why Use Titan?
 

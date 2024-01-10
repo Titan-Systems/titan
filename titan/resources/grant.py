@@ -234,10 +234,6 @@ class Grant(AccountScoped, Resource):
             _use_role=data["owner"],
         )
 
-    def create_sql(self):
-        data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return str(self.lifecycle_create(self.fqn, data))
-
 
 @_fix_class_documentation
 class RoleGrant(AccountScoped, Resource):

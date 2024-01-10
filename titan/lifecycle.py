@@ -34,16 +34,15 @@ def update__default(urn: URN, data: dict):
     )
 
 
-def drop_resource(urn: URN, data: dict):
-    return getattr(__this__, f"drop_{urn.resource_type}", "drop__default")(urn, data)
+def drop_resource(urn: URN):
+    return getattr(__this__, f"drop_{urn.resource_type}", "drop__default")(urn)
 
 
-def drop__default(urn: URN, data: dict):
+def drop__default(urn: URN):
     return tidy_sql(
         "DROP",
         urn.resource_type,
         urn.fqn,
-        # cls.props.render(data),
     )
 
 

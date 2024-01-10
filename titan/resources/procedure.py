@@ -86,12 +86,12 @@ class PythonStoredProcedure(SchemaScoped, Resource):
         language: Language = Language.PYTHON,
         runtime_version: str = None,
         packages: list = None,
-        imports: list = None,
+        imports: list = [],
         handler: str = None,
-        external_access_integrations: list = None,
-        null_handling: NullHandling = None,
-        comment: str = None,
-        execute_as: ExecutionRights = None,
+        external_access_integrations: list = [],
+        null_handling: NullHandling = NullHandling.CALLED_ON_NULL_INPUT,
+        comment: str = "",
+        execute_as: ExecutionRights = ExecutionRights.CALLER,
         as_: str = None,
     ):
         for import_location in imports:

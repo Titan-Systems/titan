@@ -8,7 +8,6 @@ from yaml import safe_load
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
 from . import data_provider as dp
-from . import resource_props as props
 
 # from . import git
 from .builder import tidy_sql
@@ -61,17 +60,6 @@ def _execute(sp_session, sql: list):
             sp_session.sql(sql_text).collect()
         except SnowparkSQLException as err:
             raise SnowparkSQLException(f"failed to execute sql, [{sql_text}]", error_code=err.error_code) from err
-
-
-def _create_schema_sql(fqn, data, or_replace=False, if_not_exists=False):
-    return tidy_sql(
-        "CREATE",
-        "OR REPLACE" if or_replace else "",
-        "SCHEMA",
-        "IF NOT EXISTS" if if_not_exists else "",
-        fqn,
-        props.schema_props.render(data),
-    )
 
 
 def _update_schema_sql(fqn, change):

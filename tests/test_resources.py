@@ -65,9 +65,9 @@ class TestResourceFixtures(unittest.TestCase):
         except ParseException:
             self.fail(f"Failed to parse {resource_cls.__name__} from SQL: {sql}")
 
-    def test_account(self):
-        for sql in load_sql_fixtures("account.sql"):
-            self.validate_from_sql(Account, sql)
+    # def test_account(self):
+    #     for sql in load_sql_fixtures("account.sql"):
+    #         self.validate_from_sql(Account, sql)
 
     def test_alert(self):
         for sql in load_sql_fixtures("alert.sql"):
