@@ -26,6 +26,13 @@ class ParseableEnum(Enum, metaclass=_Parseable):
         return str(self.value)
 
 
+class ResourceType(ParseableEnum):
+    ACCOUNT = "account"
+    TASK = "task"
+    USER = "user"
+    WAREHOUSE = "warehouse"
+
+
 class Scope(ParseableEnum):
     ORGANIZATION = "ORGANIZATION"
     ACCOUNT = "ACCOUNT"

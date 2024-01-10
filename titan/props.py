@@ -506,6 +506,8 @@ PROPS_MAP = {
 
 def render_props(urn: URN, data: dict):
     if urn.resource_type not in PROPS_MAP:
-        raise Exception(f"Unsupported resource: {urn}")
+        # raise Exception(f"Unsupported resource: {urn}")
+        # FIXME
+        return ""
     props = PROPS_MAP[urn.resource_type]
     return props.render(data)

@@ -7,7 +7,7 @@ Titan is a Python library to manage data warehouse infrastructure.
 
 Titan is made up of many parts:
 
-- **Titan Resource API**. Manage resources with pure-Python backed by [Pydantic data models](https://docs.pydantic.dev/). 
+- **Titan Resource API**. Manage resources with pure-Python classes.
   
 - **Titan Blueprint**. Define infrastructure with code.
 

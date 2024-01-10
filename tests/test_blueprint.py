@@ -8,6 +8,7 @@ class TestBlueprint(unittest.TestCase):
         self.maxDiff = None
 
         db = Database(name="DB")
+        # FIXME: database=db is not setting a ref from schema to db, causing schema to not get added to the manifest
         schema = Schema(name="SCHEMA", database=db)
         table = Table(name="TABLE", columns=["id INT"])
         table.schema = schema

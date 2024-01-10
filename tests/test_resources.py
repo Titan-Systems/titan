@@ -55,7 +55,7 @@ class TestResources(unittest.TestCase):
         assert view.columns == [{"name": "COL1"}]
 
     def test_enum_field_serialization(self):
-        self.assertEqual(Warehouse(name="WH", warehouse_size="XSMALL").warehouse_size, WarehouseSize.XSMALL.value)
+        self.assertEqual(Warehouse(name="WH", warehouse_size="XSMALL")._data.warehouse_size, WarehouseSize.XSMALL)
 
 
 class TestResourceFixtures(unittest.TestCase):

@@ -8,11 +8,11 @@ from .props import render_props
 __this__ = sys.modules[__name__]
 
 
-def create_resource(urn: URN, data: dict):
+def create_resource(urn: URN, data: dict) -> str:
     return getattr(__this__, f"create_{urn.resource_type}", create__default)(urn, data)
 
 
-def create__default(urn: URN, data: dict):
+def create__default(urn: URN, data: dict) -> str:
     return tidy_sql(
         "CREATE",
         urn.resource_type,
@@ -21,11 +21,11 @@ def create__default(urn: URN, data: dict):
     )
 
 
-def update_resource(urn: URN, data: dict):
-    return getattr(__this__, f"update_{urn.resource_type}", "update__default")(urn, data)
+def update_resource(urn: URN, data: dict) -> str:
+    return getattr(__this__, f"update_{urn.resource_type}", update__default)(urn, data)
 
 
-def update__default(urn: URN, data: dict):
+def update__default(urn: URN, data: dict) -> str:
     return tidy_sql(
         "ALTER",
         urn.resource_type,
@@ -34,14 +34,15 @@ def update__default(urn: URN, data: dict):
     )
 
 
-def drop_resource(urn: URN):
-    return getattr(__this__, f"drop_{urn.resource_type}", "drop__default")(urn)
+def drop_resource(urn: URN, if_exists: bool = False) -> str:
+    return getattr(__this__, f"drop_{urn.resource_type}", drop__default)(urn, if_exists)
 
 
-def drop__default(urn: URN):
+def drop__default(urn: URN, if_exists: bool) -> str:
     return tidy_sql(
         "DROP",
         urn.resource_type,
+        "IF EXISTS" if if_exists else "",
         urn.fqn,
     )
 

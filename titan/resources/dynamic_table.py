@@ -27,5 +27,5 @@ class DynamicTable(SchemaScoped, Resource):
     name: str
     owner: str = "SYSADMIN"
     target_lag: str
-    warehouse: Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse))]
+    warehouse: str  # Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse))]
     as_: str

@@ -120,7 +120,7 @@ def _parse_create_header(sql, resource_cls):
             pp.Opt(OR_REPLACE)("or_replace"),
             pp.Opt(TEMPORARY)("temporary"),
             ...,
-            Keywords(resource_cls.resource_type)("resource_type"),
+            Keywords(str(resource_cls.resource_type))("resource_type"),
             pp.Opt(IF_NOT_EXISTS)("if_not_exists"),
             FullyQualifiedIdentifier("resource_identifier"),
             REST_OF_STRING("remainder"),

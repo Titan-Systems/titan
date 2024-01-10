@@ -165,7 +165,10 @@ def resource(request):
 
 
 def dump(resource):
-    return resource.model_dump(mode="json", by_alias=True, exclude_none=True)
+    if hasattr(resource, "model_dump"):
+        return resource.model_dump(mode="json", by_alias=True, exclude_none=True)
+    else:
+        return resource.to_dict(packed=True)
 
 
 def test_data_identity(resource):

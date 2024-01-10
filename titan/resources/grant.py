@@ -4,8 +4,6 @@ from typing_extensions import Annotated
 from pydantic import BeforeValidator, Field, PlainSerializer, model_validator
 
 from .base import Resource, AccountScoped, T_Schema, _fix_class_documentation
-from .role import T_Role
-from .user import T_User
 from .validators import coerce_from_str, serialize_as_named_resource
 from ..builder import SQL, tidy_sql
 from ..enums import ParseableEnum
@@ -111,7 +109,7 @@ class Grant(AccountScoped, Resource):
     on_all: Any = None
     on_future: Any = None
     on_scope: str = None
-    to: T_Role = None
+    to: str = None
     grant_option: bool = False
     owner: str = None
 
@@ -119,7 +117,7 @@ class Grant(AccountScoped, Resource):
         self,
         priv: str = None,
         on: Any = None,
-        to: T_Role = None,
+        to: str = None,
         grant_option: bool = False,
         owner: str = None,
         **kwargs,
@@ -249,9 +247,9 @@ class RoleGrant(AccountScoped, Resource):
         to_user=IdentifierProp("to user", eq=False),
     )
 
-    role: T_Role
-    to_role: T_Role = None
-    to_user: T_User = None
+    role: str
+    to_role: str = None
+    to_user: str = None
     owner: str = "SYSADMIN"
 
     @model_validator(mode="after")

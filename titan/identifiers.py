@@ -98,7 +98,7 @@ class URN:
 
     @classmethod
     def from_resource(cls, resource, **kwargs):
-        return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
+        return cls(resource_type=str(resource.resource_type), fqn=resource.fqn, **kwargs)
 
     @classmethod
     def from_locator(cls, locator: "ResourceLocator"):

@@ -1,7 +1,8 @@
 from typing import Dict
 
 from .base import Resource, SchemaScoped, _fix_class_documentation
-from .warehouse import T_Warehouse
+
+# from .warehouse import T_Warehouse
 from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 
@@ -32,7 +33,7 @@ class Alert(SchemaScoped, Resource):
 
     name: str
     owner: str = "SYSADMIN"
-    warehouse: T_Warehouse
+    warehouse: str
     schedule: str
     comment: str = None
     tags: Dict[str, str] = None
