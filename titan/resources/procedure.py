@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .__resource import Resource, ResourceSpec
+from .__resource import Arg, Resource, ResourceSpec
 from ..scope import SchemaScope
 from ..enums import DataType, ExecutionRights, NullHandling, Language, ResourceType
 from ..props import (
@@ -19,7 +19,7 @@ from .stage import Stage
 @dataclass
 class _PythonStoredProcedure(ResourceSpec):
     name: str
-    args: list
+    args: list[Arg]
     returns: DataType
     language: Language
     runtime_version: str

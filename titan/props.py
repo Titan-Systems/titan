@@ -280,15 +280,24 @@ class DictProp(Prop):
             values[key] = next(pairs)
         return values
 
+    def render(self, value: dict) -> str:
+        if value is None:
+            return ""
+        kv_pairs = ", ".join([f"'{key}' = '{value}'" for key, value in value.items()])
+        eq = " = " if self.eq else " "
+        return f"{self.label}{eq}({kv_pairs})"
+
 
 class EnumProp(Prop):
     def __init__(self, label, enum_or_list, **kwargs):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
-        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | ANY()
+        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | (~Keyword("NULL") + ANY())
         super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_value):
+        if isinstance(prop_value, list):
+            prop_value = prop_value[0]
         prop_value = self.enum_type(prop_value)
         if prop_value not in self.valid_values:
             raise ValueError(f"Invalid value: {prop_value} must be one of {self.valid_values}")

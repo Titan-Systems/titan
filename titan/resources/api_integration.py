@@ -41,7 +41,7 @@ class APIIntegration(Resource):
         ;
     """
 
-    resource_type = "API INTEGRATION"
+    resource_type = ResourceType.API_INTEGRATION
     props = Props(
         api_provider=EnumProp("api_provider", ApiProvider),
         api_aws_role_arn=StringProp("api_aws_role_arn"),

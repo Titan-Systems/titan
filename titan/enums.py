@@ -28,10 +28,12 @@ class ParseableEnum(Enum, metaclass=_Parseable):
 
 class ResourceType(ParseableEnum):
     ALERT = "alert"
+    API_INTEGRATION = "api integration"
     ACCOUNT = "account"
     DATABASE = "database"
     DATABASE_ROLE = "database role"
     DYNAMIC_TABLE = "dynamic table"
+    EXTERNAL_FUNCTION = "external function"
     FUNCTION = "function"
     PROCEDURE = "procedure"
     PIPE = "pipe"

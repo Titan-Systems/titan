@@ -1,7 +1,9 @@
-from typing import Dict
+from dataclasses import dataclass
 
-from .base import Resource, AccountScoped, _fix_class_documentation
-from ..enums import DataType, NullHandling, Volatility
+from .__resource import Resource, ResourceSpec, Arg
+from ..enums import DataType, NullHandling, Volatility, ResourceType
+from ..scope import AccountScope
+
 from ..props import (
     ArgsProp,
     DictProp,
@@ -15,8 +17,27 @@ from ..props import (
 )
 
 
-@_fix_class_documentation
-class ExternalFunction(AccountScoped, Resource):
+@dataclass
+class _ExternalFunction(ResourceSpec):
+    name: str
+    returns: DataType
+    api_integration: str
+    as_: str
+    secure: bool = False
+    args: list[Arg] = None
+    not_null: bool = False
+    null_handling: NullHandling = None
+    volatility: Volatility = None
+    comment: str = None
+    headers: dict[str, str] = None
+    max_batch_rows: int = None
+    compression: str = None
+    request_translator: str = None
+    response_translator: str = None
+    owner: str = "SYSADMIN"
+
+
+class ExternalFunction(Resource):
     """
     CREATE [ OR REPLACE ] [ SECURE ] EXTERNAL FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )
       RETURNS <result_data_type>
@@ -33,7 +54,7 @@ class ExternalFunction(AccountScoped, Resource):
       AS <url_of_proxy_and_resource>;
     """
 
-    resource_type = "EXTERNAL FUNCTION"
+    resource_type = ResourceType.EXTERNAL_FUNCTION
     props = Props(
         secure=FlagProp("secure"),
         args=ArgsProp(),
@@ -50,19 +71,45 @@ class ExternalFunction(AccountScoped, Resource):
         response_translator=IdentifierProp("response_translator"),
         as_=StringProp("as", eq=False),
     )
+    scope = AccountScope()
+    spec = _ExternalFunction
 
-    name: str
-    secure: bool = False
-    args: list = []
-    returns: DataType
-    # not_null: bool = False
-    null_handling: NullHandling = None
-    volatility: Volatility = None
-    comment: str = None
-    api_integration: str
-    headers: Dict[str, str] = {}
-    max_batch_rows: int = None
-    compression: str = None
-    request_translator: str = None
-    response_translator: str = None
-    as_: str
+    def __init__(
+        self,
+        name: str,
+        returns: DataType,
+        api_integration: str,
+        as_: str,
+        secure: bool = False,
+        args: list = None,
+        not_null: bool = False,
+        null_handling: NullHandling = None,
+        volatility: Volatility = None,
+        comment: str = None,
+        headers: dict[str, str] = None,
+        max_batch_rows: int = None,
+        compression: str = None,
+        request_translator: str = None,
+        response_translator: str = None,
+        owner: str = "SYSADMIN",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _ExternalFunction(
+            name=name,
+            returns=returns,
+            api_integration=api_integration,
+            as_=as_,
+            secure=secure,
+            args=args,
+            not_null=not_null,
+            null_handling=null_handling,
+            volatility=volatility,
+            comment=comment,
+            headers=headers,
+            max_batch_rows=max_batch_rows,
+            compression=compression,
+            request_translator=request_translator,
+            response_translator=response_translator,
+            owner=owner,
+        )

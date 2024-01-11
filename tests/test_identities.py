@@ -62,6 +62,30 @@ resources = [
         },
     },
     {
+        "test": "external_function",
+        "resource_cls": resources.ExternalFunction,
+        "data": {
+            "name": "SOMEFUNC",
+            "owner": "SYSADMIN",
+            "returns": "VARIANT",
+            "api_integration": "someint",
+            "as_": "https://xyz.execute-api.us-west-2.amazonaws.com/prod/remote_echo",
+            "secure": True,
+            "args": [
+                {"name": "string_col", "data_type": "VARCHAR"},
+                {"name": "somesuch", "data_type": "INTEGER"},
+            ],
+            "null_handling": "RETURNS NULL ON NULL INPUT",
+            "volatility": "IMMUTABLE",
+            "comment": "external function comment",
+            "headers": {"volume-measure": "liters", "distance-measure": "kilometers"},
+            "max_batch_rows": 42,
+            "compression": "DEFLATE",
+            "request_translator": '"DB"."SCHEMA".function',
+            "response_translator": '"DB"."SCHEMA".function',
+        },
+    },
+    {
         "test": "grant",
         "resource_cls": resources.Grant,
         "data": {
