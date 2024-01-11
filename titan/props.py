@@ -37,6 +37,7 @@ class Prop(ABC):
     def __init__(self, label, value_expr=ANY(), eq=True, parens=False, alt_tokens=[], consume=[]):
         self.label = label
         self.eq = eq
+        self.parens = parens
         self.alt_tokens = set([tok.lower() for tok in alt_tokens])
 
         if isinstance(consume, str):
@@ -193,10 +194,12 @@ class IdentifierListProp(Prop):
         if values is None:
             return ""
         value_list = ", ".join(values)
+        if self.parens:
+            value_list = f"({value_list})"
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
-            f"({value_list})",
+            value_list,
         )
 
 
@@ -329,7 +332,8 @@ class EnumListProp(Prop):
         if values is None or len(values) == 0:
             return ""
         eq = " = " if self.eq else " "
-        return f"{self.label}{eq}({values})"
+        value_list = ", ".join([str(val) for val in values])
+        return f"{self.label}{eq}{value_list}"
 
 
 class EnumFlagProp(Prop):

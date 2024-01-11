@@ -34,6 +34,7 @@ class ResourceType(ParseableEnum):
     DATABASE_ROLE = "database role"
     DYNAMIC_TABLE = "dynamic table"
     EXTERNAL_FUNCTION = "external function"
+    FAILOVER_GROUP = "failover group"
     FUNCTION = "function"
     PROCEDURE = "procedure"
     PIPE = "pipe"

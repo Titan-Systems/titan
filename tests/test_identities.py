@@ -86,6 +86,21 @@ resources = [
         },
     },
     {
+        "test": "failover_group",
+        "resource_cls": resources.FailoverGroup,
+        "data": {
+            "name": "SOMEFG",
+            "owner": "ACCOUNTADMIN",
+            "object_types": ["NETWORK POLICIES", "WAREHOUSES"],
+            "allowed_accounts": ["SOMEORG.SOMEACCOUNT"],
+            "allowed_databases": ["SOMEDB"],
+            "allowed_shares": ["SOMESHARE"],
+            "allowed_integration_types": ["SECURITY INTEGRATIONS", "API INTEGRATIONS"],
+            "ignore_edition_check": True,
+            "replication_schedule": "15 MINUTE",
+        },
+    },
+    {
         "test": "grant",
         "resource_cls": resources.Grant,
         "data": {
