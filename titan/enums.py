@@ -28,6 +28,7 @@ class ParseableEnum(Enum, metaclass=_Parseable):
 
 class ResourceType(ParseableEnum):
     ACCOUNT = "account"
+    ROLE = "role"
     TASK = "task"
     USER = "user"
     WAREHOUSE = "warehouse"
