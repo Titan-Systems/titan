@@ -26,19 +26,25 @@ class ResourceSpec:
                     field_type = field.type
 
                 # Recursively traverse lists and dicts
-                if isinstance(field_value, list):
+                if issubclass(field_type, list):
+                    if not isinstance(field_value, list):
+                        raise Exception
                     list_element_type = get_args(field_type) or (str,)
                     return [_coerce(v, field_type=list_element_type[0]) for v in field_value]
-                elif isinstance(field_value, dict):
+                elif issubclass(field_type, dict):
+                    if not isinstance(field_value, dict):
+                        raise Exception
                     if field_type == Arg:
                         type_map = get_type_hints(field_type)
                         return {k: _coerce(v, field_type=type_map[k]) for k, v in field_value.items()}
                     else:
-                        value_type = get_args(field_type)[1]
-                        return {k: _coerce(v, field_type=value_type) for k, v in field_value.items()}
+                        dict_types = get_args(field_type)
+                        if len(dict_types) < 2:
+                            raise RuntimeError(f"Unexpected field type {field_type}")
+                        return {k: _coerce(v, field_type=dict_types[1]) for k, v in field_value.items()}
 
                 if not isclass(field_type):
-                    raise Exception
+                    raise RuntimeError(f"Unexpected field type {field_type}")
 
                 # Coerce enums
                 if issubclass(field_type, ParseableEnum):

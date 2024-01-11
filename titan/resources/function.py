@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .__resource import Resource, ResourceSpec
+from .__resource import Arg, Resource, ResourceSpec
 from ..scope import SchemaScope
 from ..enums import DataType, Language, NullHandling, ResourceType, Volatility
 from ..props import (
@@ -21,7 +21,7 @@ class _JavascriptUDF(ResourceSpec):
     returns: str
     language: Language
     as_: str
-    args: list = None
+    args: list[Arg] = None
     comment: str = None
     copy_grants: bool = False
     external_access_integrations: list[str] = None
@@ -94,7 +94,7 @@ class _PythonUDF(ResourceSpec):
     language: Language
     runtime_version: str
     handler: str
-    args: list = None
+    args: list[Arg] = None
     as_: str = None
     comment: str = None
     copy_grants: bool = False
