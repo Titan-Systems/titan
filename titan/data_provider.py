@@ -192,7 +192,7 @@ def fetch_database(session, fqn: FQN):
     }
 
 
-def fetch_javascript_udf(session, fqn: FQN):
+def fetch_function(session, fqn: FQN):
     show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
     udfs = _filter_result(show_result, name=fqn.name)
     if len(udfs) == 0:

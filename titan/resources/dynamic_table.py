@@ -1,31 +1,69 @@
-from typing_extensions import Annotated
+from dataclasses import dataclass
 
-from pydantic import BeforeValidator
-
-from ..props import Props, StringProp, IdentifierProp, QueryProp
-from .base import Resource, SchemaScoped, _fix_class_documentation
-from .validators import coerce_from_str
+from .__resource import Resource, ResourceSpec
+from .resource_monitor import ResourceMonitor
 from .warehouse import Warehouse
+from ..enums import ParseableEnum, ResourceType
+from ..scope import SchemaScope
+
+from ..props import Props, EnumProp, StringProp, IdentifierProp, QueryProp
 
 
-@_fix_class_documentation
-class DynamicTable(SchemaScoped, Resource):
-    """
-    CREATE [ OR REPLACE ] DYNAMIC TABLE <name>
-      TARGET_LAG = { '<num> { seconds | minutes | hours | days }' | DOWNSTREAM }
-      WAREHOUSE = <warehouse_name>
-      AS <query>
-    """
+class RefreshMode(ParseableEnum):
+    AUTO = "AUTO"
+    FULL = "FULL"
+    INCREMENTAL = "INCREMENTAL"
 
-    resource_type = "DYNAMIC TABLE"
+
+class InitializeBehavior(ParseableEnum):
+    ON_CREATE = "ON_CREATE"
+    ON_SCHEDULE = "ON_SCHEDULE"
+
+
+@dataclass
+class _DynamicTable(ResourceSpec):
+    name: str
+    target_lag: str
+    warehouse: str
+    refresh_mode: RefreshMode
+    initialize: str
+    as_: str
+    comment: str = None
+    owner: str = "SYSADMIN"
+
+
+class DynamicTable(Resource):
+    resource_type = ResourceType.DYNAMIC_TABLE
     props = Props(
         target_lag=StringProp("target_lag", alt_tokens=["DOWNSTREAM"]),
         warehouse=IdentifierProp("warehouse"),
+        refresh_mode=EnumProp("refresh_mode", RefreshMode),
+        initialize=EnumProp("initialize", InitializeBehavior),
         as_=QueryProp("as"),
     )
+    scope = SchemaScope()
+    spec = _DynamicTable
 
-    name: str
-    owner: str = "SYSADMIN"
-    target_lag: str
-    warehouse: str  # Annotated[Warehouse, BeforeValidator(coerce_from_str(Warehouse))]
-    as_: str
+    def __init__(
+        self,
+        name: str,
+        target_lag: str,
+        warehouse: str,
+        refresh_mode: RefreshMode,
+        initialize: InitializeBehavior,
+        as_: str,
+        comment: str = None,
+        owner: str = "SYSADMIN",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _DynamicTable(
+            name=name,
+            target_lag=target_lag,
+            warehouse=warehouse,
+            refresh_mode=refresh_mode,
+            initialize=initialize,
+            as_=as_,
+            comment=comment,
+            owner=owner,
+        )

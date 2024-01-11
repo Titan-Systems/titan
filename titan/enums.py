@@ -27,10 +27,19 @@ class ParseableEnum(Enum, metaclass=_Parseable):
 
 
 class ResourceType(ParseableEnum):
+    ALERT = "alert"
     ACCOUNT = "account"
+    DATABASE = "database"
+    DATABASE_ROLE = "database role"
+    DYNAMIC_TABLE = "dynamic table"
+    FUNCTION = "function"
+    PROCEDURE = "procedure"
+    PIPE = "pipe"
+    RESOURCE_MONITOR = "resource monitor"
     ROLE = "role"
     TASK = "task"
     USER = "user"
+    VIEW = "view"
     WAREHOUSE = "warehouse"
 
 

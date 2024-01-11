@@ -1,4 +1,3 @@
-from abc import ABC
 from dataclasses import asdict, dataclass, fields
 from typing import _GenericAlias, Type
 
@@ -6,17 +5,8 @@ from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN, URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
-from ..parse import ParseException, _resolve_resource_class, _parse_create_header, _parse_props
-
-
-class ResourceScope(ABC):
-    def fully_qualified_name(self, resource: "Resource"):
-        raise NotImplementedError
-
-
-class AccountScope(ResourceScope):
-    def fully_qualified_name(self, resource: "Resource"):
-        return FQN(name=resource._data.name.upper())
+from ..parse import ParseException, _parse_create_header, _parse_props
+from ..scope import ResourceScope
 
 
 @dataclass
@@ -40,16 +30,32 @@ class ResourceSpec:
                     setattr(self, field.name, field.type(**field_value, stub=True))
 
 
-class Resource:
+class _Resource(type):
+    __types = {}
+
+    def __new__(cls, name, bases, attrs):
+        cls_ = super().__new__(cls, name, bases, attrs)
+        try:
+            if cls_.resource_type not in cls._Resource__types:
+                cls.__types[cls_.resource_type] = []
+            cls.__types[cls_.resource_type].append(cls_)
+        except AttributeError:
+            pass
+        return cls_
+
+
+class Resource(metaclass=_Resource):
     props: ResourceProps
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
 
-    def __init__(self, implicit: bool = False, stub: bool = False):
+    def __init__(self, implicit: bool = False, stub: bool = False, **scope_kwargs):
         self._data = None
         self.implicit = implicit
         self.stub = stub
+        self.refs = []
+        self.scope.register_scope(**scope_kwargs)
 
     @classmethod
     def from_sql(cls, sql):
@@ -68,24 +74,46 @@ class Resource:
         except ParseException as err:
             raise ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
+    @classmethod
+    def props_for_resource_type(cls, resource_type: ResourceType):
+        resource_types = cls.__types[resource_type]
+        if len(resource_types) > 1:
+            raise NotImplementedError
+        return resource_types[0].props
+
     def to_dict(self, packed=False):
-        # fields(self.spec)
-        # TODO: remove default values
+        defaults = {f.name: f.default for f in fields(self.spec)}
         if packed:
-            return {k: v for k, v in asdict(self._data).items() if v is not None}
+            serialized = {}
+            for key, value in asdict(self._data).items():
+                skip_field = (value is None) or (value == defaults[key])
+                skip_field = skip_field and (key != "owner")
+                if skip_field:
+                    continue
+                if isinstance(value, Resource):
+                    serialized[key] = value.to_dict(packed=True)
+                elif isinstance(value, ParseableEnum):
+                    serialized[key] = str(value)
+                else:
+                    serialized[key] = value
+            return serialized
         else:
             return asdict(self._data)
 
     def create_sql(self, **kwargs):
-        data = self.to_dict(packed=True)
-        return create_resource(self.urn, data, **kwargs)
+        return create_resource(
+            self.urn,
+            self.to_dict(packed=True),
+            self.props,
+            **kwargs,
+        )
 
     def drop_sql(self, if_exists: bool = False):
         return drop_resource(self.urn, if_exists=if_exists)
 
     @property
     def fqn(self):
-        return self.scope.fully_qualified_name(self)
+        return self.scope.fully_qualified_name(self._data.name)
 
     @property
     def urn(self):

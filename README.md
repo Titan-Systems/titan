@@ -22,7 +22,7 @@ Titan provides a simple way to manage your data warehouse. With Titan, you can:
 
 3. **SQL Compatibility**: Integrate your existing SQL scripts and workflows into Titan, ensuring a smooth transition and continuous functionality.
 
-4. **Type Checking**: With the power of Pydantic data models, Titan ensures that the resources and configurations you define are correctly typed, reducing the chances of runtime errors.
+4. **Type Checking**: Titan ensures that the resources and configurations you define are correctly typed, reducing the chances of runtime errors.
 
 ## Installation
 

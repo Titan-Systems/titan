@@ -24,7 +24,7 @@ from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .sequence import Sequence
 from .stage import Stage, InternalStage, ExternalStage
-from .procedure import Procedure, PythonStoredProcedure
+from .procedure import PythonStoredProcedure
 from .stream import Stream, TableStream, ExternalTableStream, ViewStream, StageStream
 from .table import Table
 from .tag import Tag
@@ -33,7 +33,7 @@ from .user import User
 from .view import View
 from .warehouse import Warehouse
 
-from .function import Function, JavascriptUDF
+from .function import JavascriptUDF, PythonUDF
 
 from .notification_integration import (
     NotificationIntegration,
@@ -84,7 +84,7 @@ __all__ = [
     "Organization",
     "OrganizationScoped",
     "Pipe",
-    "Procedure",
+    "PythonUDF",
     "PythonStoredProcedure",
     "ReplicationGroup",
     "Resource",
@@ -105,7 +105,6 @@ __all__ = [
     "Tag",
     "Task",
     "User",
-    "Function",
     "View",
     "ViewStream",
     "Warehouse",

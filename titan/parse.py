@@ -6,6 +6,7 @@ from pyparsing import ParseException
 
 from .builder import SQL
 from .enums import Scope
+from .scope import DatabaseScope, SchemaScope
 
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
@@ -103,9 +104,9 @@ def _make_scoped_identifier(identifier_list, scope):
     if len(identifier_list) == 1:
         return {"name": identifier_list[0]}
     elif len(identifier_list) == 2:
-        if scope == Scope.DATABASE:
+        if scope == Scope.DATABASE or isinstance(scope, DatabaseScope):
             return {"database": identifier_list[0], "name": identifier_list[1]}
-        elif scope == Scope.SCHEMA:
+        elif scope == Scope.SCHEMA or isinstance(scope, SchemaScope):
             return {"schema": identifier_list[0], "name": identifier_list[1]}
     elif len(identifier_list) == 3:
         return {"database": identifier_list[0], "schema": identifier_list[1], "name": identifier_list[2]}

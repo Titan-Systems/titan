@@ -1,9 +1,10 @@
 from dataclasses import dataclass
-from typing import Dict, Union
 
-from .__resource import Resource, AccountScope, ResourceSpec
+from .__resource import Resource, ResourceSpec
 from .resource_monitor import ResourceMonitor
 from ..enums import ParseableEnum, ResourceType
+from ..scope import AccountScope
+
 from ..props import (
     BoolProp,
     EnumProp,
@@ -74,12 +75,13 @@ class _Warehouse(ResourceSpec):
     max_concurrency_level: int = 8
     statement_queued_timeout_in_seconds: int = 0
     statement_timeout_in_seconds: int = 172800
-    tags: Dict[str, str] = None
+    tags: dict[str, str] = None
 
 
 class Warehouse(Resource):
     """A virtual warehouse is a cluster of compute resources in Snowflake. It is used to execute SQL queries and load data."""
 
+    resource_type = ResourceType.WAREHOUSE
     props = Props(
         _start_token="WITH",
         warehouse_type=EnumProp("warehouse_type", WarehouseType),
@@ -99,7 +101,6 @@ class Warehouse(Resource):
         statement_timeout_in_seconds=IntProp("statement_timeout_in_seconds"),
         tags=TagsProp(),
     )
-    resource_type = ResourceType.WAREHOUSE
     scope = AccountScope()
     spec = _Warehouse
 
@@ -115,14 +116,14 @@ class Warehouse(Resource):
         auto_suspend: int = 600,
         auto_resume: bool = True,
         initially_suspended: bool = None,
-        resource_monitor: Union[str, ResourceMonitor] = None,
+        resource_monitor: ResourceMonitor = None,
         comment: str = None,
         enable_query_acceleration: bool = None,
         query_acceleration_max_scale_factor: int = None,
         max_concurrency_level: int = 8,
         statement_queued_timeout_in_seconds: int = 0,
         statement_timeout_in_seconds: int = 172800,
-        tags: Dict[str, str] = None,
+        tags: dict[str, str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)

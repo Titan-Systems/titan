@@ -1,34 +1,19 @@
 import pytest
 
 from titan.privs import GlobalPriv
-from titan.resources import (
-    Account,
-    Alert,
-    CSVFileFormat,
-    Database,
-    Grant,
-    JavascriptUDF,
-    Role,
-    RoleGrant,
-    Schema,
-    SharedDatabase,
-    PythonStoredProcedure,
-    Table,
-    User,
-    View,
-)
+from titan import resources
 
 resources = [
     {
         "test": "account",
-        "resource_cls": Account,
+        "resource_cls": resources.Account,
         "data": {
             "name": "SOMEACCOUNT",
         },
     },
     {
         "test": "alert",
-        "resource_cls": Alert,
+        "resource_cls": resources.Alert,
         "data": {
             "name": "ALERT",
             "owner": "SYSADMIN",
@@ -40,7 +25,7 @@ resources = [
     },
     {
         "test": "database",
-        "resource_cls": Database,
+        "resource_cls": resources.Database,
         "data": {
             "name": "SOMEDB",
             "owner": "SYSADMIN",
@@ -50,8 +35,21 @@ resources = [
         },
     },
     {
+        "test": "dynamic_table",
+        "resource_cls": resources.DynamicTable,
+        "data": {
+            "name": "SOMEDT",
+            "owner": "SYSADMIN",
+            "target_lag": "42 minutes",
+            "warehouse": "SOMEWH",
+            "refresh_mode": "FULL",
+            "initialize": "ON_CREATE",
+            "as_": "SELECT * FROM tbl",
+        },
+    },
+    {
         "test": "grant",
-        "resource_cls": Grant,
+        "resource_cls": resources.Grant,
         "data": {
             "priv": GlobalPriv.CREATE_DATABASE.value,
             "to": "SOMEROLE",
@@ -62,7 +60,7 @@ resources = [
     },
     {
         "test": "javascript_udf",
-        "resource_cls": JavascriptUDF,
+        "resource_cls": resources.JavascriptUDF,
         "data": {
             "name": "NOOP",
             "owner": "SYSADMIN",
@@ -76,17 +74,17 @@ resources = [
     },
     {
         "test": "role",
-        "resource_cls": Role,
+        "resource_cls": resources.Role,
         "data": {"name": "SOMEROLE", "owner": "SYSADMIN"},
     },
     {
         "test": "role_grant",
-        "resource_cls": RoleGrant,
+        "resource_cls": resources.RoleGrant,
         "data": {"role": "SOMEROLE", "to_user": "SOMEUSER", "owner": "SYSADMIN"},
     },
     {
         "test": "schema",
-        "resource_cls": Schema,
+        "resource_cls": resources.Schema,
         "data": {
             "name": "SOMESCHEMA",
             "owner": "SYSADMIN",
@@ -97,14 +95,33 @@ resources = [
     },
     {
         "test": "shared_database",
-        "resource_cls": SharedDatabase,
+        "resource_cls": resources.SharedDatabase,
         "data": {"name": "SOMESHARENAME", "owner": "ACCOUNTADMIN", "from_share": "SOMEACCOUNT.SOMESHARE"},
     },
     {
         "test": "python_stored_procedure",
-        "resource_cls": PythonStoredProcedure,
+        "resource_cls": resources.PythonStoredProcedure,
         "data": {
             "name": "MY_PYTHON_SPROC",
+            "owner": "SYSADMIN",
+            "args": [],
+            "secure": True,
+            "returns": "INT",
+            "language": "PYTHON",
+            "execute_as": "OWNER",
+            "runtime_version": "3.8",
+            "packages": ["snowflake-snowpark-python"],
+            "handler": "main",
+            "as_": "def main(_): return 42;",
+            "copy_grants": True,
+            "external_access_integrations": ["someint"],
+        },
+    },
+    {
+        "test": "python_udf",
+        "resource_cls": resources.PythonUDF,
+        "data": {
+            "name": "MY_PYTHON_UDF",
             "owner": "SYSADMIN",
             "args": [],
             "secure": False,
@@ -112,16 +129,13 @@ resources = [
             "language": "PYTHON",
             "runtime_version": "3.8",
             "packages": ["snowflake-snowpark-python"],
-            "handler": "main",
-            "as_": "def main(_): return 42;",
-            "copy_grants": False,
-            "external_access_integrations": [],
-            "imports": [],
+            "handler": "titan.foobar.help",
+            "imports": ["pyparsing"],
         },
     },
     {
         "test": "table",
-        "resource_cls": Table,
+        "resource_cls": resources.Table,
         "data": {
             "name": "SOMETABLE",
             "owner": "SYSADMIN",
@@ -136,19 +150,18 @@ resources = [
     },
     {
         "test": "user",
-        "resource_cls": User,
+        "resource_cls": resources.User,
         "data": {
             "name": "SOMEUSER",
             "owner": "USERADMIN",
-            "disabled": False,
             "display_name": "SOMEUSER",
             "login_name": "SOMEUSER",
-            "must_change_password": False,
+            "must_change_password": True,
         },
     },
     {
         "test": "view",
-        "resource_cls": View,
+        "resource_cls": resources.View,
         "data": {"name": "MY_VIEW", "owner": "SYSADMIN", "volatile": True, "as_": "SELECT * FROM tbl"},
     },
 ]

@@ -17,7 +17,7 @@ class FQN:
         self.params = params
 
     @classmethod
-    def from_str(cls, fqn_str, resource_key=None):
+    def from_str(cls, fqn_str, resource_type=None):
         # TODO: This needs to support periods and question marks in double quoted identifiers
         scoped_name, param_str = fqn_str.split("?") if "?" in fqn_str else (fqn_str, "")
         params = {}
@@ -29,7 +29,7 @@ class FQN:
         if len(name_parts) == 1:
             return cls(name=name_parts[0], params=params)
         elif len(name_parts) == 2:
-            if resource_key in ["schema"]:
+            if resource_type in ["schema"]:
                 return cls(database=name_parts[0], name=name_parts[1], params=params)
             else:
                 return cls(schema=name_parts[0], name=name_parts[1], params=params)
@@ -88,7 +88,7 @@ class URN:
             raise Exception(f"Invalid URN string: {urn_str}")
         resource_type, fqn_str = parts[3].split("/")
         # FIXME: This is a hack to get around the fact that we don't have a resource class yet
-        fqn = FQN.from_str(fqn_str, resource_key=resource_type)
+        fqn = FQN.from_str(fqn_str, resource_type=resource_type)
         return cls(
             organization=parts[1],
             account_locator=parts[2],

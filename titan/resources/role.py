@@ -1,58 +1,75 @@
-from typing import Dict
-from typing_extensions import Annotated
+from dataclasses import dataclass
 
-from pydantic import BeforeValidator
-
-from .base import (
-    AccountScoped,
-    DatabaseScoped,
-    Resource,
-    _fix_class_documentation,
-    serialize_resource_by_name,
-    coerce_from_str,
-)
-from ..privs import GlobalPriv, Privs, RolePriv
+from .__resource import Resource, ResourceSpec
+from ..enums import ResourceType
 from ..props import Props, StringProp, TagsProp
+from ..scope import AccountScope, DatabaseScope
 
 
-@_fix_class_documentation
-class Role(AccountScoped, Resource):
-    """
-    CREATE [ OR REPLACE ] ROLE [ IF NOT EXISTS ] <name>
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ COMMENT = '<string_literal>' ]
-    """
+@dataclass
+class _Role(ResourceSpec):
+    name: str
+    owner: str = "SYSADMIN"
+    tags: dict[str, str] = None
+    comment: str = None
 
-    resource_type = "ROLE"
-    lifecycle_privs = Privs(
-        create=GlobalPriv.CREATE_ROLE,
-        delete=RolePriv.OWNERSHIP,
-    )
+
+class Role(Resource):
+    resource_type = ResourceType.ROLE
     props = Props(
         tags=TagsProp(),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _Role
 
     name: str
     owner: str = "SYSADMIN"
-    tags: Dict[str, str] = None
+    tags: dict[str, str] = None
     comment: str = None
 
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        tags: dict[str, str] = None,
+        comment: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _Role(
+            name=name,
+            owner=owner,
+            tags=tags,
+            comment=comment,
+        )
 
-class DatabaseRole(DatabaseScoped, Resource):
-    """
-    CREATE [ OR REPLACE ] DATABASE ROLE [ IF NOT EXISTS ] <name>
-      [ COMMENT = '<string_literal>' ]
-    """
 
-    resource_type = "DATABASE ROLE"
+class DatabaseRole(Resource):
+    resource_type = ResourceType.DATABASE_ROLE
     props = Props(
         comment=StringProp("comment"),
     )
+    scope = DatabaseScope()
+    spec = _Role
 
     name: str
     owner: str = "SYSADMIN"
+    tags: dict[str, str] = None
     comment: str = None
 
-
-T_Role = Annotated[Role, BeforeValidator(coerce_from_str(Role)), serialize_resource_by_name]
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        tags: dict[str, str] = None,
+        comment: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _Role(
+            name=name,
+            owner=owner,
+            tags=tags,
+            comment=comment,
+        )

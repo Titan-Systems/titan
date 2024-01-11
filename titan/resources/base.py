@@ -129,7 +129,7 @@ class Resource(BaseModel, metaclass=_Resource):
 
     def create_sql(self, **kwargs):
         data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return str(create_resource(self.urn, data, **kwargs))
+        return str(create_resource(self.urn, data, self.props, **kwargs))
 
     def drop_sql(self, **kwargs):
         return str(drop_resource(self.urn))

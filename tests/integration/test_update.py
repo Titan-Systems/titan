@@ -4,9 +4,8 @@ import uuid
 import pytest
 import snowflake.connector
 
-from titan import data_provider
+from titan import data_provider, lifecycle
 from titan.identifiers import FQN
-from titan.lifecycle import create_resource
 from titan.resources import Database
 
 
@@ -54,6 +53,6 @@ def test_update_database(cursor, test_db, marked_for_cleanup):
     conn = cursor.connection
     result = data_provider.fetch_database(conn, FQN(name=test_db))
     assert result["max_data_extension_time_in_days"] == 10
-    cursor.execute(str(create_resource(db.fqn, {"max_data_extension_time_in_days": 9})))
+    cursor.execute(lifecycle.update_resource(db.urn, {"max_data_extension_time_in_days": 9}, db.props))
     result = data_provider.fetch_database(conn, FQN(name=test_db))
     assert result["max_data_extension_time_in_days"] == 9

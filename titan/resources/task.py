@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-# from .base import Resource, AccountScoped, _fix_class_documentation
-from .__resource import Resource, AccountScope, ResourceSpec
+from .__resource import Resource, ResourceSpec
+from .warehouse import Warehouse, WarehouseSize
 from ..enums import ResourceType
 from ..props import (
     BoolProp,
@@ -15,7 +15,7 @@ from ..props import (
     StringListProp,
     StringProp,
 )
-from .warehouse import Warehouse, WarehouseSize
+from ..scope import AccountScope
 
 
 @dataclass
@@ -38,6 +38,7 @@ class _Task(ResourceSpec):
 
 
 class Task(Resource):
+    resource_type = ResourceType.TASK
     props = Props(
         warehouse=IdentifierProp("warehouse"),
         user_task_managed_initial_warehouse_size=EnumProp("user_task_managed_initial_warehouse_size", WarehouseSize),
@@ -54,7 +55,6 @@ class Task(Resource):
         when=ExpressionProp("when"),
         as_=QueryProp("as"),
     )
-    resource_type = ResourceType.TASK
     scope = AccountScope()
     spec = _Task
 

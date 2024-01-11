@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
-from .__resource import Resource, AccountScope, ResourceSpec
+from .__resource import Resource, ResourceSpec
 from ..enums import ResourceType
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
+from ..scope import AccountScope
 
 
 @dataclass
@@ -64,8 +65,8 @@ class User(Resource):
         network_policy=StringProp("network_policy"),
         tags=TagsProp(),
     )
-    spec = _User
     scope = AccountScope()
+    spec = _User
 
     def __init__(
         self,

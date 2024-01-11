@@ -30,6 +30,8 @@ from .resources.base import (
 )
 from .resources.validators import coerce_from_str
 
+from .resources.__resource import Resource as NewResource
+
 
 def print_diffs(diffs):
     for action, target, deltas in diffs:
@@ -360,10 +362,12 @@ class Blueprint:
         for action, urn_str, data in plan:
             urn = URN.from_str(urn_str)
 
+            props = NewResource.props_for_resource_type(urn.resource_type)
+
             if action == DiffAction.ADD:
-                sql = lifecycle.create_resource(urn, data)
+                sql = lifecycle.create_resource(urn, data, props)
             elif action == DiffAction.CHANGE:
-                sql = lifecycle.update_resource(urn, data)
+                sql = lifecycle.update_resource(urn, data, props)
             elif action == DiffAction.REMOVE:
                 sql = lifecycle.drop_resource(urn)
             execute(session, sql)

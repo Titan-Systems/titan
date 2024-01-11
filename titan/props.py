@@ -181,7 +181,6 @@ class IdentifierProp(Prop):
         )
 
 
-# FIXME
 class IdentifierListProp(Prop):
     def __init__(self, label, **kwargs):
         value_expr = pp.delimited_list(pp.Group(FullyQualifiedIdentifier()))
@@ -191,7 +190,14 @@ class IdentifierListProp(Prop):
         return [".".join(id_parts) for id_parts in prop_values]
 
     def render(self, values):
-        raise NotImplementedError
+        if values is None:
+            return ""
+        value_list = ", ".join(values)
+        return tidy_sql(
+            self.label.upper(),
+            "=" if self.eq else "",
+            f"({value_list})",
+        )
 
 
 class StringListProp(Prop):
@@ -472,42 +478,3 @@ class ColumnsProp(Prop):
 
     def typecheck(self, prop_values):
         prop_values = prop_values.strip("()")
-
-
-PROPS_MAP = {
-    "procedure": Props(
-        secure=FlagProp("secure"),
-        args=ArgsProp(),
-        copy_grants=FlagProp("copy_grants"),
-        returns=EnumProp("returns", DataType, eq=False),
-        language=EnumProp("language", [Language.PYTHON], eq=False),
-        runtime_version=StringProp("runtime_version"),
-        packages=StringListProp("packages", parens=True),
-        imports=StringListProp("imports", parens=True),
-        handler=StringProp("handler"),
-        # external_access_integrations=IdentifierListProp("external_access_integrations"),
-        # secrets
-        null_handling=EnumFlagProp(NullHandling),
-        comment=StringProp("comment"),
-        execute_as=EnumProp("execute as", ExecutionRights, eq=False),
-        as_=StringProp("as", eq=False),
-    ),
-    "schema": Props(
-        transient=FlagProp("transient"),
-        managed_access=FlagProp("with managed access"),
-        data_retention_time_in_days=IntProp("data_retention_time_in_days"),
-        max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
-        default_ddl_collation=StringProp("default_ddl_collation"),
-        tags=TagsProp(),
-        comment=StringProp("comment"),
-    ),
-}
-
-
-def render_props(urn: URN, data: dict):
-    if urn.resource_type not in PROPS_MAP:
-        # raise Exception(f"Unsupported resource: {urn}")
-        # FIXME
-        return ""
-    props = PROPS_MAP[urn.resource_type]
-    return props.render(data)

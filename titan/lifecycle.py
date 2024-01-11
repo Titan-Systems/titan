@@ -3,34 +3,35 @@ import sys
 from .builder import tidy_sql
 from .identifiers import URN
 from .privs import GlobalPriv, DatabasePriv, SchemaPriv
-from .props import render_props
+from .props import Props
 
 __this__ = sys.modules[__name__]
 
 
-def create_resource(urn: URN, data: dict) -> str:
-    return getattr(__this__, f"create_{urn.resource_type}", create__default)(urn, data)
+def create_resource(urn: URN, data: dict, props: Props) -> str:
+    return getattr(__this__, f"create_{urn.resource_type}", create__default)(urn, data, props)
 
 
-def create__default(urn: URN, data: dict) -> str:
+def create__default(urn: URN, data: dict, props: Props) -> str:
     return tidy_sql(
         "CREATE",
         urn.resource_type,
         urn.fqn,
-        render_props(urn, data),
+        props.render(data),
     )
 
 
-def update_resource(urn: URN, data: dict) -> str:
-    return getattr(__this__, f"update_{urn.resource_type}", update__default)(urn, data)
+def update_resource(urn: URN, data: dict, props: Props) -> str:
+    return getattr(__this__, f"update_{urn.resource_type}", update__default)(urn, data, props)
 
 
-def update__default(urn: URN, data: dict) -> str:
+def update__default(urn: URN, data: dict, props: Props) -> str:
     return tidy_sql(
         "ALTER",
         urn.resource_type,
         urn.fqn,
-        # cls.props.render(data),
+        "SET",
+        props.render(data),
     )
 
 

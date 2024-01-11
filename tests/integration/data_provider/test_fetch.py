@@ -5,9 +5,10 @@ import pytest
 import snowflake.connector
 
 from titan import data_provider
-from titan.enums import Scope
-from titan.identifiers import FQN
-from titan.resources import Resource
+from titan.identifiers import FQN, URN
+
+# from titan.resources import Resource
+# from titan.resources.__resource import Resource as NewResource
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -20,7 +21,7 @@ connection_params = {
 
 resources = [
     {
-        "resource_key": "alert",
+        "resource_type": "alert",
         "setup_sql": [
             "CREATE WAREHOUSE {name}_wh",
             "CREATE ALERT {name} WAREHOUSE = {name}_wh SCHEDULE = '60 MINUTE' IF(EXISTS(SELECT 1)) THEN SELECT 1",
@@ -36,7 +37,7 @@ resources = [
         },
     },
     {
-        "resource_key": "database",
+        "resource_type": "database",
         "setup_sql": "CREATE DATABASE {name}",
         "teardown_sql": "DROP DATABASE {name}",
         "data": lambda name: {
@@ -48,10 +49,9 @@ resources = [
         },
     },
     {
-        "resource_key": "javascript_udf",
+        "resource_type": "function",
         "setup_sql": "CREATE FUNCTION {name}() RETURNS double LANGUAGE JAVASCRIPT AS 'return 42;'",
         "teardown_sql": "DROP FUNCTION {name}()",
-        "fetch_method": "fetch_javascript_udf",
         "data": lambda name: {
             "name": name,
             "secure": False,
@@ -62,7 +62,7 @@ resources = [
         },
     },
     {
-        "resource_key": "role",
+        "resource_type": "role",
         "setup_sql": "CREATE ROLE {name}",
         "teardown_sql": "DROP ROLE {name}",
         "data": lambda name: {
@@ -71,7 +71,7 @@ resources = [
         },
     },
     {
-        "resource_key": "schema",
+        "resource_type": "schema",
         "setup_sql": "CREATE TRANSIENT SCHEMA {name}",
         "teardown_sql": "DROP SCHEMA {name}",
         "data": lambda name: {
@@ -84,7 +84,7 @@ resources = [
         },
     },
     # {
-    #     "resource_key": "shared_database",
+    #     "resource_type": "shared_database",
     #     "setup_sql": [
     #         "CALL SYSTEM$ACCEPT_LEGAL_TERMS('DATA_EXCHANGE_LISTING', 'GZSOZ1LLE9')",
     #         "CREATE DATABASE {name} FROM SHARE WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
@@ -97,7 +97,7 @@ resources = [
     #     },
     # },
     {
-        "resource_key": "table",
+        "resource_type": "table",
         "setup_sql": "CREATE TABLE {name} (id INT)",
         "teardown_sql": "DROP TABLE {name}",
         "data": lambda name: {
@@ -107,16 +107,6 @@ resources = [
         },
     },
 ]
-
-
-def _generate_fqn(resource, test_db):
-    resource_cls = Resource.classes[resource["resource_key"]]
-    if resource_cls.scope == Scope.ACCOUNT:
-        return FQN(name=resource["name"])
-    elif resource_cls.scope == Scope.DATABASE:
-        return FQN(name=resource["name"], database=test_db)
-    elif resource_cls.scope == Scope.SCHEMA:
-        return FQN(name=resource["name"], schema="PUBLIC")
 
 
 @pytest.fixture(scope="session")
@@ -146,26 +136,30 @@ def cursor(db_session, suffix, test_db):
 
 @pytest.fixture(
     params=resources,
-    ids=[f"test_fetch_{config['resource_key']}" for config in resources],
+    ids=[f"test_fetch_{config['resource_type']}" for config in resources],
     scope="function",
 )
-def resource(request, cursor, suffix, test_db):
+def resource_config(request, cursor, suffix, test_db):
     config = request.param
     setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
     teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]
-    resource_name = f"test_{config['resource_key']}_{suffix}".upper()
+    resource_name = f"test_{config['resource_type']}_{suffix}".upper()
+
+    # resource_cls = Resource.classes[config["resource_type"]]
+    if config["resource_type"] not in ["database", "role"]:
+        if config["resource_type"] != "schema":
+            resource_name = f"PUBLIC.{resource_name}"
+        resource_name = f"{test_db}.{resource_name}"
 
     cursor.execute(f"USE DATABASE {test_db}")
     for setup_sql in setup_sqls:
         cursor.execute(setup_sql.format(name=resource_name))
     try:
         data = config["data"](name=resource_name)
-        fetch_method = config.get("fetch_method", f"fetch_{config['resource_key'].lower()}")
         yield {
             "name": resource_name,
-            "resource_key": config["resource_key"],
+            "resource_type": config["resource_type"],
             "data": data,
-            "fetch_method": fetch_method,
         }
     finally:
         for teardown_sql in teardown_sqls:
@@ -173,10 +167,15 @@ def resource(request, cursor, suffix, test_db):
 
 
 @pytest.mark.requires_snowflake
-def test_fetch_resource(resource, db_session, test_db):
-    fetch = getattr(data_provider, resource["fetch_method"])
-    fqn = _generate_fqn(resource, test_db)
-    result = fetch(db_session, fqn)
+def test_fetch_resource(resource_config, db_session, test_db):
+    account_locator = data_provider.fetch_account_locator(db_session)
+    urn = URN(
+        resource_type=resource_config["resource_type"],
+        fqn=FQN.from_str(resource_config["name"], resource_type=resource_config["resource_type"]),
+        account_locator=account_locator,
+    )
+
+    result = data_provider.fetch_resource(db_session, urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
-    assert result == resource["data"]
+    assert result == resource_config["data"]
