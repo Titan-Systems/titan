@@ -49,6 +49,7 @@ class Resource(metaclass=_Resource):
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
+    requires: set = set()
 
     def __init__(self, implicit: bool = False, stub: bool = False, **scope_kwargs):
         self._data = None

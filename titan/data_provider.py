@@ -8,7 +8,7 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .client import execute, DOEST_NOT_EXIST_ERR
+from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .identifiers import URN, FQN
 
 
@@ -110,6 +110,17 @@ def fetch_session(session):
             CURRENT_WAREHOUSE() as warehouse
         """,
     )[0]
+
+    try:
+        tags = [f"{row['database']}.{row['schema']}.{row['name']}" for row in execute(session, "SHOW TAGS IN ACCOUNT")]
+        tag_support = True
+    except ProgrammingError as err:
+        if err.errno == UNSUPPORTED_FEATURE:
+            tags = []
+            tag_support = False
+        else:
+            raise
+
     return {
         "account": session_obj["ACCOUNT"],
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
@@ -120,6 +131,8 @@ def fetch_session(session):
         "database": session_obj["DATABASE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
         "warehouse": session_obj["WAREHOUSE"],
+        "tag_support": tag_support,
+        "tags": tags,
     }
 
 
@@ -401,6 +414,23 @@ def fetch_table(session, fqn: FQN):
         "cluster_by": data["cluster_by"] or None,
         "columns": columns,
     }
+
+
+def fetch_resource_tags(session, resource_type: str, fqn: FQN):
+    tag_refs = execute(
+        session,
+        f"""
+            SELECT *
+            FROM table({fqn.database}.information_schema.tag_references(
+                '{fqn}', '{resource_type.upper()}'
+            ))""",
+    )
+
+    if len(tag_refs) == 0:
+        return None
+
+    # TODO
+    return []
 
 
 def fetch_user(session, fqn: FQN):

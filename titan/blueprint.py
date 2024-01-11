@@ -229,6 +229,7 @@ class Blueprint:
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
         resources: List[Resource] = [],
+        enforce_requirements: bool = False,
     ) -> None:
         self._finalized = False
         self._staged: List[Resource] = []

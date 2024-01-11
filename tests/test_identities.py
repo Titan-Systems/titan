@@ -24,6 +24,20 @@ resources = [
         },
     },
     {
+        "test": "api_integration",
+        "resource_cls": resources.APIIntegration,
+        "data": {
+            "name": "SOMEINT",
+            "owner": "ACCOUNTADMIN",
+            "api_provider": "AWS_API_GATEWAY",
+            "api_key": "api-987654321",
+            "api_aws_role_arn": "arn:aws:iam::123456789012:role/my_cloud_account_role",
+            "api_allowed_prefixes": ["https://xyz.execute-api.us-west-2.amazonaws.com/production"],
+            "api_blocked_prefixes": ["https://xyz.execute-api.us-west-2.amazonaws.com/development"],
+            "enabled": True,
+        },
+    },
+    {
         "test": "database",
         "resource_cls": resources.Database,
         "data": {
@@ -94,9 +108,34 @@ resources = [
         },
     },
     {
+        "test": "sequence",
+        "resource_cls": resources.Sequence,
+        "data": {
+            "name": "SOMESEQ",
+            "owner": "SYSADMIN",
+            "start": 1,
+            "increment": 2,
+            "comment": "+3",
+        },
+    },
+    {
         "test": "shared_database",
         "resource_cls": resources.SharedDatabase,
         "data": {"name": "SOMESHARENAME", "owner": "ACCOUNTADMIN", "from_share": "SOMEACCOUNT.SOMESHARE"},
+    },
+    {
+        "test": "pipe",
+        "resource_cls": resources.Pipe,
+        "data": {
+            "name": "SOMEPIPE",
+            "owner": "SYSADMIN",
+            "auto_ingest": True,
+            "error_integration": "someint",
+            "aws_sns_topic": "sometopic",
+            "integration": "someint",
+            "comment": "mario",
+            "as_": "copy into mytable(C1, C2) from (select $5, $4 from @mystage)",
+        },
     },
     {
         "test": "python_stored_procedure",
@@ -124,7 +163,6 @@ resources = [
             "name": "MY_PYTHON_UDF",
             "owner": "SYSADMIN",
             "args": [],
-            "secure": False,
             "returns": "INT",
             "language": "PYTHON",
             "runtime_version": "3.8",

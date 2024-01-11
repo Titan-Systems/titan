@@ -7,6 +7,7 @@ from snowflake.connector.errors import ProgrammingError
 
 from .builder import SQL
 
+UNSUPPORTED_FEATURE = 2
 ACCESS_CONTROL_ERR = 3001
 DOEST_NOT_EXIST_ERR = 2003
 ALREADY_EXISTS_ERR = 3041  # Not sure this is correct

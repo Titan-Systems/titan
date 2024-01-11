@@ -46,6 +46,17 @@ def role(suffix, cursor, marked_for_cleanup):
     return role
 
 
+@pytest.mark.requires_snowflake
+def test_blueprint_plan(cursor, user, role):
+    session = cursor.connection
+    bp = Blueprint(name="test")
+    bp.add(user, role)
+    changes = bp.plan(session)
+    assert len(changes) == 2
+    bp.apply(session, changes)
+    # Must reset BP before planning again
+
+
 # @pytest.mark.requires_snowflake
 # def test_role_permissions(cursor, user, role):
 #     session = cursor.connection
