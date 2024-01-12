@@ -8,25 +8,21 @@ from yaml import safe_load
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
 from . import data_provider as dp
-
-# from . import git
+from .blueprint import Blueprint
 from .builder import tidy_sql
 from .diff import diff
 from .enums import DataType
 from .identifiers import FQN, URN
-
-# TODO: spi can't import from Resources due to Pydantic version conflicts
-# from .blueprint import Blueprint
-# from .resources import PythonStoredProcedure
+from .resources import PythonStoredProcedure
 
 SNOWPARK_TELEMETRY_ID = "titan_titan"
 
 try:
-    import _snowflake
+    import _snowflake  # type: ignore
 
     _snowflake.snowflake_partner_attribution().append(SNOWPARK_TELEMETRY_ID)
 except ModuleNotFoundError as err:
-    raise ModuleNotFoundError("The titan spi module must be run from a Snowpark UDF or stored procedure") from err
+    raise ModuleNotFoundError("The titan spi module can only be run from a Snowpark UDF or stored procedure") from err
 
 __this__ = sys.modules[__name__]
 
@@ -50,8 +46,6 @@ def install(sp_session):
     )
     plan = blueprint.plan(sp_session)
     blueprint.apply(sp_session, plan)
-
-    # _execute(sp_session, sql)
 
 
 def _execute(sp_session, sql: list):

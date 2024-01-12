@@ -50,3 +50,6 @@ class Account(Resource, ResourceContainer):
             edition=edition,
             comment=comment,
         )
+
+    def databases(self):
+        return self.items(resource_type=ResourceType.DATABASE)

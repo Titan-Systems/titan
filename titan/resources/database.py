@@ -70,5 +70,5 @@ class Database(Resource, ResourceContainer):
             Schema(name="INFORMATION_SCHEMA", implicit=True),
         )
 
-    # def model_post_init(self, ctx):
-    #     super().model_post_init(ctx)
+    def schemas(self):
+        return self.items(resource_type=ResourceType.SCHEMA)

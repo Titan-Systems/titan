@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass, fields
 from typing import _GenericAlias, Any, TypedDict, Type, get_args, get_type_hints
 from inspect import isclass
+from itertools import chain
 
 from ..enums import DataType, ParseableEnum, ResourceType
 from ..identifiers import FQN, URN
@@ -185,7 +186,7 @@ class Resource(metaclass=_Resource):
 
 class ResourceContainer:
     def __init__(self):
-        self._items = []
+        self._items: dict[ResourceType, list[Resource]] = {}
 
     def add(self, *items: Resource):
         if isinstance(items[0], list):
@@ -195,7 +196,12 @@ class ResourceContainer:
                 raise RuntimeError(f"{item} already belongs to a container")
             item._container = self
             item.requires(self)
-            self._items.append(item)
+            if item.resource_type not in self._items:
+                self._items[item.resource_type] = []
+            self._items[item.resource_type].append(item)
 
-    def items(self) -> list[Resource]:
-        return self._items
+    def items(self, resource_type: ResourceType = None) -> list[Resource]:
+        if resource_type:
+            return self._items.get(resource_type, [])
+        else:
+            return list(chain.from_iterable(self._items.values()))

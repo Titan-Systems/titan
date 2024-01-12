@@ -1,18 +1,3 @@
-# from typing_extensions import Annotated
-
-# from pydantic import BeforeValidator, Field, PlainSerializer, model_validator
-
-# from .base import Resource, AccountScoped, T_Schema, _fix_class_documentation
-# from .validators import coerce_from_str, serialize_as_named_resource
-# from ..builder import SQL, tidy_sql
-# from ..enums import ParseableEnum
-# from ..helpers import listify
-
-# from ..parse import _parse_grant, _parse_props
-# from ..privs import Privs, GLOBAL_PRIV_DEFAULT_OWNERS
-# from ..props import Props, IdentifierProp, FlagProp
-
-
 from dataclasses import dataclass
 from typing import Any
 
