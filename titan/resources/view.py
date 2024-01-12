@@ -32,7 +32,7 @@ class _View(ResourceSpec):
     def __post_init__(self):
         super().__post_init__()
         if self.columns is not None and len(self.columns) == 0:
-            raise ValueError("columns must not be empty")
+            raise ValueError("columns can't be empty")
 
 
 class View(Resource):

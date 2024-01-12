@@ -36,6 +36,7 @@ class ResourceType(ParseableEnum):
     EXTERNAL_FUNCTION = "external function"
     FAILOVER_GROUP = "failover group"
     FUNCTION = "function"
+    NOTIFICATION_INTEGRATION = "notification integration"
     PROCEDURE = "procedure"
     PIPE = "pipe"
     RESOURCE_MONITOR = "resource monitor"

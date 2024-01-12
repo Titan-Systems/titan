@@ -75,7 +75,7 @@ class Table(SchemaScoped, Resource):
     @classmethod
     def validate_columns(cls, columns):
         if isinstance(columns, list):
-            assert len(columns) > 0, "columns must not be empty"
+            assert len(columns) > 0, "columns can't be empty"
         return columns
 
     @classmethod

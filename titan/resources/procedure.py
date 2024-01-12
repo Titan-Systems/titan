@@ -21,11 +21,11 @@ class _PythonStoredProcedure(ResourceSpec):
     name: str
     args: list[Arg]
     returns: DataType
-    language: Language
     runtime_version: str
     # FIXME: this is a situation where scrubbing defaults when an object is serialized is bad
     packages: list  # = ["snowflake-snowpark-python"]
     handler: str
+    language: Language = Language.PYTHON
     as_: str = None
     comment: str = None
     copy_grants: bool = False
@@ -35,6 +35,11 @@ class _PythonStoredProcedure(ResourceSpec):
     null_handling: NullHandling = NullHandling.CALLED_ON_NULL_INPUT
     owner: str = "SYSADMIN"
     secure: bool = False
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.packages is not None and len(self.packages) == 0:
+            raise ValueError("packages can't be empty")
 
 
 class PythonStoredProcedure(Resource):
@@ -103,14 +108,13 @@ class PythonStoredProcedure(Resource):
         #     stage = _parse_stage_path(import_location)
         #     # TODO: fix polymorphic resources
         #     # self.requires(Stage(name="stage", stub=True))
-        kwargs.pop("language")
+        kwargs.pop("language", None)
         super().__init__(**kwargs)
 
         self._data = _PythonStoredProcedure(
             name=name,
             args=args,
             returns=returns,
-            language=Language.PYTHON,
             runtime_version=runtime_version,
             packages=packages,
             handler=handler,

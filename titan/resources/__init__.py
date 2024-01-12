@@ -17,6 +17,7 @@ from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .file_format import FileFormat, CSVFileFormat
+from .function import JavascriptUDF, PythonUDF
 from .grant import Grant, RoleGrant
 from .pipe import Pipe
 from .replication_group import ReplicationGroup
@@ -32,8 +33,6 @@ from .task import Task
 from .user import User
 from .view import View
 from .warehouse import Warehouse
-
-from .function import JavascriptUDF, PythonUDF
 
 from .notification_integration import (
     NotificationIntegration,

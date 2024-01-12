@@ -19,8 +19,8 @@ from ..props import (
 class _JavascriptUDF(ResourceSpec):
     name: str
     returns: str
-    language: Language
     as_: str
+    language: Language = Language.JAVASCRIPT
     args: list[Arg] = None
     comment: str = None
     copy_grants: bool = False
@@ -70,12 +70,11 @@ class JavascriptUDF(Resource):
         comment: str = None,
         **kwargs,
     ):
-        kwargs.pop("language")
+        kwargs.pop("language", None)
         super().__init__(**kwargs)
         self._data = _JavascriptUDF(
             name=name,
             returns=returns,
-            language=Language.JAVASCRIPT,
             as_=as_,
             copy_grants=copy_grants,
             owner=owner,
@@ -91,9 +90,9 @@ class JavascriptUDF(Resource):
 class _PythonUDF(ResourceSpec):
     name: str
     returns: str
-    language: Language
     runtime_version: str
     handler: str
+    language: Language = Language.PYTHON
     args: list[Arg] = None
     as_: str = None
     comment: str = None
@@ -148,12 +147,11 @@ class PythonUDF(Resource):
         volatility: Volatility = None,
         **kwargs,
     ):
-        kwargs.pop("language")
+        kwargs.pop("language", None)
         super().__init__(**kwargs)
         self._data = _PythonUDF(
             name=name,
             returns=returns,
-            language=Language.PYTHON,
             runtime_version=runtime_version,
             handler=handler,
             args=args,
