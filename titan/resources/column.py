@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .__resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec
 from ..enums import DataType, ResourceType
 from ..props import FlagProp, Props, StringProp
 from ..parse import _parse_column, _parse_props

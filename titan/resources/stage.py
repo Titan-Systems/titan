@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Union
 
-from .__resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec
 
 # from .file_format import FileFormatProp
 from ..enums import ParseableEnum, ResourceType

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .__resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp

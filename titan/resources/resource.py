@@ -87,11 +87,11 @@ class Resource(metaclass=_Resource):
     scope: ResourceScope
     spec: Type[ResourceSpec]
     refs: set
-    _container: "ResourceContainer"
 
     def __init__(self, implicit: bool = False, stub: bool = False, **scope_kwargs):
         super().__init__()
-        self._data = None
+        self._data: ResourceSpec = None
+        self._container: "ResourceContainer" = None
         self.implicit = implicit
         self.stub = stub
         self.refs = set()

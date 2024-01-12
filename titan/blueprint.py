@@ -1,11 +1,10 @@
 import json
 
 from collections import defaultdict
-from typing import List, Optional, Tuple, Type, Union
+from typing import List, Optional, Tuple, Union
 from queue import Queue
 
 from . import data_provider, lifecycle
-
 from .client import execute
 from .diff import diff, DiffAction
 from .identifiers import URN, FQN
@@ -18,19 +17,10 @@ from .privs import (
     is_ownership_priv,
     create_priv_for_resource_type,
 )
-from .resources.base import (
-    Account,
-    AccountScoped,
-    Database,
-    DatabaseScoped,
-    OrganizationScoped,
-    Resource,
-    SchemaScoped,
-    Schema,
-)
+from .resources import Account, Database, Resource, Schema
+from .resources.resource import ResourceContainer
 from .resources.validators import coerce_from_str
-
-from .resources.__resource import Resource as NewResource
+from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 
 def print_diffs(diffs):
@@ -45,26 +35,27 @@ def _hash(data):
 
 
 def _is_container(resource):
-    return hasattr(resource, "children") and callable(resource.children)
+    return isinstance(resource, ResourceContainer)
+    # return hasattr(resource, "children") and callable(resource.children)
 
 
 def _split_by_scope(
-    resources: List[Resource],
-) -> Tuple[List[OrganizationScoped], List[AccountScoped], List[DatabaseScoped], List[SchemaScoped]]:
+    resources: list[Resource],
+) -> tuple[list[Resource], list[Resource], list[Resource], list[Resource]]:
     org_scoped = []
     acct_scoped = []
     db_scoped = []
     schema_scoped = []
 
-    def route(resource):
+    def route(resource: Resource):
         """The sorting hat"""
-        if isinstance(resource, OrganizationScoped):
+        if isinstance(resource.scope, OrganizationScope):
             org_scoped.append(resource)
-        elif isinstance(resource, AccountScoped):
+        elif isinstance(resource.scope, AccountScope):
             acct_scoped.append(resource)
-        elif isinstance(resource, DatabaseScoped):
+        elif isinstance(resource.scope, DatabaseScope):
             db_scoped.append(resource)
-        elif isinstance(resource, SchemaScoped):
+        elif isinstance(resource.scope, SchemaScope):
             schema_scoped.append(resource)
         else:
             raise Exception(f"Unsupported resource type {type(resource)}")
@@ -72,7 +63,7 @@ def _split_by_scope(
     for resource in resources:
         route(resource)
         if _is_container(resource):
-            for child in resource.children():
+            for child in resource.items():
                 route(child)
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
@@ -363,7 +354,7 @@ class Blueprint:
         for action, urn_str, data in plan:
             urn = URN.from_str(urn_str)
 
-            props = NewResource.props_for_resource_type(urn.resource_type)
+            props = Resource.props_for_resource_type(urn.resource_type)
 
             if action == DiffAction.ADD:
                 sql = lifecycle.create_resource(urn, data, props)

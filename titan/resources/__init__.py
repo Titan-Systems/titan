@@ -1,30 +1,22 @@
-from .base import (
-    Resource,
-    Organization,
-    OrganizationScoped,
-    Account,
-    AccountScoped,
-    Database,
-    DatabaseScoped,
-    # Schema,
-    SchemaScoped,
-)
+from .resource import Resource
+from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
 from .column import Column
-from .shared_database import SharedDatabase
+from .database import Database
 from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
 from .grant import Grant, RoleGrant
 from .pipe import Pipe
+from .procedure import PythonStoredProcedure
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
-from .sequence import Sequence
 from .schema import Schema
+from .sequence import Sequence
+from .shared_database import SharedDatabase
 from .stage import Stage, InternalStage, ExternalStage
-from .procedure import PythonStoredProcedure
 from .stream import Stream, TableStream, ExternalTableStream, ViewStream, StageStream
 from .table import Table
 from .tag import Tag
@@ -53,7 +45,6 @@ from .storage_integration import (
 
 __all__ = [
     "Account",
-    "AccountScoped",
     "Alert",
     "APIIntegration",
     "AWSOutboundNotificationIntegration",
@@ -64,7 +55,6 @@ __all__ = [
     # "CSVFileFormat",
     "Database",
     "DatabaseRole",
-    "DatabaseScoped",
     "DynamicTable",
     "EmailNotificationIntegration",
     "ExternalFunction",
@@ -79,8 +69,6 @@ __all__ = [
     "InternalStage",
     "JavascriptUDF",
     "NotificationIntegration",
-    "Organization",
-    "OrganizationScoped",
     "Pipe",
     "PythonUDF",
     "PythonStoredProcedure",
@@ -90,7 +78,6 @@ __all__ = [
     "RoleGrant",
     "S3StorageIntegration",
     "Schema",
-    "SchemaScoped",
     "Sequence",
     "SharedDatabase",
     "Stage",

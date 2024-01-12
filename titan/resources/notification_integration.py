@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from inflection import camelize
 
-from .__resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec
 from ..enums import ParseableEnum, ResourceType
 from ..parse import _resolve_resource_class
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp

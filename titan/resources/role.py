@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .__resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec
 from ..enums import ResourceType
 from ..props import Props, StringProp, TagsProp
 from ..scope import AccountScope, DatabaseScope

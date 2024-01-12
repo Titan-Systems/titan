@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .__resource import Arg, Resource, ResourceSpec
+from .resource import Arg, Resource, ResourceSpec
 from ..scope import SchemaScope
 from ..enums import DataType, ExecutionRights, NullHandling, Language, ResourceType
 from ..props import (

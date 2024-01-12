@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .__resource import Resource, ResourceSpec, Arg
+from .resource import Resource, ResourceSpec, Arg
 from ..enums import DataType, NullHandling, Volatility, ResourceType
 from ..scope import AccountScope
 

@@ -10,6 +10,14 @@ class ResourceScope(ABC):
         raise NotImplementedError
 
 
+class OrganizationScope(ResourceScope):
+    def fully_qualified_name(self, resource_name: str):
+        return FQN(name=resource_name.upper())
+
+    def register_scope(self):
+        pass
+
+
 class AccountScope(ResourceScope):
     def fully_qualified_name(self, resource_name: str):
         return FQN(name=resource_name.upper())

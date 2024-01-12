@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Union
 
-from .__resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
 from ..props import Props, FlagProp, StringProp, BoolProp, TimeTravelProp

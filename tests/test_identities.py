@@ -43,9 +43,9 @@ resources = [
         "data": {
             "name": "SOMEDB",
             "owner": "SYSADMIN",
-            "data_retention_time_in_days": 1,
-            "max_data_extension_time_in_days": 14,
-            "transient": False,
+            "data_retention_time_in_days": 2,
+            "max_data_extension_time_in_days": 13,
+            "transient": True,
         },
     },
     {
