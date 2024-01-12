@@ -93,5 +93,5 @@ class TestProp(unittest.TestCase):
 class TestProps(unittest.TestCase):
     def test_props_render(self):
         db = Database(name="foo", comment="bar")
-        rendered = db.props.render(db.model_dump(exclude_none=True, exclude_defaults=True))
+        rendered = db.props.render(db.to_dict(packed=True))
         self.assertEqual(rendered, "COMMENT = 'bar'")

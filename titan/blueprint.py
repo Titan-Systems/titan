@@ -294,7 +294,7 @@ class Blueprint:
                 continue
 
             urn = URN.from_resource(account_locator=self.account.locator, resource=resource)
-            data = resource.model_dump(exclude_none=True)
+            data = resource.to_dict(packed=True)
 
             if resource.stub:
                 data["_stub"] = True
@@ -361,7 +361,7 @@ class Blueprint:
             elif action == DiffAction.CHANGE:
                 sql = lifecycle.update_resource(urn, data, props)
             elif action == DiffAction.REMOVE:
-                sql = lifecycle.drop_resource(urn)
+                sql = lifecycle.drop_resource(urn, data)
             execute(session, sql)
 
     def destroy(self, session, manifest=None):

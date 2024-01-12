@@ -21,14 +21,21 @@ def create__default(urn: URN, data: dict, props: Props) -> str:
     )
 
 
-# def create_table(urn: URN, data: dict, props: Props) -> str:
-#     return tidy_sql(
-#         "CREATE",
-#         "TABLE",
-#         urn.fqn,
-#         render_schema(data["columns"]),
-#         props.render(data),
-#     )
+def create_grant(urn: URN, data: dict, props: Props):
+    return tidy_sql(
+        "GRANT",
+        data["priv"],
+        "ON",
+        data["on"],
+        props.render(data),
+    )
+
+
+def create_role_grant(urn: URN, data: dict, props: Props):
+    return tidy_sql(
+        "GRANT",
+        props.render(data),
+    )
 
 
 def update_resource(urn: URN, data: dict, props: Props) -> str:
@@ -45,16 +52,38 @@ def update__default(urn: URN, data: dict, props: Props) -> str:
     )
 
 
-def drop_resource(urn: URN, if_exists: bool = False) -> str:
-    return getattr(__this__, f"drop_{urn.resource_type}", drop__default)(urn, if_exists)
+def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:
+    return getattr(__this__, f"drop_{urn.resource_type}", drop__default)(urn, data, if_exists)
 
 
-def drop__default(urn: URN, if_exists: bool) -> str:
+def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
     return tidy_sql(
         "DROP",
         urn.resource_type,
         "IF EXISTS" if if_exists else "",
         urn.fqn,
+    )
+
+
+def drop_grant(urn: URN, data: dict, **kwargs):
+    return tidy_sql(
+        "REVOKE",
+        data["priv"],
+        "ON",
+        data["on"],
+        "FROM",
+        data["to"],
+        # "CASCADE" if cascade else "RESTRICT",
+    )
+
+
+def drop_role_grant(urn: URN, data: dict, **kwargs):
+    return tidy_sql(
+        "REVOKE ROLE",
+        data["role"],
+        "FROM",
+        "ROLE" if data.get("to_role") else "USER",
+        data["to_role"] if data.get("to_role") else data["to_user"],
     )
 
 

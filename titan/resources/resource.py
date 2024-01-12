@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, fields
-from typing import _GenericAlias, TypedDict, Type, get_args, get_type_hints
+from typing import _GenericAlias, Any, TypedDict, Type, get_args, get_type_hints
 from inspect import isclass
 
 from ..enums import DataType, ParseableEnum, ResourceType
@@ -24,6 +24,9 @@ class ResourceSpec:
             def _coerce(field_value, field_type=None):
                 if field_type is None:
                     field_type = field.type
+
+                if field_type == Any:
+                    return field_value
 
                 # Recursively traverse lists and dicts
                 if issubclass(field_type, list):

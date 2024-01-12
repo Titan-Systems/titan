@@ -27,9 +27,9 @@ class ParseableEnum(Enum, metaclass=_Parseable):
 
 
 class ResourceType(ParseableEnum):
+    ACCOUNT = "account"
     ALERT = "alert"
     API_INTEGRATION = "api integration"
-    ACCOUNT = "account"
     COLUMN = "column"
     DATABASE = "database"
     DATABASE_ROLE = "database role"
@@ -37,9 +37,10 @@ class ResourceType(ParseableEnum):
     EXTERNAL_FUNCTION = "external function"
     FAILOVER_GROUP = "failover group"
     FUNCTION = "function"
+    GRANT = "grant"
     NOTIFICATION_INTEGRATION = "notification integration"
-    PROCEDURE = "procedure"
     PIPE = "pipe"
+    PROCEDURE = "procedure"
     RESOURCE_MONITOR = "resource monitor"
     ROLE = "role"
     SCHEMA = "schema"
@@ -48,8 +49,8 @@ class ResourceType(ParseableEnum):
     STORAGE_INTEGRATION = "storage integration"
     STREAM = "stream"
     TABLE = "table"
-    TASK = "task"
     TAG = "tag"
+    TASK = "task"
     USER = "user"
     VIEW = "view"
     WAREHOUSE = "warehouse"

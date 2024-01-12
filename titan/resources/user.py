@@ -96,7 +96,7 @@ class User(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _User(
+        self._data: _User = _User(
             name=name,
             owner=owner,
             password=password,
@@ -121,3 +121,7 @@ class User(Resource):
             network_policy=network_policy,
             tags=tags,
         )
+
+    @property
+    def name(self):
+        return self._data.name

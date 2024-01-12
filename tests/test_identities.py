@@ -1,7 +1,7 @@
 import pytest
 
 from titan.privs import GlobalPriv
-from titan import resources
+from titan import resources, Resource
 
 resources = [
     {
@@ -9,6 +9,7 @@ resources = [
         "resource_cls": resources.Account,
         "data": {
             "name": "SOMEACCOUNT",
+            "locator": "ABC123",
         },
     },
     {
@@ -108,7 +109,7 @@ resources = [
             "to": "SOMEROLE",
             "owner": "SYSADMIN",
             "on": "ACCOUNT",
-            "grant_option": False,
+            "grant_option": True,
         },
     },
     {
@@ -216,9 +217,22 @@ resources = [
         "data": {"name": "SOMEROLE", "owner": "SYSADMIN"},
     },
     {
-        "test": "role_grant",
+        "test": "role_grant_to_user",
         "resource_cls": resources.RoleGrant,
-        "data": {"role": "SOMEROLE", "to_user": "SOMEUSER", "owner": "SYSADMIN"},
+        "data": {
+            "role": "SOMEROLE",
+            "to_user": "SOMEUSER",
+            "owner": "USERADMIN",
+        },
+    },
+    {
+        "test": "role_grant_to_role",
+        "resource_cls": resources.RoleGrant,
+        "data": {
+            "role": "SOMEROLE",
+            "to_role": "ANOTHERROLE",
+            "owner": "USERADMIN",
+        },
     },
     {
         "test": "schema",
@@ -304,11 +318,8 @@ def resource(request):
     yield resource
 
 
-def dump(resource):
-    if hasattr(resource, "model_dump"):
-        return resource.model_dump(mode="json", by_alias=True, exclude_none=True)
-    else:
-        return resource.to_dict(packed=True)
+def dump(resource: Resource):
+    return resource.to_dict(packed=True)
 
 
 def test_data_identity(resource):
