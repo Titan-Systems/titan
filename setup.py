@@ -22,7 +22,6 @@ setup(
     install_requires=[
         "click==8.1.7",
         "inflection==0.5.1",
-        "pydantic>=2.0",
         "pyparsing==3.0.9",
         "pyyaml==20.4.0",
         "snowflake-connector-python==3.5.0",
