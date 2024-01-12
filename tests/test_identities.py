@@ -226,9 +226,8 @@ resources = [
         "data": {
             "name": "SOMESCHEMA",
             "owner": "SYSADMIN",
-            "transient": False,
-            "managed_access": False,
-            "max_data_extension_time_in_days": 14,
+            "transient": True,
+            "max_data_extension_time_in_days": 7,
         },
     },
     {
@@ -270,12 +269,10 @@ resources = [
             "name": "SOMETABLE",
             "owner": "SYSADMIN",
             "columns": [{"data_type": "INT", "name": "ID"}],
-            "change_tracking": False,
-            "cluster_by": [],
-            "copy_grants": False,
-            "enable_schema_evolution": False,
-            "transient": False,
-            "volatile": False,
+            "change_tracking": True,
+            "cluster_by": ["ID"],
+            "copy_grants": True,
+            "enable_schema_evolution": True,
         },
     },
     {

@@ -30,6 +30,7 @@ class ResourceType(ParseableEnum):
     ALERT = "alert"
     API_INTEGRATION = "api integration"
     ACCOUNT = "account"
+    COLUMN = "column"
     DATABASE = "database"
     DATABASE_ROLE = "database role"
     DYNAMIC_TABLE = "dynamic table"

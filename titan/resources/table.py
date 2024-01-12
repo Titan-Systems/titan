@@ -10,10 +10,11 @@ from ..scope import SchemaScope
 from ..props import (
     BoolProp,
     FlagProp,
+    IdentifierListProp,
     IntProp,
     Props,
+    SchemaProp,
     StringProp,
-    StringListProp,
     TagsProp,
 )
 
@@ -50,7 +51,8 @@ class Table(Resource):
     props = Props(
         volatile=FlagProp("volatile"),
         transient=FlagProp("transient"),
-        cluster_by=StringListProp("cluster by"),
+        columns=SchemaProp(),
+        cluster_by=IdentifierListProp("cluster by", eq=False, parens=True),
         enable_schema_evolution=BoolProp("enable_schema_evolution"),
         # stage_file_format=FileFormatProp("stage_file_format"),
         # stage_copy_options=PropSet("stage_copy_options", copy_options),

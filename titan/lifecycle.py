@@ -21,6 +21,16 @@ def create__default(urn: URN, data: dict, props: Props) -> str:
     )
 
 
+# def create_table(urn: URN, data: dict, props: Props) -> str:
+#     return tidy_sql(
+#         "CREATE",
+#         "TABLE",
+#         urn.fqn,
+#         render_schema(data["columns"]),
+#         props.render(data),
+#     )
+
+
 def update_resource(urn: URN, data: dict, props: Props) -> str:
     return getattr(__this__, f"update_{urn.resource_type}", update__default)(urn, data, props)
 

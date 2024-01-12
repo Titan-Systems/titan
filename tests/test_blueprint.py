@@ -12,7 +12,7 @@ class TestBlueprint(unittest.TestCase):
         schema = Schema(name="SCHEMA", database=db)
         table = Table(name="TABLE", columns=["id INT"])
         table.schema = schema
-        view = View(name="VIEW", schema_=schema, as_="SELECT 1")
+        view = View(name="VIEW", schema=schema, as_="SELECT 1")
         blueprint = Blueprint(name="blueprint", resources=[db, table, schema, view])
         manifest = blueprint.generate_manifest({"account": "SOMEACCT", "account_locator": "ABCD123"})
 

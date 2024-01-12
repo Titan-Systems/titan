@@ -212,7 +212,7 @@ class StringListProp(Prop):
         return [tok.strip(" ") for tok in prop_value]
 
     def render(self, values):
-        if values is None:
+        if values is None or len(values) == 0:
             return ""
         value_list = ", ".join([f"'{v}'" for v in values])
         return tidy_sql(
@@ -482,10 +482,21 @@ class ColumnNamesProp(Prop):
         return columns
 
 
-class ColumnsProp(Prop):
+class SchemaProp(Prop):
     def __init__(self):
-        value_expr = pp.original_text_for(pp.nested_expr())
-        super().__init__(label=None, value_expr=value_expr, eq=False)
+        super().__init__(label=None, value_expr=pp.NoMatch())
 
     def typecheck(self, prop_values):
-        prop_values = prop_values.strip("()")
+        pass
+
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return "()"
+        columns = []
+        for column in values:
+            name = column["name"]
+            data_type = str(column["data_type"])
+            comment = f" COMMENT '{column['comment']}'" if "comment" in column else ""
+            column_str = f"{name} {data_type}{comment}"
+            columns.append(column_str)
+        return f"({', '.join(columns)})"
