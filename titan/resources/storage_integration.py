@@ -1,10 +1,9 @@
-from abc import ABC
-from typing import List, Union
+from dataclasses import dataclass
 
-from .base import AccountScoped, Resource, _fix_class_documentation
-from ..parse import _resolve_resource_class
+from .__resource import Resource, ResourceSpec
+from ..enums import ParseableEnum, ResourceType
+from ..scope import AccountScope
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
-from ..enums import ParseableEnum
 
 
 class StorageProvider(ParseableEnum):
@@ -13,8 +12,20 @@ class StorageProvider(ParseableEnum):
     GCS = "GCS"
 
 
-@_fix_class_documentation
-class S3StorageIntegration(AccountScoped, Resource):
+@dataclass
+class _S3StorageIntegration(ResourceSpec):
+    name: str
+    enabled: bool
+    storage_aws_role_arn: str
+    storage_allowed_locations: list[str]
+    storage_blocked_locations: list[str] = None
+    storage_provider: StorageProvider = StorageProvider.S3
+    storage_aws_object_acl: str = None
+    owner: str = "ACCOUNTADMIN"
+    comment: str = None
+
+
+class S3StorageIntegration(Resource):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
       <name>
@@ -31,7 +42,7 @@ class S3StorageIntegration(AccountScoped, Resource):
       [ STORAGE_AWS_OBJECT_ACL = 'bucket-owner-full-control' ]
     """
 
-    resource_type = "STORAGE INTEGRATION"
+    resource_type = ResourceType.STORAGE_INTEGRATION
     props = Props(
         _start_token="type = external_stage",
         storage_provider=EnumProp("storage_provider", [StorageProvider.S3]),
@@ -42,20 +53,47 @@ class S3StorageIntegration(AccountScoped, Resource):
         storage_blocked_locations=StringListProp("storage_blocked_locations", parens=True),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _S3StorageIntegration
 
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        storage_aws_role_arn: str,
+        storage_allowed_locations: list[str],
+        storage_blocked_locations: list[str] = None,
+        storage_aws_object_acl: str = None,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("storage_provider", None)
+        super().__init__(**kwargs)
+        self._data = _S3StorageIntegration(
+            name=name,
+            enabled=enabled,
+            storage_aws_role_arn=storage_aws_role_arn,
+            storage_allowed_locations=storage_allowed_locations,
+            storage_blocked_locations=storage_blocked_locations,
+            storage_aws_object_acl=storage_aws_object_acl,
+            owner=owner,
+            comment=comment,
+        )
+
+
+@dataclass
+class _GCSStorageIntegration(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
-    storage_provider: StorageProvider
-    storage_aws_role_arn: str
-    storage_aws_object_acl: str = None
     enabled: bool
-    storage_allowed_locations: List[str]
-    storage_blocked_locations: List[str] = None
+    storage_allowed_locations: list[str]
+    storage_blocked_locations: list[str] = None
+    storage_provider: StorageProvider = StorageProvider.GCS
+    owner: str = "ACCOUNTADMIN"
     comment: str = None
 
 
-@_fix_class_documentation
-class GCSStorageIntegration(AccountScoped, Resource):
+class GCSStorageIntegration(Resource):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
       <name>
@@ -71,7 +109,7 @@ class GCSStorageIntegration(AccountScoped, Resource):
 
     """
 
-    resource_type = "STORAGE INTEGRATION"
+    resource_type = ResourceType.STORAGE_INTEGRATION
     props = Props(
         _start_token="type = external_stage",
         storage_provider=EnumProp("storage_provider", [StorageProvider.GCS]),
@@ -80,18 +118,44 @@ class GCSStorageIntegration(AccountScoped, Resource):
         storage_blocked_locations=StringListProp("storage_blocked_locations", parens=True),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _GCSStorageIntegration
 
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        storage_allowed_locations: list[str],
+        storage_blocked_locations: list[str] = None,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("storage_provider", None)
+        super().__init__(**kwargs)
+        self._data = _GCSStorageIntegration(
+            name=name,
+            enabled=enabled,
+            storage_allowed_locations=storage_allowed_locations,
+            storage_blocked_locations=storage_blocked_locations,
+            owner=owner,
+            comment=comment,
+        )
+
+
+@dataclass
+class _AzureStorageIntegration(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
-    storage_provider: StorageProvider
     enabled: bool
-    storage_allowed_locations: List[str]
-    storage_blocked_locations: List[str] = None
+    azure_tenant_id: str
+    storage_allowed_locations: list[str]
+    storage_blocked_locations: list[str] = None
+    storage_provider: StorageProvider = StorageProvider.AZURE
+    owner: str = "ACCOUNTADMIN"
     comment: str = None
 
 
-@_fix_class_documentation
-class AzureStorageIntegration(AccountScoped, Resource):
+class AzureStorageIntegration(Resource):
     """
     CREATE [ OR REPLACE ] STORAGE INTEGRATION [IF NOT EXISTS]
       <name>
@@ -107,7 +171,7 @@ class AzureStorageIntegration(AccountScoped, Resource):
       AZURE_TENANT_ID = '<tenant_id>'
     """
 
-    resource_type = "STORAGE INTEGRATION"
+    resource_type = ResourceType.STORAGE_INTEGRATION
     props = Props(
         _start_token="type = external_stage",
         storage_provider=EnumProp("storage_provider", [StorageProvider.AZURE]),
@@ -117,15 +181,31 @@ class AzureStorageIntegration(AccountScoped, Resource):
         storage_blocked_locations=StringListProp("storage_blocked_locations", parens=True),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _AzureStorageIntegration
 
-    name: str
-    owner: str = "SYSADMIN"
-    storage_provider: StorageProvider
-    azure_tenant_id: str
-    enabled: bool
-    storage_allowed_locations: List[str]
-    storage_blocked_locations: List[str] = None
-    comment: str = None
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        azure_tenant_id: str,
+        storage_allowed_locations: list[str],
+        storage_blocked_locations: list[str] = None,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("storage_provider", None)
+        super().__init__(**kwargs)
+        self._data = _AzureStorageIntegration(
+            name=name,
+            enabled=enabled,
+            azure_tenant_id=azure_tenant_id,
+            storage_allowed_locations=storage_allowed_locations,
+            storage_blocked_locations=storage_blocked_locations,
+            owner=owner,
+            comment=comment,
+        )
 
 
 StorageIntegrationMap = {
@@ -135,15 +215,14 @@ StorageIntegrationMap = {
 }
 
 
-class StorageIntegration(Resource, ABC):
-    def __new__(
-        cls, storage_provider: Union[str, StorageProvider], **kwargs
-    ) -> Union[S3StorageIntegration, GCSStorageIntegration, AzureStorageIntegration]:
-        storage_provider_type = StorageProvider.parse(storage_provider)
-        storage_integration_cls = StorageIntegrationMap[storage_provider_type]
-        return storage_integration_cls(type=storage_provider_type, **kwargs)
+class StorageIntegration:
+    def __new__(cls, storage_provider: StorageProvider, **kwargs) -> Resource:
+        if isinstance(storage_provider, str):
+            storage_provider = StorageProvider(storage_provider)
+        storage_integration_cls = StorageIntegrationMap[storage_provider]
+        return storage_integration_cls(**kwargs)
 
-    @classmethod
-    def from_sql(cls, sql):
-        resource_cls = Resource.classes[_resolve_resource_class(sql)]
-        return resource_cls.from_sql(sql)
+    # @classmethod
+    # def from_sql(cls, sql):
+    #     resource_cls = Resource.classes[_resolve_resource_class(sql)]
+    #     return resource_cls.from_sql(sql)

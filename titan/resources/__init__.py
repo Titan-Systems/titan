@@ -12,7 +12,7 @@ from .base import (
 from .alert import Alert
 from .api_integration import APIIntegration
 from .column import Column
-from .database import SharedDatabase
+from .shared_database import SharedDatabase
 from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup

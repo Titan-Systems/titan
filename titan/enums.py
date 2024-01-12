@@ -42,6 +42,7 @@ class ResourceType(ParseableEnum):
     RESOURCE_MONITOR = "resource monitor"
     ROLE = "role"
     SEQUENCE = "sequence"
+    STORAGE_INTEGRATION = "storage integration"
     TASK = "task"
     TAG = "tag"
     USER = "user"

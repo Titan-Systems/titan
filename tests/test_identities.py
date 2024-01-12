@@ -135,43 +135,6 @@ resources = [
         },
     },
     {
-        "test": "role",
-        "resource_cls": resources.Role,
-        "data": {"name": "SOMEROLE", "owner": "SYSADMIN"},
-    },
-    {
-        "test": "role_grant",
-        "resource_cls": resources.RoleGrant,
-        "data": {"role": "SOMEROLE", "to_user": "SOMEUSER", "owner": "SYSADMIN"},
-    },
-    {
-        "test": "schema",
-        "resource_cls": resources.Schema,
-        "data": {
-            "name": "SOMESCHEMA",
-            "owner": "SYSADMIN",
-            "transient": False,
-            "managed_access": False,
-            "max_data_extension_time_in_days": 14,
-        },
-    },
-    {
-        "test": "sequence",
-        "resource_cls": resources.Sequence,
-        "data": {
-            "name": "SOMESEQ",
-            "owner": "SYSADMIN",
-            "start": 1,
-            "increment": 2,
-            "comment": "+3",
-        },
-    },
-    {
-        "test": "shared_database",
-        "resource_cls": resources.SharedDatabase,
-        "data": {"name": "SOMESHARENAME", "owner": "ACCOUNTADMIN", "from_share": "SOMEACCOUNT.SOMESHARE"},
-    },
-    {
         "test": "pipe",
         "resource_cls": resources.Pipe,
         "data": {
@@ -215,6 +178,55 @@ resources = [
             "packages": ["snowflake-snowpark-python"],
             "handler": "titan.foobar.help",
             "imports": ["pyparsing"],
+        },
+    },
+    {
+        "test": "role",
+        "resource_cls": resources.Role,
+        "data": {"name": "SOMEROLE", "owner": "SYSADMIN"},
+    },
+    {
+        "test": "role_grant",
+        "resource_cls": resources.RoleGrant,
+        "data": {"role": "SOMEROLE", "to_user": "SOMEUSER", "owner": "SYSADMIN"},
+    },
+    {
+        "test": "schema",
+        "resource_cls": resources.Schema,
+        "data": {
+            "name": "SOMESCHEMA",
+            "owner": "SYSADMIN",
+            "transient": False,
+            "managed_access": False,
+            "max_data_extension_time_in_days": 14,
+        },
+    },
+    {
+        "test": "sequence",
+        "resource_cls": resources.Sequence,
+        "data": {
+            "name": "SOMESEQ",
+            "owner": "SYSADMIN",
+            "start": 1,
+            "increment": 2,
+            "comment": "+3",
+        },
+    },
+    {
+        "test": "shared_database",
+        "resource_cls": resources.SharedDatabase,
+        "data": {"name": "SOMESHARENAME", "owner": "ACCOUNTADMIN", "from_share": "SOMEACCOUNT.SOMESHARE"},
+    },
+    {
+        "test": "s3_storage_integration",
+        "resource_cls": resources.S3StorageIntegration,
+        "data": {
+            "name": "S3_INT",
+            "owner": "ACCOUNTADMIN",
+            "storage_aws_role_arn": "arn:aws:iam::123456789012:role/my_cloud_account_role",
+            "storage_allowed_locations": ["s3://bucket/prod/"],
+            "storage_blocked_locations": ["s3://bucket/dev/"],
+            "enabled": True,
         },
     },
     {
