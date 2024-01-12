@@ -409,6 +409,17 @@ class FileFormatProp(Prop):
         file_type_cls = FileTypeMap[file_type]
         return _parse_props(file_type_cls.props, prop_value)
 
+    def render(self, value):
+        if value is None:
+            return ""
+        eq = " = " if self.eq else " "
+        if isinstance(value, dict):
+            value_str = ", ".join(f"{k} = {v}" for k, v in value.items())
+            value_str = f"({value_str})"
+        else:
+            value_str = str(value)
+        return f"{self.label}{eq}{value_str}"
+
 
 class FileFormat(Resource, ABC):
     def __new__(

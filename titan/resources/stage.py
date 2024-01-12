@@ -1,9 +1,11 @@
-from abc import ABC
-from typing import Dict, Union, Any
+from dataclasses import dataclass
+from typing import Union
 
-from ..enums import ParseableEnum
-from ..parse import _resolve_resource_class
-from .base import Resource, SchemaScoped, _fix_class_documentation
+from .__resource import Resource, ResourceSpec
+from .file_format import FileFormatProp
+from ..enums import ParseableEnum, ResourceType
+from ..scope import SchemaScope
+
 from ..props import (
     BoolProp,
     EnumProp,
@@ -13,7 +15,6 @@ from ..props import (
     TagsProp,
     PropSet,
 )
-from .file_format import FileFormatProp
 
 
 class StageType(ParseableEnum):
@@ -55,8 +56,20 @@ copy_options = Props(
 )
 
 
-@_fix_class_documentation
-class InternalStage(SchemaScoped, Resource):
+@dataclass
+class _InternalStage(ResourceSpec):
+    name: str
+    owner: str = "SYSADMIN"
+    type: StageType = StageType.INTERNAL
+    encryption: dict[str, EncryptionType] = None
+    file_format: Union[str, dict[str, str]] = None  #  Union[str, dict]
+    directory: dict[str, bool] = None
+    copy_options: dict[str, str] = None
+    tags: dict[str, str] = None
+    comment: str = None
+
+
+class InternalStage(Resource):
     """
     -- Internal stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <internal_stage_name>
@@ -76,7 +89,7 @@ class InternalStage(SchemaScoped, Resource):
                       [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
     """
 
-    resource_type = "STAGE"
+    resource_type = ResourceType.STAGE
     props = Props(
         encryption=PropSet(
             "encryption",
@@ -90,20 +103,51 @@ class InternalStage(SchemaScoped, Resource):
         tags=TagsProp(),
         comment=StringProp("comment"),
     )
+    scope = SchemaScope()
+    spec = _InternalStage
 
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        encryption: dict[str, EncryptionType] = None,
+        file_format=None,
+        directory: dict[str, bool] = None,
+        copy_options: dict = None,
+        tags: dict[str, str] = None,
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        super().__init__(**kwargs)
+        self._data = _InternalStage(
+            name=name,
+            owner=owner,
+            encryption=encryption,
+            file_format=file_format,
+            directory=directory,
+            copy_options=copy_options,
+            tags=tags,
+            comment=comment,
+        )
+
+
+@dataclass
+class _ExternalStage(ResourceSpec):
     name: str
+    url: str
     owner: str = "SYSADMIN"
-    type: StageType = StageType.INTERNAL
-    encryption: Dict[str, EncryptionType] = None
+    type: StageType = StageType.EXTERNAL
+    storage_integration: str = None
+    encryption: dict[str, EncryptionType] = None
     file_format: Union[str, dict] = None
-    directory: Dict[str, bool] = None
-    copy_options: Dict[str, Any] = None
-    tags: Dict[str, str] = None
+    directory: dict[str, bool] = None
+    copy_options: dict = None
+    tags: dict[str, str] = None
     comment: str = None
 
 
-@_fix_class_documentation
-class ExternalStage(SchemaScoped, Resource):
+class ExternalStage(Resource):
     """
     -- External stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <external_stage_name>
@@ -145,35 +189,63 @@ class ExternalStage(SchemaScoped, Resource):
                       [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
     """
 
-    resource_type = "STAGE"
+    resource_type = ResourceType.STAGE
     props = Props(
         url=StringProp("url"),
         storage_integration=StringProp("storage_integration"),
         encryption=PropSet(
             "encryption",
-            Props(type=EnumProp("type", [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE])),
+            Props(
+                type=EnumProp("type", EncryptionType),
+                master_key=StringProp("master_key"),
+                kms_key_id=StringProp("kms_key_id"),
+            ),
         ),
         directory=PropSet(
-            "directory", Props(enable=BoolProp("ENABLE"), refresh_on_create=BoolProp("REFRESH_ON_CREATE"))
+            "directory",
+            Props(
+                enable=BoolProp("ENABLE"),
+                refresh_on_create=BoolProp("REFRESH_ON_CREATE"),
+            ),
         ),
         file_format=FileFormatProp("file_format"),
         copy_options=PropSet("copy_options", copy_options),
         tags=TagsProp(),
         comment=StringProp("comment"),
     )
+    scope = SchemaScope()
+    spec = _ExternalStage
 
-    name: str
-    owner: str = "SYSADMIN"
-    type: StageType = StageType.EXTERNAL
-    url: str
-    directory: Dict[str, bool] = None
-    storage_integration: str = None
-    encryption: Dict[str, EncryptionType] = None
-    file_format: Union[str, dict] = None
-    directory: Dict[str, bool] = None
-    copy_options: Dict[str, Any] = None
-    tags: Dict[str, str] = None
-    comment: str = None
+    def __init__(
+        self,
+        name: str,
+        url: str,
+        owner: str = "SYSADMIN",
+        type: StageType = StageType.EXTERNAL,
+        storage_integration: str = None,
+        encryption: dict[str, EncryptionType] = None,
+        file_format=None,
+        directory: dict[str, bool] = None,
+        copy_options: dict = None,
+        tags: dict[str, str] = None,
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        super().__init__(**kwargs)
+        self._data = _ExternalStage(
+            name=name,
+            url=url,
+            owner=owner,
+            type=type,
+            storage_integration=storage_integration,
+            encryption=encryption,
+            file_format=file_format,
+            directory=directory,
+            copy_options=copy_options,
+            tags=tags,
+            comment=comment,
+        )
 
 
 StageTypeMap = {
@@ -182,13 +254,14 @@ StageTypeMap = {
 }
 
 
-class Stage(Resource, ABC):
-    def __new__(cls, type: Union[str, StageType], **kwargs) -> Union[InternalStage, ExternalStage]:
-        stage_type = StageType.parse(type)
-        stage_cls = StageTypeMap[stage_type]
-        return stage_cls(type=stage_type, **kwargs)
+class Stage:
+    def __new__(cls, type: StageType, **kwargs) -> Union[InternalStage, ExternalStage]:
+        if isinstance(type, str):
+            type = StageType(type)
+        stage_cls = StageTypeMap[type]
+        return stage_cls(**kwargs)
 
-    @classmethod
-    def from_sql(cls, sql):
-        resource_cls = Resource.classes[_resolve_resource_class(sql)]
-        return resource_cls.from_sql(sql)
+    # @classmethod
+    # def from_sql(cls, sql):
+    #     resource_cls = Resource.classes[_resolve_resource_class(sql)]
+    #     return resource_cls.from_sql(sql)

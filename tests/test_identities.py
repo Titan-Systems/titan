@@ -135,6 +135,36 @@ resources = [
         },
     },
     {
+        "test": "external_stage",
+        "resource_cls": resources.ExternalStage,
+        "data": {
+            "name": "SOMESTAGE",
+            "owner": "SYSADMIN",
+            "url": "s3://bucket/path/",
+            "storage_integration": "someint",
+            "encryption": {
+                "type": "AWS_CSE",
+                "master_key": "arn:aws:kms:us-west-2:123456789012:key/12345678-1234-1234-1234-123456789012",
+            },
+            "file_format": "somefmt",
+        },
+    },
+    {
+        "test": "internal_stage",
+        "resource_cls": resources.InternalStage,
+        "data": {
+            "name": "SOMESTAGE",
+            "owner": "SYSADMIN",
+            "copy_options": {
+                "on_error": "skip_file",
+                "force": True,
+                "enforce_length": True,
+                "match_by_column_name": "CASE_INSENSITIVE",
+            },
+            "file_format": {"type": "JSON"},
+        },
+    },
+    {
         "test": "pipe",
         "resource_cls": resources.Pipe,
         "data": {
@@ -215,7 +245,11 @@ resources = [
     {
         "test": "shared_database",
         "resource_cls": resources.SharedDatabase,
-        "data": {"name": "SOMESHARENAME", "owner": "ACCOUNTADMIN", "from_share": "SOMEACCOUNT.SOMESHARE"},
+        "data": {
+            "name": "SOMESHARENAME",
+            "owner": "ACCOUNTADMIN",
+            "from_share": "SOMEACCOUNT.SOMESHARE",
+        },
     },
     {
         "test": "s3_storage_integration",

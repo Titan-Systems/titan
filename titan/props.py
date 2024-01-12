@@ -232,15 +232,13 @@ class PropSet(Prop):
         prop_value = prop_value.strip("()")
         return _parse_props(self.props, prop_value)
 
-    # def render(self, values):
-    #     if values is None or len(values) == 0:
-    #         return ""
-    #     kv_pairs = []
-    #     for name, prop in self.expected_props.items():
-    #         if name.lower() in values:
-    #             kv_pairs.append(prop.render(values[name.lower()]))
-
-    #     return f"{self.name} = ({', '.join(kv_pairs)})"
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return ""
+        eq = " = " if self.eq else " "
+        value_str = self.props.render(values)
+        value_str = f"({value_str})"
+        return f"{self.label}{eq}{value_str}"
 
 
 class TagsProp(Prop):
