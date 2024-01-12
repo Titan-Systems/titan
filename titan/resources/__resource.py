@@ -86,13 +86,15 @@ class Resource(metaclass=_Resource):
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
-    requires: set = set()
+    refs: set
+    _container: "ResourceContainer"
 
     def __init__(self, implicit: bool = False, stub: bool = False, **scope_kwargs):
+        super().__init__()
         self._data = None
         self.implicit = implicit
         self.stub = stub
-        self.refs = []
+        self.refs = set()
         self.scope.register_scope(**scope_kwargs)
 
     @classmethod
@@ -158,6 +160,13 @@ class Resource(metaclass=_Resource):
     def drop_sql(self, if_exists: bool = False):
         return drop_resource(self.urn, if_exists=if_exists)
 
+    def requires(self, *resources):
+        self.refs.update(resources)
+
+    @property
+    def container(self):
+        return self._container
+
     @property
     def fqn(self):
         return self.scope.fully_qualified_name(self._data.name)
@@ -169,3 +178,21 @@ class Resource(metaclass=_Resource):
     # @classmethod
     # def from_dict(cls, urn, data):
     #     return cls(**data)
+
+
+class ResourceContainer:
+    def __init__(self):
+        self._items = []
+
+    def add(self, *items: Resource):
+        if isinstance(items[0], list):
+            items = items[0]
+        for item in items:
+            if item.container:
+                raise RuntimeError(f"{item} already belongs to a container")
+            item._container = self
+            item.requires(self)
+            self._items.append(item)
+
+    def items(self) -> list[Resource]:
+        return self._items

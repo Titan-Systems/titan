@@ -4,8 +4,11 @@ Snowflake app (preferred)
 
 ```SQL
 -- AWS
-CREATE STAGE titan_aws URL = 's3://titan-snowflake/';
-EXECUTE IMMEDIATE FROM @titan_aws/install;
+CREATE STAGE titan_aws
+  URL = 's3://titan-snowflake/';
+
+EXECUTE IMMEDIATE
+  FROM @titan_aws/install;
 
 -- Google Cloud
 CREATE STORAGE INTEGRATION titan_storage_int
@@ -16,11 +19,11 @@ CREATE STORAGE INTEGRATION titan_storage_int
 ;
 
 CREATE STAGE titan_gcp
-    URL = 'gcs://titan-snowflake/'
-    STORAGE_INTEGRATION = titan_storage_int;
+  URL = 'gcs://titan-snowflake/'
+  STORAGE_INTEGRATION = titan_storage_int;
 
 EXECUTE IMMEDIATE
-    FROM @titan_gcp/install;
+  FROM @titan_gcp/install;
 ```
 
 

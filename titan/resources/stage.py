@@ -2,7 +2,8 @@ from dataclasses import dataclass
 from typing import Union
 
 from .__resource import Resource, ResourceSpec
-from .file_format import FileFormatProp
+
+# from .file_format import FileFormatProp
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
 
@@ -98,7 +99,7 @@ class InternalStage(Resource):
         directory=PropSet(
             "directory", Props(enable=BoolProp("ENABLE"), refresh_on_create=BoolProp("REFRESH_ON_CREATE"))
         ),
-        file_format=FileFormatProp("file_format"),
+        # file_format=FileFormatProp("file_format"),
         copy_options=PropSet("copy_options", copy_options),
         tags=TagsProp(),
         comment=StringProp("comment"),
@@ -208,7 +209,7 @@ class ExternalStage(Resource):
                 refresh_on_create=BoolProp("REFRESH_ON_CREATE"),
             ),
         ),
-        file_format=FileFormatProp("file_format"),
+        # file_format=FileFormatProp("file_format"),
         copy_options=PropSet("copy_options", copy_options),
         tags=TagsProp(),
         comment=StringProp("comment"),

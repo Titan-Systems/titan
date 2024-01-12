@@ -348,7 +348,7 @@ class Blueprint:
 
             Each action requires:
                 • a set of privileges necessary to run commands
-                • the appropriate role to execute commands
+                • the appropriate role to execute commands
 
             Once we've determined those things, we can compare the list of required roles and privileges
             against what we have access to in the session and the role tree.

@@ -1,37 +1,52 @@
-from typing import List, Dict
+from dataclasses import dataclass
 
-from pydantic import field_validator
+from .__resource import Resource, ResourceSpec
+from .column import Column
 
-from .base import Resource, Schema, SchemaScoped, _fix_class_documentation
-from .column import Column, T_Column
-from .stage import InternalStage, copy_options
-from .file_format import FileFormatProp
-from ..builder import SQL
-from ..identifiers import FQN
-from ..lifecycle import create_resource
+# from .stage import InternalStage, copy_options
+from ..enums import ResourceType
 from ..parse import _parse_create_header, _parse_props, _parse_table_schema
-from ..privs import Privs, SchemaPriv, TablePriv
+from ..scope import SchemaScope
 from ..props import (
     BoolProp,
     FlagProp,
     IntProp,
     Props,
-    PropSet,
     StringProp,
     StringListProp,
     TagsProp,
 )
 
 
-@_fix_class_documentation
-class Table(SchemaScoped, Resource):
-    resource_type = "TABLE"
-    lifecycle_privs = Privs(
-        create=SchemaPriv.CREATE_TABLE,
-        read=[SchemaPriv.USAGE, TablePriv.SELECT],
-        write=[TablePriv.INSERT, TablePriv.UPDATE, TablePriv.DELETE, TablePriv.TRUNCATE],
-        delete=TablePriv.OWNERSHIP,
-    )
+@dataclass
+class _Table(ResourceSpec):
+    name: str
+    columns: list[Column]
+    constraints: list[str] = None
+    volatile: bool = False
+    transient: bool = False
+    cluster_by: list[str] = None
+    enable_schema_evolution: bool = False
+    data_retention_time_in_days: int = None
+    max_data_extension_time_in_days: int = None
+    change_tracking: bool = False
+    default_ddl_collation: str = None
+    copy_grants: bool = False
+    row_access_policy: dict[str, list] = None
+    tags: dict[str, str] = None
+    owner: str = "SYSADMIN"
+    comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.columns is None:
+            raise ValueError("columns can't be None")
+        if len(self.columns) == 0:
+            raise ValueError("columns can't be empty")
+
+
+class Table(Resource):
+    resource_type = ResourceType.TABLE
     props = Props(
         volatile=FlagProp("volatile"),
         transient=FlagProp("transient"),
@@ -47,36 +62,52 @@ class Table(SchemaScoped, Resource):
         tags=TagsProp(),
         comment=StringProp("comment"),
     )
+    scope = SchemaScope()
+    spec = _Table
 
-    name: str
-    owner: str = "SYSADMIN"
-    columns: List[T_Column]
-    constraints: List[str] = None
-    volatile: bool = False
-    transient: bool = False
-    cluster_by: List[str] = []
-    enable_schema_evolution: bool = False
-    data_retention_time_in_days: int = None
-    max_data_extension_time_in_days: int = None
-    change_tracking: bool = False
-    default_ddl_collation: str = None
-    copy_grants: bool = False
-    row_access_policy: Dict[str, list] = None
-    tags: Dict[str, str] = None
-    comment: str = None
-
-    def model_post_init(self, ctx):
-        super().model_post_init(ctx)
-        self._table_stage: InternalStage = InternalStage(name=f"@%{self.name}", implicit=True)
-        if self.schema:
-            self._table_stage.schema = self.schema
-
-    @field_validator("columns")
-    @classmethod
-    def validate_columns(cls, columns):
-        if isinstance(columns, list):
-            assert len(columns) > 0, "columns can't be empty"
-        return columns
+    def __init__(
+        self,
+        name: str,
+        columns: list[Column],
+        constraints: list[str] = None,
+        volatile: bool = False,
+        transient: bool = False,
+        cluster_by: list[str] = None,
+        enable_schema_evolution: bool = False,
+        data_retention_time_in_days: int = None,
+        max_data_extension_time_in_days: int = None,
+        change_tracking: bool = False,
+        default_ddl_collation: str = None,
+        copy_grants: bool = False,
+        row_access_policy: dict[str, list] = None,
+        tags: dict[str, str] = None,
+        owner: str = "SYSADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _Table(
+            name=name,
+            columns=columns,
+            constraints=constraints,
+            volatile=volatile,
+            transient=transient,
+            cluster_by=cluster_by,
+            enable_schema_evolution=enable_schema_evolution,
+            data_retention_time_in_days=data_retention_time_in_days,
+            max_data_extension_time_in_days=max_data_extension_time_in_days,
+            change_tracking=change_tracking,
+            default_ddl_collation=default_ddl_collation,
+            copy_grants=copy_grants,
+            row_access_policy=row_access_policy,
+            tags=tags,
+            owner=owner,
+            comment=comment,
+        )
+        self._table_stage = None
+        # self._table_stage: InternalStage = InternalStage(name=f"@%{self.name}", implicit=True)
+        # if self.schema:
+        #     self._table_stage.schema = self.schema
 
     @classmethod
     def from_sql(cls, sql):
@@ -102,36 +133,15 @@ class Table(SchemaScoped, Resource):
 
         identifier, remainder = _parse_create_header(sql, cls)
         table_schema, remainder = _parse_table_schema(remainder)
-        if "schema" in identifier:
-            schema = Schema(name=identifier["schema"], stub=True)
-            if "database" in identifier:
-                schema.database = identifier["database"]
-                del identifier["database"]
-            identifier["schema"] = schema
+        # if "schema" in identifier:
+        #     schema = Schema(name=identifier["schema"], stub=True)
+        #     if "database" in identifier:
+        #         schema.database = identifier["database"]
+        #         del identifier["database"]
+        #     identifier["schema"] = schema
         props = _parse_props(cls.props, remainder)
         return cls(**identifier, **table_schema, **props)
-
-    # @classmethod
-    # def lifecycle_create(cls, fqn: FQN, data, or_replace=False, if_not_exists=False, temporary=False):
-    #     return SQL(
-    #         "CREATE",
-    #         "OR REPLACE" if or_replace else "",
-    #         "TEMPORARY" if temporary else "",
-    #         "VOLATILE" if data.get("volatile") else "",
-    #         "TRANSIENT" if data.get("transient") else "",
-    #         "TABLE",
-    #         "IF NOT EXISTS" if if_not_exists else "",
-    #         fqn,
-    #         "(",
-    #         *[Column.lifecycle_create(FQN(name=col["name"]), col) for col in data["columns"]],
-    #         ")",
-    #         cls.props.render(data),
-    #     )
 
     @property
     def table_stage(self):
         return self._table_stage
-
-    @property
-    def select_star_sql(self):
-        return f"SELECT * FROM {self.fully_qualified_name}"

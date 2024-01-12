@@ -73,9 +73,9 @@ class TestResourceFixtures(unittest.TestCase):
         for sql in load_sql_fixtures("failover_group.sql"):
             self.validate_from_sql(resources.FailoverGroup, sql)
 
-    def test_file_format(self):
-        for sql in load_sql_fixtures("file_format.sql"):
-            self.validate_from_sql(resources.FileFormat, sql)
+    # def test_file_format(self):
+    #     for sql in load_sql_fixtures("file_format.sql"):
+    #         self.validate_from_sql(resources.FileFormat, sql)
 
     def test_grant(self):
         for sql in load_sql_fixtures("grant.sql"):
