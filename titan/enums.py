@@ -44,6 +44,7 @@ class ResourceType(ParseableEnum):
     SEQUENCE = "sequence"
     STAGE = "stage"
     STORAGE_INTEGRATION = "storage integration"
+    STREAM = "stream"
     TASK = "task"
     TAG = "tag"
     USER = "user"
