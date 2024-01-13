@@ -44,7 +44,7 @@ class Account(Resource, ResourceContainer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _Account(
+        self._data: _Account = _Account(
             name=name,
             locator=locator,
             edition=edition,
@@ -53,3 +53,7 @@ class Account(Resource, ResourceContainer):
 
     def databases(self):
         return self.items(resource_type=ResourceType.DATABASE)
+
+    @property
+    def locator(self):
+        return self._data.locator

@@ -1,14 +1,13 @@
 import json
 
 from collections import defaultdict
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Union
 from queue import Queue
 
 from . import data_provider, lifecycle
 from .client import execute
 from .diff import diff, DiffAction
 from .identifiers import URN, FQN
-from .lifecycle import drop_resource
 from .privs import (
     GlobalPriv,
     DatabasePriv,
@@ -17,8 +16,8 @@ from .privs import (
     is_ownership_priv,
     create_priv_for_resource_type,
 )
-from .resources import Account, Database, Resource, Schema
-from .resources.resource import ResourceContainer
+from .resources import Account, Database, Schema
+from .resources.resource import Resource, ResourceContainer, ResourceType
 from .resources.validators import coerce_from_str
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
@@ -32,11 +31,6 @@ def print_diffs(diffs):
 
 def _hash(data):
     return hash(json.dumps(data, sort_keys=True))
-
-
-def _is_container(resource):
-    return isinstance(resource, ResourceContainer)
-    # return hasattr(resource, "children") and callable(resource.children)
 
 
 def _split_by_scope(
@@ -62,22 +56,10 @@ def _split_by_scope(
 
     for resource in resources:
         route(resource)
-        if _is_container(resource):
-            for child in resource.items():
-                route(child)
+        if isinstance(resource, ResourceContainer):
+            for item in resource.items():
+                route(item)
     return org_scoped, acct_scoped, db_scoped, schema_scoped
-
-
-def _filter_unfetchable_fields(data):
-    filtered = data.copy()
-    for key in list(filtered.keys()):
-        # field = cls.model_fields[key]
-        # fetchable = field.json_schema_extra is None or field.json_schema_extra.get("fetchable", True)
-        # FIXME
-        fetchable = True
-        if not fetchable:
-            del filtered[key]
-    return filtered
 
 
 def _plan(remote_state, manifest):
@@ -99,17 +81,15 @@ def _plan(remote_state, manifest):
 
     changes = []
     for action, urn_str, data in diff(remote_state, manifest):
-        data = _filter_unfetchable_fields(data)
-        if data:
-            changes.append((action, urn_str, data))
+        changes.append((action, urn_str, data))
     return sorted(changes, key=lambda change: sort_order[change[1]])
 
 
 def _walk(resource: Resource):
     yield resource
-    if _is_container(resource):
-        for child in resource.children():
-            yield from _walk(child)
+    if isinstance(resource, ResourceContainer):
+        for item in resource.items():
+            yield from _walk(item)
 
 
 def _collect_required_privs(session_ctx, plan):
@@ -197,7 +177,7 @@ def _collect_available_privs(session_ctx, session, plan):
     return priv_map
 
 
-def _raise_if_missing_privs(required, available):
+def _raise_if_missing_privs(required: dict, available: dict):
     for principal, privs in required.items():
         required_privs = privs.copy()
         for priv_map in available.values():
@@ -263,20 +243,20 @@ class Blueprint:
         if session_context.get("database") is not None:
             self._root.add(Database(name=session_context["database"], stub=True))
 
-        databases = self._root.databases()
+        databases: list[Database] = self._root.databases()
 
         # Add all schemas and database roles to their respective databases
         for resource in db_scoped:
-            if resource.database is None:
+            if resource.container is None:
                 if len(databases) == 1:
                     databases[0].add(resource)
                 else:
-                    raise Exception(f"Database [{resource.database}] for resource {resource} not found")
+                    raise Exception(f"Database [{resource.container}] for resource {resource} not found")
 
         for resource in schema_scoped:
-            if resource.schema is None:
+            if resource.container is None:
                 if len(databases) == 1:
-                    public_schema = databases[0].find(schema="PUBLIC")
+                    public_schema: Schema = databases[0].find(resource_type=ResourceType.SCHEMA, name="PUBLIC")
                     if public_schema:
                         public_schema.add(resource)
                 else:
@@ -301,7 +281,7 @@ class Blueprint:
 
             manifest_key = str(urn)
 
-            if resource.serialize_as_list:
+            if resource.resource_type == ResourceType.GRANT:
                 if manifest_key not in manifest:
                     manifest[manifest_key] = []
                 manifest[manifest_key].append(data)
@@ -367,10 +347,13 @@ class Blueprint:
     def destroy(self, session, manifest=None):
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
-        for urn_str in manifest.keys():
+        for urn_str, data in manifest.items():
             urn = URN.from_str(urn_str)
-            resource_cls = Resource.classes[urn.resource_key]
-            execute(session, drop_resource(urn.fqn))
+            if urn.resource_type == ResourceType.GRANT:
+                for grant in data:
+                    execute(session, lifecycle.drop_resource(urn, grant))
+            else:
+                execute(session, lifecycle.drop_resource(urn, data))
 
     def _add(self, resource):
         if self._finalized:

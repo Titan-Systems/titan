@@ -8,7 +8,7 @@ from ..identifiers import FQN, URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
 from ..parse import ParseException, _parse_create_header, _parse_props
-from ..scope import ResourceScope
+from ..scope import ResourceScope, DatabaseScope, SchemaScope
 
 
 class Arg(TypedDict):
@@ -90,7 +90,6 @@ class Resource(metaclass=_Resource):
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
-    refs: set
 
     def __init__(self, implicit: bool = False, stub: bool = False, **scope_kwargs):
         super().__init__()
@@ -99,7 +98,7 @@ class Resource(metaclass=_Resource):
         self.implicit = implicit
         self.stub = stub
         self.refs = set()
-        self.scope.register_scope(**scope_kwargs)
+        self._register_scope(**scope_kwargs)
 
     @classmethod
     def from_sql(cls, sql):
@@ -120,10 +119,17 @@ class Resource(metaclass=_Resource):
 
     @classmethod
     def props_for_resource_type(cls, resource_type: ResourceType):
+        return cls.resource_cls_for_type(resource_type).props
+
+    @classmethod
+    def resource_cls_for_type(cls, resource_type: ResourceType) -> Type["Resource"]:
         resource_types = cls.__types[resource_type]
         if len(resource_types) > 1:
             raise NotImplementedError
-        return resource_types[0].props
+        return resource_types[0]
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({str(self.fqn)})"
 
     def to_dict(self, packed=False):
         defaults = {f.name: f.default for f in fields(self.spec)}
@@ -167,21 +173,37 @@ class Resource(metaclass=_Resource):
     def requires(self, *resources):
         self.refs.update(resources)
 
+    def _register_scope(self, database=None, schema=None):
+        if isinstance(database, str):
+            resource_cls = Resource.resource_cls_for_type(ResourceType.DATABASE)
+            database: ResourceContainer = resource_cls(name=database, stub=True)
+
+        if isinstance(schema, str):
+            resource_cls = Resource.resource_cls_for_type(ResourceType.SCHEMA)
+            schema: ResourceContainer = resource_cls(name=schema, stub=True)
+
+        if isinstance(self.scope, DatabaseScope):
+            if schema is not None:
+                raise RuntimeError(f"Unexpected kwarg schema {schema} for resource {self}")
+            if database is not None:
+                database.add(self)
+
+        if isinstance(self.scope, SchemaScope):
+            if schema is not None:
+                schema.add(self)
+
     @property
     def container(self):
         return self._container
 
     @property
     def fqn(self):
-        return self.scope.fully_qualified_name(self._data.name)
+        name = getattr(self._data, "name", "[NONAME]")
+        return self.scope.fully_qualified_name(self._container, name)
 
     @property
     def urn(self):
         return URN.from_resource(self, account_locator="")
-
-    # @classmethod
-    # def from_dict(cls, urn, data):
-    #     return cls(**data)
 
 
 class ResourceContainer:
@@ -205,3 +227,13 @@ class ResourceContainer:
             return self._items.get(resource_type, [])
         else:
             return list(chain.from_iterable(self._items.values()))
+
+    def find(self, resource_type: ResourceType, name: str) -> Resource:
+        for resource in self.items(resource_type):
+            if resource._data.name == name:
+                return resource
+        raise KeyError(f"Resource {resource_type} {name} not found")
+
+    @property
+    def name(self):
+        return self._data.name

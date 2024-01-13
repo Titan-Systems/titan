@@ -22,6 +22,7 @@ from ..props import (
 @dataclass
 class _Table(ResourceSpec):
     name: str
+    # TODO: allow columns to be specified as SQL
     columns: list[Column]
     constraints: list[str] = None
     volatile: bool = False
