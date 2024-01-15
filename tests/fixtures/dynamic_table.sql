@@ -1,4 +1,7 @@
-CREATE OR REPLACE DYNAMIC TABLE product
+CREATE OR REPLACE DYNAMIC TABLE product (
+  product_id INT,
+  product_name VARCHAR
+)
  TARGET_LAG = '20 minutes'
   WAREHOUSE = mywh
   REFRESH_MODE = AUTO
@@ -7,7 +10,11 @@ CREATE OR REPLACE DYNAMIC TABLE product
     SELECT product_id, product_name FROM staging_table;
 
 
-CREATE OR REPLACE DYNAMIC TABLE names
+CREATE OR REPLACE DYNAMIC TABLE names (
+  id INT,
+  first_name VARCHAR,
+  last_name VARCHAR
+)
 TARGET_LAG = DOWNSTREAM
 WAREHOUSE = mywh
 REFRESH_MODE = INCREMENTAL

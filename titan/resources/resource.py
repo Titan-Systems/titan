@@ -119,13 +119,16 @@ class Resource(metaclass=_Resource):
 
     @classmethod
     def props_for_resource_type(cls, resource_type: ResourceType):
-        return cls.resource_cls_for_type(resource_type).props
+        return cls.resolve_resource_cls(resource_type).props
 
     @classmethod
-    def resource_cls_for_type(cls, resource_type: ResourceType) -> Type["Resource"]:
+    def resolve_resource_cls(cls, resource_type: ResourceType, data: dict = None) -> Type["Resource"]:
         resource_types = cls.__types[resource_type]
         if len(resource_types) > 1:
-            raise NotImplementedError
+            if data is None:
+                raise Exception("Cannot resolve resource class without data")
+            else:
+                raise NotImplementedError
         return resource_types[0]
 
     def __repr__(self):
@@ -138,7 +141,8 @@ class Resource(metaclass=_Resource):
 
             def _serialize(value):
                 if isinstance(value, Resource):
-                    return value.to_dict(packed=True)
+                    # return value.to_dict(packed=True)
+                    return getattr(value._data, "name", "[NONAME]")
                 elif isinstance(value, ParseableEnum):
                     return str(value)
                 elif isinstance(value, list):
@@ -168,18 +172,18 @@ class Resource(metaclass=_Resource):
         )
 
     def drop_sql(self, if_exists: bool = False):
-        return drop_resource(self.urn, if_exists=if_exists)
+        return drop_resource(self.urn, self.to_dict(packed=True), if_exists=if_exists)
 
     def requires(self, *resources):
         self.refs.update(resources)
 
     def _register_scope(self, database=None, schema=None):
         if isinstance(database, str):
-            resource_cls = Resource.resource_cls_for_type(ResourceType.DATABASE)
+            resource_cls = Resource.resolve_resource_cls(ResourceType.DATABASE)
             database: ResourceContainer = resource_cls(name=database, stub=True)
 
         if isinstance(schema, str):
-            resource_cls = Resource.resource_cls_for_type(ResourceType.SCHEMA)
+            resource_cls = Resource.resolve_resource_cls(ResourceType.SCHEMA)
             schema: ResourceContainer = resource_cls(name=schema, stub=True)
 
         if isinstance(self.scope, DatabaseScope):

@@ -18,6 +18,11 @@ class _Schema(ResourceSpec):
     owner: str = "SYSADMIN"
     comment: str = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.transient and self.data_retention_time_in_days is not None:
+            raise ValueError("Transient schema can't have data retention time")
+
 
 class Schema(Resource, ResourceContainer):
     """

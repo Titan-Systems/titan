@@ -55,11 +55,12 @@ resources = [
         "data": {
             "name": "SOMEDT",
             "owner": "SYSADMIN",
+            "columns": [{"name": "ID", "data_type": "INT"}],
             "target_lag": "42 minutes",
             "warehouse": "SOMEWH",
             "refresh_mode": "FULL",
             "initialize": "ON_CREATE",
-            "as_": "SELECT * FROM tbl",
+            "as_": "SELECT id FROM tbl",
         },
     },
     {

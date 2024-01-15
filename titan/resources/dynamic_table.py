@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
-from .resource_monitor import ResourceMonitor
+from .column import Column
 from .warehouse import Warehouse
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
-
-from ..props import Props, EnumProp, StringProp, IdentifierProp, QueryProp
+from ..props import Props, EnumProp, StringProp, IdentifierProp, QueryProp, SchemaProp
 
 
 class RefreshMode(ParseableEnum):
@@ -23,8 +22,9 @@ class InitializeBehavior(ParseableEnum):
 @dataclass
 class _DynamicTable(ResourceSpec):
     name: str
+    columns: list[Column]
     target_lag: str
-    warehouse: str
+    warehouse: Warehouse
     refresh_mode: RefreshMode
     initialize: str
     as_: str
@@ -35,6 +35,7 @@ class _DynamicTable(ResourceSpec):
 class DynamicTable(Resource):
     resource_type = ResourceType.DYNAMIC_TABLE
     props = Props(
+        columns=SchemaProp(),
         target_lag=StringProp("target_lag", alt_tokens=["DOWNSTREAM"]),
         warehouse=IdentifierProp("warehouse"),
         refresh_mode=EnumProp("refresh_mode", RefreshMode),
@@ -47,6 +48,7 @@ class DynamicTable(Resource):
     def __init__(
         self,
         name: str,
+        columns: list[Column],
         target_lag: str,
         warehouse: str,
         refresh_mode: RefreshMode,
@@ -59,6 +61,7 @@ class DynamicTable(Resource):
         super().__init__(**kwargs)
         self._data = _DynamicTable(
             name=name,
+            columns=columns,
             target_lag=target_lag,
             warehouse=warehouse,
             refresh_mode=refresh_mode,

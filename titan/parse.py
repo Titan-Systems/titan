@@ -1,3 +1,5 @@
+import re
+
 from typing import List, Dict, Callable, Union
 
 import pyparsing as pp
@@ -6,6 +8,7 @@ from pyparsing import ParseException
 
 from .builder import SQL
 from .enums import Scope
+from .identifiers import FQN, URN
 from .scope import DatabaseScope, SchemaScope
 
 Keyword = pp.CaselessKeyword
@@ -498,3 +501,110 @@ def _parse_stage_path(stage_path_str):
         stage_path["stage_name"] = stage_path_str[1:]
         stage_path["path"] = ""
     return stage_path
+
+
+def _parse_dynamic_table_text(text: str):
+    """
+    To the annoyance of some, the only way to get the canonical values of refresh_mode, initialize, and as
+    is to parse it out of the `text` field of the dynamic table. This function does that.
+
+    In a SHOW DYNAMIC TABLES statement, the `text` field is the DDL statement for the dynamic table. Snowflake
+    (strangely) decided to use the mostly unaltered SQL statement as originally run, preserving some whitespace.
+
+    For example:
+        CREATE OR REPLACE DYNAMIC TABLE
+            product (id INT)
+            COMMENT = 'this is a comment'
+            lag = '20 minutes'
+            refresh_mode = 'AUTO'
+            initialize = 'ON_CREATE'
+            warehouse = CI
+            AS
+                SELECT id FROM upstream;
+
+    """
+
+    # Remove newlines
+    text = text.replace("\n", " ")
+
+    # Parse refresh_mode
+    match_refresh_mode = re.search(r"refresh_mode\s*=\s*'(AUTO|FULL|INCREMENTAL)'", text)
+    refresh_mode = match_refresh_mode.group(1) if match_refresh_mode else None
+
+    # Parse initialize
+    match_initialize = re.search(r"initialize\s*=\s*'(ON_CREATE|ON_SCHEDULE)'", text)
+    initialize = match_initialize.group(1) if match_initialize else None
+
+    # Parse as
+    match_as = re.search(r"\s+AS\s+(.*)$", text)
+    as_ = match_as.group(1) if match_as else None
+
+    return (
+        refresh_mode,
+        initialize,
+        as_,
+    )
+
+
+def parse_function_name(header: str):
+    """
+    Example:
+        "CREATE_OR_UPDATE_SCHEMA(CONFIG OBJECT, YAML VARCHAR, DRY_RUN BOOLEAN):OBJECT"
+        "THIS()SUCKS():OBJECT"
+        "A(BCDEFG:OBJEC)T(ARG1 OBJECT, FOO BAR.BAZ():VARIANT VARCHAR):OBJECT"
+    """
+    header = header.strip('"')
+    # Only handling the simple case because adverse cases are likely impossible to parse
+    prefix, _, _ = header.partition("(")
+    return prefix
+
+
+def parse_identifier(identifier, is_schema=False) -> FQN:
+    # TODO: This needs to support periods and question marks in double quoted identifiers
+    scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
+    params = {}
+    if param_str:
+        for param in param_str.split("&"):
+            k, v = param.split("=")
+            params[k] = v
+
+    name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
+    if len(name_parts) == 1:
+        return FQN(name=name_parts[0], params=params)
+    elif len(name_parts) == 2:
+        if is_schema:
+            return FQN(
+                database=name_parts[0],
+                name=name_parts[1],
+                params=params,
+            )
+        else:
+            return FQN(
+                schema=name_parts[0],
+                name=name_parts[1],
+                params=params,
+            )
+    elif len(name_parts) == 3:
+        return FQN(
+            database=name_parts[0],
+            schema=name_parts[1],
+            name=name_parts[2],
+            params=params,
+        )
+    raise Exception(f"Failed to parse identifier: {identifier}")
+
+
+def parse_URN(urn_str: str) -> URN:
+    parts = urn_str.split(":")
+    if len(parts) != 4:
+        raise Exception(f"Invalid URN string: {urn_str}")
+    if parts[0] != "urn":
+        raise Exception(f"Invalid URN string: {urn_str}")
+    resource_type, fqn_str = parts[3].split("/")
+    fqn = parse_identifier(fqn_str, is_schema=(resource_type == "schema"))
+    return URN(
+        organization=parts[1],
+        account_locator=parts[2],
+        resource_type=resource_type,
+        fqn=fqn,
+    )

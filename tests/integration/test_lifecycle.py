@@ -57,7 +57,7 @@ resources = [
     {"test": "database", "resource_cls": Database},
     {"test": "schema", "resource_cls": Schema},
     {"test": "role", "resource_cls": Role},
-    {"test": "table", "resource_cls": Table, "data": {"columns": ["id int"]}},
+    {"test": "table", "resource_cls": Table, "data": {"columns": [{"name": "id", "data_type": "int"}]}},
     {"test": "user", "resource_cls": User},
     {"test": "view", "resource_cls": View, "data": {"as_": "SELECT 1::INT as col"}},
     {"test": "warehouse", "resource_cls": Warehouse},

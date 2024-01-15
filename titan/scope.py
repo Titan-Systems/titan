@@ -19,17 +19,17 @@ class AccountScope(ResourceScope):
 
 class DatabaseScope(ResourceScope):
     def fully_qualified_name(self, database, resource_name: str):
-        return FQN(name=resource_name.upper(), database=database.name.upper())
+        db = database.name.upper() if database else None
+        return FQN(name=resource_name.upper(), database=db)
 
 
 class SchemaScope(ResourceScope):
     def fully_qualified_name(self, schema, resource_name: str):
-        database = schema.container.name.upper() if schema.container else None
-        return FQN(
-            name=resource_name.upper(),
-            database=database,
-            schema=schema.name.upper(),
-        )
+        db, sch = None, None
+        if schema:
+            db = schema.container.name.upper() if schema.container else None
+            sch = schema.name.upper() if schema else None
+        return FQN(name=resource_name.upper(), database=db, schema=sch)
 
 
 class TableScope(ResourceScope):

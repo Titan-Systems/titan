@@ -8,6 +8,7 @@ from . import data_provider, lifecycle
 from .client import execute
 from .diff import diff, DiffAction
 from .identifiers import URN, FQN
+from .parse import parse_URN
 from .privs import (
     GlobalPriv,
     DatabasePriv,
@@ -65,7 +66,7 @@ def _split_by_scope(
 def _plan(remote_state, manifest):
     manifest = manifest.copy()
 
-    # Generate a list of all URNs we're concerned with
+    # Generate a list of all URNs
     resource_set = set(manifest["_urns"] + list(remote_state.keys()))
 
     for ref in manifest["_refs"]:
@@ -101,7 +102,7 @@ def _collect_required_privs(session_ctx, plan):
     account_urn = URN.from_session_ctx(session_ctx)
 
     for action, urn_str, data in plan:
-        urn = URN.from_str(urn_str)
+        urn = parse_URN(urn_str)
         privs = []
         if action == DiffAction.ADD:
             privs = lifecycle.privs_for_create(urn, data)
@@ -139,16 +140,19 @@ def _collect_available_privs(session_ctx, session, plan):
     for role in session_ctx["available_roles"]:
         priv_map[role] = {}
 
+        if role.startswith("SNOWFLAKE.LOCAL"):
+            continue
+
         # Existing privilege grants
         role_grants = data_provider.fetch_role_grants(session, role)
         for principal, grant_list in role_grants.items():
             for grant in grant_list:
-                priv = priv_for_principal(URN.from_str(principal), grant["priv"])
+                priv = priv_for_principal(parse_URN(principal), grant["priv"])
                 _add(role, principal, priv)
 
         # Implied privilege grants in the context of our plan
         for action, urn_str, _ in plan:
-            urn = URN.from_str(urn_str)
+            urn = parse_URN(urn_str)
             if action == DiffAction.ADD:
                 create_priv = create_priv_for_resource_type(urn.resource_type)
                 ownership_priv = priv_for_principal(urn, "OWNERSHIP")
@@ -332,9 +336,9 @@ class Blueprint:
         _raise_if_missing_privs(required_privs, available_privs)
 
         for action, urn_str, data in plan:
-            urn = URN.from_str(urn_str)
+            urn = parse_URN(urn_str)
 
-            props = Resource.props_for_resource_type(urn.resource_type)
+            props = Resource.props_for_resource_type(ResourceType(urn.resource_type))
 
             if action == DiffAction.ADD:
                 sql = lifecycle.create_resource(urn, data, props)
@@ -348,7 +352,7 @@ class Blueprint:
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
         for urn_str, data in manifest.items():
-            urn = URN.from_str(urn_str)
+            urn = parse_URN(urn_str)
             if urn.resource_type == ResourceType.GRANT:
                 for grant in data:
                     execute(session, lifecycle.drop_resource(urn, grant))

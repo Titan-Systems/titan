@@ -10,6 +10,12 @@ from snowflake.connector.errors import ProgrammingError
 
 from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .identifiers import URN, FQN
+from .parse import (
+    _parse_dynamic_table_text,
+    parse_identifier,
+    parse_function_name,
+    parse_URN,
+)
 
 
 __this__ = sys.modules[__name__]
@@ -36,11 +42,17 @@ def _filter_result(result, **kwargs):
 def _urn_from_grant(row, session_ctx):
     granted_on = row["granted_on"].lower()
     if granted_on == "account":
-        urn = URN.from_session_ctx(session_ctx)
+        return URN.from_session_ctx(session_ctx)
     else:
-        fqn = FQN(name=row["name"])
-        urn = URN(resource_type=granted_on, account_locator=session_ctx["account_locator"], fqn=fqn)
-    return urn
+        fqn = parse_identifier(row["name"], is_schema=(granted_on == "schema"))
+        if granted_on == "procedure" or granted_on == "function":
+            name = parse_function_name(fqn.name)
+            fqn.name = name
+        return URN(
+            resource_type=granted_on,
+            account_locator=session_ctx["account_locator"],
+            fqn=fqn,
+        )
 
 
 def params_result_to_dict(params_result):
@@ -67,9 +79,10 @@ def remove_none_values(d):
 def fetch_remote_state(session, manifest):
     state = {}
     for urn_str in manifest["_urns"]:
-        urn = URN.from_str(urn_str)
+        urn = parse_URN(urn_str)
         data = fetch_resource(session, urn)
         if urn_str in manifest and data is not None:
+            # TODO: also compact default values
             if isinstance(data, list):
                 compacted = [remove_none_values(d) for d in data]
             else:
@@ -84,7 +97,7 @@ def fetch_resource(session, urn):
 
 
 def fetch_account_locator(session):
-    locator = execute(session, "SELECT CURRENT_ACCOUNT()")[0]
+    locator = execute(session, "SELECT CURRENT_ACCOUNT() as account_locator")[0]["ACCOUNT_LOCATOR"]
     return locator
 
 
@@ -205,6 +218,31 @@ def fetch_database(session, fqn: FQN):
     }
 
 
+def fetch_dynamic_table(session, fqn: FQN):
+    show_result = execute(session, f"SHOW DYNAMIC TABLES LIKE '{fqn.name}'")
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple dynamic tables matching {fqn}")
+
+    columns = fetch_columns(session, "DYNAMIC TABLE", fqn)
+
+    data = show_result[0]
+    refresh_mode, initialize, as_ = _parse_dynamic_table_text(data["text"])
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "warehouse": data["warehouse"],
+        "refresh_mode": refresh_mode,
+        "initialize": initialize,
+        "target_lag": data["target_lag"],
+        "comment": data["comment"] or None,
+        "columns": columns,
+        "as_": as_,
+    }
+
+
 def fetch_function(session, fqn: FQN):
     show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
     udfs = _filter_result(show_result, name=fqn.name)
@@ -255,6 +293,8 @@ def fetch_grant(session, fqn: FQN):
 
 
 def fetch_role_grants(session, role: str):
+    if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
+        return {}
     show_result = execute(session, f"SHOW GRANTS TO ROLE {role}")
     session_ctx = fetch_session(session)
 
@@ -284,6 +324,7 @@ def fetch_procedure(session, fqn: FQN):
 
     data = sprocs[0]
     inputs, output = data["arguments"].split(" RETURN ")
+    # inputs, output = _parse_function_arguments(data["arguments"])
     desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
     properties = dict([(row["property"], row["value"]) for row in desc_result])
 

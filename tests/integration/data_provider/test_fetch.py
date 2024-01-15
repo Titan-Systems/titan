@@ -7,9 +7,6 @@ import snowflake.connector
 from titan import data_provider
 from titan.identifiers import FQN, URN
 
-# from titan.resources import Resource
-# from titan.resources.__resource import Resource as NewResource
-
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 connection_params = {
@@ -19,29 +16,13 @@ connection_params = {
     "role": TEST_ROLE,
 }
 
-resources = [
-    {
-        "resource_type": "alert",
-        "setup_sql": [
-            "CREATE WAREHOUSE {name}_wh",
-            "CREATE ALERT {name} WAREHOUSE = {name}_wh SCHEDULE = '60 MINUTE' IF(EXISTS(SELECT 1)) THEN SELECT 1",
-        ],
-        "teardown_sql": ["DROP ALERT {name}", "DROP WAREHOUSE {name}_wh"],
-        "data": lambda name: {
-            "name": name,
-            "warehouse": f"{name}_WH",
-            "schedule": "60 MINUTE",
-            "condition": "SELECT 1",
-            "then": "SELECT 1",
-            "owner": TEST_ROLE,
-        },
-    },
+account_resources = [
     {
         "resource_type": "database",
-        "setup_sql": "CREATE DATABASE {name}",
-        "teardown_sql": "DROP DATABASE {name}",
-        "data": lambda name: {
-            "name": name,
+        "setup_sql": "CREATE DATABASE SOMEDB",
+        "teardown_sql": "DROP DATABASE IF EXISTS SOMEDB",
+        "data": {
+            "name": "SOMEDB",
             "owner": TEST_ROLE,
             "data_retention_time_in_days": 1,
             "max_data_extension_time_in_days": 14,
@@ -49,38 +30,12 @@ resources = [
         },
     },
     {
-        "resource_type": "function",
-        "setup_sql": "CREATE FUNCTION {name}() RETURNS double LANGUAGE JAVASCRIPT AS 'return 42;'",
-        "teardown_sql": "DROP FUNCTION {name}()",
-        "data": lambda name: {
-            "name": name,
-            "secure": False,
-            "returns": "FLOAT",
-            "language": "JAVASCRIPT",
-            "volatility": "VOLATILE",
-            "as_": "return 42;",
-        },
-    },
-    {
         "resource_type": "role",
-        "setup_sql": "CREATE ROLE {name}",
-        "teardown_sql": "DROP ROLE {name}",
-        "data": lambda name: {
-            "name": name,
+        "setup_sql": "CREATE ROLE somerole",
+        "teardown_sql": "DROP ROLE IF EXISTS somerole",
+        "data": {
+            "name": "SOMEROLE",
             "owner": TEST_ROLE,
-        },
-    },
-    {
-        "resource_type": "schema",
-        "setup_sql": "CREATE TRANSIENT SCHEMA {name}",
-        "teardown_sql": "DROP SCHEMA {name}",
-        "data": lambda name: {
-            "name": name,
-            "owner": TEST_ROLE,
-            "data_retention_time_in_days": 1,
-            "max_data_extension_time_in_days": 14,
-            "transient": True,
-            "managed_access": False,
         },
     },
     # {
@@ -96,12 +51,79 @@ resources = [
     #         "from_share": "WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
     #     },
     # },
+]
+
+scoped_resources = [
+    {
+        "resource_type": "alert",
+        "setup_sql": [
+            "CREATE WAREHOUSE TEST_WH",
+            "CREATE ALERT somealert WAREHOUSE = TEST_WH SCHEDULE = '60 MINUTE' IF(EXISTS(SELECT 1)) THEN SELECT 1",
+        ],
+        "teardown_sql": ["DROP ALERT IF EXISTS somealert", "DROP WAREHOUSE IF EXISTS TEST_WH"],
+        "data": {
+            "name": "SOMEALERT",
+            "warehouse": "TEST_WH",
+            "schedule": "60 MINUTE",
+            "condition": "SELECT 1",
+            "then": "SELECT 1",
+            "owner": TEST_ROLE,
+        },
+    },
+    {
+        "resource_type": "dynamic_table",
+        "setup_sql": [
+            "CREATE TABLE upstream (id INT) AS select 1",
+            "CREATE DYNAMIC TABLE product (id INT) TARGET_LAG = '20 minutes' WAREHOUSE = CI REFRESH_MODE = AUTO INITIALIZE = ON_CREATE COMMENT = 'this is a comment' AS SELECT id FROM upstream",
+        ],
+        "teardown_sql": [
+            "DROP TABLE IF EXISTS upstream",
+            "DROP TABLE IF EXISTS product",
+        ],
+        "data": {
+            "name": "PRODUCT",
+            "owner": TEST_ROLE,
+            "columns": [{"name": "ID", "data_type": "NUMBER(38,0)", "nullable": True}],
+            "target_lag": "20 minutes",
+            "warehouse": "CI",
+            "refresh_mode": "AUTO",
+            "initialize": "ON_CREATE",
+            "comment": "this is a comment",
+            "as_": "SELECT id FROM upstream",
+        },
+    },
+    {
+        "resource_type": "function",
+        "setup_sql": "CREATE FUNCTION somefunc() RETURNS double LANGUAGE JAVASCRIPT AS 'return 42;'",
+        "teardown_sql": "DROP FUNCTION somefunc()",
+        "data": {
+            "name": "SOMEFUNC",
+            "secure": False,
+            "returns": "FLOAT",
+            "language": "JAVASCRIPT",
+            "volatility": "VOLATILE",
+            "as_": "return 42;",
+        },
+    },
+    {
+        "resource_type": "schema",
+        "setup_sql": "CREATE TRANSIENT SCHEMA somesch MAX_DATA_EXTENSION_TIME_IN_DAYS = 3",
+        "teardown_sql": "DROP SCHEMA IF EXISTS somesch",
+        "data": {
+            "name": "SOMESCH",
+            "owner": TEST_ROLE,
+            "data_retention_time_in_days": 1,
+            "max_data_extension_time_in_days": 3,
+            "transient": True,
+            "managed_access": False,
+        },
+    },
     {
         "resource_type": "table",
-        "setup_sql": "CREATE TABLE {name} (id INT)",
-        "teardown_sql": "DROP TABLE {name}",
-        "data": lambda name: {
-            "name": name,
+        "setup_sql": "CREATE TABLE sometbl (id INT)",
+        "teardown_sql": "DROP TABLE IF EXISTS sometbl",
+        "data": {
+            "name": "SOMETBL",
             "owner": TEST_ROLE,
             "columns": [{"name": "ID", "nullable": True, "data_type": "NUMBER(38,0)"}],
         },
@@ -111,71 +133,105 @@ resources = [
 
 @pytest.fixture(scope="session")
 def suffix():
-    return str(uuid.uuid4())[:8]
+    return str(uuid.uuid4())[:8].upper()
 
 
 @pytest.fixture(scope="session")
-def test_db(suffix):
+def test_db_name(suffix):
     return f"TEST_DB_RUN_{suffix}"
 
 
 @pytest.fixture(scope="session")
-def db_session(suffix):
+def db_session():
     return snowflake.connector.connect(**connection_params)
 
 
 @pytest.fixture(scope="session")
-def cursor(db_session, suffix, test_db):
+def cursor(db_session, suffix, test_db_name):
     with db_session.cursor() as cur:
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
         cur.execute(f"USE ROLE {TEST_ROLE}")
-        cur.execute(f"CREATE DATABASE {test_db}")
+        cur.execute(f"CREATE DATABASE {test_db_name}")
+        cur.execute("USE WAREHOUSE CI")
         yield cur
-        cur.execute(f"DROP DATABASE {test_db}")
+        cur.execute(f"DROP DATABASE {test_db_name}")
+
+
+@pytest.fixture(scope="session")
+def account_locator(db_session):
+    return data_provider.fetch_account_locator(db_session)
 
 
 @pytest.fixture(
-    params=resources,
-    ids=[f"test_fetch_{config['resource_type']}" for config in resources],
+    params=scoped_resources,
+    ids=[f"test_fetch_{config['resource_type']}" for config in scoped_resources],
     scope="function",
 )
-def resource_config(request, cursor, suffix, test_db):
+def scoped_resource(request, cursor, test_db_name):
     config = request.param
     setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
     teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]
-    resource_name = f"test_{config['resource_type']}_{suffix}".upper()
 
-    # resource_cls = Resource.classes[config["resource_type"]]
-    if config["resource_type"] not in ["database", "role"]:
-        if config["resource_type"] != "schema":
-            resource_name = f"PUBLIC.{resource_name}"
-        resource_name = f"{test_db}.{resource_name}"
-
-    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute(f"USE DATABASE {test_db_name}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute("USE WAREHOUSE CI")
     for setup_sql in setup_sqls:
-        cursor.execute(setup_sql.format(name=resource_name))
+        cursor.execute(setup_sql)
     try:
-        data = config["data"](name=resource_name)
-        yield {
-            "name": resource_name,
-            "resource_type": config["resource_type"],
-            "data": data,
-        }
+        yield config
     finally:
         for teardown_sql in teardown_sqls:
-            cursor.execute(teardown_sql.format(name=resource_name))
+            cursor.execute(teardown_sql)
 
 
 @pytest.mark.requires_snowflake
-def test_fetch_resource(resource_config, db_session, test_db):
-    account_locator = data_provider.fetch_account_locator(db_session)
+def test_fetch_scoped_resource(scoped_resource, db_session, account_locator, test_db_name):
+    fqn = FQN(
+        name=scoped_resource["data"]["name"],
+        database=test_db_name,
+        schema=None if scoped_resource["resource_type"] == "schema" else "PUBLIC",
+    )
     urn = URN(
-        resource_type=resource_config["resource_type"],
-        fqn=FQN.from_str(resource_config["name"], resource_type=resource_config["resource_type"]),
+        resource_type=scoped_resource["resource_type"],
+        fqn=fqn,
         account_locator=account_locator,
     )
 
     result = data_provider.fetch_resource(db_session, urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
-    assert result == resource_config["data"]
+    assert result == scoped_resource["data"]
+
+
+@pytest.fixture(
+    params=account_resources,
+    ids=[f"test_fetch_{config['resource_type']}" for config in account_resources],
+    scope="function",
+)
+def account_resource(request, cursor):
+    config = request.param
+    setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
+    teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]
+
+    for setup_sql in setup_sqls:
+        cursor.execute(setup_sql)
+    try:
+        yield config
+    finally:
+        for teardown_sql in teardown_sqls:
+            cursor.execute(teardown_sql)
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_account_resource(account_resource, db_session, account_locator):
+    fqn = FQN(name=account_resource["data"]["name"])
+    urn = URN(
+        resource_type=account_resource["resource_type"],
+        fqn=fqn,
+        account_locator=account_locator,
+    )
+
+    result = data_provider.fetch_resource(db_session, urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == account_resource["data"]

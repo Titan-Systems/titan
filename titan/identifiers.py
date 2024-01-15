@@ -11,31 +11,10 @@ class FQN:
         schema: Optional[str] = None,
         params: dict = {},
     ) -> None:
-        self.name = name
+        self.name = name.upper()
         self.database = database
         self.schema = schema
         self.params = params
-
-    @classmethod
-    def from_str(cls, fqn_str, resource_type=None):
-        # TODO: This needs to support periods and question marks in double quoted identifiers
-        scoped_name, param_str = fqn_str.split("?") if "?" in fqn_str else (fqn_str, "")
-        params = {}
-        if param_str:
-            for param in param_str.split("&"):
-                k, v = param.split("=")
-                params[k] = v
-        name_parts = scoped_name.split(".")
-        if len(name_parts) == 1:
-            return cls(name=name_parts[0], params=params)
-        elif len(name_parts) == 2:
-            if resource_type in ["schema"]:
-                return cls(database=name_parts[0], name=name_parts[1], params=params)
-            else:
-                return cls(schema=name_parts[0], name=name_parts[1], params=params)
-        elif len(name_parts) == 3:
-            return cls(database=name_parts[0], schema=name_parts[1], name=name_parts[2], params=params)
-        raise Exception(f"Invalid FQN string: {fqn_str}")
 
     def __str__(self):
         db = f"{self.database}." if self.database else ""
@@ -44,8 +23,8 @@ class FQN:
         return f"{db}{schema}{self.name}{params}"
 
     def __repr__(self):
-        db = f", db={self.database}." if self.database else ""
-        schema = f", schema={self.schema}." if self.schema else ""
+        db = f", db={self.database}" if self.database else ""
+        schema = f", schema={self.schema}" if self.schema else ""
         return f"FQN(name={self.name}{db}{schema})"
 
 
@@ -80,31 +59,14 @@ class URN:
         return f"URN(urn:{self.organization}:{self.account_locator}:{self.resource_type}/{self.fqn})"
 
     @classmethod
-    def from_str(cls, urn_str):
-        parts = urn_str.split(":")
-        if len(parts) != 4:
-            raise Exception(f"Invalid URN string: {urn_str}")
-        if parts[0] != "urn":
-            raise Exception(f"Invalid URN string: {urn_str}")
-        resource_type, fqn_str = parts[3].split("/")
-        # FIXME: This is a hack to get around the fact that we don't have a resource class yet
-        fqn = FQN.from_str(fqn_str, resource_type=resource_type)
-        return cls(
-            organization=parts[1],
-            account_locator=parts[2],
-            resource_type=resource_type,
-            fqn=fqn,
-        )
-
-    @classmethod
     def from_resource(cls, resource, **kwargs):
         return cls(resource_type=str(resource.resource_type), fqn=resource.fqn, **kwargs)
 
-    @classmethod
-    def from_locator(cls, locator: "ResourceLocator"):
-        if locator.star:
-            raise Exception("Cannot create URN from a wildcard locator")
-        return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
+    # @classmethod
+    # def from_locator(cls, locator: "ResourceLocator"):
+    #     if locator.star:
+    #         raise Exception("Cannot create URN from a wildcard locator")
+    #     return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
 
     @classmethod
     def from_session_ctx(cls, session_ctx):
