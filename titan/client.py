@@ -34,9 +34,9 @@ def _execute(session, sql, use_role=None) -> list:
     with session.cursor(snowflake.connector.DictCursor) as cur:
         try:
             if use_role:
-                print(f"[{session.user}:{session.role}] »", f"USE ROLE {use_role}")
+                print(f"[{session.user}:{session.role}] >", f"USE ROLE {use_role}")
                 cur.execute(f"USE ROLE {use_role}")
-            print(f"[{session.user}:{session.role}] »", sql_text, end="")
+            print(f"[{session.user}:{session.role}] >", sql_text, end="")
             start = time.time()
             result = cur.execute(sql_text).fetchall()
             print(f"    \033[94m({len(result)} rows, {time.time() - start:.2f}s)\033[0m", flush=True)

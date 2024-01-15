@@ -1,20 +1,22 @@
 # Stored Procedure Interface (spi)
+import os
 import pydoc
 import re
 import sys
+
+os.environ["PYTHONIOENCODING"] = "utf-8"
 
 from yaml import safe_load
 
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
 from . import data_provider as dp
-from . import lifecycle
+from . import lifecycle, resources
 from .blueprint import Blueprint
 from .diff import diff
 from .enums import DataType, ResourceType
 from .identifiers import FQN, URN
 from .parse import parse_identifier
-from .resources import Resource, PythonStoredProcedure
 
 SNOWPARK_TELEMETRY_ID = "titan_titan"
 
@@ -34,8 +36,11 @@ def install(sp_session):
     """
     blueprint = Blueprint("titan", database="titan")
     blueprint.add(
-        PythonStoredProcedure(
+        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators"),
+        resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
+        resources.PythonStoredProcedure(
             name="fetch_database",
+            owner="TITAN_ADMIN",
             args=[("name", DataType.VARCHAR)],
             returns=DataType.OBJECT,
             runtime_version="3.9",
@@ -43,10 +48,10 @@ def install(sp_session):
             imports=["@TITAN/titan-latest.zip"],
             handler="titan.spi.fetch_database",
             execute_as="CALLER",
-        )
+        ),
     )
-    plan = blueprint.plan(sp_session)
-    blueprint.apply(sp_session, plan)
+    plan = blueprint.plan(sp_session.connection)
+    blueprint.apply(sp_session.connection, plan)
 
 
 def _execute(sp_session, sql: list):
@@ -110,6 +115,32 @@ def create_or_update_schema(sp_session, config: dict = None, yaml: str = None, d
     _create_or_update_resource(sp_session.connection, ResourceType.SCHEMA, config, dry_run)
 
 
+def create_or_update_user(sp_session, config: dict = None, yaml: str = None, dry_run: bool = False):
+    """
+    Takes configuration (either as an OBJECT or a YAML string) and creates or updates a user.
+    Use the `dry_run` parameter to test the operation without executing any SQL.
+
+    Parameters
+    ----------
+    config : OBJECT
+        A dictionary containing the schema configuration
+    yaml : VARCHAR
+        A YAML string containing the schema configuration
+    dry_run : BOOLEAN
+        If True, do not execute any SQL
+
+    User Config
+    -----------
+    name : STRING
+        The name of the user
+    comment : STRING
+
+    """
+    if yaml and config is None:
+        config = safe_load(yaml)
+    _create_or_update_resource(sp_session.connection, ResourceType.USER, config, dry_run)
+
+
 def _create_or_update_resource(
     sf_session,
     resource_type: ResourceType,
@@ -124,7 +155,7 @@ def _create_or_update_resource(
     schema = dp.fetch_schema(sf_session, fqn)
     sql = []
     if schema:
-        props = Resource.props_for_resource_type(resource_type)
+        props = resources.Resource.props_for_resource_type(resource_type)
         resource = {str(urn): dp.remove_none_values(schema)}
         data = {str(urn): dp.remove_none_values(_schema_defaults | config)}
         for _, _, change in diff(resource, data):
