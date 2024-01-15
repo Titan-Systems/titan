@@ -559,7 +559,7 @@ def parse_function_name(header: str):
     return prefix
 
 
-def parse_identifier(identifier, is_schema=False) -> FQN:
+def parse_identifier(identifier: str, is_schema=False) -> FQN:
     # TODO: This needs to support periods and question marks in double quoted identifiers
     scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
     params = {}

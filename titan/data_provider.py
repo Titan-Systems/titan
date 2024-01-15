@@ -376,9 +376,19 @@ def fetch_role_grant(session, fqn: FQN):
     for data in show_result:
         if data["granted_to"] == subject.upper() and data["grantee_name"] == name:
             if data["granted_to"] == "ROLE":
-                return {"role": fqn.name, "to_role": data["grantee_name"], "owner": data["granted_by"]}
+                return {
+                    "name": f"{data['role']}?role={data['grantee_name']}",
+                    "role": fqn.name,
+                    "to_role": data["grantee_name"],
+                    "owner": data["granted_by"],
+                }
             elif data["granted_to"] == "USER":
-                return {"role": fqn.name, "to_user": data["grantee_name"], "owner": data["granted_by"]}
+                return {
+                    "name": f"{data['role']}?user={data['grantee_name']}",
+                    "role": fqn.name,
+                    "to_user": data["grantee_name"],
+                    "owner": data["granted_by"],
+                }
             else:
                 raise Exception(f"Unexpected role grant for role {fqn.name}")
 
@@ -476,7 +486,7 @@ def fetch_resource_tags(session, resource_type: str, fqn: FQN):
 
 def fetch_user(session, fqn: FQN):
     # SHOW USERS requires the MANAGE GRANTS privilege
-    show_result = execute(session, "SHOW USERS", cacheable=True, use_role="SECURITYADMIN")
+    show_result = execute(session, "SHOW USERS", cacheable=True)  # , use_role="SECURITYADMIN"
 
     users = _filter_result(show_result, name=fqn.name)
 

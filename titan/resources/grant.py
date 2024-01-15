@@ -260,7 +260,7 @@ class RoleGrant(Resource):
     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
     """
 
-    resource_type = "GRANT"
+    resource_type = ResourceType.ROLE_GRANT
     props = Props()
     scope = AccountScope()
     spec = _RoleGrant

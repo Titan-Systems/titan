@@ -8,12 +8,13 @@ from yaml import safe_load
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
 from . import data_provider as dp
+from . import lifecycle
 from .blueprint import Blueprint
-from .builder import tidy_sql
 from .diff import diff
-from .enums import DataType
+from .enums import DataType, ResourceType
 from .identifiers import FQN, URN
-from .resources import PythonStoredProcedure
+from .parse import parse_identifier
+from .resources import Resource, PythonStoredProcedure
 
 SNOWPARK_TELEMETRY_ID = "titan_titan"
 
@@ -54,24 +55,6 @@ def _execute(sp_session, sql: list):
             sp_session.sql(sql_text).collect()
         except SnowparkSQLException as err:
             raise SnowparkSQLException(f"failed to execute sql, [{sql_text}]", error_code=err.error_code) from err
-
-
-def _update_schema_sql(fqn, change):
-    attr, new_value = change.popitem()
-    attr = attr.lower()
-    if new_value is None:
-        return tidy_sql("ALTER SCHEMA", fqn, "UNSET", attr)
-    elif attr == "name":
-        return tidy_sql("ALTER SCHEMA", fqn, "RENAME TO", new_value)
-    elif attr == "owner":
-        raise NotImplementedError
-    elif attr == "transient":
-        raise Exception("Cannot change transient property of schema")
-    elif attr == "managed_access":
-        return tidy_sql("ALTER SCHEMA", fqn, "ENABLE" if new_value else "DISABLE", "MANAGED ACCESS")
-    else:
-        new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
-        return tidy_sql("ALTER SCHEMA", fqn, "SET", attr, "=", new_value)
 
 
 _schema_defaults = {
@@ -124,21 +107,32 @@ def create_or_update_schema(sp_session, config: dict = None, yaml: str = None, d
     """
     if yaml and config is None:
         config = safe_load(yaml)
-    db = config.get("database", sp_session.get_current_database())
-    fqn = FQN(database=db, name=config["name"])
-    urn = str(URN(resource_key="schema", fqn=fqn))
-    schema = dp.fetch_schema(sp_session.connection, fqn)
+    _create_or_update_resource(sp_session.connection, ResourceType.SCHEMA, config, dry_run)
+
+
+def _create_or_update_resource(
+    sf_session,
+    resource_type: ResourceType,
+    config: dict,
+    dry_run: bool = False,
+):
+    fqn = parse_identifier(config["name"], is_schema=(resource_type == ResourceType.SCHEMA))
+
+    session_ctx = dp.fetch_session()
+    fqn.database = config.get("database", session_ctx["database"])
+    urn = URN(resource_type=str(resource_type), fqn=fqn, account_locator=session_ctx["account_locator"])
+    schema = dp.fetch_schema(sf_session, fqn)
     sql = []
     if schema:
-        resource = {urn: dp.remove_none_values(schema)}
-        data = {urn: dp.remove_none_values(_schema_defaults | config)}
-        # return {"res": resource, "data": data}
+        props = Resource.props_for_resource_type(resource_type)
+        resource = {str(urn): dp.remove_none_values(schema)}
+        data = {str(urn): dp.remove_none_values(_schema_defaults | config)}
         for _, _, change in diff(resource, data):
-            sql.append(_update_schema_sql(fqn, change))
+            sql.append(lifecycle.update_resource(urn, change, props))
     else:
-        sql = [_create_schema_sql(fqn, config, if_not_exists=True)]
+        sql = [lifecycle.create_resource(urn, config, if_not_exists=True)]
     if not dry_run:
-        _execute(sp_session, sql)
+        _execute(sf_session, sql)
     return {"sql": sql}
 
 
@@ -164,13 +158,15 @@ def fetch(sp_session, name) -> dict:
     """
     Returns a resource's configuration.
     """
-    fqn = FQN.from_str(name)
-    if fqn.resource_key == "schema":
-        return fetch_schema(sp_session, name)
-    elif fqn.resource_key == "database":
-        return fetch_database(sp_session, name)
-    else:
-        raise Exception(f"Unsupported resource type: {fqn.resource_key}")
+    fqn = parse_identifier(name)
+    urn = None
+    return dp.fetch_resource(sp_session.connection, urn)
+    # if fqn.resource_type == "schema":
+    #     return fetch_schema(sp_session, name)
+    # elif fqn.resource_key == "database":
+    #     return fetch_database(sp_session, name)
+    # else:
+    #     raise Exception(f"Unsupported resource type: {fqn.resource_key}")
 
 
 # def git_export(sp_session, locator: str, repo: str, path: str) -> dict:

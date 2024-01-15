@@ -43,6 +43,7 @@ class ResourceType(ParseableEnum):
     PROCEDURE = "PROCEDURE"
     RESOURCE_MONITOR = "RESOURCE MONITOR"
     ROLE = "ROLE"
+    ROLE_GRANT = "ROLE GRANT"
     SCHEMA = "SCHEMA"
     SEQUENCE = "SEQUENCE"
     STAGE = "STAGE"

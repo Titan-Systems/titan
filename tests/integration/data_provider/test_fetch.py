@@ -6,6 +6,7 @@ import snowflake.connector
 
 from titan import data_provider
 from titan.identifiers import FQN, URN
+from titan.parse import parse_identifier
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -51,6 +52,37 @@ account_resources = [
     #         "from_share": "WEATHERSOURCE_SNOWFLAKE_SNOWPARK_TILE_SNOWFLAKE_SECURE_SHARE_1651768630709",
     #     },
     # },
+    {
+        "resource_type": "role_grant",
+        "setup_sql": [
+            "CREATE USER recipient",
+            "CREATE ROLE thatrole",
+            "GRANT ROLE thatrole TO USER recipient",
+        ],
+        "teardown_sql": [
+            "DROP USER IF EXISTS recipient",
+            "DROP ROLE IF EXISTS thatrole",
+        ],
+        "data": {
+            "name": "THATROLE?user=RECIPIENT",
+            "owner": "CI",
+            "role": "THATROLE",
+            "to_user": "RECIPIENT",
+        },
+    },
+    {
+        "resource_type": "user",
+        "setup_sql": "CREATE USER someuser",
+        "teardown_sql": "DROP USER IF EXISTS someuser",
+        "data": {
+            "name": "SOMEUSER",
+            "owner": TEST_ROLE,
+            "display_name": "SOMEUSER",
+            "login_name": "SOMEUSER",
+            "disabled": False,
+            "must_change_password": False,
+        },
+    },
 ]
 
 scoped_resources = [
@@ -224,7 +256,8 @@ def account_resource(request, cursor):
 
 @pytest.mark.requires_snowflake
 def test_fetch_account_resource(account_resource, db_session, account_locator):
-    fqn = FQN(name=account_resource["data"]["name"])
+    # fqn = FQN(name=account_resource["data"]["name"])
+    fqn = parse_identifier(account_resource["data"]["name"])
     urn = URN(
         resource_type=account_resource["resource_type"],
         fqn=fqn,
