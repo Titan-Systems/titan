@@ -138,6 +138,30 @@ scoped_resources = [
         },
     },
     {
+        "resource_type": "procedure",
+        "setup_sql": """
+            CREATE PROCEDURE somesproc(ARG1 VARCHAR)
+                RETURNS INT NOT NULL
+                language python
+                packages = ('snowflake-snowpark-python')
+                runtime_version = '3.9'
+                handler = 'main'
+                as 'def main(_, arg1: str): return 42'
+        """,
+        "teardown_sql": "DROP PROCEDURE somesproc(VARCHAR)",
+        "data": {
+            "name": "SOMESPROC",
+            "args": [{"name": "ARG1", "data_type": "VARCHAR", "nullable": True}],
+            "returns": "NUMBER",
+            "language": "PYTHON",
+            "packages": ["snowflake-snowpark-python"],
+            "runtime_version": "3.9",
+            "handler": "main",
+            "execute_as": "OWNER",
+            "as_": "def main(_, arg1: str): return 42",
+        },
+    },
+    {
         "resource_type": "schema",
         "setup_sql": "CREATE TRANSIENT SCHEMA somesch MAX_DATA_EXTENSION_TIME_IN_DAYS = 3",
         "teardown_sql": "DROP SCHEMA IF EXISTS somesch",

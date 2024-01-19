@@ -47,7 +47,8 @@ class URN:
     """
 
     def __init__(self, resource_type: str, fqn: FQN, account_locator: str, organization: str = "") -> None:
-        self.resource_type = underscore(resource_type)
+        # self.resource_type = underscore(resource_type)
+        self.resource_type = resource_type.replace(" ", "_").lower()
         self.fqn = fqn
         self.account_locator = account_locator
         self.organization = organization

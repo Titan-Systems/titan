@@ -175,6 +175,8 @@ class IdentifierProp(Prop):
     def render(self, value):
         if value is None:
             return ""
+        if not isinstance(value, str) and hasattr(value, "name"):
+            value = value.name
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",

@@ -8,7 +8,7 @@ from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN
 from ..parse import _parse_grant
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
-from ..props import Props
+from ..props import Props, IdentifierProp
 from ..scope import AccountScope
 
 
@@ -253,6 +253,8 @@ class _RoleGrant(ResourceSpec):
         super().__post_init__()
         if self.to_role is not None and self.to_user is not None:
             raise ValueError("You can only grant to a role or a user, not both")
+        if self.to_role is None and self.to_user is None:
+            raise ValueError("You must specify a role or a user to grant to")
 
 
 class RoleGrant(Resource):
@@ -261,15 +263,19 @@ class RoleGrant(Resource):
     """
 
     resource_type = ResourceType.ROLE_GRANT
-    props = Props()
+    props = Props(
+        role=IdentifierProp("role", eq=False),
+        to_role=IdentifierProp("to role", eq=False),
+        to_user=IdentifierProp("to user", eq=False),
+    )
     scope = AccountScope()
     spec = _RoleGrant
 
     def __init__(
         self,
-        role: str,
-        to_role: str = None,
-        to_user: str = None,
+        role: Role,
+        to_role: Role = None,
+        to_user: User = None,
         owner: str = "USERADMIN",
         **kwargs,
     ):
@@ -288,7 +294,7 @@ class RoleGrant(Resource):
         raise NotImplementedError
 
     @property
-    def fully_qualified_name(self):
+    def fqn(self):
         subject = "user" if self._data.to_user else "role"
         name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
         return FQN(name=self.name, params={subject: name})

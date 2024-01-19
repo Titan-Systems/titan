@@ -1,5 +1,5 @@
 from dataclasses import asdict, dataclass, fields
-from typing import _GenericAlias, Any, TypedDict, Type, get_args, get_type_hints
+from typing import _GenericAlias, Any, TypedDict, Type, Union, get_args, get_type_hints
 from inspect import isclass
 from itertools import chain
 
@@ -60,6 +60,8 @@ class ResourceSpec:
                         return field_type(name=field_value, stub=True)
                     elif isinstance(field_value, dict):
                         return field_type(**field_value, stub=True)
+                    elif isinstance(field_value, field_type):
+                        return field_value
                 else:
                     return field_value
 
@@ -122,7 +124,9 @@ class Resource(metaclass=_Resource):
         return cls.resolve_resource_cls(resource_type).props
 
     @classmethod
-    def resolve_resource_cls(cls, resource_type: ResourceType, data: dict = None) -> Type["Resource"]:
+    def resolve_resource_cls(cls, resource_type: Union[str, ResourceType], data: dict = None) -> Type["Resource"]:
+        if isinstance(resource_type, str):
+            resource_type = ResourceType(resource_type)
         resource_types = cls.__types[resource_type]
         if len(resource_types) > 1:
             if data is None:
@@ -130,6 +134,10 @@ class Resource(metaclass=_Resource):
             else:
                 raise NotImplementedError
         return resource_types[0]
+
+    @classmethod
+    def defaults(cls):
+        return {f.name: f.default for f in fields(cls.spec)}
 
     def __repr__(self):
         return f"{self.__class__.__name__}({str(self.fqn)})"
@@ -141,8 +149,9 @@ class Resource(metaclass=_Resource):
 
             def _serialize(value):
                 if isinstance(value, Resource):
-                    # return value.to_dict(packed=True)
-                    return getattr(value._data, "name", "[NONAME]")
+                    if not hasattr(value._data, "name"):
+                        raise NotImplementedError
+                    return getattr(value._data, "name")
                 elif isinstance(value, ParseableEnum):
                     return str(value)
                 elif isinstance(value, list):
@@ -202,7 +211,9 @@ class Resource(metaclass=_Resource):
 
     @property
     def fqn(self):
-        name = getattr(self._data, "name", "[NONAME]")
+        if not hasattr(self._data, "name"):
+            raise Exception
+        name = getattr(self._data, "name")
         return self.scope.fully_qualified_name(self._container, name)
 
     @property

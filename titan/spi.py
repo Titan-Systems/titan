@@ -25,7 +25,8 @@ try:
 
     _snowflake.snowflake_partner_attribution().append(SNOWPARK_TELEMETRY_ID)
 except ModuleNotFoundError as err:
-    raise ModuleNotFoundError("The titan spi module can only be run from a Snowpark UDF or stored procedure") from err
+    # raise ModuleNotFoundError("The titan spi module can only be run from a Snowpark UDF or stored procedure") from err
+    pass
 
 __this__ = sys.modules[__name__]
 
@@ -62,17 +63,17 @@ def _execute(sp_session, sql: list):
             raise SnowparkSQLException(f"failed to execute sql, [{sql_text}]", error_code=err.error_code) from err
 
 
-_schema_defaults = {
-    "database": None,
-    "transient": False,
-    "owner": "SYSADMIN",
-    "managed_access": False,
-    "data_retention_time_in_days": None,
-    "max_data_extension_time_in_days": 14,
-    "default_ddl_collation": None,
-    "tags": None,
-    "comment": None,
-}
+# _schema_defaults = {
+#     "database": None,
+#     "transient": False,
+#     "owner": "SYSADMIN",
+#     "managed_access": False,
+#     "data_retention_time_in_days": None,
+#     "max_data_extension_time_in_days": 14,
+#     "default_ddl_collation": None,
+#     "tags": None,
+#     "comment": None,
+# }
 
 
 def create_or_update_schema(sp_session, config: dict = None, yaml: str = None, dry_run: bool = False):
@@ -152,14 +153,14 @@ def _create_or_update_resource(
     session_ctx = dp.fetch_session()
     fqn.database = config.get("database", session_ctx["database"])
     urn = URN(resource_type=str(resource_type), fqn=fqn, account_locator=session_ctx["account_locator"])
-    schema = dp.fetch_schema(sf_session, fqn)
+    original = dp.fetch_resource(sf_session, fqn)
     sql = []
-    if schema:
-        props = resources.Resource.props_for_resource_type(resource_type)
-        resource = {str(urn): dp.remove_none_values(schema)}
-        data = {str(urn): dp.remove_none_values(_schema_defaults | config)}
-        for _, _, change in diff(resource, data):
-            sql.append(lifecycle.update_resource(urn, change, props))
+    if original:
+        resource_cls = resources.Resource.resolve_resource_cls(resource_type)
+        original = {str(urn): dp.remove_none_values(original)}
+        new = {str(urn): dp.remove_none_values(resource_cls.defaults() | config)}
+        for _, _, change in diff(original, new):
+            sql.append(lifecycle.update_resource(urn, change, resource_cls.props))
     else:
         sql = [lifecycle.create_resource(urn, config, if_not_exists=True)]
     if not dry_run:

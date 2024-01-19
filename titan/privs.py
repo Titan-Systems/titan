@@ -225,7 +225,7 @@ def create_priv_for_resource_type(resource_type):
         return SchemaPriv.CREATE_VIEW
     elif resource_type == "procedure":
         return SchemaPriv.CREATE_PROCEDURE
-    raise Exception("Missing")
+    return None
 
 
 def is_ownership_priv(priv):

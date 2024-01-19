@@ -153,8 +153,12 @@ def _collect_available_privs(session_ctx, session, plan):
         # Implied privilege grants in the context of our plan
         for action, urn_str, _ in plan:
             urn = parse_URN(urn_str)
+            # If we plan to add a new resource and we have the privs to create it, we can assume
+            # that we have the OWNERSHIP priv on that resource
             if action == DiffAction.ADD:
                 create_priv = create_priv_for_resource_type(urn.resource_type)
+                if create_priv is None:
+                    continue
                 ownership_priv = priv_for_principal(urn, "OWNERSHIP")
                 if urn.resource_type == "database":
                     parent_urn = account_urn
@@ -194,6 +198,25 @@ def _raise_if_missing_privs(required: dict, available: dict):
                 required_privs -= priv_map[principal]
         if required_privs:
             raise Exception(f"Missing privileges for {principal}: {required_privs}")
+
+
+def _fetch_remote_state(session, manifest):
+    state = {}
+    for urn_str in manifest["_urns"]:
+        urn = parse_URN(urn_str)
+        resource_cls = Resource.resolve_resource_cls(urn.resource_type)
+        data = data_provider.fetch_resource(session, urn)
+        if urn_str in manifest and data is not None:
+            # TODO: also compact default values
+            if isinstance(data, list):
+                # compacted = [data_provider.remove_none_values(d) for d in data]
+                normalized = [resource_cls.defaults() | d for d in data]
+            else:
+                # compacted = data_provider.remove_none_values(resource_cls.defaults() | data)
+                normalized = resource_cls.defaults() | data
+            state[urn_str] = normalized
+
+    return state
 
 
 class Blueprint:
@@ -278,7 +301,7 @@ class Blueprint:
                 continue
 
             urn = URN.from_resource(account_locator=self.account.locator, resource=resource)
-            data = resource.to_dict(packed=True)
+            data = resource.to_dict()
 
             if resource.stub:
                 data["_stub"] = True
@@ -305,7 +328,7 @@ class Blueprint:
     def plan(self, session):
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
-        remote_state = data_provider.fetch_remote_state(session, manifest)
+        remote_state = _fetch_remote_state(session, manifest)
         return _plan(remote_state, manifest)
 
     def apply(self, session, plan=None):

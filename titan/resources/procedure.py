@@ -27,9 +27,9 @@ class _PythonStoredProcedure(ResourceSpec):
     handler: str
     language: Language = Language.PYTHON
     as_: str = None
-    comment: str = None
+    comment: str = "user-defined procedure"
     copy_grants: bool = False
-    execute_as: ExecutionRights = ExecutionRights.CALLER
+    execute_as: ExecutionRights = ExecutionRights.OWNER
     external_access_integrations: list = None
     imports: list = None
     null_handling: NullHandling = NullHandling.CALLED_ON_NULL_INPUT

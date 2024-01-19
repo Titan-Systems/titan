@@ -2,7 +2,7 @@ import sys
 
 from .builder import tidy_sql
 from .identifiers import URN
-from .privs import GlobalPriv, DatabasePriv, SchemaPriv
+from .privs import GlobalPriv, DatabasePriv, RolePriv, SchemaPriv
 from .props import Props
 
 __this__ = sys.modules[__name__]
@@ -22,7 +22,7 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
-def create_grant(urn: URN, data: dict, props: Props):
+def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     return tidy_sql(
         "GRANT",
         data["priv"],
@@ -32,7 +32,7 @@ def create_grant(urn: URN, data: dict, props: Props):
     )
 
 
-def create_role_grant(urn: URN, data: dict, props: Props):
+def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     return tidy_sql(
         "GRANT",
         props.render(data),
@@ -111,6 +111,8 @@ CREATE_RESOURCE_PRIV_MAP = {
     "schema": [DatabasePriv.CREATE_SCHEMA],
     "table": [SchemaPriv.CREATE_TABLE, SchemaPriv.USAGE, DatabasePriv.USAGE],
     "procedure": [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],
+    "function": [SchemaPriv.CREATE_FUNCTION, SchemaPriv.USAGE, DatabasePriv.USAGE],
+    "role_grant": [RolePriv.OWNERSHIP],
 }
 
 

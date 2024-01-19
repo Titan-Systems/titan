@@ -76,23 +76,7 @@ def remove_none_values(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
-def fetch_remote_state(session, manifest):
-    state = {}
-    for urn_str in manifest["_urns"]:
-        urn = parse_URN(urn_str)
-        data = fetch_resource(session, urn)
-        if urn_str in manifest and data is not None:
-            # TODO: also compact default values
-            if isinstance(data, list):
-                compacted = [remove_none_values(d) for d in data]
-            else:
-                compacted = remove_none_values(data)
-            state[urn_str] = compacted
-
-    return state
-
-
-def fetch_resource(session, urn):
+def fetch_resource(session, urn: URN):
     return getattr(__this__, f"fetch_{urn.resource_type}")(session, urn.fqn)
 
 
@@ -325,7 +309,7 @@ def fetch_procedure(session, fqn: FQN):
     data = sprocs[0]
     inputs, output = data["arguments"].split(" RETURN ")
     # inputs, output = _parse_function_arguments(data["arguments"])
-    desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+    desc_result = execute(session, f"DESC PROCEDURE {inputs}", cacheable=True)
     properties = dict([(row["property"], row["value"]) for row in desc_result])
 
     return {
@@ -335,8 +319,8 @@ def fetch_procedure(session, fqn: FQN):
         "returns": output,
         "language": properties["language"],
         "runtime_version": properties["runtime_version"],
-        "null_handling": properties["null_handling"],
-        "packages": properties["packages"],
+        "null_handling": properties["null handling"],
+        "packages": json.loads(properties["packages"].replace("'", '"')),
         "comment": None if data["description"] == "user-defined function" else data["description"],
         "handler": properties["handler"],
         "execute_as": properties["execute as"],

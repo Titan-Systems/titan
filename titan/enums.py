@@ -2,7 +2,7 @@ from enum import Enum, EnumMeta
 
 
 def _normalize_enum_value(value: str) -> str:
-    return value.strip(" ").upper()
+    return value.strip(" ").upper().replace("_", " ")
 
 
 class _Parseable(EnumMeta):

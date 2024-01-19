@@ -3,7 +3,7 @@ import uuid
 
 import pytest
 
-from titan import Blueprint, User, Role, RoleGrant
+from titan import Blueprint, User, Resource, Role, RoleGrant
 from titan.client import get_session
 
 
@@ -19,7 +19,7 @@ def marked_for_cleanup():
 
 
 @pytest.fixture(scope="session")
-def cursor(suffix, marked_for_cleanup):
+def cursor(suffix, marked_for_cleanup: list[Resource]):
     session = get_session()
     with session.cursor() as cur:
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
@@ -31,7 +31,7 @@ def cursor(suffix, marked_for_cleanup):
 
 
 @pytest.fixture(scope="session")
-def user(suffix, cursor, marked_for_cleanup):
+def user(suffix, cursor, marked_for_cleanup: list[Resource]):
     user = User(name=f"TEST_USER_{suffix}", owner="ACCOUNTADMIN")
     cursor.execute(user.create_sql())
     marked_for_cleanup.append(user)
@@ -39,7 +39,7 @@ def user(suffix, cursor, marked_for_cleanup):
 
 
 @pytest.fixture(scope="session")
-def role(suffix, cursor, marked_for_cleanup):
+def role(suffix, cursor, marked_for_cleanup: list[Resource]):
     role = Role(name=f"TEST_ROLE_{suffix}", owner="ACCOUNTADMIN")
     cursor.execute(role.create_sql())
     marked_for_cleanup.append(role)
@@ -50,11 +50,11 @@ def role(suffix, cursor, marked_for_cleanup):
 def test_blueprint_plan(cursor, user, role):
     session = cursor.connection
     bp = Blueprint(name="test")
-    bp.add(user, role)
+    role_grant = RoleGrant(role=role, to_user=user, owner="ACCOUNTADMIN")
+    bp.add(role_grant)
     changes = bp.plan(session)
-    assert len(changes) == 2
+    assert len(changes) == 1
     bp.apply(session, changes)
-    # Must reset BP before planning again
 
 
 # @pytest.mark.requires_snowflake

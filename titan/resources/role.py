@@ -44,6 +44,10 @@ class Role(Resource):
             comment=comment,
         )
 
+    @property
+    def name(self):
+        return self._data.name
+
 
 class DatabaseRole(Resource):
     resource_type = ResourceType.DATABASE_ROLE
@@ -73,3 +77,7 @@ class DatabaseRole(Resource):
             tags=tags,
             comment=comment,
         )
+
+    @property
+    def name(self):
+        return self._data.name
