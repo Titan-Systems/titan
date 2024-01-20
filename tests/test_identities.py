@@ -256,15 +256,15 @@ resources = [
             "comment": "+3",
         },
     },
-    {
-        "test": "shared_database",
-        "resource_cls": resources.SharedDatabase,
-        "data": {
-            "name": "SOMESHARENAME",
-            "owner": "ACCOUNTADMIN",
-            "from_share": "SOMEACCOUNT.SOMESHARE",
-        },
-    },
+    # {
+    #     "test": "shared_database",
+    #     "resource_cls": resources.SharedDatabase,
+    #     "data": {
+    #         "name": "SOMESHARENAME",
+    #         "owner": "ACCOUNTADMIN",
+    #         "from_share": "SOMEACCOUNT.SOMESHARE",
+    #     },
+    # },
     {
         "test": "s3_storage_integration",
         "resource_cls": resources.S3StorageIntegration,

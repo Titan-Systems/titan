@@ -22,6 +22,19 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
+def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    db = f"{urn.fqn.database}." if urn.fqn.database else ""
+    schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
+    name = f"{db}{schema}{urn.fqn.name}"
+    return tidy_sql(
+        "CREATE",
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.resource_type,
+        name,
+        props.render(data),
+    )
+
+
 def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     return tidy_sql(
         "GRANT",
@@ -44,13 +57,25 @@ def update_resource(urn: URN, data: dict, props: Props) -> str:
 
 
 def update__default(urn: URN, data: dict, props: Props) -> str:
-    return tidy_sql(
-        "ALTER",
-        urn.resource_type,
-        urn.fqn,
-        "SET",
-        props.render(data),
-    )
+    attr, new_value = data.popitem()
+    attr = attr.lower()
+    if new_value is None:
+        return tidy_sql("ALTER", urn.resource_type, urn.fqn, "UNSET", attr)
+    elif attr == "name":
+        return tidy_sql("ALTER", urn.resource_type, urn.fqn, "RENAME TO", new_value)
+    elif attr == "owner":
+        return tidy_sql("GRANT OWNERSHIP ON", urn.resource_type, urn.fqn, "TO ROLE", new_value)
+    else:
+        new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
+        return tidy_sql(
+            "ALTER",
+            urn.resource_type,
+            urn.fqn,
+            "SET",
+            attr,
+            "=",
+            new_value,
+        )
 
 
 def update_schema(urn: URN, data: dict, props: Props) -> str:
@@ -113,6 +138,7 @@ CREATE_RESOURCE_PRIV_MAP = {
     "procedure": [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],
     "function": [SchemaPriv.CREATE_FUNCTION, SchemaPriv.USAGE, DatabasePriv.USAGE],
     "role_grant": [RolePriv.OWNERSHIP],
+    "role": [GlobalPriv.CREATE_ROLE],
 }
 
 

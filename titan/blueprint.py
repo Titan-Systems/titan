@@ -207,12 +207,9 @@ def _fetch_remote_state(session, manifest):
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
         if urn_str in manifest and data is not None:
-            # TODO: also compact default values
             if isinstance(data, list):
-                # compacted = [data_provider.remove_none_values(d) for d in data]
                 normalized = [resource_cls.defaults() | d for d in data]
             else:
-                # compacted = data_provider.remove_none_values(resource_cls.defaults() | data)
                 normalized = resource_cls.defaults() | data
             state[urn_str] = normalized
 

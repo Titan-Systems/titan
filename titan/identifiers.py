@@ -9,18 +9,21 @@ class FQN:
         name: str,
         database: Optional[str] = None,
         schema: Optional[str] = None,
+        arg_types: Optional[list] = None,
         params: dict = {},
     ) -> None:
         self.name = name.upper()
         self.database = database
         self.schema = schema
+        self.arg_types = arg_types
         self.params = params
 
     def __str__(self):
         db = f"{self.database}." if self.database else ""
         schema = f"{self.schema}." if self.schema else ""
+        arg_types = f"({', '.join(self.arg_types)})" if self.arg_types else ""
         params = "?" + "&".join([f"{k.lower()}={v}" for k, v in self.params.items()]) if self.params else ""
-        return f"{db}{schema}{self.name}{params}"
+        return f"{db}{schema}{self.name}{arg_types}{params}"
 
     def __repr__(self):
         db = f", db={self.database}" if self.database else ""

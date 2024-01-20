@@ -1,4 +1,4 @@
-CREATE PROCEDURE public.install()
+WITH install AS PROCEDURE()
 RETURNS OBJECT NOT NULL
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.9'
@@ -6,6 +6,5 @@ PACKAGES = ('snowflake-snowpark-python', 'inflection', 'pyparsing')
 IMPORTS = ('@titan_aws/releases/titan-0.1.0-dev.zip')
 HANDLER = 'titan.spi.install'
 EXECUTE AS CALLER
+CALL install()
 ;
-
-CALL public.install();

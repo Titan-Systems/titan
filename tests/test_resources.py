@@ -114,9 +114,9 @@ class TestResourceFixtures(unittest.TestCase):
         for sql in load_sql_fixtures("sequence.sql"):
             self.validate_from_sql(resources.Sequence, sql)
 
-    def test_shared_database(self):
-        for sql in load_sql_fixtures("share.sql"):
-            self.validate_from_sql(resources.SharedDatabase, sql)
+    # def test_shared_database(self):
+    #     for sql in load_sql_fixtures("share.sql"):
+    #         self.validate_from_sql(resources.SharedDatabase, sql)
 
     def test_stage(self):
         for sql in load_sql_fixtures("stage.sql"):

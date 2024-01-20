@@ -69,7 +69,6 @@ class PythonStoredProcedure(Resource):
         args=ArgsProp(),
         copy_grants=FlagProp("copy grants"),
         returns=EnumProp("returns", DataType, eq=False),
-        null_handling=EnumFlagProp(NullHandling),
         language=EnumProp("language", [Language.PYTHON], eq=False),
         runtime_version=StringProp("runtime_version"),
         packages=StringListProp("packages", parens=True),
@@ -77,6 +76,8 @@ class PythonStoredProcedure(Resource):
         handler=StringProp("handler"),
         external_access_integrations=IdentifierListProp("external_access_integrations", parens=True),
         # secrets
+        # Not working in Snowflake
+        # null_handling=EnumFlagProp(NullHandling),
         comment=StringProp("comment"),
         execute_as=EnumProp("execute as", ExecutionRights, eq=False),
         as_=StringProp("as", eq=False),
@@ -94,7 +95,7 @@ class PythonStoredProcedure(Resource):
         packages: list,
         handler: str,
         as_: str = None,
-        comment: str = None,
+        comment: str = "user-defined procedure",
         copy_grants: bool = False,
         execute_as: ExecutionRights = ExecutionRights.CALLER,
         external_access_integrations: list = None,
@@ -111,7 +112,7 @@ class PythonStoredProcedure(Resource):
         kwargs.pop("language", None)
         super().__init__(**kwargs)
 
-        self._data = _PythonStoredProcedure(
+        self._data: _PythonStoredProcedure = _PythonStoredProcedure(
             name=name,
             args=args,
             returns=returns,
@@ -128,6 +129,11 @@ class PythonStoredProcedure(Resource):
             owner=owner,
             secure=secure,
         )
+
+    @property
+    def fqn(self):
+        name = f"{self._data.name}({', '.join([str(arg['data_type']) for arg in self._data.args])})"
+        return self.scope.fully_qualified_name(self._container, name)
 
 
 ProcedureMap = {

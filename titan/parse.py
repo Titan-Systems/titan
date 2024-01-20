@@ -568,21 +568,33 @@ def parse_identifier(identifier: str, is_schema=False) -> FQN:
             k, v = param.split("=")
             params[k] = v
 
+    arg_types = []
+    if "(" in scoped_name:
+        args_start = scoped_name.find("(")
+        scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
+        arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
+
     name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
     if len(name_parts) == 1:
-        return FQN(name=name_parts[0], params=params)
+        return FQN(
+            name=name_parts[0],
+            params=params,
+            arg_types=arg_types,
+        )
     elif len(name_parts) == 2:
         if is_schema:
             return FQN(
                 database=name_parts[0],
                 name=name_parts[1],
                 params=params,
+                arg_types=arg_types,
             )
         else:
             return FQN(
                 schema=name_parts[0],
                 name=name_parts[1],
                 params=params,
+                arg_types=arg_types,
             )
     elif len(name_parts) == 3:
         return FQN(
@@ -590,6 +602,7 @@ def parse_identifier(identifier: str, is_schema=False) -> FQN:
             schema=name_parts[1],
             name=name_parts[2],
             params=params,
+            arg_types=arg_types,
         )
     raise Exception(f"Failed to parse identifier: {identifier}")
 

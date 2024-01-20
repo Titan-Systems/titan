@@ -40,7 +40,7 @@ class ResourceSpec:
                         raise Exception
                     if field_type == Arg:
                         type_map = get_type_hints(field_type)
-                        return {k: _coerce(v, field_type=type_map[k]) for k, v in field_value.items()}
+                        return {k.upper(): _coerce(v, field_type=type_map[k]) for k, v in field_value.items()}
                     else:
                         dict_types = get_args(field_type)
                         if len(dict_types) < 2:
@@ -130,7 +130,7 @@ class Resource(metaclass=_Resource):
         resource_types = cls.__types[resource_type]
         if len(resource_types) > 1:
             if data is None:
-                raise Exception("Cannot resolve resource class without data")
+                raise Exception(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
             else:
                 raise NotImplementedError
         return resource_types[0]
@@ -144,33 +144,32 @@ class Resource(metaclass=_Resource):
 
     def to_dict(self, packed=False):
         defaults = {f.name: f.default for f in fields(self.spec)}
-        if packed:
-            serialized = {}
 
-            def _serialize(value):
-                if isinstance(value, Resource):
-                    if not hasattr(value._data, "name"):
-                        raise NotImplementedError
-                    return getattr(value._data, "name")
-                elif isinstance(value, ParseableEnum):
-                    return str(value)
-                elif isinstance(value, list):
-                    return [_serialize(v) for v in value]
-                elif isinstance(value, dict):
-                    return {k: _serialize(v) for k, v in value.items()}
-                else:
-                    return value
+        serialized = {}
 
-            for key, value in asdict(self._data).items():
-                skip_field = (value is None) or (value == defaults[key])
-                skip_field = skip_field and (key != "owner")
-                if skip_field:
-                    continue
-                serialized[key] = _serialize(value)
+        def _serialize(value):
+            if isinstance(value, Resource):
+                if not hasattr(value._data, "name"):
+                    raise NotImplementedError
+                return getattr(value._data, "name")
+            elif isinstance(value, ParseableEnum):
+                return str(value)
+            elif isinstance(value, list):
+                return [_serialize(v) for v in value]
+            elif isinstance(value, dict):
+                return {k: _serialize(v) for k, v in value.items()}
+            else:
+                return value
 
-            return serialized
-        else:
-            return asdict(self._data)
+        for key, value in asdict(self._data).items():
+            skip_field = (value is None) or (value == defaults[key])
+            skip_field = skip_field and (key != "owner")
+            if skip_field:
+                # continue
+                pass
+            serialized[key] = _serialize(value)
+
+        return serialized
 
     def create_sql(self, **kwargs):
         return create_resource(
@@ -183,8 +182,15 @@ class Resource(metaclass=_Resource):
     def drop_sql(self, if_exists: bool = False):
         return drop_resource(self.urn, self.to_dict(packed=True), if_exists=if_exists)
 
-    def requires(self, *resources):
-        self.refs.update(resources)
+    def _requires(self, resource: "Resource"):
+        if isinstance(resource, Resource):
+            self.refs.add(resource)
+
+    def requires(self, *resources: "Resource"):
+        if isinstance(resources[0], list):
+            resources = resources[0]
+        for resource in resources:
+            self._requires(resource)
 
     def _register_scope(self, database=None, schema=None):
         if isinstance(database, str):

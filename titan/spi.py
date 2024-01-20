@@ -35,18 +35,22 @@ def install(sp_session):
     """
     Installs the titan spi functions and procedures into the current database.
     """
-    blueprint = Blueprint("titan", database="titan")
+
+    # stage = _snowflake.get_stage_location("TITAN")
+    stage = [s for s in dp.list_stages(sp_session.connection) if s["url"] == "s3://titan-snowflake/"][0]
+
+    blueprint = Blueprint("titan")
     blueprint.add(
-        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators"),
-        resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
+        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators", owner="CI"),
+        resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN", owner="CI"),
         resources.PythonStoredProcedure(
             name="fetch_database",
             owner="TITAN_ADMIN",
-            args=[("name", DataType.VARCHAR)],
+            args=[{"name": "name", "data_type": DataType.VARCHAR}],
             returns=DataType.OBJECT,
             runtime_version="3.9",
-            packages=["snowflake-snowpark-python"],
-            imports=["@TITAN/titan-latest.zip"],
+            packages=["snowflake-snowpark-python", "inflection", "pyparsing"],
+            imports=[f"@{stage['fqn']}/releases/titan-0.1.0-dev.zip"],
             handler="titan.spi.fetch_database",
             execute_as="CALLER",
         ),
@@ -172,7 +176,7 @@ def fetch_schema(sp_session, name) -> dict:
     """
     Returns a schema's configuration.
     """
-    fqn = FQN.from_str(name, resource_key="schema")
+    fqn = parse_identifier(name, is_schema=True)
     if fqn.database is None:
         fqn.database = sp_session.get_current_database()
     return dp.fetch_schema(sp_session.connection, fqn)
@@ -182,8 +186,7 @@ def fetch_database(sp_session, name) -> dict:
     """
     Returns a database's configuration.
     """
-    fqn = FQN.from_str(name, resource_key="database")
-    return dp.fetch_database(sp_session.connection, fqn)
+    return dp.fetch_database(sp_session.connection, FQN(name))
 
 
 def fetch(sp_session, name) -> dict:

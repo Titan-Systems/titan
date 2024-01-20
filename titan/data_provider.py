@@ -11,10 +11,11 @@ from snowflake.connector.errors import ProgrammingError
 from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .identifiers import URN, FQN
 from .parse import (
+    FullyQualifiedIdentifier,
     _parse_dynamic_table_text,
+    _parse_column,
     parse_identifier,
     parse_function_name,
-    parse_URN,
 )
 
 
@@ -44,15 +45,55 @@ def _urn_from_grant(row, session_ctx):
     if granted_on == "account":
         return URN.from_session_ctx(session_ctx)
     else:
-        fqn = parse_identifier(row["name"], is_schema=(granted_on == "schema"))
         if granted_on == "procedure" or granted_on == "function":
-            name = parse_function_name(fqn.name)
-            fqn.name = name
+            # This needs a special function because Snowflake gives an incorrect FQN for functions/sprocs
+            # eg. TITAN_DEV.PUBLIC."FETCH_DATABASE(NAME VARCHAR):OBJECT"
+            # The correct FQN is TITAN_DEV.PUBLIC."FETCH_DATABASE"(VARCHAR)
+            id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
+            name = parse_function_name(id_parts[-1])
+            fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
+        else:
+            fqn = parse_identifier(row["name"], is_schema=(granted_on == "schema"))
         return URN(
             resource_type=granted_on,
             account_locator=session_ctx["account_locator"],
             fqn=fqn,
         )
+
+
+def _parse_function_arguments(arguments_str: str) -> tuple:
+    """
+    Input
+    -----
+        FETCH_DATABASE(VARCHAR) RETURN OBJECT
+
+    Output
+    ------
+        identifier => FETCH_DATABASE(VARCHAR)
+        returns => OBJECT
+
+    """
+
+    header, returns = arguments_str.split(" RETURN ")
+    identifier = parse_identifier(header)
+    return (identifier, returns)
+
+
+def _parse_imports(imports: str) -> list:
+    if imports is None:
+        return []
+    imports = imports.strip("[]")
+    if imports:
+        return [imp.strip(" ") for imp in imports.split(",")]
+    return []
+
+
+def _parse_signature(signature: str) -> list:
+    signature = signature.strip("()")
+
+    if signature:
+        return [_parse_column(col.strip(" ")) for col in signature.split(",")]
+    return []
 
 
 def params_result_to_dict(params_result):
@@ -276,6 +317,38 @@ def fetch_grant(session, fqn: FQN):
     )
 
 
+def fetch_procedure(session, fqn: FQN):
+    # SHOW PROCEDURES IN SCHEMA {}.{}
+    show_result = execute(session, "SHOW PROCEDURES IN SCHEMA", cacheable=True)
+    sprocs = _filter_result(show_result, name=fqn.name)
+    if len(sprocs) == 0:
+        return None
+    if len(sprocs) > 1:
+        raise Exception(f"Found multiple stored procedures matching {fqn}")
+
+    data = sprocs[0]
+    # inputs, output = data["arguments"].split(" RETURN ")
+    identifier, returns = _parse_function_arguments(data["arguments"])
+    desc_result = execute(session, f"DESC PROCEDURE {str(identifier)}", cacheable=True)
+    properties = dict([(row["property"], row["value"]) for row in desc_result])
+
+    return {
+        "name": data["name"].lower(),
+        "secure": data["is_secure"] == "Y",
+        "args": _parse_signature(properties["signature"]),
+        "returns": returns,
+        "language": properties["language"],
+        "runtime_version": properties["runtime_version"],
+        "null_handling": properties["null handling"],
+        "imports": _parse_imports(properties["imports"]),
+        "packages": json.loads(properties["packages"].replace("'", '"')),
+        "comment": data["description"],
+        "handler": properties["handler"],
+        "execute_as": properties["execute as"],
+        "as_": properties["body"],
+    }
+
+
 def fetch_role_grants(session, role: str):
     if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
         return {}
@@ -295,37 +368,6 @@ def fetch_role_grants(session, role: str):
         )
 
     return dict(priv_map)
-
-
-def fetch_procedure(session, fqn: FQN):
-    # SHOW PROCEDURES IN SCHEMA {}.{}
-    show_result = execute(session, "SHOW PROCEDURES IN SCHEMA", cacheable=True)
-    sprocs = _filter_result(show_result, name=fqn.name)
-    if len(sprocs) == 0:
-        return None
-    if len(sprocs) > 1:
-        raise Exception(f"Found multiple stored procedures matching {fqn}")
-
-    data = sprocs[0]
-    inputs, output = data["arguments"].split(" RETURN ")
-    # inputs, output = _parse_function_arguments(data["arguments"])
-    desc_result = execute(session, f"DESC PROCEDURE {inputs}", cacheable=True)
-    properties = dict([(row["property"], row["value"]) for row in desc_result])
-
-    return {
-        "name": data["name"],
-        "secure": data["is_secure"] == "Y",
-        # "args": data["arguments"],
-        "returns": output,
-        "language": properties["language"],
-        "runtime_version": properties["runtime_version"],
-        "null_handling": properties["null handling"],
-        "packages": json.loads(properties["packages"].replace("'", '"')),
-        "comment": None if data["description"] == "user-defined function" else data["description"],
-        "handler": properties["handler"],
-        "execute_as": properties["execute as"],
-        "as_": properties["body"],
-    }
 
 
 def fetch_role(session, fqn: FQN):
@@ -361,14 +403,14 @@ def fetch_role_grant(session, fqn: FQN):
         if data["granted_to"] == subject.upper() and data["grantee_name"] == name:
             if data["granted_to"] == "ROLE":
                 return {
-                    "name": f"{data['role']}?role={data['grantee_name']}",
+                    # "name": f"{data['role']}?role={data['grantee_name']}",
                     "role": fqn.name,
                     "to_role": data["grantee_name"],
                     "owner": data["granted_by"],
                 }
             elif data["granted_to"] == "USER":
                 return {
-                    "name": f"{data['role']}?user={data['grantee_name']}",
+                    # "name": f"{data['role']}?user={data['grantee_name']}",
                     "role": fqn.name,
                     "to_user": data["grantee_name"],
                     "owner": data["granted_by"],
@@ -427,6 +469,10 @@ def fetch_shared_database(session, fqn: FQN):
         "from_share": data["origin"],
         "owner": data["owner"],
     }
+
+
+def fetch_stage(session, fqn: FQN):
+    raise NotImplementedError
 
 
 def fetch_table(session, fqn: FQN):
@@ -586,3 +632,12 @@ def list_databases(session):
 def list_schemas(session):
     show_result = execute(session, "SHOW SCHEMAS")
     return [f"{row['database_name']}.{row['name']}" for row in show_result]
+
+
+def list_stages(session):
+    show_result = execute(session, "SHOW STAGES")
+    stages = []
+    for row in show_result:
+        row["fqn"] = f"{row['database_name']}.{row['schema_name']}.{row['name']}"
+        stages.append(row)
+    return stages

@@ -1,4 +1,4 @@
-.PHONY: install install-dev test integration style check
+.PHONY: install install-dev test integration style check clean
 
 install:
 	pip install -e .
@@ -17,3 +17,6 @@ style:
 	codespell .
 
 check: style test
+
+clean:
+	find . -name "__pycache__" -type d -exec rm -rf {} +

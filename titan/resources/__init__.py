@@ -15,7 +15,8 @@ from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
 from .sequence import Sequence
-from .shared_database import SharedDatabase
+
+# from .shared_database import SharedDatabase
 from .stage import Stage, InternalStage, ExternalStage
 from .stream import Stream, TableStream, ExternalTableStream, ViewStream, StageStream
 from .table import Table
@@ -79,7 +80,7 @@ __all__ = [
     "S3StorageIntegration",
     "Schema",
     "Sequence",
-    "SharedDatabase",
+    # "SharedDatabase",
     "Stage",
     "StageStream",
     "StorageIntegration",
