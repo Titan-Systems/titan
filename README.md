@@ -1,18 +1,76 @@
-# Titan
+# `Titan Core`
 
+<img src="images/titan-logo.png" alt="Titan Core" title="Titan Core logo"/>
 
-## What is Titan?
+Titan Core helps you provision, automate, and deploy resources in Snowflake. It replaces terraform.
 
-Titan is a Python library to manage data warehouse infrastructure.
+Define any resource – users, roles, schemas, databases, integrations, pipes, stages, functions, sprocs – with declarative Python.
 
-Titan is made up of many parts:
+## How it works
 
-- **Titan Resource API**. Manage resources with pure-Python classes.
-  
-- **Titan Blueprint**. Define infrastructure with code.
+### Define resources
 
+```Python
+from titan.resources import Grant, Role, Warehouse
 
-## Why Use Titan?
+role = Role(name="transformer")
+
+warehouse = Warehouse(
+    name="transforming",
+    warehouse_size="large",
+    auto_suspend=60,
+)
+
+grants = [
+    Grant(priv="usage", to=role, on=warehouse),
+    Grant(priv="operate", to=role, on=warehouse),
+]
+```
+
+### Plan and apply
+```Python
+from titan import Blueprint
+
+bp = Blueprint()
+bp.add(
+    role,
+    warehouse,
+    *grants,
+)
+plan = bp.plan(session)
+print(plan) # =>
+"""
+account:ABC123
+
+  + role "urn::ABC123:role/transformer" {
+     + name  = "transformer"
+     + owner = "SYSADMIN"
+    }
+
+  + warehouse "urn::ABC123:warehouse/transforming" {
+     + name           = "transforming"
+     + owner          = "SYSADMIN"
+     + warehouse_type = "STANDARD"
+     + warehouse_size = "LARGE"
+     + auto_suspend   = 60
+    }
+
+  + grant "urn::ABC123:grant/..." {
+     + priv = "USAGE"
+     + on   = warehouse "transforming"
+     + to   = role "transformer
+    }
+
+  + grant "urn::ABC123:grant/..." {
+     + priv = "OPERATE"
+     + on   = warehouse "transforming"
+     + to   = role "transformer
+    }
+"""
+bp.apply(session, plan)
+```
+
+## Why use Titan?
 
 Titan provides a simple way to manage your data warehouse. With Titan, you can:
 
@@ -24,7 +82,30 @@ Titan provides a simple way to manage your data warehouse. With Titan, you can:
 
 4. **Type Checking**: Titan ensures that the resources and configurations you define are correctly typed, reducing the chances of runtime errors.
 
+## Titan Core vs Terraform
+Terraform limits you to **1 role per provider**. However, Snowflake's access control is designed to use multiple roles. This forces you into a complex multi-provider configuration which results in drift, permission errors, and broken plans.
+
+Titan Core checks which privileges are required to ensure that plans can be applied. When privileges are missing, Titan tells you exactly what to grant. This speeds up development cycles and helps eliminate the use of `ACCOUNTADMIN`. 
+
+Titan also doesn’t use a state file, which provides more accurate plans and eliminates state mismatch issues.
+
+
+## Titan Core vs Schemachange
+
+
+
 ## Installation
+
+```SQL
+-- AWS
+CREATE DATABASE titan;
+
+CREATE STAGE titan.public.titan_aws
+  URL = 's3://titan-snowflake/';
+
+EXECUTE IMMEDIATE
+  FROM @titan.public.titan_aws/install;
+```
 
 Install Titan from GitHub with pip:
 
@@ -32,7 +113,7 @@ Install Titan from GitHub with pip:
 python -m pip install git+https://github.com/teej/titan.git
 ```
 
-## Getting Started
+## Get started
 
 Use Titan to create a starter dbt project.
 
@@ -97,7 +178,10 @@ def dbt():
 
 
 if __name__ == "__main__":
-    bp = Blueprint(name="dbt-quickstart", account=os.environ["SNOWFLAKE_ACCOUNT"])
+    bp = Blueprint(
+        name="dbt-quickstart",
+        account=os.environ["SNOWFLAKE_ACCOUNT"],
+    )
     bp.add(*dbt())
     session = snowflake.connector.connect(**connection_params)
     plan = bp.plan(session)

@@ -3,7 +3,7 @@ from setuptools import find_packages, setup
 setup(
     name="titan",
     version="0.1.0",
-    description="The easy way to automate data warehouse infrastructure",
+    description="Snowflake infrastructure as code",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     url="https://github.com/teej/titan",
@@ -36,7 +36,6 @@ setup(
             "ruff",
             "snowflake-cli-labs",
             "pytest-xdist",
-            "pre-commit==3.6.0",
             "codespell==2.2.6",
         ]
     },

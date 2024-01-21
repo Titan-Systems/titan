@@ -63,8 +63,8 @@ account_resources = [
             "DROP USER IF EXISTS recipient",
             "DROP ROLE IF EXISTS thatrole",
         ],
+        "fqn": "THATROLE?user=RECIPIENT",
         "data": {
-            "name": "THATROLE?user=RECIPIENT",
             "owner": "CI",
             "role": "THATROLE",
             "to_user": "RECIPIENT",
@@ -150,14 +150,18 @@ scoped_resources = [
         """,
         "teardown_sql": "DROP PROCEDURE somesproc(VARCHAR)",
         "data": {
-            "name": "SOMESPROC",
-            "args": [{"name": "ARG1", "data_type": "VARCHAR", "nullable": True}],
+            "name": "somesproc",
+            "args": [{"name": "ARG1", "data_type": "VARCHAR"}],
             "returns": "NUMBER",
             "language": "PYTHON",
             "packages": ["snowflake-snowpark-python"],
             "runtime_version": "3.9",
             "handler": "main",
             "execute_as": "OWNER",
+            "comment": "user-defined procedure",
+            "imports": [],
+            "null_handling": "CALLED ON NULL INPUT",
+            "secure": False,
             "as_": "def main(_, arg1: str): return 42",
         },
     },
@@ -281,7 +285,10 @@ def account_resource(request, cursor):
 @pytest.mark.requires_snowflake
 def test_fetch_account_resource(account_resource, db_session, account_locator):
     # fqn = FQN(name=account_resource["data"]["name"])
-    fqn = parse_identifier(account_resource["data"]["name"])
+    if "name" in account_resource["data"]:
+        fqn = parse_identifier(account_resource["data"]["name"])
+    else:
+        fqn = parse_identifier(account_resource["fqn"])
     urn = URN(
         resource_type=account_resource["resource_type"],
         fqn=fqn,
