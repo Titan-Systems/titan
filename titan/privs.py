@@ -1,5 +1,5 @@
 from .helpers import listify
-from .enums import ParseableEnum
+from .enums import ParseableEnum, ResourceType
 from .identifiers import URN
 
 
@@ -195,16 +195,16 @@ class WarehousePriv(ParseableEnum):
 
 
 RESOURCE_GRANTS_MAP = {
-    "account": GlobalPriv,
-    "database": DatabasePriv,
-    "procedure": ProcedurePriv,
-    "role": RolePriv,
-    "schema": SchemaPriv,
-    "stage": StagePriv,
-    "table": TablePriv,
-    "user": UserPriv,
-    "view": ViewPriv,
-    "warehouse": WarehousePriv,
+    ResourceType.ACCOUNT: GlobalPriv,
+    ResourceType.DATABASE: DatabasePriv,
+    ResourceType.PROCEDURE: ProcedurePriv,
+    ResourceType.ROLE: RolePriv,
+    ResourceType.SCHEMA: SchemaPriv,
+    ResourceType.STAGE: StagePriv,
+    ResourceType.TABLE: TablePriv,
+    ResourceType.USER: UserPriv,
+    ResourceType.VIEW: ViewPriv,
+    ResourceType.WAREHOUSE: WarehousePriv,
 }
 
 

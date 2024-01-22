@@ -1,4 +1,5 @@
 # Stored Procedure Interface (spi)
+import json
 import os
 import pydoc
 import re
@@ -36,13 +37,30 @@ def install(sp_session):
     Installs the titan spi functions and procedures into the current database.
     """
 
-    # stage = _snowflake.get_stage_location("TITAN")
-    stage = [s for s in dp.list_stages(sp_session.connection) if s["url"] == "s3://titan-snowflake/"][0]
+    conn = sp_session.connection
+
+    session_ctx = dp.fetch_session(conn)
+    print(session_ctx)
+
+    visible_stages = dp.list_stages(conn)
+    stage = None
+    for s in visible_stages:
+        if s["url"] == "s3://titan-snowflake/":
+            stage = s
+            break
+
+    if stage is None:
+        raise Exception(
+            "Cannot find Titan stage. Did you forget to run `CREATE STAGE titan_aws URL = 's3://titan-snowflake/'`?"
+        )
+
+    titan_db = stage["database_name"]
 
     blueprint = Blueprint("titan")
     blueprint.add(
-        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators", owner="CI"),
-        resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN", owner="CI"),
+        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators", owner="SYSADMIN"),
+        resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
+        resources.Grant(priv="USAGE", on_database=titan_db, to="TITAN_ADMIN"),
         resources.PythonStoredProcedure(
             name="fetch_database",
             owner="TITAN_ADMIN",
@@ -55,8 +73,12 @@ def install(sp_session):
             execute_as="CALLER",
         ),
     )
-    plan = blueprint.plan(sp_session.connection)
-    blueprint.apply(sp_session.connection, plan)
+    plan = blueprint.plan(conn)
+    result = blueprint.apply(conn, plan)
+    return {
+        "plan": json.dumps(plan, default=str),
+        "actions": json.dumps(result, default=str),
+    }
 
 
 def _execute(sp_session, sql: list):

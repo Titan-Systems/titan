@@ -1,6 +1,6 @@
 from typing import Optional
 
-from inflection import underscore
+from .enums import ResourceType
 
 
 class FQN:
@@ -49,22 +49,28 @@ class URN:
                              Fully Qualified Name
     """
 
-    def __init__(self, resource_type: str, fqn: FQN, account_locator: str, organization: str = "") -> None:
-        # self.resource_type = underscore(resource_type)
-        self.resource_type = resource_type.replace(" ", "_").lower()
+    def __init__(self, resource_type: ResourceType, fqn: FQN, account_locator: str) -> None:
+        if not isinstance(resource_type, ResourceType):
+            raise Exception(f"Invalid resource type: {resource_type}")
+        self.resource_type = resource_type
+        self.resource_label = str(resource_type).replace(" ", "_").lower()
         self.fqn = fqn
         self.account_locator = account_locator
-        self.organization = organization
+        self.organization = ""
 
     def __str__(self):
-        return f"urn:{self.organization}:{self.account_locator}:{self.resource_type}/{self.fqn}"
+        return f"urn:{self.organization}:{self.account_locator}:{self.resource_label}/{self.fqn}"
 
     def __repr__(self):
-        return f"URN(urn:{self.organization}:{self.account_locator}:{self.resource_type}/{self.fqn})"
+        org = getattr(self, "organization", "")
+        acct = getattr(self, "account_locator", "")
+        label = getattr(self, "resource_label", "")
+        fqn = getattr(self, "fqn", "")
+        return f"URN(urn:{org}:{acct}:{label}/{fqn})"
 
     @classmethod
     def from_resource(cls, resource, **kwargs):
-        return cls(resource_type=str(resource.resource_type), fqn=resource.fqn, **kwargs)
+        return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
 
     # @classmethod
     # def from_locator(cls, locator: "ResourceLocator"):
@@ -75,7 +81,7 @@ class URN:
     @classmethod
     def from_session_ctx(cls, session_ctx):
         return cls(
-            resource_type="account",
+            resource_type=ResourceType.ACCOUNT,
             fqn=FQN(name=session_ctx["account"]),
             account_locator=session_ctx["account_locator"],
         )
@@ -84,7 +90,7 @@ class URN:
         if not self.fqn.database:
             raise Exception(f"URN does not have a database: {self}")
         return URN(
-            resource_type="database",
+            resource_type=ResourceType.DATABASE,
             account_locator=self.account_locator,
             fqn=FQN(name=self.fqn.database),
         )
@@ -93,7 +99,7 @@ class URN:
         if not self.fqn.schema:
             raise Exception(f"URN does not have a schema: {self}")
         return URN(
-            resource_type="schema",
+            resource_type=ResourceType.SCHEMA,
             account_locator=self.account_locator,
             fqn=FQN(name=self.fqn.schema, database=self.fqn.database),
         )

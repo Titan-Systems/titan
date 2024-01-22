@@ -9,6 +9,7 @@ from inflection import pluralize
 from snowflake.connector.errors import ProgrammingError
 
 from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
+from .enums import ResourceType
 from .identifiers import URN, FQN
 from .parse import (
     FullyQualifiedIdentifier,
@@ -55,7 +56,7 @@ def _urn_from_grant(row, session_ctx):
         else:
             fqn = parse_identifier(row["name"], is_schema=(granted_on == "schema"))
         return URN(
-            resource_type=granted_on,
+            resource_type=ResourceType(granted_on),
             account_locator=session_ctx["account_locator"],
             fqn=fqn,
         )
@@ -118,7 +119,7 @@ def remove_none_values(d):
 
 
 def fetch_resource(session, urn: URN):
-    return getattr(__this__, f"fetch_{urn.resource_type}")(session, urn.fqn)
+    return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
 
 def fetch_account_locator(session):
@@ -145,7 +146,9 @@ def fetch_session(session):
             CURRENT_SECONDARY_ROLES() as secondary_roles,
             CURRENT_DATABASE() as database,
             CURRENT_SCHEMAS() as schemas,
-            CURRENT_WAREHOUSE() as warehouse
+            CURRENT_WAREHOUSE() as warehouse,
+            CURRENT_VERSION() as version,
+            { '2024_01': SYSTEM$BEHAVIOR_CHANGE_BUNDLE_STATUS('2024_01') } as release_bundle_status
         """,
     )[0]
 
@@ -160,17 +163,19 @@ def fetch_session(session):
             raise
 
     return {
-        "account": session_obj["ACCOUNT"],
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
-        "user": session_obj["USER"],
-        "role": session_obj["ROLE"],
+        "account": session_obj["ACCOUNT"],
         "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
-        "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
         "database": session_obj["DATABASE"],
+        "release_bundle_status": json.loads(session_obj["RELEASE_BUNDLE_STATUS"]),
+        "role": session_obj["ROLE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
-        "warehouse": session_obj["WAREHOUSE"],
+        "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
         "tag_support": tag_support,
         "tags": tags,
+        "user": session_obj["USER"],
+        "version": session_obj["VERSION"],
+        "warehouse": session_obj["WAREHOUSE"],
     }
 
 
@@ -332,19 +337,23 @@ def fetch_procedure(session, fqn: FQN):
     desc_result = execute(session, f"DESC PROCEDURE {str(identifier)}", cacheable=True)
     properties = dict([(row["property"], row["value"]) for row in desc_result])
 
+    show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {str(identifier)}")
+    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+
     return {
         "name": data["name"].lower(),
-        "secure": data["is_secure"] == "Y",
         "args": _parse_signature(properties["signature"]),
-        "returns": returns,
-        "language": properties["language"],
-        "runtime_version": properties["runtime_version"],
-        "null_handling": properties["null handling"],
-        "imports": _parse_imports(properties["imports"]),
-        "packages": json.loads(properties["packages"].replace("'", '"')),
         "comment": data["description"],
-        "handler": properties["handler"],
         "execute_as": properties["execute as"],
+        "handler": properties["handler"],
+        "imports": _parse_imports(properties["imports"]),
+        "language": properties["language"],
+        "null_handling": properties["null handling"],
+        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
+        "packages": json.loads(properties["packages"].replace("'", '"')),
+        "returns": returns,
+        "runtime_version": properties["runtime_version"],
+        "secure": data["is_secure"] == "Y",
         "as_": properties["body"],
     }
 
@@ -403,17 +412,15 @@ def fetch_role_grant(session, fqn: FQN):
         if data["granted_to"] == subject.upper() and data["grantee_name"] == name:
             if data["granted_to"] == "ROLE":
                 return {
-                    # "name": f"{data['role']}?role={data['grantee_name']}",
                     "role": fqn.name,
                     "to_role": data["grantee_name"],
-                    "owner": data["granted_by"],
+                    # "owner": data["granted_by"],
                 }
             elif data["granted_to"] == "USER":
                 return {
-                    # "name": f"{data['role']}?user={data['grantee_name']}",
                     "role": fqn.name,
                     "to_user": data["grantee_name"],
-                    "owner": data["granted_by"],
+                    # "owner": data["granted_by"],
                 }
             else:
                 raise Exception(f"Unexpected role grant for role {fqn.name}")

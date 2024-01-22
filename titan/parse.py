@@ -4,10 +4,8 @@ from typing import List, Dict, Callable, Union
 
 import pyparsing as pp
 
-from pyparsing import ParseException
-
 from .builder import SQL
-from .enums import Scope
+from .enums import ResourceType, Scope
 from .identifiers import FQN, URN
 from .scope import DatabaseScope, SchemaScope
 
@@ -304,8 +302,8 @@ def _resolve_resource_class(sql):
     try:
         resource_key = convert_match(lexicon, sql)
         return resource_key
-    except ParseException as err:
-        raise ParseException(f"Could not resolve resource class for SQL: {sql}") from err
+    except pp.ParseException as err:
+        raise pp.ParseException(f"Could not resolve resource class for SQL: {sql}") from err
 
 
 class Lexicon:
@@ -335,7 +333,7 @@ def convert_match(lexicon: Lexicon, text):
     parser = pp.StringStart() + lexicon.parser
     parse_result, _, end = _first_match(parser, text)
     if parse_result is None:
-        raise ParseException(f"Could not match {text}")
+        raise pp.ParseException(f"Could not match {text}")
     action_or_str = lexicon.get_action(parse_result)
     if callable(action_or_str):
         action = action_or_str
@@ -410,7 +408,7 @@ def _parse_props(props, sql):
         # Check if we skipped any text. Since `parser` is a MatchFirst, skipped text is a sign
         # that our SQL is invalid or our parser is incomplete.
         if len(sql[prev_end:start].strip()) > 0:
-            raise ParseException(f"Failed to parse prop {sql[prev_end:start]}")
+            raise pp.ParseException(f"Failed to parse prop {sql[prev_end:start]}")
 
         prop_kwarg = parse_results[-1]
         prop = props[prop_kwarg]
@@ -427,7 +425,7 @@ def _parse_props(props, sql):
             found_props[prop_kwarg] = prop.typecheck(prop_value)
         except ValueError as err:
             raise ValueError(f"Parsed prop {prop_kwarg} with value {prop_value} failed typechecking") from err
-        except ParseException:
+        except pp.ParseException:
             raise ValueError(f"Parsed prop {prop_kwarg}={prop} with value {prop_value} failed typechecking")
         remainder = sql[end:].strip(" ")
         prev_end = end
@@ -613,10 +611,10 @@ def parse_URN(urn_str: str) -> URN:
         raise Exception(f"Invalid URN string: {urn_str}")
     if parts[0] != "urn":
         raise Exception(f"Invalid URN string: {urn_str}")
-    resource_type, fqn_str = parts[3].split("/")
-    fqn = parse_identifier(fqn_str, is_schema=(resource_type == "schema"))
+    resource_label, fqn_str = parts[3].split("/")
+    resource_type = ResourceType(resource_label.replace("_", " ").upper())
+    fqn = parse_identifier(fqn_str, is_schema=(resource_label == "schema"))
     return URN(
-        organization=parts[1],
         account_locator=parts[2],
         resource_type=resource_type,
         fqn=fqn,

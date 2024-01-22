@@ -4,11 +4,10 @@ from typing import Any
 from .resource import Resource, ResourceSpec
 from .role import Role
 from .user import User
-from ..enums import ParseableEnum, ResourceType
+from ..enums import ResourceType
 from ..identifiers import FQN
-from ..parse import _parse_grant
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
-from ..props import Props, IdentifierProp
+from ..props import Props, FlagProp, IdentifierProp
 from ..scope import AccountScope
 
 
@@ -106,7 +105,10 @@ class Grant(Resource):
     """
 
     resource_type = ResourceType.GRANT
-    props = Props()
+    props = Props(
+        to=IdentifierProp("to", eq=False, consume="role"),
+        grant_option=FlagProp("with grant option"),
+    )
     scope = AccountScope()
     spec = _Grant
 
@@ -247,7 +249,7 @@ class _RoleGrant(ResourceSpec):
     role: Role
     to_role: Role = None
     to_user: User = None
-    owner: str = "USERADMIN"
+    # owner: str = None  # "USERADMIN"
 
     def __post_init__(self):
         super().__post_init__()
@@ -276,7 +278,7 @@ class RoleGrant(Resource):
         role: Role,
         to_role: Role = None,
         to_user: User = None,
-        owner: str = "USERADMIN",
+        # owner: str = None,  # = "USERADMIN"
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -284,7 +286,7 @@ class RoleGrant(Resource):
             role=role,
             to_role=to_role,
             to_user=to_user,
-            owner=owner,
+            # owner=owner,
         )
         self.requires(
             role,

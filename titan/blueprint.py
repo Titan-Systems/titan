@@ -4,8 +4,10 @@ from collections import defaultdict
 from typing import List, Optional, Union
 from queue import Queue
 
+import snowflake.connector
+
 from . import data_provider, lifecycle
-from .client import execute
+from .client import ALREADY_EXISTS_ERR, execute
 from .diff import diff, DiffAction
 from .identifiers import URN, FQN
 from .parse import parse_URN
@@ -160,23 +162,23 @@ def _collect_available_privs(session_ctx, session, plan):
                 if create_priv is None:
                     continue
                 ownership_priv = priv_for_principal(urn, "OWNERSHIP")
-                if urn.resource_type == "database":
+                if urn.resource_type == ResourceType.DATABASE:
                     parent_urn = account_urn
-                elif urn.resource_type == "schema":
+                elif urn.resource_type == ResourceType.SCHEMA:
                     parent_urn = urn.database()
                 else:
                     parent_urn = urn.schema()
                 if _contains(role, str(parent_urn), create_priv):
                     _add(role, urn_str, ownership_priv)
-                    if urn.resource_type == "database":
+                    if urn.resource_type == ResourceType.DATABASE:
                         public_schema = URN(
                             account_locator=account_urn.account_locator,
-                            resource_type="schema",
+                            resource_type=ResourceType.SCHEMA,
                             fqn=FQN(name="PUBLIC", database=urn.fqn.name),
                         )
                         information_schema = URN(
                             account_locator=account_urn.account_locator,
-                            resource_type="schema",
+                            resource_type=ResourceType.SCHEMA,
                             fqn=FQN(name="PUBLIC", database=urn.fqn.name),
                         )
                         _add(role, str(public_schema), priv_for_principal(public_schema, "OWNERSHIP"))
@@ -355,10 +357,12 @@ class Blueprint:
 
         _raise_if_missing_privs(required_privs, available_privs)
 
+        actions_taken = []
+
         for action, urn_str, data in plan:
             urn = parse_URN(urn_str)
 
-            props = Resource.props_for_resource_type(ResourceType(urn.resource_type))
+            props = Resource.props_for_resource_type(urn.resource_type)
 
             if action == DiffAction.ADD:
                 sql = lifecycle.create_resource(urn, data, props)
@@ -366,7 +370,15 @@ class Blueprint:
                 sql = lifecycle.update_resource(urn, data, props)
             elif action == DiffAction.REMOVE:
                 sql = lifecycle.drop_resource(urn, data)
-            execute(session, sql)
+            try:
+                actions_taken.append(sql)
+                execute(session, sql)
+            except snowflake.connector.errors.ProgrammingError as err:
+                if err.errno == ALREADY_EXISTS_ERR:
+                    # raise Exception(f"Resource already exists: {urn_str}")
+                    print(f"Resource already exists: {urn_str}, skipping...")
+                raise err
+        return actions_taken
 
     def destroy(self, session, manifest=None):
         session_ctx = data_provider.fetch_session(session)

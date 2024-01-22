@@ -1,6 +1,7 @@
 import sys
 
 from .builder import tidy_sql
+from .enums import ResourceType
 from .identifiers import URN
 from .privs import GlobalPriv, DatabasePriv, RolePriv, SchemaPriv
 from .props import Props
@@ -9,7 +10,7 @@ __this__ = sys.modules[__name__]
 
 
 def create_resource(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
-    return getattr(__this__, f"create_{urn.resource_type}", create__default)(urn, data, props, if_not_exists)
+    return getattr(__this__, f"create_{urn.resource_label}", create__default)(urn, data, props, if_not_exists)
 
 
 def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
@@ -53,7 +54,7 @@ def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
 
 
 def update_resource(urn: URN, data: dict, props: Props) -> str:
-    return getattr(__this__, f"update_{urn.resource_type}", update__default)(urn, data, props)
+    return getattr(__this__, f"update_{urn.resource_label}", update__default)(urn, data, props)
 
 
 def update__default(urn: URN, data: dict, props: Props) -> str:
@@ -78,6 +79,10 @@ def update__default(urn: URN, data: dict, props: Props) -> str:
         )
 
 
+def update_role_grant(urn: URN, data: dict, props: Props) -> str:
+    raise NotImplementedError
+
+
 def update_schema(urn: URN, data: dict, props: Props) -> str:
     attr, new_value = data.popitem()
     attr = attr.lower()
@@ -97,7 +102,7 @@ def update_schema(urn: URN, data: dict, props: Props) -> str:
 
 
 def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:
-    return getattr(__this__, f"drop_{urn.resource_type}", drop__default)(urn, data, if_exists)
+    return getattr(__this__, f"drop_{urn.resource_label}", drop__default)(urn, data, if_exists)
 
 
 def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
@@ -132,13 +137,15 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
 
 
 CREATE_RESOURCE_PRIV_MAP = {
-    "database": [GlobalPriv.CREATE_DATABASE],
-    "schema": [DatabasePriv.CREATE_SCHEMA],
-    "table": [SchemaPriv.CREATE_TABLE, SchemaPriv.USAGE, DatabasePriv.USAGE],
-    "procedure": [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],
-    "function": [SchemaPriv.CREATE_FUNCTION, SchemaPriv.USAGE, DatabasePriv.USAGE],
-    "role_grant": [RolePriv.OWNERSHIP],
-    "role": [GlobalPriv.CREATE_ROLE],
+    ResourceType.DATABASE: [GlobalPriv.CREATE_DATABASE],
+    ResourceType.FUNCTION: [SchemaPriv.CREATE_FUNCTION, SchemaPriv.USAGE, DatabasePriv.USAGE],
+    ResourceType.GRANT: [],  # TODO
+    ResourceType.PROCEDURE: [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],
+    ResourceType.ROLE_GRANT: [RolePriv.OWNERSHIP],
+    ResourceType.ROLE: [GlobalPriv.CREATE_ROLE],
+    ResourceType.SCHEMA: [DatabasePriv.CREATE_SCHEMA],
+    ResourceType.TABLE: [SchemaPriv.CREATE_TABLE, SchemaPriv.USAGE, DatabasePriv.USAGE],
+    ResourceType.USER: [GlobalPriv.CREATE_USER],
 }
 
 

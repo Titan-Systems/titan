@@ -5,6 +5,7 @@ import pytest
 import snowflake.connector
 
 from titan import data_provider
+from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from titan.parse import parse_identifier
 
@@ -19,7 +20,7 @@ connection_params = {
 
 account_resources = [
     {
-        "resource_type": "database",
+        "resource_type": ResourceType.DATABASE,
         "setup_sql": "CREATE DATABASE SOMEDB",
         "teardown_sql": "DROP DATABASE IF EXISTS SOMEDB",
         "data": {
@@ -31,7 +32,7 @@ account_resources = [
         },
     },
     {
-        "resource_type": "role",
+        "resource_type": ResourceType.ROLE,
         "setup_sql": "CREATE ROLE somerole",
         "teardown_sql": "DROP ROLE IF EXISTS somerole",
         "data": {
@@ -53,7 +54,7 @@ account_resources = [
     #     },
     # },
     {
-        "resource_type": "role_grant",
+        "resource_type": ResourceType.ROLE_GRANT,
         "setup_sql": [
             "CREATE USER recipient",
             "CREATE ROLE thatrole",
@@ -71,7 +72,7 @@ account_resources = [
         },
     },
     {
-        "resource_type": "user",
+        "resource_type": ResourceType.USER,
         "setup_sql": "CREATE USER someuser",
         "teardown_sql": "DROP USER IF EXISTS someuser",
         "data": {
@@ -87,7 +88,7 @@ account_resources = [
 
 scoped_resources = [
     {
-        "resource_type": "alert",
+        "resource_type": ResourceType.ALERT,
         "setup_sql": [
             "CREATE WAREHOUSE TEST_WH",
             "CREATE ALERT somealert WAREHOUSE = TEST_WH SCHEDULE = '60 MINUTE' IF(EXISTS(SELECT 1)) THEN SELECT 1",
@@ -103,7 +104,7 @@ scoped_resources = [
         },
     },
     {
-        "resource_type": "dynamic_table",
+        "resource_type": ResourceType.DYNAMIC_TABLE,
         "setup_sql": [
             "CREATE TABLE upstream (id INT) AS select 1",
             "CREATE DYNAMIC TABLE product (id INT) TARGET_LAG = '20 minutes' WAREHOUSE = CI REFRESH_MODE = AUTO INITIALIZE = ON_CREATE COMMENT = 'this is a comment' AS SELECT id FROM upstream",
@@ -125,7 +126,7 @@ scoped_resources = [
         },
     },
     {
-        "resource_type": "function",
+        "resource_type": ResourceType.FUNCTION,
         "setup_sql": "CREATE FUNCTION somefunc() RETURNS double LANGUAGE JAVASCRIPT AS 'return 42;'",
         "teardown_sql": "DROP FUNCTION somefunc()",
         "data": {
@@ -138,7 +139,7 @@ scoped_resources = [
         },
     },
     {
-        "resource_type": "procedure",
+        "resource_type": ResourceType.PROCEDURE,
         "setup_sql": """
             CREATE PROCEDURE somesproc(ARG1 VARCHAR)
                 RETURNS INT NOT NULL
@@ -166,7 +167,7 @@ scoped_resources = [
         },
     },
     {
-        "resource_type": "schema",
+        "resource_type": ResourceType.SCHEMA,
         "setup_sql": "CREATE TRANSIENT SCHEMA somesch MAX_DATA_EXTENSION_TIME_IN_DAYS = 3",
         "teardown_sql": "DROP SCHEMA IF EXISTS somesch",
         "data": {
@@ -179,7 +180,7 @@ scoped_resources = [
         },
     },
     {
-        "resource_type": "table",
+        "resource_type": ResourceType.TABLE,
         "setup_sql": "CREATE TABLE sometbl (id INT)",
         "teardown_sql": "DROP TABLE IF EXISTS sometbl",
         "data": {
@@ -249,7 +250,7 @@ def test_fetch_scoped_resource(scoped_resource, db_session, account_locator, tes
     fqn = FQN(
         name=scoped_resource["data"]["name"],
         database=test_db_name,
-        schema=None if scoped_resource["resource_type"] == "schema" else "PUBLIC",
+        schema=None if scoped_resource["resource_type"] == ResourceType.SCHEMA else "PUBLIC",
     )
     urn = URN(
         resource_type=scoped_resource["resource_type"],

@@ -1,13 +1,15 @@
 from dataclasses import asdict, dataclass, fields
-from typing import _GenericAlias, Any, TypedDict, Type, Union, get_args, get_type_hints
+from typing import _GenericAlias, Any, TypedDict, Type, Union, get_args, get_origin, get_type_hints
 from inspect import isclass
 from itertools import chain
+
+import pyparsing as pp
 
 from ..enums import DataType, ParseableEnum, ResourceType
 from ..identifiers import FQN, URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
-from ..parse import ParseException, _parse_create_header, _parse_props
+from ..parse import _parse_create_header, _parse_props
 from ..scope import ResourceScope, DatabaseScope, SchemaScope
 
 
@@ -19,58 +21,60 @@ class Arg(TypedDict):
 @dataclass
 class ResourceSpec:
     def __post_init__(self):
+        def _coerce(field_value, field_type):
+            if field_type == Any:
+                return field_value
+
+            # Recursively traverse lists and dicts
+            if get_origin(field_type) == list:  # or issubclass(field_type, list):
+                if not isinstance(field_value, list):
+                    raise Exception
+                list_element_type = get_args(field_type) or (str,)
+                return [_coerce(v, field_type=list_element_type[0]) for v in field_value]
+            elif get_origin(field_type) == dict:  # issubclass(field_type, dict):
+                if not isinstance(field_value, dict):
+                    raise Exception
+                dict_types = get_args(field_type)
+                if len(dict_types) < 2:
+                    raise RuntimeError(f"Unexpected field type {field_type}")
+                return {k: _coerce(v, field_type=dict_types[1]) for k, v in field_value.items()}
+
+            if not isclass(field_type):
+                raise RuntimeError(f"Unexpected field type {field_type}")
+
+            # Coerce enums
+            if issubclass(field_type, ParseableEnum):
+                return field_type(field_value)
+
+            # Coerce args
+            elif field_type == Arg:
+                # type_map = get_type_hints(field_type)
+                # return {k: _coerce(v, field_type=type_map[k]) for k, v in field_value.items()}
+                return {
+                    "name": field_value["name"].upper(),
+                    "data_type": DataType(field_value["data_type"]),
+                }
+
+            # Coerce resources
+            elif issubclass(field_type, Resource):
+                if isinstance(field_value, str):
+                    return field_type(name=field_value, stub=True)
+                elif isinstance(field_value, dict):
+                    return field_type(**field_value, stub=True)
+                elif isinstance(field_value, field_type):
+                    return field_value
+            else:
+                return field_value
+
         for field in fields(self):
             field_value = getattr(self, field.name)
 
-            def _coerce(field_value, field_type=None):
-                if field_type is None:
-                    field_type = field.type
-
-                if field_type == Any:
-                    return field_value
-
-                # Recursively traverse lists and dicts
-                if issubclass(field_type, list):
-                    if not isinstance(field_value, list):
-                        raise Exception
-                    list_element_type = get_args(field_type) or (str,)
-                    return [_coerce(v, field_type=list_element_type[0]) for v in field_value]
-                elif issubclass(field_type, dict):
-                    if not isinstance(field_value, dict):
-                        raise Exception
-                    if field_type == Arg:
-                        type_map = get_type_hints(field_type)
-                        return {k.upper(): _coerce(v, field_type=type_map[k]) for k, v in field_value.items()}
-                    else:
-                        dict_types = get_args(field_type)
-                        if len(dict_types) < 2:
-                            raise RuntimeError(f"Unexpected field type {field_type}")
-                        return {k: _coerce(v, field_type=dict_types[1]) for k, v in field_value.items()}
-
-                if not isclass(field_type):
-                    raise RuntimeError(f"Unexpected field type {field_type}")
-
-                # Coerce enums
-                if issubclass(field_type, ParseableEnum):
-                    return field_type(field_value)
-
-                # Coerce resources
-                elif issubclass(field_type, Resource):
-                    if isinstance(field_value, str):
-                        return field_type(name=field_value, stub=True)
-                    elif isinstance(field_value, dict):
-                        return field_type(**field_value, stub=True)
-                    elif isinstance(field_value, field_type):
-                        return field_value
-                else:
-                    return field_value
-
             if field_value is None:
                 continue
-            elif isinstance(field.type, _GenericAlias):
-                continue
+            # elif isinstance(field.type, _GenericAlias):
+            #     continue
             else:
-                setattr(self, field.name, _coerce(field_value))
+                setattr(self, field.name, _coerce(field_value, field.type))
 
 
 class _Resource(type):
@@ -116,17 +120,15 @@ class Resource(metaclass=_Resource):
         try:
             props = _parse_props(resource_cls.props, remainder_sql) if remainder_sql else {}
             return resource_cls(**identifier, **props)
-        except ParseException as err:
-            raise ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
+        except pp.ParseException as err:
+            raise pp.ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
     @classmethod
     def props_for_resource_type(cls, resource_type: ResourceType):
         return cls.resolve_resource_cls(resource_type).props
 
     @classmethod
-    def resolve_resource_cls(cls, resource_type: Union[str, ResourceType], data: dict = None) -> Type["Resource"]:
-        if isinstance(resource_type, str):
-            resource_type = ResourceType(resource_type)
+    def resolve_resource_cls(cls, resource_type: ResourceType, data: dict = None) -> Type["Resource"]:
         resource_types = cls.__types[resource_type]
         if len(resource_types) > 1:
             if data is None:
