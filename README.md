@@ -1,10 +1,8 @@
 # `Titan Core`
 
-<img src="images/titan-logo.png" alt="Titan Core" title="Titan Core logo"/>
+Titan Core helps you provision, deploy, and secure resources in Snowflake. It replaces infrastructure tools like Terraform or Schemachange.
 
-Titan Core helps you provision, automate, and deploy resources in Snowflake. It replaces terraform.
-
-Define any resource – users, roles, schemas, databases, integrations, pipes, stages, functions, sprocs – with declarative Python.
+Define any Snowflake resource, including users, roles, schemas, databases, integrations, pipes, stages, functions, and stored procedures, using declarative Python.
 
 ## How it works
 
@@ -42,6 +40,8 @@ print(plan) # =>
 """
 account:ABC123
 
+  » role.transformer will be created
+
   + role "urn::ABC123:role/transformer" {
      + name  = "transformer"
      + owner = "SYSADMIN"
@@ -69,18 +69,6 @@ account:ABC123
 """
 bp.apply(session, plan)
 ```
-
-## Why use Titan?
-
-Titan provides a simple way to manage your data warehouse. With Titan, you can:
-
-1. **Declarative API**: Describe what you want without the hassle of how to achieve it.
-
-2. **Deferred Execution**: Plan your infrastructure modifications without immediate execution, allowing you to visualize and review changes before they happen.
-
-3. **SQL Compatibility**: Integrate your existing SQL scripts and workflows into Titan, ensuring a smooth transition and continuous functionality.
-
-4. **Type Checking**: Titan ensures that the resources and configurations you define are correctly typed, reducing the chances of runtime errors.
 
 ## Titan Core vs Terraform
 Terraform limits you to **1 role per provider**. However, Snowflake's access control is designed to use multiple roles. This forces you into a complex multi-provider configuration which results in drift, permission errors, and broken plans.
@@ -113,7 +101,7 @@ Install Titan from GitHub with pip:
 python -m pip install git+https://github.com/teej/titan.git
 ```
 
-## Get started
+## Examples
 
 Use Titan to create a starter dbt project.
 
