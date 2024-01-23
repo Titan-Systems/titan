@@ -55,7 +55,7 @@ class Column(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _Column(
+        self._data: _Column = _Column(
             name,
             data_type,
             collate=collate,
@@ -70,3 +70,6 @@ class Column(Resource):
         remainder = parse_results.pop("remainder", "")
         props = _parse_props(cls.props, remainder)
         return cls(**parse_results, **props)
+
+    def serialize(self):
+        return {"name": self._data.name, "data_type": self._data.data_type}

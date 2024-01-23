@@ -5,8 +5,6 @@ import pydoc
 import re
 import sys
 
-from yaml import safe_load
-
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
 from . import data_provider as dp
@@ -16,6 +14,7 @@ from .diff import diff
 from .enums import DataType, ResourceType
 from .identifiers import FQN, URN
 from .parse import parse_identifier
+from .scope import DatabaseScope, SchemaScope
 
 SNOWPARK_TELEMETRY_ID = "titan_titan"
 
@@ -123,12 +122,50 @@ def install(sp_session):
     }
 
 
-def _execute(sp_session, sql: list):
+def _execute(sf_session, sql: list):
     for sql_text in sql:
         try:
-            sp_session.sql(sql_text).collect()
+            sf_session.execute_string(sql_text)
         except SnowparkSQLException as err:
             raise SnowparkSQLException(f"failed to execute sql, [{sql_text}]", error_code=err.error_code) from err
+
+
+###############################################################################
+# Create or Update functions
+###############################################################################
+
+
+def _create_or_update_resource(
+    sf_session,
+    resource_type: ResourceType,
+    config: dict,
+    dry_run: bool = False,
+):
+    fqn = parse_identifier(config["name"], is_schema=(resource_type == ResourceType.SCHEMA))
+
+    resource_cls = resources.Resource.resolve_resource_cls(resource_type)
+    session_ctx = dp.fetch_session(sf_session)
+    if isinstance(resource_cls.scope, (DatabaseScope, SchemaScope)) and fqn.database is None:
+        fqn.database = config.get("database", session_ctx["database"])
+    urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
+    original = dp.fetch_resource(sf_session, urn)
+    sql = []
+    if original:
+        resource_cls = resources.Resource.resolve_resource_cls(resource_type)
+        original = {str(urn): dp.remove_none_values(original)}
+        new = {str(urn): dp.remove_none_values(resource_cls.defaults() | config)}
+        for _, _, change in diff(original, new):
+            sql.append(lifecycle.update_resource(urn, change, resource_cls.props))
+    else:
+        sql = [lifecycle.create_resource(urn, config, if_not_exists=True)]
+    if not dry_run:
+        _execute(sf_session, sql)
+    return {"sql": sql}
+
+
+@procedure
+def create_or_update_database(sp_session, config: dict, dry_run: bool = False):
+    return _create_or_update_resource(sp_session.connection, ResourceType.DATABASE, config, dry_run)
 
 
 @procedure
@@ -141,8 +178,6 @@ def create_or_update_schema(sp_session, config: dict, dry_run: bool = False):
     ----------
     config : OBJECT
         A dictionary containing the schema configuration
-    yaml : VARCHAR
-        A YAML string containing the schema configuration
     dry_run : BOOLEAN
         If True, do not execute any SQL
 
@@ -167,9 +202,7 @@ def create_or_update_schema(sp_session, config: dict, dry_run: bool = False):
     managed_access : BOOLEAN
         If True, the schema is managed
     """
-    if yaml and config is None:
-        config = safe_load(yaml)
-    _create_or_update_resource(sp_session.connection, ResourceType.SCHEMA, config, dry_run)
+    return _create_or_update_resource(sp_session.connection, ResourceType.SCHEMA, config, dry_run)
 
 
 @procedure
@@ -182,8 +215,6 @@ def create_or_update_user(sp_session, config: dict, dry_run: bool = False):
     ----------
     config : OBJECT
         A dictionary containing the schema configuration
-    yaml : VARCHAR
-        A YAML string containing the schema configuration
     dry_run : BOOLEAN
         If True, do not execute any SQL
 
@@ -192,37 +223,33 @@ def create_or_update_user(sp_session, config: dict, dry_run: bool = False):
     name : STRING
         The name of the user
     comment : STRING
+        A comment to attach to the user
 
     """
-    if yaml and config is None:
-        config = safe_load(yaml)
-    _create_or_update_resource(sp_session.connection, ResourceType.USER, config, dry_run)
+    return _create_or_update_resource(sp_session.connection, ResourceType.USER, config, dry_run)
 
 
-def _create_or_update_resource(
-    sf_session,
-    resource_type: ResourceType,
-    config: dict,
-    dry_run: bool = False,
-):
-    fqn = parse_identifier(config["name"], is_schema=(resource_type == ResourceType.SCHEMA))
+@procedure
+def create_or_update_warehouse(sp_session, config: dict, dry_run: bool = False):
+    return _create_or_update_resource(sp_session.connection, ResourceType.WAREHOUSE, config, dry_run)
 
-    session_ctx = dp.fetch_session()
-    fqn.database = config.get("database", session_ctx["database"])
-    urn = URN(resource_type=str(resource_type), fqn=fqn, account_locator=session_ctx["account_locator"])
-    original = dp.fetch_resource(sf_session, fqn)
-    sql = []
-    if original:
-        resource_cls = resources.Resource.resolve_resource_cls(resource_type)
-        original = {str(urn): dp.remove_none_values(original)}
-        new = {str(urn): dp.remove_none_values(resource_cls.defaults() | config)}
-        for _, _, change in diff(original, new):
-            sql.append(lifecycle.update_resource(urn, change, resource_cls.props))
-    else:
-        sql = [lifecycle.create_resource(urn, config, if_not_exists=True)]
-    if not dry_run:
-        _execute(sf_session, sql)
-    return {"sql": sql}
+
+@procedure
+def create_or_update_role(sp_session, config: dict, dry_run: bool = False):
+    return _create_or_update_resource(sp_session.connection, ResourceType.ROLE, config, dry_run)
+
+
+###############################################################################
+# Fetch functions
+###############################################################################
+
+
+@procedure
+def fetch_database(sp_session, name: str) -> dict:
+    """
+    Returns a database's configuration.
+    """
+    return dp.fetch_database(sp_session.connection, FQN(name))
 
 
 @procedure
@@ -237,18 +264,27 @@ def fetch_schema(sp_session, name: str) -> dict:
 
 
 @procedure
-def fetch_database(sp_session, name: str) -> dict:
-    """
-    Returns a database's configuration.
-    """
-    return dp.fetch_database(sp_session.connection, FQN(name))
-
-
 def fetch_user(sp_session, name: str) -> dict:
     """
     Returns a user's configuration.
     """
     return dp.fetch_user(sp_session.connection, FQN(name))
+
+
+@procedure
+def fetch_warehouse(sp_session, name: str) -> dict:
+    """
+    Returns a user's configuration.
+    """
+    return dp.fetch_warehouse(sp_session.connection, FQN(name))
+
+
+@procedure
+def fetch_role(sp_session, name: str) -> dict:
+    """
+    Returns a user's configuration.
+    """
+    return dp.fetch_role(sp_session.connection, FQN(name))
 
 
 # def git_export(sp_session, locator: str, repo: str, path: str) -> dict:

@@ -50,7 +50,7 @@ def role(suffix, cursor, marked_for_cleanup: list[Resource]):
 def test_blueprint_plan(cursor, user, role):
     session = cursor.connection
     bp = Blueprint(name="test")
-    role_grant = RoleGrant(role=role, to_user=user, owner="ACCOUNTADMIN")
+    role_grant = RoleGrant(role=role, to_user=user)
     bp.add(role_grant)
     changes = bp.plan(session)
     assert len(changes) == 1

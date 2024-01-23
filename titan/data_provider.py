@@ -167,7 +167,7 @@ def fetch_session(session):
             CURRENT_SCHEMAS() as schemas,
             CURRENT_WAREHOUSE() as warehouse,
             CURRENT_VERSION() as version,
-            { '2024_01': SYSTEM$BEHAVIOR_CHANGE_BUNDLE_STATUS('2024_01') } as release_bundle_status
+            SYSTEM$BEHAVIOR_CHANGE_BUNDLE_STATUS('2024_01') as release_bundle_2024_01
         """,
     )[0]
 
@@ -186,7 +186,7 @@ def fetch_session(session):
         "account": session_obj["ACCOUNT"],
         "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
         "database": session_obj["DATABASE"],
-        "release_bundle_status": json.loads(session_obj["RELEASE_BUNDLE_STATUS"]),
+        "release_bundle_2024_01": session_obj["RELEASE_BUNDLE_2024_01"],
         "role": session_obj["ROLE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
         "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
@@ -366,7 +366,7 @@ def fetch_procedure(session, fqn: FQN):
     # inputs, output = data["arguments"].split(" RETURN ")
     session_ctx = fetch_session(session)
 
-    if session_ctx["release_bundle_status"]["2024_01"] == "ENABLED":
+    if session_ctx["release_bundle_2024_01"] == "ENABLED":
         identifier, returns = _parse_function_arguments(data["arguments"])
     else:
         identifier, returns = _parse_function_arguments_2023_compat(data["arguments"])

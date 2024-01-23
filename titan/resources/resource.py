@@ -152,9 +152,12 @@ class Resource(metaclass=_Resource):
 
         def _serialize(value):
             if isinstance(value, Resource):
-                if not hasattr(value._data, "name"):
-                    raise NotImplementedError
-                return getattr(value._data, "name")
+                if hasattr(value, "serialize"):
+                    return value.serialize()
+                elif hasattr(value._data, "name"):
+                    return getattr(value._data, "name")
+                else:
+                    raise Exception(f"Cannot serialize {value}")
             elif isinstance(value, ParseableEnum):
                 return str(value)
             elif isinstance(value, list):
