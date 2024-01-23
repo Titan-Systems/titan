@@ -70,16 +70,34 @@ account:ABC123
 bp.apply(session, plan)
 ```
 
-## Titan Core vs Terraform
-Terraform limits you to **1 role per provider**. However, Snowflake's access control is designed to use multiple roles. This forces you into a complex multi-provider configuration which results in drift, permission errors, and broken plans.
+## Titan vs other tools
 
-Titan Core checks which privileges are required to ensure that plans can be applied. When privileges are missing, Titan tells you exactly what to grant. This speeds up development cycles and helps eliminate the use of `ACCOUNTADMIN`. 
+| Feature/Capability                      | Titan Core     | Terraform      | Schemachange   |
+|-----------------------------------------|----------------|----------------|----------------|
+| Plan and Execute Changes                | ✅              | ✅              | ❌              |
+| Declarative Configuration               | ✅              | ✅              | ❌              |
+| Python-Based Definitions                | ✅              | ❌              | ❌              |
+| SQL Support                             | ✅              | ❌              | ✅              |
+| Multi-Role Support                      | ✅              | ❌              | N/A            |
+| No State File Dependency                | ✅              | ❌              | ✅              |
+| Checks for Required Privileges          | ✅              | ❌              | ❌              |
+| Infrastructure Visualization            | WIP             | ✅              | ❌              |
+
+
+### Titan Core vs Terraform
+Terraform is an infrastructure-as-code tool using the HCL config language.
+
+The Snowflake provider for Terraform is limited to **1 role per provider**. This limitation is at odds with Snowflake's design, which is built to use multiple roles. This mismatch forces you into a complex multi-provider setup which can result in drift, permission errors, and broken plans.
+
+Titan Core streamlines this with upfront privileges checks to ensure that plans can be applied. When privileges are missing, Titan tells you exactly what to grant. This speeds up development cycles and helps eliminate the use of `ACCOUNTADMIN`.
 
 Titan also doesn’t use a state file, which provides more accurate plans and eliminates state mismatch issues.
 
 
-## Titan Core vs Schemachange
+### Titan Core vs Schemachange
+Schemachange is a database migration tool that uses SQL scripts to deploy resources to different environments. As an imperative migration tool, it requires developers to write code for each step, demanding a deep understanding of the database's current state and the exact commands needed for updates. If environments change, your Schemachange scripts may need significant adjustments.
 
+Titan Core simplifies this process with a declarative Python approach. It allows you to define what your environment should look like, without specifying the detailed steps to get there. This is less error-prone and more flexible to changes. Titan Core manages a broader range of Snowflake resources, providing a more integrated and streamlined experience, especially in dynamic and complex data environments.
 
 
 ## Installation
