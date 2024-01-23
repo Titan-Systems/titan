@@ -62,6 +62,25 @@ def _urn_from_grant(row, session_ctx):
         )
 
 
+def _parse_function_arguments_2023_compat(arguments_str: str) -> tuple:
+    """
+    Input
+    -----
+        FETCH_DATABASE(OBJECT [, BOOLEAN]) RETURN OBJECT
+
+    Output
+    ------
+        identifier => FETCH_DATABASE(OBJECT, BOOLEAN)
+        returns => OBJECT
+
+    """
+
+    header, returns = arguments_str.split(" RETURN ")
+    header = header.replace("[", "").replace("]", "")
+    identifier = parse_identifier(header)
+    return (identifier, returns)
+
+
 def _parse_function_arguments(arguments_str: str) -> tuple:
     """
     Input
@@ -345,7 +364,12 @@ def fetch_procedure(session, fqn: FQN):
 
     data = sprocs[0]
     # inputs, output = data["arguments"].split(" RETURN ")
-    identifier, returns = _parse_function_arguments(data["arguments"])
+    session_ctx = fetch_session(session)
+
+    if session_ctx["release_bundle_status"]["2024_01"] == "ENABLED":
+        identifier, returns = _parse_function_arguments(data["arguments"])
+    else:
+        identifier, returns = _parse_function_arguments_2023_compat(data["arguments"])
     desc_result = execute(session, f"DESC PROCEDURE {str(identifier)}", cacheable=True)
     properties = dict([(row["property"], row["value"]) for row in desc_result])
 

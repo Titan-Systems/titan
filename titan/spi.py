@@ -1,11 +1,9 @@
 # Stored Procedure Interface (spi)
+import inspect
 import json
-import os
 import pydoc
 import re
 import sys
-
-os.environ["PYTHONIOENCODING"] = "utf-8"
 
 from yaml import safe_load
 
@@ -31,6 +29,39 @@ except ModuleNotFoundError as err:
 
 __this__ = sys.modules[__name__]
 
+_PYTHON_TO_SNOWFLAKE_TYPE = {
+    int: DataType.INTEGER,
+    float: DataType.FLOAT,
+    str: DataType.VARCHAR,
+    bool: DataType.BOOLEAN,
+    dict: DataType.OBJECT,
+    list: DataType.ARRAY,
+}
+
+
+def _python_args_to_sproc_args(parameters):
+    """
+    Converts a dictionary of Python arguments to a list of Snowflake stored procedure arguments.
+    """
+    sproc_args = []
+    for name, param in parameters.items():
+        if name == "sp_session":
+            continue
+        arg = {"name": name, "data_type": _PYTHON_TO_SNOWFLAKE_TYPE[param.annotation]}
+        if param.default is not inspect.Parameter.empty:
+            arg["default"] = param.default
+        sproc_args.append(arg)
+    return sproc_args
+
+
+def procedure(func):
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    wrapper.is_procedure = True
+    wrapper.__sproc_args__ = _python_args_to_sproc_args(inspect.signature(func).parameters)
+    return wrapper
+
 
 def install(sp_session):
     """
@@ -40,7 +71,9 @@ def install(sp_session):
     conn = sp_session.connection
 
     session_ctx = dp.fetch_session(conn)
-    print(session_ctx)
+    if "SYSADMIN" != session_ctx["role"]:
+        # TODO: make dynamic role selection work
+        raise Exception(f"You must use the SYSADMIN role to install the Titan SPI [role={session_ctx['role']}]")
 
     visible_stages = dp.list_stages(conn)
     stage = None
@@ -57,26 +90,35 @@ def install(sp_session):
     titan_db = stage["database_name"]
 
     blueprint = Blueprint("titan")
+
+    sprocs = []
+    for name, func in vars(__this__).items():
+        if callable(func) and getattr(func, "is_procedure", False):
+            sprocs.append(
+                resources.PythonStoredProcedure(
+                    name=name,
+                    owner="SYSADMIN",
+                    # args=[{"name": "name", "data_type": DataType.VARCHAR}],
+                    args=func.__sproc_args__,
+                    returns=DataType.OBJECT,
+                    runtime_version="3.9",
+                    packages=["snowflake-snowpark-python", "inflection", "pyparsing"],
+                    imports=[f"@{stage['fqn']}/releases/titan-0.1.0.zip"],
+                    handler=f"titan.spi.{name}",
+                    execute_as="CALLER",
+                ),
+            )
+
     blueprint.add(
         resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators", owner="SYSADMIN"),
         resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
         resources.Grant(priv="USAGE", on_database=titan_db, to="TITAN_ADMIN"),
-        resources.PythonStoredProcedure(
-            name="fetch_database",
-            owner="TITAN_ADMIN",
-            args=[{"name": "name", "data_type": DataType.VARCHAR}],
-            returns=DataType.OBJECT,
-            runtime_version="3.9",
-            packages=["snowflake-snowpark-python", "inflection", "pyparsing"],
-            imports=[f"@{stage['fqn']}/releases/titan-0.1.0-dev.zip"],
-            handler="titan.spi.fetch_database",
-            execute_as="CALLER",
-        ),
+        *sprocs,
     )
     plan = blueprint.plan(conn)
     result = blueprint.apply(conn, plan)
     return {
-        "plan": json.dumps(plan, default=str),
+        "plan": [json.dumps(action, default=str) for action in plan],
         "actions": json.dumps(result, default=str),
     }
 
@@ -89,20 +131,8 @@ def _execute(sp_session, sql: list):
             raise SnowparkSQLException(f"failed to execute sql, [{sql_text}]", error_code=err.error_code) from err
 
 
-# _schema_defaults = {
-#     "database": None,
-#     "transient": False,
-#     "owner": "SYSADMIN",
-#     "managed_access": False,
-#     "data_retention_time_in_days": None,
-#     "max_data_extension_time_in_days": 14,
-#     "default_ddl_collation": None,
-#     "tags": None,
-#     "comment": None,
-# }
-
-
-def create_or_update_schema(sp_session, config: dict = None, yaml: str = None, dry_run: bool = False):
+@procedure
+def create_or_update_schema(sp_session, config: dict, dry_run: bool = False):
     """
     Takes configuration (either as an OBJECT or a YAML string) and creates or updates a schema.
     Use the `dry_run` parameter to test the operation without executing any SQL.
@@ -142,7 +172,8 @@ def create_or_update_schema(sp_session, config: dict = None, yaml: str = None, d
     _create_or_update_resource(sp_session.connection, ResourceType.SCHEMA, config, dry_run)
 
 
-def create_or_update_user(sp_session, config: dict = None, yaml: str = None, dry_run: bool = False):
+@procedure
+def create_or_update_user(sp_session, config: dict, dry_run: bool = False):
     """
     Takes configuration (either as an OBJECT or a YAML string) and creates or updates a user.
     Use the `dry_run` parameter to test the operation without executing any SQL.
@@ -194,7 +225,8 @@ def _create_or_update_resource(
     return {"sql": sql}
 
 
-def fetch_schema(sp_session, name) -> dict:
+@procedure
+def fetch_schema(sp_session, name: str) -> dict:
     """
     Returns a schema's configuration.
     """
@@ -204,26 +236,19 @@ def fetch_schema(sp_session, name) -> dict:
     return dp.fetch_schema(sp_session.connection, fqn)
 
 
-def fetch_database(sp_session, name) -> dict:
+@procedure
+def fetch_database(sp_session, name: str) -> dict:
     """
     Returns a database's configuration.
     """
     return dp.fetch_database(sp_session.connection, FQN(name))
 
 
-def fetch(sp_session, name) -> dict:
+def fetch_user(sp_session, name: str) -> dict:
     """
-    Returns a resource's configuration.
+    Returns a user's configuration.
     """
-    fqn = parse_identifier(name)
-    urn = None
-    return dp.fetch_resource(sp_session.connection, urn)
-    # if fqn.resource_type == "schema":
-    #     return fetch_schema(sp_session, name)
-    # elif fqn.resource_key == "database":
-    #     return fetch_database(sp_session, name)
-    # else:
-    #     raise Exception(f"Unsupported resource type: {fqn.resource_key}")
+    return dp.fetch_user(sp_session.connection, FQN(name))
 
 
 # def git_export(sp_session, locator: str, repo: str, path: str) -> dict:

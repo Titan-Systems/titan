@@ -48,12 +48,13 @@ class ResourceSpec:
 
             # Coerce args
             elif field_type == Arg:
-                # type_map = get_type_hints(field_type)
-                # return {k: _coerce(v, field_type=type_map[k]) for k, v in field_value.items()}
-                return {
+                arg_dict = {
                     "name": field_value["name"].upper(),
                     "data_type": DataType(field_value["data_type"]),
                 }
+                if "default" in field_value:
+                    arg_dict["default"] = field_value["default"]
+                return arg_dict
 
             # Coerce resources
             elif issubclass(field_type, Resource):

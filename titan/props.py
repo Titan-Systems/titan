@@ -456,7 +456,8 @@ class ArgsProp(Prop):
             return "()"
         args = []
         for arg in value:
-            args.append(f"{arg['name']} {str(arg['data_type'])}")
+            default = f" DEFAULT {arg['default']}" if "default" in arg else ""
+            args.append(f"{arg['name']} {str(arg['data_type'])}{default}")
         return f"({', '.join(args)})"
 
 
