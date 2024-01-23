@@ -30,13 +30,19 @@ def diff(original, new):
     original_keys = set(original.keys())
     new_keys = set(new.keys())
 
+    # Resources in remote state but not in the manifest should be removed
     for key in original_keys - new_keys:
         yield DiffAction.REMOVE, key, original[key]
 
+    # Resources in the manifest but not in remote state should be added
     for key in new_keys - original_keys:
-        if new[key].get("_stub", False):
+        if isinstance(new[key], dict) and new[key].get("_stub", False):
             raise Exception(f"Stubbed resource doesn't exist or isn't visible in session: {key}")
-        yield DiffAction.ADD, key, new[key]
+        elif isinstance(new[key], list):
+            for item in new[key]:
+                yield DiffAction.ADD, key, item
+        else:
+            yield DiffAction.ADD, key, new[key]
 
     for key in original_keys & new_keys:
         if isinstance(original[key], dict):

@@ -41,6 +41,7 @@ def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
         "GRANT",
         data["priv"],
         "ON",
+        data["on_type"],
         data["on"],
         props.render(data),
     )
@@ -77,6 +78,19 @@ def update__default(urn: URN, data: dict, props: Props) -> str:
             "=",
             new_value,
         )
+
+
+def update_procedure(urn: URN, data: dict, props: Props) -> str:
+    if "execute_as" in data:
+        return tidy_sql(
+            "ALTER",
+            urn.resource_type,
+            urn.fqn,
+            "EXECUTE AS",
+            data["execute_as"],
+        )
+    else:
+        return update__default(urn, data, props)
 
 
 def update_role_grant(urn: URN, data: dict, props: Props) -> str:

@@ -32,10 +32,6 @@ def print_diffs(diffs):
             print("\t", delta)
 
 
-def _hash(data):
-    return hash(json.dumps(data, sort_keys=True))
-
-
 def _split_by_scope(
     resources: list[Resource],
 ) -> tuple[list[Resource], list[Resource], list[Resource], list[Resource]]:
@@ -357,27 +353,33 @@ class Blueprint:
 
         _raise_if_missing_privs(required_privs, available_privs)
 
+        action_queue = []
         actions_taken = []
+
+        def _queue_action(urn, data, props):
+            if action == DiffAction.ADD:
+                action_queue.append(lifecycle.create_resource(urn, data, props))
+            elif action == DiffAction.CHANGE:
+                action_queue.append(lifecycle.update_resource(urn, data, props))
+            elif action == DiffAction.REMOVE:
+                action_queue.append(lifecycle.drop_resource(urn, data))
 
         for action, urn_str, data in plan:
             urn = parse_URN(urn_str)
 
             props = Resource.props_for_resource_type(urn.resource_type)
 
-            if action == DiffAction.ADD:
-                sql = lifecycle.create_resource(urn, data, props)
-            elif action == DiffAction.CHANGE:
-                sql = lifecycle.update_resource(urn, data, props)
-            elif action == DiffAction.REMOVE:
-                sql = lifecycle.drop_resource(urn, data)
-            try:
+            _queue_action(urn, data, props)
+
+            while action_queue:
+                sql = action_queue.pop(0)
                 actions_taken.append(sql)
-                execute(session, sql)
-            except snowflake.connector.errors.ProgrammingError as err:
-                if err.errno == ALREADY_EXISTS_ERR:
-                    # raise Exception(f"Resource already exists: {urn_str}")
-                    print(f"Resource already exists: {urn_str}, skipping...")
-                raise err
+                try:
+                    execute(session, sql)
+                except snowflake.connector.errors.ProgrammingError as err:
+                    if err.errno == ALREADY_EXISTS_ERR:
+                        print(f"Resource already exists: {urn_str}, skipping...")
+                    raise err
         return actions_taken
 
     def destroy(self, session, manifest=None):

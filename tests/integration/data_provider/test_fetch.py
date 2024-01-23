@@ -66,7 +66,7 @@ account_resources = [
         ],
         "fqn": "THATROLE?user=RECIPIENT",
         "data": {
-            "owner": "CI",
+            # "owner": "CI",
             "role": "THATROLE",
             "to_user": "RECIPIENT",
         },
@@ -163,6 +163,7 @@ scoped_resources = [
             "imports": [],
             "null_handling": "CALLED ON NULL INPUT",
             "secure": False,
+            "owner": TEST_ROLE,
             "as_": "def main(_, arg1: str): return 42",
         },
     },

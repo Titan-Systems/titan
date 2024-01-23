@@ -14,11 +14,9 @@ from ..scope import AccountScope
 @dataclass
 class _Grant(ResourceSpec):
     priv: str
-    on: Any = None
-    on_all: Any = None
-    on_future: Any = None
-    on_scope: str = None
-    to: str = None
+    on: str
+    on_type: ResourceType
+    to: Role
     grant_option: bool = False
     owner: str = None
 
@@ -145,8 +143,11 @@ class Grant(Resource):
         >>> Grant(priv="SELECT", on_future_tables_in=Database(name="somedb"), to="somerole")
 
         """
-        on_all = None
-        on_future = None
+        # on_all = None
+        # on_future = None
+        on_type = None
+
+        to = to if isinstance(to, Role) else Role(name=to, stub=True)
 
         # Collect on_ kwargs
         on_kwargs = {}
@@ -154,33 +155,46 @@ class Grant(Resource):
             if keyword.startswith("on_"):
                 on_kwargs[keyword] = kwargs.pop(keyword)
 
-        for keyword, arg in on_kwargs.items():
-            if on is not None:
-                raise ValueError("You can only specify one 'on' parameter, multiple found")
+        # Handle dynamic on_ kwargs
+        if on_kwargs:
+            for keyword, arg in on_kwargs.items():
+                if on is not None:
+                    raise ValueError("You can only specify one 'on' parameter, multiple found")
 
-            # Ex: on_future_schemas_in_database -> on_future_schemas_in, database
-            is_scoped_grant = "_in_" in keyword or keyword.endswith("_in")
+                # Ex: on_future_schemas_in_database -> on_future_schemas_in, database
+                is_scoped_grant = "_in_" in keyword or keyword.endswith("_in")
 
-            if is_scoped_grant:
-                if keyword.endswith("_in"):
-                    keyword = keyword[:-3]
+                if is_scoped_grant:
+                    if keyword.endswith("_in"):
+                        keyword = keyword[:-3]
+                        if not isinstance(arg, Resource):
+                            raise ValueError(f"Invalid resource type: {arg}")
+                        on = arg._data.name
+                        on_type = arg.resource_type
+                    elif "_in_" in keyword:
+                        keyword, resource_type = keyword.split("_in_")
+                        on = arg
+                        on_type = ResourceType(resource_type)
+
+                    if keyword.startswith("on_all"):
+                        # on_all = keyword[7:].replace("_", " ").upper()
+                        raise NotImplementedError
+                    elif keyword.startswith("on_future"):
+                        # on_future = keyword[10:].replace("_", " ").upper()
+                        raise NotImplementedError
+                else:
+                    # Grant targeting a specific resource
+                    # on_{resource} kwargs
+                    # on_schema="foo" -> on=Schema(name="foo", stub=True)
                     on = arg
-                elif "_in_" in keyword:
-                    keyword, resource_type = keyword.split("_in_")
-                    on = f"{resource_type} {arg}"
-                    # resource_cls = Resource.classes[resource_key]
-                    # on = resource_cls(name=arg, stub=True)
-
-                if keyword.startswith("on_all"):
-                    on_all = keyword[7:].replace("_", " ").upper()
-                elif keyword.startswith("on_future"):
-                    on_future = keyword[10:].replace("_", " ").upper()
-            else:
-                # Grant targeting a specific resource
-                # on_{resource} kwargs
-                # on_schema="foo" -> on=Schema(name="foo", stub=True)
-                # TODO: find a different way to create a reference pointer to the ON resource
-                on = f"{keyword[3:]} {arg}"
+                    on_type = ResourceType(keyword[3:])
+        # Handle on= kwarg
+        else:
+            if on is None:
+                raise ValueError("You must specify an 'on' parameter")
+            if isinstance(on, Resource):
+                on_type = on.resource_type
+                on = on._data.name
 
         if owner is None:
             if on == "ACCOUNT" and isinstance(priv, GlobalPriv):
@@ -192,12 +206,14 @@ class Grant(Resource):
         self._data: _Grant = _Grant(
             priv=priv,
             on=on,
-            on_all=on_all,
-            on_future=on_future,
+            on_type=on_type,
             to=to,
             grant_option=grant_option,
             owner=owner,
         )
+
+        granted_on = Resource.resolve_resource_cls(on_type)(name=on, stub=True)
+        self.requires(granted_on)
 
     def __repr__(self):
         priv = getattr(self, "priv", "")
@@ -213,8 +229,13 @@ class Grant(Resource):
 
     @property
     def fqn(self):
-        to = self._data.to.name if isinstance(self._data.to, Resource) else self._data.to
-        return FQN(name=to, params={"on": self._data.on})
+        return FQN(
+            name=self._data.to.name,
+            params={
+                "on": self._data.on,
+                "type": str(self._data.on_type),
+            },
+        )
 
     @property
     def name(self):
@@ -224,16 +245,20 @@ class Grant(Resource):
         return priv
 
     @property
-    def on(self):
+    def on(self) -> str:
         return self._data.on
 
     @property
-    def on_all(self):
-        return self._data.on_all
+    def on_type(self) -> ResourceType:
+        return self._data.on_type
 
-    @property
-    def on_future(self):
-        return self._data.on_future
+    # @property
+    # def on_all(self):
+    #     return self._data.on_all
+
+    # @property
+    # def on_future(self):
+    #     return self._data.on_future
 
     @property
     def to(self):
@@ -289,9 +314,9 @@ class RoleGrant(Resource):
             # owner=owner,
         )
         self.requires(
-            role,
-            to_role,
-            to_user,
+            self._data.role,
+            self._data.to_role,
+            self._data.to_user,
         )
 
     @classmethod

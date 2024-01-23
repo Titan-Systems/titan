@@ -299,10 +299,21 @@ def fetch_function(session, fqn: FQN):
 
 
 def fetch_grant(session, fqn: FQN):
-    show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}")
-    on = fqn.params["on"]
-    to = fqn.name
-    grants = _filter_result(show_result, granted_on=on, grantee_name=to)
+    try:
+        show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}")
+    except ProgrammingError as err:
+        if err.errno == DOEST_NOT_EXIST_ERR:
+            return None
+        raise
+    granted_on = fqn.params["type"]
+    name = fqn.params["on"]
+    grantee_name = fqn.name
+    grants = _filter_result(
+        show_result,
+        granted_on=granted_on,
+        name=name,
+        grantee_name=grantee_name,
+    )
 
     if len(grants) == 0:
         return []
@@ -311,7 +322,8 @@ def fetch_grant(session, fqn: FQN):
         [
             {
                 "priv": row["privilege"],
-                "on": row["granted_on"],
+                "on": row["name"],
+                "on_type": row["granted_on"],
                 "to": row["grantee_name"],
                 "grant_option": row["grant_option"] == "true",
                 "owner": row["granted_by"],

@@ -36,6 +36,14 @@ class TestBlueprint(unittest.TestCase):
             {
                 "name": "DB",
                 "owner": "SYSADMIN",
+                "comment": None,
+                "data_retention_time_in_days": 1,
+                "default_ddl_collation": None,
+                "max_data_extension_time_in_days": 14,
+                "name": "DB",
+                "owner": "SYSADMIN",
+                "tags": None,
+                "transient": False,
             },
         )
 
@@ -43,14 +51,33 @@ class TestBlueprint(unittest.TestCase):
         self.assertDictEqual(
             manifest["urn::ABCD123:schema/DB.SCHEMA"],
             {
+                "comment": None,
+                "data_retention_time_in_days": None,
+                "default_ddl_collation": None,
+                "managed_access": False,
+                "max_data_extension_time_in_days": 14,
                 "name": "SCHEMA",
                 "owner": "SYSADMIN",
+                "tags": None,
+                "transient": False,
             },
         )
         self.assertIn("urn::ABCD123:view/DB.SCHEMA.VIEW", manifest)
         self.assertDictEqual(
             manifest["urn::ABCD123:view/DB.SCHEMA.VIEW"],
-            {"name": "VIEW", "owner": "SYSADMIN", "as_": "SELECT 1"},
+            {
+                "as_": "SELECT 1",
+                "change_tracking": None,
+                "columns": None,
+                "comment": None,
+                "copy_grants": None,
+                "name": "VIEW",
+                "owner": "SYSADMIN",
+                "recursive": None,
+                "secure": None,
+                "tags": None,
+                "volatile": None,
+            },
         )
         self.assertIn("urn::ABCD123:table/DB.SCHEMA.TABLE", manifest)
         self.assertDictEqual(

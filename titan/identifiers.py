@@ -3,6 +3,10 @@ from typing import Optional
 from .enums import ResourceType
 
 
+def _params_to_str(params: dict) -> str:
+    return "&".join([f"{k.lower()}={v}" for k, v in params.items()])
+
+
 class FQN:
     def __init__(
         self,
@@ -22,13 +26,14 @@ class FQN:
         db = f"{self.database}." if self.database else ""
         schema = f"{self.schema}." if self.schema else ""
         arg_types = f"({', '.join(self.arg_types)})" if self.arg_types else ""
-        params = "?" + "&".join([f"{k.lower()}={v}" for k, v in self.params.items()]) if self.params else ""
+        params = "?" + _params_to_str(self.params) if self.params else ""
         return f"{db}{schema}{self.name}{arg_types}{params}"
 
     def __repr__(self):
         db = f", db={self.database}" if self.database else ""
         schema = f", schema={self.schema}" if self.schema else ""
-        return f"FQN(name={self.name}{db}{schema})"
+        params = "?" + _params_to_str(self.params) if self.params else ""
+        return f"FQN(name={self.name}{db}{schema}{params})"
 
 
 class URN:
