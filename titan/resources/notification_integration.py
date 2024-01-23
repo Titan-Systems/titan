@@ -1,10 +1,12 @@
-from abc import ABC
-from typing import List
+from dataclasses import dataclass
 
-from .base import AccountScoped, Resource, _fix_class_documentation
-from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
-from ..enums import ParseableEnum
+from inflection import camelize
+
+from .resource import Resource, ResourceSpec
+from ..enums import ParseableEnum, ResourceType
 from ..parse import _resolve_resource_class
+from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
+from ..scope import AccountScope
 
 
 class NotificationType(ParseableEnum):
@@ -24,8 +26,22 @@ class NotificationDirection(ParseableEnum):
     OUTBOUND = "OUTBOUND"
 
 
-@_fix_class_documentation
-class EmailNotificationIntegration(AccountScoped, Resource):
+@dataclass
+class _EmailNotificationIntegration(ResourceSpec):
+    name: str
+    enabled: bool
+    allowed_recipients: list[str]
+    type: NotificationType = NotificationType.EMAIL
+    owner: str = "ACCOUNTADMIN"
+    comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.allowed_recipients is not None and len(self.allowed_recipients) == 0:
+            raise ValueError("allowed_recipients can't be empty")
+
+
+class EmailNotificationIntegration(Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -35,24 +51,50 @@ class EmailNotificationIntegration(AccountScoped, Resource):
       [ COMMENT = '<string_literal>' ]
     """
 
-    resource_type = "NOTIFICATION INTEGRATION"
+    resource_type = ResourceType.NOTIFICATION_INTEGRATION
     props = Props(
         type=EnumProp("type", [NotificationType.EMAIL]),
         enabled=BoolProp("enabled"),
         allowed_recipients=StringListProp("allowed_recipients", parens=True),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _EmailNotificationIntegration
 
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        allowed_recipients: list[str],
+        comment: str = None,
+        owner: str = "ACCOUNTADMIN",
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        super().__init__(**kwargs)
+        self._data = _EmailNotificationIntegration(
+            name=name,
+            enabled=enabled,
+            allowed_recipients=allowed_recipients,
+            comment=comment,
+            owner=owner,
+        )
+
+
+@dataclass
+class _AWSOutboundNotificationIntegration(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
-    type: NotificationType = NotificationType.EMAIL
     enabled: bool
-    allowed_recipients: List[str]
+    aws_sns_topic_arn: str
+    aws_sns_role_arn: str
+    direction: NotificationDirection = NotificationDirection.OUTBOUND
+    type: str = NotificationType.QUEUE
+    notification_provider: str = NotificationProvider.AWS_SNS
+    owner: str = "ACCOUNTADMIN"
     comment: str = None
 
 
-@_fix_class_documentation
-class AWSOutboundNotificationIntegration(AccountScoped, Resource):
+class AWSOutboundNotificationIntegration(Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -69,7 +111,7 @@ class AWSOutboundNotificationIntegration(AccountScoped, Resource):
       AWS_SNS_ROLE_ARN = '<iam_role_arn>'
     """
 
-    resource_type = "NOTIFICATION INTEGRATION"
+    resource_type = ResourceType.NOTIFICATION_INTEGRATION
     props = Props(
         enabled=BoolProp("enabled"),
         direction=EnumProp("direction", [NotificationDirection.OUTBOUND]),
@@ -79,20 +121,46 @@ class AWSOutboundNotificationIntegration(AccountScoped, Resource):
         aws_sns_role_arn=StringProp("aws_sns_role_arn"),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _AWSOutboundNotificationIntegration
 
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        aws_sns_topic_arn: str,
+        aws_sns_role_arn: str,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        kwargs.pop("direction", None)
+        kwargs.pop("notification_provider", None)
+        super().__init__(**kwargs)
+        self._data = _AWSOutboundNotificationIntegration(
+            name=name,
+            enabled=enabled,
+            aws_sns_topic_arn=aws_sns_topic_arn,
+            aws_sns_role_arn=aws_sns_role_arn,
+            owner=owner,
+            comment=comment,
+        )
+
+
+@dataclass
+class _GCPOutboundNotificationIntegration(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
     enabled: bool
+    gcp_pubsub_topic_name: str
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
-    notification_provider: str = NotificationProvider.AWS_SNS
-    aws_sns_topic_arn: str
-    aws_sns_role_arn: str
+    notification_provider: str = NotificationProvider.GCP_PUBSUB
+    owner: str = "ACCOUNTADMIN"
     comment: str = None
 
 
-@_fix_class_documentation
-class GCPOutboundNotificationIntegration(AccountScoped, Resource):
+class GCPOutboundNotificationIntegration(Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -107,7 +175,7 @@ class GCPOutboundNotificationIntegration(AccountScoped, Resource):
       GCP_PUBSUB_TOPIC_NAME = '<topic_id>'
     """
 
-    resource_type = "NOTIFICATION INTEGRATION"
+    resource_type = ResourceType.NOTIFICATION_INTEGRATION
     props = Props(
         enabled=BoolProp("enabled"),
         direction=EnumProp("direction", [NotificationDirection.OUTBOUND]),
@@ -116,19 +184,45 @@ class GCPOutboundNotificationIntegration(AccountScoped, Resource):
         gcp_pubsub_topic_name=StringProp("gcp_pubsub_topic_name"),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _GCPOutboundNotificationIntegration
 
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        gcp_pubsub_topic_name: str,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        kwargs.pop("direction", None)
+        kwargs.pop("notification_provider", None)
+        super().__init__(**kwargs)
+        self._data = _GCPOutboundNotificationIntegration(
+            name=name,
+            enabled=enabled,
+            gcp_pubsub_topic_name=gcp_pubsub_topic_name,
+            owner=owner,
+            comment=comment,
+        )
+
+
+@dataclass
+class _AzureOutboundNotificationIntegration(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
     enabled: bool
+    azure_event_grid_topic_endpoint: str
+    azure_tenant_id: str
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
-    notification_provider: str = NotificationProvider.AWS_SNS
-    gcp_pubsub_topic_name: str
+    notification_provider: str = NotificationProvider.AZURE_EVENT_GRID
+    owner: str = "ACCOUNTADMIN"
     comment: str = None
 
 
-@_fix_class_documentation
-class AzureOutboundNotificationIntegration(AccountScoped, Resource):
+class AzureOutboundNotificationIntegration(Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -144,7 +238,7 @@ class AzureOutboundNotificationIntegration(AccountScoped, Resource):
       AZURE_TENANT_ID = '<directory_ID>';
     """
 
-    resource_type = "NOTIFICATION INTEGRATION"
+    resource_type = ResourceType.NOTIFICATION_INTEGRATION
     props = Props(
         enabled=BoolProp("enabled"),
         direction=EnumProp("direction", [NotificationDirection.OUTBOUND]),
@@ -154,20 +248,46 @@ class AzureOutboundNotificationIntegration(AccountScoped, Resource):
         azure_tenant_id=StringProp("azure_tenant_id"),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _AzureOutboundNotificationIntegration
 
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        azure_event_grid_topic_endpoint: str,
+        azure_tenant_id: str,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        kwargs.pop("direction", None)
+        kwargs.pop("notification_provider", None)
+        super().__init__(**kwargs)
+        self._data = _AzureOutboundNotificationIntegration(
+            name=name,
+            enabled=enabled,
+            azure_event_grid_topic_endpoint=azure_event_grid_topic_endpoint,
+            azure_tenant_id=azure_tenant_id,
+            owner=owner,
+            comment=comment,
+        )
+
+
+@dataclass
+class _GCPInboundNotificationIntegration(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
     enabled: bool
-    direction: NotificationDirection = NotificationDirection.OUTBOUND
+    gcp_pubsub_subscription_name: str
+    direction: NotificationDirection = NotificationDirection.INBOUND
     type: str = NotificationType.QUEUE
-    notification_provider: str = NotificationProvider.AZURE_EVENT_GRID
-    azure_event_grid_topic_endpoint: str
-    azure_tenant_id: str
+    notification_provider: str = NotificationProvider.GCP_PUBSUB
+    owner: str = "ACCOUNTADMIN"
     comment: str = None
 
 
-@_fix_class_documentation
-class GCPInboundNotificationIntegration(AccountScoped, Resource):
+class GCPInboundNotificationIntegration(Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -181,7 +301,7 @@ class GCPInboundNotificationIntegration(AccountScoped, Resource):
       GCP_PUBSUB_SUBSCRIPTION_NAME = '<subscription_id>'
     """
 
-    resource_type = "NOTIFICATION INTEGRATION"
+    resource_type = ResourceType.NOTIFICATION_INTEGRATION
     props = Props(
         enabled=BoolProp("enabled"),
         type=EnumProp("type", [NotificationType.QUEUE]),
@@ -189,19 +309,44 @@ class GCPInboundNotificationIntegration(AccountScoped, Resource):
         gcp_pubsub_subscription_name=StringProp("gcp_pubsub_subscription_name"),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _GCPInboundNotificationIntegration
 
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        gcp_pubsub_subscription_name: str,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        kwargs.pop("notification_provider", None)
+        super().__init__(**kwargs)
+        self._data = _GCPInboundNotificationIntegration(
+            name=name,
+            enabled=enabled,
+            gcp_pubsub_subscription_name=gcp_pubsub_subscription_name,
+            owner=owner,
+            comment=comment,
+        )
+
+
+@dataclass
+class _AzureInboundNotificationIntegration(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
     enabled: bool
+    azure_storage_queue_primary_uri: str
+    azure_tenant_id: str
     direction: NotificationDirection = NotificationDirection.INBOUND
     type: str = NotificationType.QUEUE
-    notification_provider: str = NotificationProvider.GCP_PUBSUB
-    gcp_pubsub_subscription_name: str
+    notification_provider: str = NotificationProvider.AZURE_STORAGE_QUEUE
+    owner: str = "ACCOUNTADMIN"
     comment: str = None
 
 
-@_fix_class_documentation
-class AzureInboundNotificationIntegration(AccountScoped, Resource):
+class AzureInboundNotificationIntegration(Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -216,7 +361,7 @@ class AzureInboundNotificationIntegration(AccountScoped, Resource):
       AZURE_TENANT_ID = '<directory_ID>';
     """
 
-    resource_type = "NOTIFICATION INTEGRATION"
+    resource_type = ResourceType.NOTIFICATION_INTEGRATION
     props = Props(
         enabled=BoolProp("enabled"),
         type=EnumProp("type", [NotificationType.QUEUE]),
@@ -225,26 +370,42 @@ class AzureInboundNotificationIntegration(AccountScoped, Resource):
         azure_tenant_id=StringProp("azure_tenant_id"),
         comment=StringProp("comment"),
     )
+    scope = AccountScope()
+    spec = _AzureInboundNotificationIntegration
 
-    name: str
-    owner: str = "SYSADMIN"
-    enabled: bool
-    direction: NotificationDirection = NotificationDirection.INBOUND
-    type: str = NotificationType.QUEUE
-    notification_provider: str = NotificationProvider.AZURE_STORAGE_QUEUE
-    azure_storage_queue_primary_uri: str
-    azure_tenant_id: str
-    comment: str = None
+    def __init__(
+        self,
+        name: str,
+        enabled: bool,
+        azure_storage_queue_primary_uri: str,
+        azure_tenant_id: str,
+        owner: str = "ACCOUNTADMIN",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        kwargs.pop("notification_provider", None)
+        super().__init__(**kwargs)
+        self._data = _AzureInboundNotificationIntegration(
+            name=name,
+            enabled=enabled,
+            azure_storage_queue_primary_uri=azure_storage_queue_primary_uri,
+            azure_tenant_id=azure_tenant_id,
+            owner=owner,
+            comment=comment,
+        )
 
 
-class NotificationIntegration(Resource, ABC):
+class NotificationIntegration:
     def __new__(
         cls,
         type: NotificationType,
         direction: NotificationDirection = None,
         notification_provider: NotificationProvider = None,
         **kwargs,
-    ):
+    ) -> Resource:
+        if isinstance(type, str):
+            type = NotificationType(type)
         if type == NotificationType.EMAIL:
             return EmailNotificationIntegration(**kwargs)
         elif type == NotificationType.QUEUE:
@@ -263,6 +424,8 @@ class NotificationIntegration(Resource, ABC):
         raise Exception("Invalid Notification Integration")
 
     @classmethod
-    def from_sql(cls, sql):
-        resource_cls = Resource.classes[_resolve_resource_class(sql)]
-        return resource_cls.from_sql(sql)
+    def from_sql(cls, sql) -> Resource:
+        # camelize(_resolve_resource_class(sql))
+        # resource_cls = Resource.classes[]
+        # return resource_cls.from_sql(sql)
+        raise NotImplementedError

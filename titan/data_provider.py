@@ -1,15 +1,26 @@
 import json
 import sys
 
+from collections import defaultdict
+from functools import cache
+
 from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .client import execute
+from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
+from .enums import ResourceType
 from .identifiers import URN, FQN
+from .parse import (
+    FullyQualifiedIdentifier,
+    _parse_dynamic_table_text,
+    _parse_column,
+    parse_identifier,
+    parse_function_name,
+)
 
-ACCESS_CONTROL_ERR = 3001
-DOEST_NOT_EXIST_ERR = 2003
+
+__this__ = sys.modules[__name__]
 
 
 def _fail_if_not_granted(result, *args):
@@ -28,6 +39,81 @@ def _filter_result(result, **kwargs):
         else:
             filtered.append(row)
     return filtered
+
+
+def _urn_from_grant(row, session_ctx):
+    granted_on = row["granted_on"].lower()
+    if granted_on == "account":
+        return URN.from_session_ctx(session_ctx)
+    else:
+        if granted_on == "procedure" or granted_on == "function":
+            # This needs a special function because Snowflake gives an incorrect FQN for functions/sprocs
+            # eg. TITAN_DEV.PUBLIC."FETCH_DATABASE(NAME VARCHAR):OBJECT"
+            # The correct FQN is TITAN_DEV.PUBLIC."FETCH_DATABASE"(VARCHAR)
+            id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
+            name = parse_function_name(id_parts[-1])
+            fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
+        else:
+            fqn = parse_identifier(row["name"], is_schema=(granted_on == "schema"))
+        return URN(
+            resource_type=ResourceType(granted_on),
+            account_locator=session_ctx["account_locator"],
+            fqn=fqn,
+        )
+
+
+def _parse_function_arguments_2023_compat(arguments_str: str) -> tuple:
+    """
+    Input
+    -----
+        FETCH_DATABASE(OBJECT [, BOOLEAN]) RETURN OBJECT
+
+    Output
+    ------
+        identifier => FETCH_DATABASE(OBJECT, BOOLEAN)
+        returns => OBJECT
+
+    """
+
+    header, returns = arguments_str.split(" RETURN ")
+    header = header.replace("[", "").replace("]", "")
+    identifier = parse_identifier(header)
+    return (identifier, returns)
+
+
+def _parse_function_arguments(arguments_str: str) -> tuple:
+    """
+    Input
+    -----
+        FETCH_DATABASE(VARCHAR) RETURN OBJECT
+
+    Output
+    ------
+        identifier => FETCH_DATABASE(VARCHAR)
+        returns => OBJECT
+
+    """
+
+    header, returns = arguments_str.split(" RETURN ")
+    identifier = parse_identifier(header)
+    return (identifier, returns)
+
+
+def _parse_imports(imports: str) -> list:
+    if imports is None:
+        return []
+    imports = imports.strip("[]")
+    if imports:
+        return [imp.strip(" ") for imp in imports.split(",")]
+    return []
+
+
+def _parse_signature(signature: str) -> list:
+    signature = signature.strip("()")
+
+    if signature:
+        return [_parse_column(col.strip(" ")) for col in signature.split(",")]
+    return []
 
 
 def params_result_to_dict(params_result):
@@ -51,29 +137,12 @@ def remove_none_values(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
-def fetch_remote_state(session, manifest):
-    state = {}
-    for urn_str in manifest["_urns"]:
-        urn = URN.from_str(urn_str)
-        data = fetch_resource(session, urn)
-        # TODO: handle implicit and stub resources
-        if urn_str in manifest and data is not None:
-            if isinstance(data, list):
-                compacted = [remove_none_values(d) for d in data]
-            else:
-                compacted = remove_none_values(data)
-            state[urn_str] = compacted
-
-    return state
-
-
-def fetch_resource(session, urn):
-    data_provider = sys.modules[__name__]
-    return getattr(data_provider, f"fetch_{urn.resource_type}")(session, urn.fqn)
+def fetch_resource(session, urn: URN):
+    return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
 
 def fetch_account_locator(session):
-    locator = execute(session, "SELECT CURRENT_ACCOUNT()")[0]
+    locator = execute(session, "SELECT CURRENT_ACCOUNT() as account_locator")[0]["ACCOUNT_LOCATOR"]
     return locator
 
 
@@ -82,52 +151,56 @@ def fetch_region(session):
     return region
 
 
+@cache
 def fetch_session(session):
     session_obj = execute(
         session,
         """
         SELECT
-            CURRENT_ACCOUNT() as account,
+            CURRENT_ACCOUNT_NAME() as account,
+            CURRENT_ACCOUNT() as account_locator,
             CURRENT_USER() as user,
             CURRENT_ROLE() as role,
             CURRENT_AVAILABLE_ROLES() as available_roles,
             CURRENT_SECONDARY_ROLES() as secondary_roles,
             CURRENT_DATABASE() as database,
             CURRENT_SCHEMAS() as schemas,
-            CURRENT_WAREHOUSE() as warehouse
+            CURRENT_WAREHOUSE() as warehouse,
+            CURRENT_VERSION() as version,
+            SYSTEM$BEHAVIOR_CHANGE_BUNDLE_STATUS('2024_01') as release_bundle_2024_01
         """,
     )[0]
+
+    try:
+        tags = [f"{row['database']}.{row['schema']}.{row['name']}" for row in execute(session, "SHOW TAGS IN ACCOUNT")]
+        tag_support = True
+    except ProgrammingError as err:
+        if err.errno == UNSUPPORTED_FEATURE:
+            tags = []
+            tag_support = False
+        else:
+            raise
+
     return {
+        "account_locator": session_obj["ACCOUNT_LOCATOR"],
         "account": session_obj["ACCOUNT"],
-        "user": session_obj["USER"],
-        "role": session_obj["ROLE"],
         "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
-        "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
         "database": session_obj["DATABASE"],
+        "release_bundle_2024_01": session_obj["RELEASE_BUNDLE_2024_01"],
+        "role": session_obj["ROLE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
+        "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
+        "tag_support": tag_support,
+        "tags": tags,
+        "user": session_obj["USER"],
+        "version": session_obj["VERSION"],
         "warehouse": session_obj["WAREHOUSE"],
     }
 
 
 def fetch_account(session, fqn: FQN):
-    # TODO: rewrite to not use ORGADMIN
-
-    show_result = execute(session, "SHOW ORGANIZATION ACCOUNTS", use_role="ORGADMIN", cacheable=True)
-    accounts = _filter_result(show_result, account_name=fqn.name)
-    if len(accounts) == 0:
-        return None
-    if len(accounts) > 1:
-        raise Exception(f"Found multiple alerts matching {fqn}")
-    data = accounts[0]
-    return {
-        "resource_key": "account",
-        "name": data["account_name"],
-        # "edition": data["edition"],
-        # This column is only displayed for organizations that span multiple region groups.
-        "region_group": data.get("region_group"),
-        # "region": data["snowflake_region"],
-        "comment": data["comment"],
-    }
+    # raise NotImplementedError()
+    return {}
 
 
 def fetch_alert(session, fqn: FQN):
@@ -194,7 +267,32 @@ def fetch_database(session, fqn: FQN):
     }
 
 
-def fetch_javascript_udf(session, fqn: FQN):
+def fetch_dynamic_table(session, fqn: FQN):
+    show_result = execute(session, f"SHOW DYNAMIC TABLES LIKE '{fqn.name}'")
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple dynamic tables matching {fqn}")
+
+    columns = fetch_columns(session, "DYNAMIC TABLE", fqn)
+
+    data = show_result[0]
+    refresh_mode, initialize, as_ = _parse_dynamic_table_text(data["text"])
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "warehouse": data["warehouse"],
+        "refresh_mode": refresh_mode,
+        "initialize": initialize,
+        "target_lag": data["target_lag"],
+        "comment": data["comment"] or None,
+        "columns": columns,
+        "as_": as_,
+    }
+
+
+def fetch_function(session, fqn: FQN):
     show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
     udfs = _filter_result(show_result, name=fqn.name)
     if len(udfs) == 0:
@@ -220,10 +318,21 @@ def fetch_javascript_udf(session, fqn: FQN):
 
 
 def fetch_grant(session, fqn: FQN):
-    show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}")
-    on = fqn.params["on"]
-    to = fqn.name
-    grants = _filter_result(show_result, granted_on=on, grantee_name=to)
+    try:
+        show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}")
+    except ProgrammingError as err:
+        if err.errno == DOEST_NOT_EXIST_ERR:
+            return None
+        raise
+    granted_on = fqn.params["type"]
+    name = fqn.params["on"]
+    grantee_name = fqn.name
+    grants = _filter_result(
+        show_result,
+        granted_on=granted_on,
+        name=name,
+        grantee_name=grantee_name,
+    )
 
     if len(grants) == 0:
         return []
@@ -232,7 +341,8 @@ def fetch_grant(session, fqn: FQN):
         [
             {
                 "priv": row["privilege"],
-                "on": row["granted_on"],
+                "on": row["name"],
+                "on_type": row["granted_on"],
                 "to": row["grantee_name"],
                 "grant_option": row["grant_option"] == "true",
                 "owner": row["granted_by"],
@@ -253,24 +363,56 @@ def fetch_procedure(session, fqn: FQN):
         raise Exception(f"Found multiple stored procedures matching {fqn}")
 
     data = sprocs[0]
-    inputs, output = data["arguments"].split(" RETURN ")
-    desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+    # inputs, output = data["arguments"].split(" RETURN ")
+    session_ctx = fetch_session(session)
+
+    if session_ctx["release_bundle_2024_01"] == "ENABLED":
+        identifier, returns = _parse_function_arguments(data["arguments"])
+    else:
+        identifier, returns = _parse_function_arguments_2023_compat(data["arguments"])
+    desc_result = execute(session, f"DESC PROCEDURE {str(identifier)}", cacheable=True)
     properties = dict([(row["property"], row["value"]) for row in desc_result])
 
+    show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {str(identifier)}")
+    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+
     return {
-        "name": data["name"],
-        "secure": data["is_secure"] == "Y",
-        # "args": data["arguments"],
-        "returns": output,
-        "language": properties["language"],
-        "runtime_version": properties["runtime_version"],
-        "null_handling": properties["null_handling"],
-        "packages": properties["packages"],
-        "comment": None if data["description"] == "user-defined function" else data["description"],
-        "handler": properties["handler"],
+        "name": data["name"].lower(),
+        "args": _parse_signature(properties["signature"]),
+        "comment": data["description"],
         "execute_as": properties["execute as"],
+        "handler": properties["handler"],
+        "imports": _parse_imports(properties["imports"]),
+        "language": properties["language"],
+        "null_handling": properties["null handling"],
+        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
+        "packages": json.loads(properties["packages"].replace("'", '"')),
+        "returns": returns,
+        "runtime_version": properties["runtime_version"],
+        "secure": data["is_secure"] == "Y",
         "as_": properties["body"],
     }
+
+
+def fetch_role_grants(session, role: str):
+    if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
+        return {}
+    show_result = execute(session, f"SHOW GRANTS TO ROLE {role}")
+    session_ctx = fetch_session(session)
+
+    priv_map = defaultdict(list)
+
+    for row in show_result:
+        urn = _urn_from_grant(row, session_ctx)
+        priv_map[str(urn)].append(
+            {
+                "priv": row["privilege"],
+                "grant_option": row["grant_option"] == "true",
+                "owner": row["granted_by"],
+            }
+        )
+
+    return dict(priv_map)
 
 
 def fetch_role(session, fqn: FQN):
@@ -305,9 +447,17 @@ def fetch_role_grant(session, fqn: FQN):
     for data in show_result:
         if data["granted_to"] == subject.upper() and data["grantee_name"] == name:
             if data["granted_to"] == "ROLE":
-                return {"role": fqn.name, "to_role": data["grantee_name"], "owner": data["granted_by"]}
+                return {
+                    "role": fqn.name,
+                    "to_role": data["grantee_name"],
+                    # "owner": data["granted_by"],
+                }
             elif data["granted_to"] == "USER":
-                return {"role": fqn.name, "to_user": data["grantee_name"], "owner": data["granted_by"]}
+                return {
+                    "role": fqn.name,
+                    "to_user": data["grantee_name"],
+                    # "owner": data["granted_by"],
+                }
             else:
                 raise Exception(f"Unexpected role grant for role {fqn.name}")
 
@@ -364,6 +514,10 @@ def fetch_shared_database(session, fqn: FQN):
     }
 
 
+def fetch_stage(session, fqn: FQN):
+    raise NotImplementedError
+
+
 def fetch_table(session, fqn: FQN):
     show_result = execute(session, "SHOW TABLES")
 
@@ -386,9 +540,26 @@ def fetch_table(session, fqn: FQN):
     }
 
 
+def fetch_resource_tags(session, resource_type: str, fqn: FQN):
+    tag_refs = execute(
+        session,
+        f"""
+            SELECT *
+            FROM table({fqn.database}.information_schema.tag_references(
+                '{fqn}', '{resource_type.upper()}'
+            ))""",
+    )
+
+    if len(tag_refs) == 0:
+        return None
+
+    # TODO
+    return []
+
+
 def fetch_user(session, fqn: FQN):
     # SHOW USERS requires the MANAGE GRANTS privilege
-    show_result = execute(session, "SHOW USERS", cacheable=True, use_role="SECURITYADMIN")
+    show_result = execute(session, "SHOW USERS", cacheable=True)  # , use_role="SECURITYADMIN"
 
     users = _filter_result(show_result, name=fqn.name)
 
@@ -493,8 +664,7 @@ def fetch_warehouse(session, fqn: FQN):
 
 
 def list_resource(session, resource_key):
-    data_provider = sys.modules[__name__]
-    return getattr(data_provider, f"list_{pluralize(resource_key)}")(session)
+    return getattr(__this__, f"list_{pluralize(resource_key)}")(session)
 
 
 def list_databases(session):
@@ -505,3 +675,12 @@ def list_databases(session):
 def list_schemas(session):
     show_result = execute(session, "SHOW SCHEMAS")
     return [f"{row['database_name']}.{row['name']}" for row in show_result]
+
+
+def list_stages(session):
+    show_result = execute(session, "SHOW STAGES")
+    stages = []
+    for row in show_result:
+        row["fqn"] = f"{row['database_name']}.{row['schema_name']}.{row['name']}"
+        stages.append(row)
+    return stages

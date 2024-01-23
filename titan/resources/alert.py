@@ -1,26 +1,39 @@
-from typing import Dict
+from dataclasses import dataclass
 
-from .base import Resource, SchemaScoped, _fix_class_documentation
-from .warehouse import T_Warehouse
+from .resource import Resource, ResourceSpec
+from ..enums import ResourceType
+from ..scope import SchemaScope
+
 from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 
-@_fix_class_documentation
-class Alert(SchemaScoped, Resource):
-    """
-    CREATE [ OR REPLACE ] ALERT [ IF NOT EXISTS ] <name>
-      WAREHOUSE = <warehouse_name>
-      SCHEDULE = '{ <num> MINUTE | USING CRON <expr> <time_zone> }'
-      COMMENT = '<string_literal>'
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      IF( EXISTS(
-        <condition>
-      ))
-      THEN
-        <action>
+@dataclass
+class _Alert(ResourceSpec):
+    name: str
+    warehouse: str
+    schedule: str
+    condition: str
+    then: str
+    owner: str = "SYSADMIN"
+    comment: str = None
+    tags: dict[str, str] = None
+
+
+class Alert(Resource):
+    """Alerts trigger notifications when certain conditions are met.
+
+    Args:
+        name (str): The name of the alert.
+        warehouse (str): The name of the warehouse to run the query on.
+        schedule (str): The schedule for the alert to run on.
+        condition (str): The condition for the alert to trigger on.
+        then (str): The query to run when the alert triggers.
+        owner (str, optional): The owner of the alert. Defaults to "SYSADMIN".
+        comment (str, optional): A comment for the alert. Defaults to None.
+        tags (dict[str, str], optional): Tags for the alert. Defaults to None.
     """
 
-    resource_type = "ALERT"
+    resource_type = ResourceType.ALERT
     props = Props(
         warehouse=StringProp("warehouse"),
         schedule=StringProp("schedule"),
@@ -29,12 +42,29 @@ class Alert(SchemaScoped, Resource):
         condition=AlertConditionProp(),
         then=QueryProp("then"),
     )
+    scope = SchemaScope()
+    spec = _Alert
 
-    name: str
-    owner: str = "SYSADMIN"
-    warehouse: T_Warehouse
-    schedule: str
-    comment: str = None
-    tags: Dict[str, str] = None
-    condition: str
-    then: str
+    def __init__(
+        self,
+        name: str,
+        warehouse: str,
+        schedule: str,
+        condition: str,
+        then: str,
+        owner: str = "SYSADMIN",
+        comment: str = None,
+        tags: dict[str, str] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _Alert(
+            name=name,
+            warehouse=warehouse,
+            schedule=schedule,
+            condition=condition,
+            then=then,
+            owner=owner,
+            comment=comment,
+            tags=tags,
+        )

@@ -1,30 +1,23 @@
-from .base import (
-    Resource,
-    Organization,
-    OrganizationScoped,
-    Account,
-    AccountScoped,
-    Database,
-    DatabaseScoped,
-    Schema,
-    SchemaScoped,
-)
+from .resource import Resource
+from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
 from .column import Column
-from .database import SharedDatabase
+from .database import Database
 from .dynamic_table import DynamicTable
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
-from .file_format import FileFormat, CSVFileFormat
+from .function import JavascriptUDF, PythonUDF
 from .grant import Grant, RoleGrant
 from .pipe import Pipe
-from .replication_group import ReplicationGroup
+from .procedure import PythonStoredProcedure
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
+from .schema import Schema
 from .sequence import Sequence
+
+# from .shared_database import SharedDatabase
 from .stage import Stage, InternalStage, ExternalStage
-from .procedure import Procedure, PythonStoredProcedure
 from .stream import Stream, TableStream, ExternalTableStream, ViewStream, StageStream
 from .table import Table
 from .tag import Tag
@@ -32,8 +25,6 @@ from .task import Task
 from .user import User
 from .view import View
 from .warehouse import Warehouse
-
-from .function import Function, JavascriptUDF
 
 from .notification_integration import (
     NotificationIntegration,
@@ -55,7 +46,6 @@ from .storage_integration import (
 
 __all__ = [
     "Account",
-    "AccountScoped",
     "Alert",
     "APIIntegration",
     "AWSOutboundNotificationIntegration",
@@ -63,17 +53,16 @@ __all__ = [
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
     "Column",
-    "CSVFileFormat",
+    # "CSVFileFormat",
     "Database",
     "DatabaseRole",
-    "DatabaseScoped",
     "DynamicTable",
     "EmailNotificationIntegration",
     "ExternalFunction",
     "ExternalStage",
     "ExternalTableStream",
     "FailoverGroup",
-    "FileFormat",
+    # "FileFormat",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
@@ -81,21 +70,17 @@ __all__ = [
     "InternalStage",
     "JavascriptUDF",
     "NotificationIntegration",
-    "Organization",
-    "OrganizationScoped",
     "Pipe",
-    "Procedure",
+    "PythonUDF",
     "PythonStoredProcedure",
-    "ReplicationGroup",
     "Resource",
     "ResourceMonitor",
     "Role",
     "RoleGrant",
     "S3StorageIntegration",
     "Schema",
-    "SchemaScoped",
     "Sequence",
-    "SharedDatabase",
+    # "SharedDatabase",
     "Stage",
     "StageStream",
     "StorageIntegration",
@@ -105,7 +90,6 @@ __all__ = [
     "Tag",
     "Task",
     "User",
-    "Function",
     "View",
     "ViewStream",
     "Warehouse",

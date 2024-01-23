@@ -21,7 +21,7 @@ __all__ = [
     "Warehouse",
 ]
 
-__version__ = "0.0.15"
+__version__ = "0.1.0"
 
 LOGO = r"""
     __  _ __          
@@ -33,5 +33,3 @@ LOGO = r"""
 """.strip(
     "\n"
 )
-
-SNOWPARK_TELEMETRY_ID = "titan_titan"

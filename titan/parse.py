@@ -1,12 +1,13 @@
+import re
+
 from typing import List, Dict, Callable, Union
 
 import pyparsing as pp
 
-from pyparsing import ParseException
-
 from .builder import SQL
-from .enums import Scope
-
+from .enums import ResourceType, Scope
+from .identifiers import FQN, URN
+from .scope import DatabaseScope, SchemaScope
 
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
@@ -104,9 +105,9 @@ def _make_scoped_identifier(identifier_list, scope):
     if len(identifier_list) == 1:
         return {"name": identifier_list[0]}
     elif len(identifier_list) == 2:
-        if scope == Scope.DATABASE:
+        if scope == Scope.DATABASE or isinstance(scope, DatabaseScope):
             return {"database": identifier_list[0], "name": identifier_list[1]}
-        elif scope == Scope.SCHEMA:
+        elif scope == Scope.SCHEMA or isinstance(scope, SchemaScope):
             return {"schema": identifier_list[0], "name": identifier_list[1]}
     elif len(identifier_list) == 3:
         return {"database": identifier_list[0], "schema": identifier_list[1], "name": identifier_list[2]}
@@ -121,7 +122,7 @@ def _parse_create_header(sql, resource_cls):
             pp.Opt(OR_REPLACE)("or_replace"),
             pp.Opt(TEMPORARY)("temporary"),
             ...,
-            Keywords(resource_cls.resource_type)("resource_type"),
+            Keywords(str(resource_cls.resource_type))("resource_type"),
             pp.Opt(IF_NOT_EXISTS)("if_not_exists"),
             FullyQualifiedIdentifier("resource_identifier"),
             REST_OF_STRING("remainder"),
@@ -301,8 +302,8 @@ def _resolve_resource_class(sql):
     try:
         resource_key = convert_match(lexicon, sql)
         return resource_key
-    except ParseException as err:
-        raise ParseException(f"Could not resolve resource class for SQL: {sql}") from err
+    except pp.ParseException as err:
+        raise pp.ParseException(f"Could not resolve resource class for SQL: {sql}") from err
 
 
 class Lexicon:
@@ -332,7 +333,7 @@ def convert_match(lexicon: Lexicon, text):
     parser = pp.StringStart() + lexicon.parser
     parse_result, _, end = _first_match(parser, text)
     if parse_result is None:
-        raise ParseException(f"Could not match {text}")
+        raise pp.ParseException(f"Could not match {text}")
     action_or_str = lexicon.get_action(parse_result)
     if callable(action_or_str):
         action = action_or_str
@@ -407,7 +408,7 @@ def _parse_props(props, sql):
         # Check if we skipped any text. Since `parser` is a MatchFirst, skipped text is a sign
         # that our SQL is invalid or our parser is incomplete.
         if len(sql[prev_end:start].strip()) > 0:
-            raise ParseException(f"Failed to parse prop {sql[prev_end:start]}")
+            raise pp.ParseException(f"Failed to parse prop {sql[prev_end:start]}")
 
         prop_kwarg = parse_results[-1]
         prop = props[prop_kwarg]
@@ -424,7 +425,7 @@ def _parse_props(props, sql):
             found_props[prop_kwarg] = prop.typecheck(prop_value)
         except ValueError as err:
             raise ValueError(f"Parsed prop {prop_kwarg} with value {prop_value} failed typechecking") from err
-        except ParseException:
+        except pp.ParseException:
             raise ValueError(f"Parsed prop {prop_kwarg}={prop} with value {prop_value} failed typechecking")
         remainder = sql[end:].strip(" ")
         prev_end = end
@@ -485,3 +486,136 @@ def _parse_table_schema(sql):
     remainder = sql[0:start] + " " + sql[end:]
     table_schema = {"columns": columns}
     return (table_schema, remainder)
+
+
+def _parse_stage_path(stage_path_str):
+    stage_path = {}
+    if not stage_path_str.startswith("@"):
+        raise Exception(f"Import location must be a stage: {stage_path_str} does not start with @")
+    if "/" in stage_path_str:
+        stage_path["stage_name"] = stage_path_str[1:].split("/")[0]
+        stage_path["path"] = "/".join(stage_path_str[1:].split("/")[1:])
+    else:
+        stage_path["stage_name"] = stage_path_str[1:]
+        stage_path["path"] = ""
+    return stage_path
+
+
+def _parse_dynamic_table_text(text: str):
+    """
+    To the annoyance of some, the only way to get the canonical values of refresh_mode, initialize, and as
+    is to parse it out of the `text` field of the dynamic table. This function does that.
+
+    In a SHOW DYNAMIC TABLES statement, the `text` field is the DDL statement for the dynamic table. Snowflake
+    (strangely) decided to use the mostly unaltered SQL statement as originally run, preserving some whitespace.
+
+    For example:
+        CREATE OR REPLACE DYNAMIC TABLE
+            product (id INT)
+            COMMENT = 'this is a comment'
+            lag = '20 minutes'
+            refresh_mode = 'AUTO'
+            initialize = 'ON_CREATE'
+            warehouse = CI
+            AS
+                SELECT id FROM upstream;
+
+    """
+
+    # Remove newlines
+    text = text.replace("\n", " ")
+
+    # Parse refresh_mode
+    match_refresh_mode = re.search(r"refresh_mode\s*=\s*'(AUTO|FULL|INCREMENTAL)'", text)
+    refresh_mode = match_refresh_mode.group(1) if match_refresh_mode else None
+
+    # Parse initialize
+    match_initialize = re.search(r"initialize\s*=\s*'(ON_CREATE|ON_SCHEDULE)'", text)
+    initialize = match_initialize.group(1) if match_initialize else None
+
+    # Parse as
+    match_as = re.search(r"\s+AS\s+(.*)$", text)
+    as_ = match_as.group(1) if match_as else None
+
+    return (
+        refresh_mode,
+        initialize,
+        as_,
+    )
+
+
+def parse_function_name(header: str):
+    """
+    Example:
+        "CREATE_OR_UPDATE_SCHEMA(CONFIG OBJECT, YAML VARCHAR, DRY_RUN BOOLEAN):OBJECT"
+        "THIS()SUCKS():OBJECT"
+        "A(BCDEFG:OBJEC)T(ARG1 OBJECT, FOO BAR.BAZ():VARIANT VARCHAR):OBJECT"
+    """
+    header = header.strip('"')
+    # Only handling the simple case because adverse cases are likely impossible to parse
+    prefix, _, _ = header.partition("(")
+    return prefix
+
+
+def parse_identifier(identifier: str, is_schema=False) -> FQN:
+    # TODO: This needs to support periods and question marks in double quoted identifiers
+    scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
+    params = {}
+    if param_str:
+        for param in param_str.split("&"):
+            k, v = param.split("=")
+            params[k] = v
+
+    arg_types = []
+    if "(" in scoped_name:
+        args_start = scoped_name.find("(")
+        scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
+        arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
+
+    name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
+    if len(name_parts) == 1:
+        return FQN(
+            name=name_parts[0],
+            params=params,
+            arg_types=arg_types,
+        )
+    elif len(name_parts) == 2:
+        if is_schema:
+            return FQN(
+                database=name_parts[0],
+                name=name_parts[1],
+                params=params,
+                arg_types=arg_types,
+            )
+        else:
+            return FQN(
+                schema=name_parts[0],
+                name=name_parts[1],
+                params=params,
+                arg_types=arg_types,
+            )
+    elif len(name_parts) == 3:
+        return FQN(
+            database=name_parts[0],
+            schema=name_parts[1],
+            name=name_parts[2],
+            params=params,
+            arg_types=arg_types,
+        )
+    raise Exception(f"Failed to parse identifier: {identifier}")
+
+
+def parse_URN(urn_str: str) -> URN:
+    parts = urn_str.split(":")
+    if len(parts) != 4:
+        raise Exception(f"Invalid URN string: {urn_str}")
+    if parts[0] != "urn":
+        raise Exception(f"Invalid URN string: {urn_str}")
+    resource_label, fqn_str = parts[3].split("/")
+    resource_type = ResourceType(resource_label.replace("_", " ").upper())
+    fqn = parse_identifier(fqn_str, is_schema=(resource_label == "schema"))
+    return URN(
+        account_locator=parts[2],
+        resource_type=resource_type,
+        fqn=fqn,
+    )

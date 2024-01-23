@@ -1,24 +1,28 @@
 import json
 
-from typing import List, Optional, Tuple, Type, Union
+from collections import defaultdict
+from typing import List, Optional, Union
 from queue import Queue
 
-from . import data_provider
+import snowflake.connector
 
-from .client import execute
+from . import data_provider, lifecycle
+from .client import ALREADY_EXISTS_ERR, execute
 from .diff import diff, DiffAction
-from .identifiers import URN
-from .resources.base import (
-    Account,
-    AccountScoped,
-    Database,
-    DatabaseScoped,
-    OrganizationScoped,
-    Resource,
-    SchemaScoped,
-    Schema,
+from .identifiers import URN, FQN
+from .parse import parse_URN
+from .privs import (
+    GlobalPriv,
+    DatabasePriv,
+    SchemaPriv,
+    priv_for_principal,
+    is_ownership_priv,
+    create_priv_for_resource_type,
 )
+from .resources import Account, Database, Schema
+from .resources.resource import Resource, ResourceContainer, ResourceType
 from .resources.validators import coerce_from_str
+from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 
 def print_diffs(diffs):
@@ -28,54 +32,186 @@ def print_diffs(diffs):
             print("\t", delta)
 
 
-def _hash(data):
-    return hash(json.dumps(data, sort_keys=True))
-
-
 def _split_by_scope(
-    resources: List[Resource],
-) -> Tuple[List[OrganizationScoped], List[AccountScoped], List[DatabaseScoped], List[SchemaScoped]]:
+    resources: list[Resource],
+) -> tuple[list[Resource], list[Resource], list[Resource], list[Resource]]:
     org_scoped = []
     acct_scoped = []
     db_scoped = []
     schema_scoped = []
-    for resource in resources:
-        if isinstance(resource, OrganizationScoped):
+
+    def route(resource: Resource):
+        """The sorting hat"""
+        if isinstance(resource.scope, OrganizationScope):
             org_scoped.append(resource)
-        elif isinstance(resource, AccountScoped):
+        elif isinstance(resource.scope, AccountScope):
             acct_scoped.append(resource)
-        elif isinstance(resource, DatabaseScoped):
+        elif isinstance(resource.scope, DatabaseScope):
             db_scoped.append(resource)
-        elif isinstance(resource, SchemaScoped):
+        elif isinstance(resource.scope, SchemaScope):
             schema_scoped.append(resource)
         else:
             raise Exception(f"Unsupported resource type {type(resource)}")
+
+    for resource in resources:
+        route(resource)
+        if isinstance(resource, ResourceContainer):
+            for item in resource.items():
+                route(item)
     return org_scoped, acct_scoped, db_scoped, schema_scoped
-
-
-def _filter_unfetchable_fields(data):
-    filtered = data.copy()
-    for key in list(filtered.keys()):
-        # field = cls.model_fields[key]
-        # fetchable = field.json_schema_extra is None or field.json_schema_extra.get("fetchable", True)
-        # FIXME
-        fetchable = True
-        if not fetchable:
-            del filtered[key]
-    return filtered
 
 
 def _plan(remote_state, manifest):
     manifest = manifest.copy()
-    urns = manifest.pop("_urns") + list(remote_state.keys())
-    sort_order = topological_sort(manifest, urns)
+
+    # Generate a list of all URNs
+    resource_set = set(manifest["_urns"] + list(remote_state.keys()))
+
+    for ref in manifest["_refs"]:
+        resource_set.add(ref[0])
+        resource_set.add(ref[1])
+
+    # Calculate a topological sort order for the URNs
+    sort_order = topological_sort(resource_set, manifest["_refs"])
+
+    # Once sorting is done, remove the _refs and _urns keys from the manifest
     del manifest["_refs"]
+    del manifest["_urns"]
+
     changes = []
     for action, urn_str, data in diff(remote_state, manifest):
-        data = _filter_unfetchable_fields(data)
-        if data:
-            changes.append((action, urn_str, data))
+        changes.append((action, urn_str, data))
     return sorted(changes, key=lambda change: sort_order[change[1]])
+
+
+def _walk(resource: Resource):
+    yield resource
+    if isinstance(resource, ResourceContainer):
+        for item in resource.items():
+            yield from _walk(item)
+
+
+def _collect_required_privs(session_ctx, plan):
+    priv_map = defaultdict(set)
+
+    def _add(urn, priv):
+        priv_map[str(urn)].add(priv)
+
+    account_urn = URN.from_session_ctx(session_ctx)
+
+    for action, urn_str, data in plan:
+        urn = parse_URN(urn_str)
+        privs = []
+        if action == DiffAction.ADD:
+            privs = lifecycle.privs_for_create(urn, data)
+
+        for priv in privs:
+            if isinstance(priv, GlobalPriv):
+                _add(account_urn, priv)
+            elif isinstance(priv, DatabasePriv):
+                _add(urn.database(), priv)
+            elif isinstance(priv, SchemaPriv):
+                _add(urn.schema(), priv)
+
+    return dict(priv_map)
+
+
+def _collect_available_privs(session_ctx, session, plan):
+    priv_map = {}
+
+    def _add(role, principal, priv):
+        if role not in priv_map:
+            priv_map[role] = {}
+        if principal not in priv_map[role]:
+            priv_map[role][principal] = set()
+        priv_map[role][principal].add(priv)
+
+    def _contains(role, principal, priv):
+        if role not in priv_map:
+            return False
+        if principal not in priv_map[role]:
+            return False
+        return priv in priv_map[role][principal]
+
+    account_urn = URN.from_session_ctx(session_ctx)
+
+    for role in session_ctx["available_roles"]:
+        priv_map[role] = {}
+
+        if role.startswith("SNOWFLAKE.LOCAL"):
+            continue
+
+        # Existing privilege grants
+        role_grants = data_provider.fetch_role_grants(session, role)
+        for principal, grant_list in role_grants.items():
+            for grant in grant_list:
+                priv = priv_for_principal(parse_URN(principal), grant["priv"])
+                _add(role, principal, priv)
+
+        # Implied privilege grants in the context of our plan
+        for action, urn_str, _ in plan:
+            urn = parse_URN(urn_str)
+            # If we plan to add a new resource and we have the privs to create it, we can assume
+            # that we have the OWNERSHIP priv on that resource
+            if action == DiffAction.ADD:
+                create_priv = create_priv_for_resource_type(urn.resource_type)
+                if create_priv is None:
+                    continue
+                ownership_priv = priv_for_principal(urn, "OWNERSHIP")
+                if urn.resource_type == ResourceType.DATABASE:
+                    parent_urn = account_urn
+                elif urn.resource_type == ResourceType.SCHEMA:
+                    parent_urn = urn.database()
+                else:
+                    parent_urn = urn.schema()
+                if _contains(role, str(parent_urn), create_priv):
+                    _add(role, urn_str, ownership_priv)
+                    if urn.resource_type == ResourceType.DATABASE:
+                        public_schema = URN(
+                            account_locator=account_urn.account_locator,
+                            resource_type=ResourceType.SCHEMA,
+                            fqn=FQN(name="PUBLIC", database=urn.fqn.name),
+                        )
+                        information_schema = URN(
+                            account_locator=account_urn.account_locator,
+                            resource_type=ResourceType.SCHEMA,
+                            fqn=FQN(name="PUBLIC", database=urn.fqn.name),
+                        )
+                        _add(role, str(public_schema), priv_for_principal(public_schema, "OWNERSHIP"))
+                        _add(role, str(information_schema), priv_for_principal(information_schema, "OWNERSHIP"))
+
+    return priv_map
+
+
+def _raise_if_missing_privs(required: dict, available: dict):
+    for principal, privs in required.items():
+        required_privs = privs.copy()
+        for priv_map in available.values():
+            if principal in priv_map:
+                # If OWNERSHIP in priv_map[principal], we can assume we pass requirements
+                for priv in priv_map[principal]:
+                    if is_ownership_priv(priv):
+                        required_privs = set()
+                        break
+                required_privs -= priv_map[principal]
+        if required_privs:
+            raise Exception(f"Missing privileges for {principal}: {required_privs}")
+
+
+def _fetch_remote_state(session, manifest):
+    state = {}
+    for urn_str in manifest["_urns"]:
+        urn = parse_URN(urn_str)
+        resource_cls = Resource.resolve_resource_cls(urn.resource_type)
+        data = data_provider.fetch_resource(session, urn)
+        if urn_str in manifest and data is not None:
+            if isinstance(data, list):
+                normalized = [resource_cls.defaults() | d for d in data]
+            else:
+                normalized = resource_cls.defaults() | data
+            state[urn_str] = normalized
+
+    return state
 
 
 class Blueprint:
@@ -86,10 +222,12 @@ class Blueprint:
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
         resources: List[Resource] = [],
+        enforce_requirements: bool = False,
     ) -> None:
         self._finalized = False
+        self._staged: List[Resource] = []
+        self._root: Account = None
         self.name = name
-        self.staged: List[Resource] = []
         self.account: Optional[Account] = coerce_from_str(Account)(account) if account else None
         self.database: Optional[Database] = coerce_from_str(Database)(database) if database else None
         self.schema: Optional[Schema] = coerce_from_str(Schema)(schema) if schema else None
@@ -98,42 +236,49 @@ class Blueprint:
         self.add([res for res in [self.account, self.database, self.schema] if res is not None])
 
     def _finalize(self, session_context: dict):
+        """
+        Convert the staged resources into a tree of resources
+        """
         if self._finalized:
             return
         self._finalized = True
 
-        org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self.staged)
+        org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
 
         if len(org_scoped) > 1:
             raise Exception("Only one account allowed")
         elif len(org_scoped) == 1:
             # If we have a staged account, use it
-            root = org_scoped[0]
+            self._root = org_scoped[0]
         else:
-            # Otherwise, use the session context to create a new account
-            root = Account(name=session_context["account"], stub=True)
-            self.account = root
+            # Otherwise, create a stub account from the session context
+            self._root = Account(
+                name=session_context["account"],
+                locator=session_context["account_locator"],
+                stub=True,
+            )
+            self.account = self._root
 
-        # Add all databases and other account scoped resources to the root account
+        # Add all databases and other account scoped resources to the root
         for resource in acct_scoped:
-            root.add(resource)
+            self._root.add(resource)
         if session_context.get("database") is not None:
-            root.add(Database(name=session_context["database"], stub=True))
+            self._root.add(Database(name=session_context["database"], stub=True))
 
-        root_databases = root.databases()
+        databases: list[Database] = self._root.databases()
 
         # Add all schemas and database roles to their respective databases
         for resource in db_scoped:
-            if resource.database is None:
-                if len(root_databases) == 1:
-                    root_databases[0].add(resource)
+            if resource.container is None:
+                if len(databases) == 1:
+                    databases[0].add(resource)
                 else:
-                    raise Exception(f"Database [{resource.database}] for resource {resource} not found")
+                    raise Exception(f"Database [{resource.container}] for resource {resource} not found")
 
         for resource in schema_scoped:
-            if resource.schema is None:
-                if len(root_databases) == 1:
-                    public_schema = root_databases[0].find(schema="PUBLIC")
+            if resource.container is None:
+                if len(databases) == 1:
+                    public_schema: Schema = databases[0].find(resource_type=ResourceType.SCHEMA, name="PUBLIC")
                     if public_schema:
                         public_schema.add(resource)
                 else:
@@ -146,31 +291,30 @@ class Blueprint:
 
         self._finalize(session_context)
 
-        # TODO: move this out into it's own function without the session
-        for resource in self.staged:
+        for resource in _walk(self._root):
             if resource.implicit:
                 continue
-            urn = URN.from_resource(account=self.account, resource=resource)
 
-            if resource.implicit:
-                continue
-            data = resource.model_dump(exclude_none=True)
+            urn = URN.from_resource(account_locator=self.account.locator, resource=resource)
+            data = resource.to_dict()
+
+            if resource.stub:
+                data["_stub"] = True
 
             manifest_key = str(urn)
 
-            if resource.serialize_as_list:
+            if resource.resource_type == ResourceType.GRANT:
                 if manifest_key not in manifest:
                     manifest[manifest_key] = []
                 manifest[manifest_key].append(data)
             else:
-                if manifest_key in manifest:  # and _hash(manifest[manifest_key]) != _hash(data):
-                    # raise RuntimeError(f"Duplicate resource found {manifest_key}")
+                if manifest_key in manifest:
                     continue
                 manifest[manifest_key] = data
             urns.append(manifest_key)
 
             for ref in resource.refs:
-                ref_urn = URN.from_resource(account=self.account, resource=ref)
+                ref_urn = URN.from_resource(account_locator=self.account.locator, resource=ref)
                 refs.append((str(urn), str(ref_urn)))
         manifest["_refs"] = refs
         manifest["_urns"] = urns
@@ -179,7 +323,7 @@ class Blueprint:
     def plan(self, session):
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
-        remote_state = data_provider.fetch_remote_state(session, manifest)
+        remote_state = _fetch_remote_state(session, manifest)
         return _plan(remote_state, manifest)
 
     def apply(self, session, plan=None):
@@ -187,37 +331,72 @@ class Blueprint:
             plan = self.plan(session)
 
         # TODO: cursor setup, including query tag
+        # TODO: clean up urn vs urn_str madness
+
+        """
+            At this point, we have a list of actions as a part of the plan. Each action is one of:
+                1. [ADD] action (CREATE command)
+                2. [CHANGE] action (one or many ALTER or SET PARAMETER commands)
+                3. [REMOVE] action (DROP command, REVOKE command, or a rename operation)
+
+            Each action requires:
+                • a set of privileges necessary to run commands
+                • the appropriate role to execute commands
+
+            Once we've determined those things, we can compare the list of required roles and privileges
+            against what we have access to in the session and the role tree.
+        """
+
+        session_ctx = data_provider.fetch_session(session)
+        required_privs = _collect_required_privs(session_ctx, plan)
+        available_privs = _collect_available_privs(session_ctx, session, plan)
+
+        _raise_if_missing_privs(required_privs, available_privs)
+
+        action_queue = []
+        actions_taken = []
+
+        def _queue_action(urn, data, props):
+            if action == DiffAction.ADD:
+                action_queue.append(lifecycle.create_resource(urn, data, props))
+            elif action == DiffAction.CHANGE:
+                action_queue.append(lifecycle.update_resource(urn, data, props))
+            elif action == DiffAction.REMOVE:
+                action_queue.append(lifecycle.drop_resource(urn, data))
+
         for action, urn_str, data in plan:
-            # TODO: eliminate the need to do resource class lookups. Probably by refactoring the lifecycle methods
-            urn = URN.from_str(urn_str)
-            resource_cls = Resource.classes[urn.resource_key]
-            try:
-                if action == DiffAction.ADD:
-                    sql = resource_cls.lifecycle_create(urn.fqn, data)
-                elif action == DiffAction.CHANGE:
-                    sql = resource_cls.lifecycle_update(urn.fqn, data)
-                elif action == DiffAction.REMOVE:
-                    sql = resource_cls.lifecycle_delete(urn.fqn, data)
-                else:
-                    raise Exception(f"Unexpected action {action} in plan")
-                execute(session, sql)
-            except AttributeError as err:
-                raise AttributeError(f"Resource {resource_cls.__name__} missing lifecycle action") from err
+            urn = parse_URN(urn_str)
+
+            props = Resource.props_for_resource_type(urn.resource_type)
+
+            _queue_action(urn, data, props)
+
+            while action_queue:
+                sql = action_queue.pop(0)
+                actions_taken.append(sql)
+                try:
+                    execute(session, sql)
+                except snowflake.connector.errors.ProgrammingError as err:
+                    if err.errno == ALREADY_EXISTS_ERR:
+                        print(f"Resource already exists: {urn_str}, skipping...")
+                    raise err
+        return actions_taken
 
     def destroy(self, session, manifest=None):
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
-        for urn_str in manifest.keys():
-            urn = URN.from_str(urn_str)
-            resource_cls = Resource.classes[urn.resource_key]
-            execute(session, resource_cls.lifecycle_delete(urn.fqn))
+        for urn_str, data in manifest.items():
+            urn = parse_URN(urn_str)
+            if urn.resource_type == ResourceType.GRANT:
+                for grant in data:
+                    execute(session, lifecycle.drop_resource(urn, grant))
+            else:
+                execute(session, lifecycle.drop_resource(urn, data))
 
     def _add(self, resource):
         if self._finalized:
             raise Exception("Cannot add resources to a finalized blueprint")
-        self.staged.append(resource)
-        for ref in resource.refs:
-            self._add(ref)
+        self._staged.append(resource)
 
     def add(self, *resources):
         if isinstance(resources[0], list):
@@ -226,18 +405,18 @@ class Blueprint:
             self._add(resource)
 
 
-def topological_sort(manifest, urns):
+def topological_sort(resource_set: set, references: list):
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
     in_degrees = {}
     outgoing_edges = {}
 
-    for node in urns:
+    for node in resource_set:
         in_degrees[node] = 0
         outgoing_edges[node] = set()
 
-    for node, ref in manifest["_refs"]:
+    for node, ref in references:
         in_degrees[ref] += 1
         outgoing_edges[node].add(ref)
 

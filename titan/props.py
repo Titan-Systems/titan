@@ -1,4 +1,5 @@
 import json
+import sys
 
 from abc import ABC
 from typing import Dict
@@ -6,7 +7,8 @@ from typing import Dict
 import pyparsing as pp
 
 from .builder import tidy_sql
-from .enums import DataType
+from .enums import DataType, Language, ExecutionRights, NullHandling
+from .identifiers import URN
 from .parse import (
     _parser_has_results_name,
     _parse_props,
@@ -23,6 +25,9 @@ from .parse import (
 )
 
 
+__this__ = sys.modules[__name__]
+
+
 class Prop(ABC):
     """
     A Prop is a named expression that can be parsed from a SQL string.
@@ -32,6 +37,7 @@ class Prop(ABC):
     def __init__(self, label, value_expr=ANY(), eq=True, parens=False, alt_tokens=[], consume=[]):
         self.label = label
         self.eq = eq
+        self.parens = parens
         self.alt_tokens = set([tok.lower() for tok in alt_tokens])
 
         if isinstance(consume, str):
@@ -169,6 +175,8 @@ class IdentifierProp(Prop):
     def render(self, value):
         if value is None:
             return ""
+        if not isinstance(value, str) and hasattr(value, "name"):
+            value = value.name
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
@@ -176,7 +184,6 @@ class IdentifierProp(Prop):
         )
 
 
-# FIXME
 class IdentifierListProp(Prop):
     def __init__(self, label, **kwargs):
         value_expr = pp.delimited_list(pp.Group(FullyQualifiedIdentifier()))
@@ -186,7 +193,16 @@ class IdentifierListProp(Prop):
         return [".".join(id_parts) for id_parts in prop_values]
 
     def render(self, values):
-        raise NotImplementedError
+        if values is None:
+            return ""
+        value_list = ", ".join(values)
+        if self.parens:
+            value_list = f"({value_list})"
+        return tidy_sql(
+            self.label.upper(),
+            "=" if self.eq else "",
+            value_list,
+        )
 
 
 class StringListProp(Prop):
@@ -198,7 +214,7 @@ class StringListProp(Prop):
         return [tok.strip(" ") for tok in prop_value]
 
     def render(self, values):
-        if values is None:
+        if values is None or len(values) == 0:
             return ""
         value_list = ", ".join([f"'{v}'" for v in values])
         return tidy_sql(
@@ -218,15 +234,13 @@ class PropSet(Prop):
         prop_value = prop_value.strip("()")
         return _parse_props(self.props, prop_value)
 
-    # def render(self, values):
-    #     if values is None or len(values) == 0:
-    #         return ""
-    #     kv_pairs = []
-    #     for name, prop in self.expected_props.items():
-    #         if name.lower() in values:
-    #             kv_pairs.append(prop.render(values[name.lower()]))
-
-    #     return f"{self.name} = ({', '.join(kv_pairs)})"
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return ""
+        eq = " = " if self.eq else " "
+        value_str = self.props.render(values)
+        value_str = f"({value_str})"
+        return f"{self.label}{eq}{value_str}"
 
 
 class TagsProp(Prop):
@@ -269,15 +283,24 @@ class DictProp(Prop):
             values[key] = next(pairs)
         return values
 
+    def render(self, value: dict) -> str:
+        if value is None:
+            return ""
+        kv_pairs = ", ".join([f"'{key}' = '{value}'" for key, value in value.items()])
+        eq = " = " if self.eq else " "
+        return f"{self.label}{eq}({kv_pairs})"
+
 
 class EnumProp(Prop):
     def __init__(self, label, enum_or_list, **kwargs):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
-        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | ANY()
+        value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | (~Keyword("NULL") + ANY())
         super().__init__(label, value_expr, **kwargs)
 
     def typecheck(self, prop_value):
+        if isinstance(prop_value, list):
+            prop_value = prop_value[0]
         prop_value = self.enum_type(prop_value)
         if prop_value not in self.valid_values:
             raise ValueError(f"Invalid value: {prop_value} must be one of {self.valid_values}")
@@ -309,7 +332,8 @@ class EnumListProp(Prop):
         if values is None or len(values) == 0:
             return ""
         eq = " = " if self.eq else " "
-        return f"{self.label}{eq}({values})"
+        value_list = ", ".join([str(val) for val in values])
+        return f"{self.label}{eq}{value_list}"
 
 
 class EnumFlagProp(Prop):
@@ -432,7 +456,8 @@ class ArgsProp(Prop):
             return "()"
         args = []
         for arg in value:
-            args.append(f"{arg['name']} {str(arg['data_type'])}")
+            default = f" DEFAULT {arg['default']}" if "default" in arg else ""
+            args.append(f"{arg['name']} {str(arg['data_type'])}{default}")
         return f"({', '.join(args)})"
 
 
@@ -460,10 +485,21 @@ class ColumnNamesProp(Prop):
         return columns
 
 
-class ColumnsProp(Prop):
+class SchemaProp(Prop):
     def __init__(self):
-        value_expr = pp.original_text_for(pp.nested_expr())
-        super().__init__(label=None, value_expr=value_expr, eq=False)
+        super().__init__(label=None, value_expr=pp.NoMatch())
 
     def typecheck(self, prop_values):
-        prop_values = prop_values.strip("()")
+        pass
+
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return "()"
+        columns = []
+        for column in values:
+            name = column["name"]
+            data_type = str(column["data_type"])
+            comment = f" COMMENT '{column['comment']}'" if "comment" in column else ""
+            column_str = f"{name} {data_type}{comment}"
+            columns.append(column_str)
+        return f"({', '.join(columns)})"

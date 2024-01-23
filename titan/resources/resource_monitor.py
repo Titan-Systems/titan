@@ -1,10 +1,8 @@
-from typing import List
-from typing_extensions import Annotated
+from dataclasses import dataclass
 
-from pydantic import BeforeValidator
-
-from .base import AccountScoped, Resource, _fix_class_documentation, coerce_from_str, serialize_resource_by_name
-from ..enums import ParseableEnum
+from .resource import Resource, ResourceSpec
+from ..enums import ParseableEnum, ResourceType
+from ..scope import AccountScope
 from ..props import (
     EnumProp,
     IntProp,
@@ -22,22 +20,18 @@ class ResourceMonitorFrequency(ParseableEnum):
     NEVER = "NEVER"
 
 
-@_fix_class_documentation
-class ResourceMonitor(AccountScoped, Resource):
-    """
-    CREATE [ OR REPLACE ] RESOURCE MONITOR <name> WITH
-                          [ CREDIT_QUOTA = <number> ]
-                          [ FREQUENCY = { MONTHLY | DAILY | WEEKLY | YEARLY | NEVER } ]
-                          [ START_TIMESTAMP = { <timestamp> | IMMEDIATELY } ]
-                          [ END_TIMESTAMP = <timestamp> ]
-                          [ NOTIFY_USERS = ( <user_name> [ , <user_name> , ... ] ) ]
-                          [ TRIGGERS triggerDefinition [ triggerDefinition ... ] ]
+@dataclass
+class _ResourceMonitor(ResourceSpec):
+    name: str
+    credit_quota: int = None
+    frequency: ResourceMonitorFrequency = None
+    start_timestamp: str = None
+    end_timestamp: str = None
+    notify_users: list[str] = None
 
-    triggerDefinition ::=
-        ON <threshold> PERCENT DO { SUSPEND | SUSPEND_IMMEDIATE | NOTIFY }
-    """
 
-    resource_type = "RESOURCE MONITOR"
+class ResourceMonitor(Resource):
+    resource_type = ResourceType.RESOURCE_MONITOR
     props = Props(
         _start_token="WITH",
         credit_quota=IntProp("credit_quota"),
@@ -46,17 +40,25 @@ class ResourceMonitor(AccountScoped, Resource):
         end_timestamp=StringProp("end_timestamp"),
         notify_users=StringListProp("notify_users", parens=True),
     )
+    scope = AccountScope()
+    spec = _ResourceMonitor
 
-    name: str
-    credit_quota: int = None
-    frequency: ResourceMonitorFrequency = None
-    start_timestamp: str = None
-    end_timestamp: str = None
-    notify_users: List[str] = None
-
-
-T_ResourceMonitor = Annotated[
-    ResourceMonitor,
-    BeforeValidator(coerce_from_str(ResourceMonitor)),
-    serialize_resource_by_name,
-]
+    def __init__(
+        self,
+        name: str,
+        credit_quota: int = None,
+        frequency: ResourceMonitorFrequency = None,
+        start_timestamp: str = None,
+        end_timestamp: str = None,
+        notify_users: list[str] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _ResourceMonitor(
+            name=name,
+            credit_quota=credit_quota,
+            frequency=frequency,
+            start_timestamp=start_timestamp,
+            end_timestamp=end_timestamp,
+            notify_users=notify_users,
+        )

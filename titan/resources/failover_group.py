@@ -1,7 +1,10 @@
-from typing import List
+from dataclasses import dataclass
 
-from .base import Resource, AccountScoped, _fix_class_documentation
-from ..enums import ParseableEnum
+from .resource import Resource, ResourceSpec
+from ..enums import ParseableEnum, ResourceType
+from ..scope import AccountScope
+
+
 from ..props import Props, EnumListProp, StringListProp, FlagProp, StringProp, IdentifierListProp
 
 
@@ -23,8 +26,20 @@ class IntegrationTypes(ParseableEnum):
     NOTIFICATION_INTEGRATIONS = "NOTIFICATION INTEGRATIONS"
 
 
-@_fix_class_documentation
-class FailoverGroup(AccountScoped, Resource):
+@dataclass
+class _FailoverGroup(ResourceSpec):
+    name: str
+    object_types: list[ObjectType]
+    allowed_accounts: list[str]
+    allowed_databases: list[str] = None
+    allowed_shares: list[str] = None
+    allowed_integration_types: list[IntegrationTypes] = None
+    ignore_edition_check: bool = None
+    replication_schedule: str = None
+    owner: str = "ACCOUNTADMIN"
+
+
+class FailoverGroup(Resource):
     """
     CREATE FAILOVER GROUP [ IF NOT EXISTS ] <name>
         OBJECT_TYPES = <object_type> [ , <object_type> , ... ]
@@ -36,23 +51,41 @@ class FailoverGroup(AccountScoped, Resource):
         [ REPLICATION_SCHEDULE = '{ <num> MINUTE | USING CRON <expr> <time_zone> }' ]
     """
 
-    resource_type = "FAILOVER GROUP"
+    resource_type = ResourceType.FAILOVER_GROUP
     props = Props(
         object_types=EnumListProp("object_types", ObjectType),
-        allowed_databases=StringListProp("allowed_databases"),
-        allowed_shares=StringListProp("allowed_shares"),
+        allowed_databases=IdentifierListProp("allowed_databases"),
+        allowed_shares=IdentifierListProp("allowed_shares"),
         allowed_integration_types=EnumListProp("allowed_integration_types", IntegrationTypes),
         allowed_accounts=IdentifierListProp("allowed_accounts"),
         ignore_edition_check=FlagProp("ignore edition check"),
         replication_schedule=StringProp("replication_schedule"),
     )
+    scope = AccountScope()
+    spec = _FailoverGroup
 
-    name: str
-    owner: str = "SYSADMIN"
-    object_types: List[ObjectType]
-    allowed_databases: List[str] = None
-    allowed_shares: List[str] = None
-    allowed_integration_types: List[IntegrationTypes] = None
-    allowed_accounts: List[str]
-    ignore_edition_check: bool = None
-    replication_schedule: str = None
+    def __init__(
+        self,
+        name: str,
+        object_types: list[ObjectType],
+        allowed_accounts: list[str],
+        allowed_databases: list[str] = None,
+        allowed_shares: list[str] = None,
+        allowed_integration_types: list[IntegrationTypes] = None,
+        ignore_edition_check: bool = None,
+        replication_schedule: str = None,
+        owner: str = "ACCOUNTADMIN",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _FailoverGroup(
+            name=name,
+            object_types=object_types,
+            allowed_accounts=allowed_accounts,
+            allowed_databases=allowed_databases,
+            allowed_shares=allowed_shares,
+            allowed_integration_types=allowed_integration_types,
+            ignore_edition_check=ignore_edition_check,
+            replication_schedule=replication_schedule,
+            owner=owner,
+        )

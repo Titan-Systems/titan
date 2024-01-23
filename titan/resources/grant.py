@@ -1,24 +1,27 @@
-from typing import Any, List, Union, Type
-from typing_extensions import Annotated
+from dataclasses import dataclass
+from typing import Any
 
-from pydantic import BeforeValidator, Field, PlainSerializer, model_validator
-
-from .base import Resource, AccountScoped, T_Schema, _fix_class_documentation
-from .role import T_Role
-from .user import T_User
-from .validators import coerce_from_str, serialize_as_named_resource
-from ..builder import SQL, tidy_sql
-from ..enums import ParseableEnum
-from ..helpers import listify
+from .resource import Resource, ResourceSpec
+from .role import Role
+from .user import User
+from ..enums import ResourceType
 from ..identifiers import FQN
-from ..parse import _parse_grant, _parse_props
-from ..privs import Privs, GLOBAL_PRIV_DEFAULT_OWNERS
-from ..props import Props, IdentifierProp, FlagProp
-from ..privs import GlobalPriv, SchemaPriv
+from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
+from ..props import Props, FlagProp, IdentifierProp
+from ..scope import AccountScope
 
 
-@_fix_class_documentation
-class Grant(AccountScoped, Resource):
+@dataclass
+class _Grant(ResourceSpec):
+    priv: str
+    on: str
+    on_type: ResourceType
+    to: Role
+    grant_option: bool = False
+    owner: str = None
+
+
+class Grant(Resource):
     """
     GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
         | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
@@ -99,27 +102,19 @@ class Grant(AccountScoped, Resource):
             { SELECT | REFERENCES } [ , ... ]
     """
 
-    resource_type = "GRANT"
-    serialize_as_list = True
+    resource_type = ResourceType.GRANT
     props = Props(
         to=IdentifierProp("to", eq=False, consume="role"),
         grant_option=FlagProp("with grant option"),
     )
-
-    priv: str = None
-    on: Any = None
-    on_all: Any = None
-    on_future: Any = None
-    on_scope: str = None
-    to: T_Role = None
-    grant_option: bool = False
-    owner: str = None
+    scope = AccountScope()
+    spec = _Grant
 
     def __init__(
         self,
         priv: str = None,
         on: Any = None,
-        to: T_Role = None,
+        to: str = None,
         grant_option: bool = False,
         owner: str = None,
         **kwargs,
@@ -148,56 +143,99 @@ class Grant(AccountScoped, Resource):
         >>> Grant(priv="SELECT", on_future_tables_in=Database(name="somedb"), to="somerole")
 
         """
-        on_all = None
-        on_future = None
+        # on_all = None
+        # on_future = None
+        on_type = None
 
-        for keyword, arg in kwargs.items():
+        to = to if isinstance(to, Role) else Role(name=to, stub=True)
+
+        # Collect on_ kwargs
+        on_kwargs = {}
+        for keyword, arg in kwargs.copy().items():
             if keyword.startswith("on_"):
+                on_kwargs[keyword] = kwargs.pop(keyword)
+
+        # Handle dynamic on_ kwargs
+        if on_kwargs:
+            for keyword, arg in on_kwargs.items():
                 if on is not None:
                     raise ValueError("You can only specify one 'on' parameter, multiple found")
 
+                # Ex: on_future_schemas_in_database -> on_future_schemas_in, database
                 is_scoped_grant = "_in_" in keyword or keyword.endswith("_in")
 
                 if is_scoped_grant:
                     if keyword.endswith("_in"):
                         keyword = keyword[:-3]
-                        on = arg
+                        if not isinstance(arg, Resource):
+                            raise ValueError(f"Invalid resource type: {arg}")
+                        on = arg._data.name
+                        on_type = arg.resource_type
                     elif "_in_" in keyword:
-                        keyword, resource_key = keyword.split("_in_")
-                        resource_cls = Resource.classes[resource_key]
-                        on = resource_cls(name=arg, stub=True)
+                        keyword, resource_type = keyword.split("_in_")
+                        on = arg
+                        on_type = ResourceType(resource_type)
 
                     if keyword.startswith("on_all"):
-                        on_all = keyword[7:].replace("_", " ").upper()
+                        # on_all = keyword[7:].replace("_", " ").upper()
+                        raise NotImplementedError
                     elif keyword.startswith("on_future"):
-                        on_future = keyword[10:].replace("_", " ").upper()
+                        # on_future = keyword[10:].replace("_", " ").upper()
+                        raise NotImplementedError
                 else:
                     # Grant targeting a specific resource
                     # on_{resource} kwargs
                     # on_schema="foo" -> on=Schema(name="foo", stub=True)
-                    # TODO: find a different way to create a reference pointer to the ON resource
-                    on = f"{keyword[3:]} {arg}"
+                    on = arg
+                    on_type = ResourceType(keyword[3:])
+        # Handle on= kwarg
+        else:
+            if on is None:
+                raise ValueError("You must specify an 'on' parameter")
+            if isinstance(on, Resource):
+                on_type = on.resource_type
+                on = on._data.name
 
-        if owner is None and on == "ACCOUNT" and isinstance(priv, GlobalPriv):
-            owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
+        if owner is None:
+            if on == "ACCOUNT" and isinstance(priv, GlobalPriv):
+                owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
+            else:
+                owner = "SYSADMIN"
 
-        super().__init__(
-            priv=priv.value if isinstance(priv, ParseableEnum) else priv,
+        super().__init__(**kwargs)
+        self._data: _Grant = _Grant(
+            priv=priv,
             on=on,
-            on_all=on_all,
-            on_future=on_future,
+            on_type=on_type,
             to=to,
             grant_option=grant_option,
-            owner=owner or "SYSADMIN",
+            owner=owner,
         )
 
+        granted_on = Resource.resolve_resource_cls(on_type)(name=on, stub=True)
+        self.requires(granted_on)
+
     def __repr__(self):
-        return f"{self.__class__.__name__}(priv={getattr(self, 'priv', '')}, on={getattr(self, 'on', '')}, to={getattr(self, 'to', '')})"
+        priv = getattr(self, "priv", "")
+        on = getattr(self, "on", "")
+        to = getattr(self, "to", "")
+        return f"{self.__class__.__name__}(priv={priv}, on={on}, to={to})"
 
     @classmethod
     def from_sql(cls, sql):
-        parsed = _parse_grant(sql)
-        return cls(**parsed)
+        # parsed = _parse_grant(sql)
+        # return cls(**parsed)
+        raise NotImplementedError
+
+    @property
+    def fqn(self):
+        return FQN(
+            name=self._data.to.name,
+            params={
+                "on": self._data.on,
+                "type": str(self._data.on_type),
+            },
+        )
 
     @property
     def name(self):
@@ -207,88 +245,92 @@ class Grant(AccountScoped, Resource):
         return priv
 
     @property
-    def fully_qualified_name(self):
-        return FQN(name=self.to.name, params={"on": self.on})
+    def on(self) -> str:
+        return self._data.on
 
-    @classmethod
-    def lifecycle_create(cls, fqn: FQN, data):
-        return SQL(
-            "GRANT",
-            data["priv"],
-            "ON",
-            data["on"],
-            cls.props.render(data),
-            _use_role=data["owner"],
-        )
+    @property
+    def on_type(self) -> ResourceType:
+        return self._data.on_type
 
-    @classmethod
-    def lifecycle_delete(cls, fqn: FQN, data, cascade=False):
-        return SQL(
-            "REVOKE",
-            data["priv"],
-            "ON",
-            data["on"],
-            "FROM",
-            data["to"],
-            "CASCADE" if cascade else "RESTRICT",
-            _use_role=data["owner"],
-        )
+    # @property
+    # def on_all(self):
+    #     return self._data.on_all
 
-    def create_sql(self):
-        data = self.model_dump(exclude_none=True, exclude_defaults=True)
-        return str(self.lifecycle_create(self.fqn, data))
+    # @property
+    # def on_future(self):
+    #     return self._data.on_future
+
+    @property
+    def to(self):
+        return self._data.to
+
+    @property
+    def priv(self):
+        return self._data.priv
 
 
-@_fix_class_documentation
-class RoleGrant(AccountScoped, Resource):
+@dataclass
+class _RoleGrant(ResourceSpec):
+    role: Role
+    to_role: Role = None
+    to_user: User = None
+    # owner: str = None  # "USERADMIN"
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.to_role is not None and self.to_user is not None:
+            raise ValueError("You can only grant to a role or a user, not both")
+        if self.to_role is None and self.to_user is None:
+            raise ValueError("You must specify a role or a user to grant to")
+
+
+class RoleGrant(Resource):
     """
     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
     """
 
-    resource_type = "GRANT"
+    resource_type = ResourceType.ROLE_GRANT
     props = Props(
-        _start_token="grant",
         role=IdentifierProp("role", eq=False),
         to_role=IdentifierProp("to role", eq=False),
         to_user=IdentifierProp("to user", eq=False),
     )
+    scope = AccountScope()
+    spec = _RoleGrant
 
-    role: T_Role
-    to_role: T_Role = None
-    to_user: T_User = None
-    owner: str = "SYSADMIN"
-
-    @model_validator(mode="after")
-    def ensure_single_target_type(self) -> "RoleGrant":
-        if self.to_role is not None and self.to_user is not None:
-            raise ValueError("You can only grant to a role or a user, not both")
-        return self
+    def __init__(
+        self,
+        role: Role,
+        to_role: Role = None,
+        to_user: User = None,
+        # owner: str = None,  # = "USERADMIN"
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data: _RoleGrant = _RoleGrant(
+            role=role,
+            to_role=to_role,
+            to_user=to_user,
+            # owner=owner,
+        )
+        self.requires(
+            self._data.role,
+            self._data.to_role,
+            self._data.to_user,
+        )
 
     @classmethod
     def from_sql(cls, sql):
-        props = _parse_props(cls.props, sql)
-        return RoleGrant(**props)
+        # props = _parse_props(cls.props, sql)
+        # return RoleGrant(**props)
+        raise NotImplementedError
 
     @property
-    def fully_qualified_name(self):
-        subject = "user" if self.to_user else "role"
-        name = self.to_user.name if self.to_user else self.to_role.name
-        return FQN(name=self.name, params={subject: name})
+    def fqn(self):
+        subject = "user" if self._data.to_user else "role"
+        name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
+        return FQN(name=self._data.role.name, params={subject: name})
 
-    @property
-    def name(self):
-        return self.role.name
-
-    @classmethod
-    def lifecycle_create(cls, fqn, data):
-        return tidy_sql("GRANT", cls.props.render(data))
-
-    @classmethod
-    def lifecycle_delete(cls, fqn, data):
-        return tidy_sql(
-            "REVOKE ROLE",
-            data["role"],
-            "FROM",
-            "ROLE" if data.get("to_role") else "USER",
-            data["to_role"] if data.get("to_role") else data["to_user"],
-        )
+    # @property
+    # def name(self):
+    #     return self._data.role.name

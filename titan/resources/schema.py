@@ -1,74 +1,77 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceContainer, ResourceSpec
-from .schema import Schema
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
-from ..scope import AccountScope
+from ..scope import DatabaseScope
 
 
 @dataclass
-class _Database(ResourceSpec):
+class _Schema(ResourceSpec):
     name: str
     transient: bool = False
-    owner: str = "SYSADMIN"
-    data_retention_time_in_days: int = 1
+    managed_access: bool = False
+    data_retention_time_in_days: int = None
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
     tags: dict[str, str] = None
+    owner: str = "SYSADMIN"
     comment: str = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.transient and self.data_retention_time_in_days is not None:
+            raise ValueError("Transient schema can't have data retention time")
 
-class Database(Resource, ResourceContainer):
+
+class Schema(Resource, ResourceContainer):
     """
-    CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
-        [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
-        [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
-        [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-        [ COMMENT = '<string_literal>' ]
+    CREATE [ OR REPLACE ] [ TRANSIENT ] SCHEMA [ IF NOT EXISTS ] <name>
+      [ CLONE <source_schema>
+            [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> } ) ] ]
+      [ WITH MANAGED ACCESS ]
+      [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
+      [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
+      [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
+      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+      [ COMMENT = '<string_literal>' ]
     """
 
-    resource_type = ResourceType.DATABASE
-
+    resource_type = ResourceType.SCHEMA
     props = Props(
         transient=FlagProp("transient"),
+        managed_access=FlagProp("with managed access"),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
         max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
         default_ddl_collation=StringProp("default_ddl_collation"),
         tags=TagsProp(),
         comment=StringProp("comment"),
     )
-    scope = AccountScope()
-    spec = _Database
+    scope = DatabaseScope()
+    spec = _Schema
 
     def __init__(
         self,
         name: str,
         transient: bool = False,
-        owner: str = "SYSADMIN",
-        data_retention_time_in_days: int = 1,
+        managed_access: bool = False,
+        data_retention_time_in_days: int = None,
         max_data_extension_time_in_days: int = 14,
         default_ddl_collation: str = None,
         tags: dict[str, str] = None,
+        owner: str = "SYSADMIN",
         comment: str = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _Database(
+        self._data = _Schema(
             name=name,
             transient=transient,
-            owner=owner,
+            managed_access=managed_access,
             data_retention_time_in_days=data_retention_time_in_days,
             max_data_extension_time_in_days=max_data_extension_time_in_days,
             default_ddl_collation=default_ddl_collation,
             tags=tags,
+            owner=owner,
             comment=comment,
         )
-        self.add(
-            Schema(name="PUBLIC", implicit=True),
-            Schema(name="INFORMATION_SCHEMA", implicit=True),
-        )
-
-    def schemas(self):
-        return self.items(resource_type=ResourceType.SCHEMA)

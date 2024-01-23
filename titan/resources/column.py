@@ -1,16 +1,22 @@
-from typing_extensions import Annotated
+from dataclasses import dataclass
 
-from pydantic import BeforeValidator
-
-from .base import Resource, ResourceName, _fix_class_documentation
-from ..builder import SQL
-from ..enums import DataType
-from ..identifiers import FQN
+from .resource import Resource, ResourceSpec
+from ..enums import DataType, ResourceType
 from ..props import FlagProp, Props, StringProp
 from ..parse import _parse_column, _parse_props
+from ..scope import TableScope
 
 
-@_fix_class_documentation
+@dataclass
+class _Column(ResourceSpec):
+    name: str
+    data_type: str
+    collate: str = None
+    comment: str = None
+    not_null: bool = None
+    constraint: str = None
+
+
 class Column(Resource):
     """
     <col_name> <col_type>
@@ -29,19 +35,34 @@ class Column(Resource):
       [ <constraint_properties> ]
     """
 
-    resource_type = "COLUMN"
+    resource_type = ResourceType.COLUMN
     props = Props(
         collate=StringProp("collate", eq=False),
         comment=StringProp("comment", eq=False),
         not_null=FlagProp("not null"),
     )
+    scope = TableScope()
+    spec = _Column
 
-    name: ResourceName
-    data_type: str  # DataType
-    collate: str = None
-    comment: str = None
-    not_null: bool = None
-    constraint: str = None
+    def __init__(
+        self,
+        name: str,
+        data_type: DataType,
+        collate: str = None,
+        comment: str = None,
+        not_null: bool = None,
+        constraint: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data: _Column = _Column(
+            name,
+            data_type,
+            collate=collate,
+            comment=comment,
+            not_null=not_null,
+            constraint=constraint,
+        )
 
     @classmethod
     def from_sql(cls, sql):
@@ -50,20 +71,5 @@ class Column(Resource):
         props = _parse_props(cls.props, remainder)
         return cls(**parse_results, **props)
 
-    @classmethod
-    def lifecycle_create(cls, fqn: FQN, data):
-        return SQL(
-            fqn.name,
-            data["data_type"],
-            cls.props.render(data),
-        )
-
-
-def _coerce(sql_or_resource):
-    if isinstance(sql_or_resource, str):
-        return Column.from_sql(sql_or_resource)
-    else:
-        return sql_or_resource
-
-
-T_Column = Annotated[Column, BeforeValidator(_coerce)]
+    def serialize(self):
+        return {"name": self._data.name, "data_type": self._data.data_type}

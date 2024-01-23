@@ -1,92 +1,47 @@
-from typing import Dict, List
-from typing_extensions import Annotated
+from dataclasses import dataclass
 
-from pydantic import BeforeValidator, Field, model_validator
-
-from .base import (
-    AccountScoped,
-    Resource,
-    _fix_class_documentation,
-    serialize_resource_by_name,
-    coerce_from_str,
-)
-from ..builder import tidy_sql
-from ..privs import GlobalPriv, Privs, UserPriv
+from .resource import Resource, ResourceSpec
+from ..enums import ResourceType
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
+from ..scope import AccountScope
 
 
-@_fix_class_documentation
-class User(AccountScoped, Resource):
-    """
-    CREATE [ OR REPLACE ] USER [ IF NOT EXISTS ] <name>
-        [ objectProperties ]
-        [ objectParams ]
-        [ sessionParams ]
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+@dataclass
+class _User(ResourceSpec):
+    name: str
+    owner: str = "USERADMIN"
+    password: str = None
+    login_name: str = None
+    display_name: str = None
+    first_name: str = None
+    middle_name: str = None
+    last_name: str = None
+    email: str = None
+    must_change_password: bool = False
+    disabled: bool = False
+    days_to_expiry: int = None
+    mins_to_unlock: int = None
+    default_warehouse: str = None
+    default_namespace: str = None
+    default_role: str = None
+    default_secondary_roles: list[str] = None
+    mins_to_bypass_mfa: int = None
+    rsa_public_key: str = None
+    rsa_public_key_2: str = None
+    comment: str = None
+    network_policy: str = None
+    tags: dict[str, str] = None
 
-    objectProperties ::=
-        PASSWORD = '<string>'
-        LOGIN_NAME = <string>
-        DISPLAY_NAME = <string>
-        FIRST_NAME = <string>
-        MIDDLE_NAME = <string>
-        LAST_NAME = <string>
-        EMAIL = <string>
-        MUST_CHANGE_PASSWORD = TRUE | FALSE
-        DISABLED = TRUE | FALSE
-        DAYS_TO_EXPIRY = <integer>
-        MINS_TO_UNLOCK = <integer>
-        DEFAULT_WAREHOUSE = <string>
-        DEFAULT_NAMESPACE = <string>
-        DEFAULT_ROLE = <string>
-        DEFAULT_SECONDARY_ROLES = ( 'ALL' )
-        MINS_TO_BYPASS_MFA = <integer>
-        RSA_PUBLIC_KEY = <string>
-        RSA_PUBLIC_KEY_2 = <string>
-        COMMENT = '<string_literal>'
+    def __post_init__(self):
+        super().__post_init__()
+        if not self.login_name:
+            self.login_name = self.name
+        if not self.display_name:
+            self.display_name = self.name
 
-    objectParams ::=
-        NETWORK_POLICY = <string>
 
-    sessionParams ::=
-        ABORT_DETACHED_QUERY = TRUE | FALSE
-        AUTOCOMMIT = TRUE | FALSE
-        BINARY_INPUT_FORMAT = <string>
-        BINARY_OUTPUT_FORMAT = <string>
-        DATE_INPUT_FORMAT = <string>
-        DATE_OUTPUT_FORMAT = <string>
-        ERROR_ON_NONDETERMINISTIC_MERGE = TRUE | FALSE
-        ERROR_ON_NONDETERMINISTIC_UPDATE = TRUE | FALSE
-        JSON_INDENT = <num>
-        LOCK_TIMEOUT = <num>
-        QUERY_TAG = <string>
-        ROWS_PER_RESULTSET = <num>
-        SIMULATED_DATA_SHARING_CONSUMER = <string>
-        STATEMENT_TIMEOUT_IN_SECONDS = <num>
-        STRICT_JSON_OUTPUT = TRUE | FALSE
-        TIMESTAMP_DAY_IS_ALWAYS_24H = TRUE | FALSE
-        TIMESTAMP_INPUT_FORMAT = <string>
-        TIMESTAMP_LTZ_OUTPUT_FORMAT = <string>
-        TIMESTAMP_NTZ_OUTPUT_FORMAT = <string>
-        TIMESTAMP_OUTPUT_FORMAT = <string>
-        TIMESTAMP_TYPE_MAPPING = <string>
-        TIMESTAMP_TZ_OUTPUT_FORMAT = <string>
-        TIMEZONE = <string>
-        TIME_INPUT_FORMAT = <string>
-        TIME_OUTPUT_FORMAT = <string>
-        TRANSACTION_DEFAULT_ISOLATION_LEVEL = <string>
-        TWO_DIGIT_CENTURY_START = <num>
-        UNSUPPORTED_DDL_ACTION = <string>
-        USE_CACHED_RESULT = TRUE | FALSE
-        WEEK_OF_YEAR_POLICY = <num>
-        WEEK_START = <num>
-    """
-
-    resource_type = "USER"
-    lifecycle_privs = Privs(
-        create=GlobalPriv.CREATE_USER,
-        delete=UserPriv.OWNERSHIP,
-    )
+class User(Resource):
+    resource_type = ResourceType.USER
     props = Props(
         password=StringProp("password"),
         login_name=StringProp("login_name"),
@@ -110,70 +65,63 @@ class User(AccountScoped, Resource):
         network_policy=StringProp("network_policy"),
         tags=TagsProp(),
     )
+    scope = AccountScope()
+    spec = _User
 
-    name: str
-    owner: str = "USERADMIN"
-    password: str = Field(default=None, json_schema_extra={"fetchable": False})
-    login_name: str = None
-    display_name: str = None
-    first_name: str = None
-    middle_name: str = None
-    last_name: str = None
-    email: str = None
-    must_change_password: bool = False
-    disabled: bool = False
-    days_to_expiry: int = None
-    mins_to_unlock: int = None
-    default_warehouse: str = None
-    default_namespace: str = None
-    default_role: str = None
-    default_secondary_roles: List[str] = None
-    mins_to_bypass_mfa: int = None
-    rsa_public_key: str = None
-    rsa_public_key_2: str = None
-    comment: str = None
-    network_policy: str = None
-    tags: Dict[str, str] = None
+    def __init__(
+        self,
+        name: str,
+        owner: str = "USERADMIN",
+        password: str = None,
+        login_name: str = None,
+        display_name: str = None,
+        first_name: str = None,
+        middle_name: str = None,
+        last_name: str = None,
+        email: str = None,
+        must_change_password: bool = False,
+        disabled: bool = False,
+        days_to_expiry: int = None,
+        mins_to_unlock: int = None,
+        default_warehouse: str = None,
+        default_namespace: str = None,
+        default_role: str = None,
+        default_secondary_roles: list[str] = None,
+        mins_to_bypass_mfa: int = None,
+        rsa_public_key: str = None,
+        rsa_public_key_2: str = None,
+        comment: str = None,
+        network_policy: str = None,
+        tags: dict[str, str] = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data: _User = _User(
+            name=name,
+            owner=owner,
+            password=password,
+            login_name=login_name,
+            display_name=display_name,
+            first_name=first_name,
+            middle_name=middle_name,
+            last_name=last_name,
+            email=email,
+            must_change_password=must_change_password,
+            disabled=disabled,
+            days_to_expiry=days_to_expiry,
+            mins_to_unlock=mins_to_unlock,
+            default_warehouse=default_warehouse,
+            default_namespace=default_namespace,
+            default_role=default_role,
+            default_secondary_roles=default_secondary_roles,
+            mins_to_bypass_mfa=mins_to_bypass_mfa,
+            rsa_public_key=rsa_public_key,
+            rsa_public_key_2=rsa_public_key_2,
+            comment=comment,
+            network_policy=network_policy,
+            tags=tags,
+        )
 
-    @model_validator(mode="after")
-    def set_name_defaults(self) -> "User":
-        if not self.login_name:
-            self.login_name = self.name
-        if not self.display_name:
-            self.display_name = self.name
-        return self
-
-    @classmethod
-    def lifecycle_update(cls, fqn, change, if_exists=False):
-        attr, new_value = change.popitem()
-        attr = attr.upper()
-        if new_value is None:
-            return tidy_sql(
-                "ALTER USER",
-                "IF EXISTS" if if_exists else "",
-                fqn,
-                "UNSET",
-                attr,
-            )
-        elif attr == "NAME":
-            return tidy_sql(
-                "ALTER USER",
-                "IF EXISTS" if if_exists else "",
-                fqn,
-                "RENAME TO",
-                new_value,
-            )
-        else:
-            new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
-            return tidy_sql(
-                "ALTER USER",
-                "IF EXISTS" if if_exists else "",
-                fqn,
-                "SET",
-                attr,
-                "=",
-                new_value,
-            )
-
-
-T_User = Annotated[User, BeforeValidator(coerce_from_str(User)), serialize_resource_by_name]
+    @property
+    def name(self):
+        return self._data.name

@@ -1,9 +1,9 @@
-from typing import Dict, List
+from dataclasses import dataclass
 
-from pydantic import field_validator
+from .resource import Resource, ResourceSpec
+from ..enums import ResourceType
+from ..scope import SchemaScope
 
-from .base import Resource, SchemaScoped, _fix_class_documentation
-from ..privs import Privs, SchemaPriv, ViewPriv
 from ..props import (
     BoolProp,
     ColumnNamesProp,
@@ -15,27 +15,28 @@ from ..props import (
 )
 
 
-@_fix_class_documentation
-class View(SchemaScoped, Resource):
-    """
-    CREATE [ OR REPLACE ] [ SECURE ] [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE } ] [ RECURSIVE ] VIEW [ IF NOT EXISTS ] <name>
-      [ ( <column_list> ) ]
-      [ <col1> [ WITH ] MASKING POLICY <policy_name> [ USING ( <col1> , <cond_col1> , ... ) ]
-               [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ , <col2> [ ... ] ]
-      [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ COPY GRANTS ]
-      [ COMMENT = '<string_literal>' ]
-      AS <select_statement>
-    """
+@dataclass
+class _View(ResourceSpec):
+    name: str
+    owner: str = "SYSADMIN"
+    secure: bool = None
+    volatile: bool = None
+    recursive: bool = None
+    columns: list[dict] = None
+    tags: dict[str, str] = None
+    change_tracking: bool = None
+    copy_grants: bool = None
+    comment: str = None
+    as_: str = None
 
-    resource_type = "VIEW"
-    lifecycle_privs = Privs(
-        create=SchemaPriv.CREATE_VIEW,
-        read=ViewPriv.SELECT,
-        delete=ViewPriv.OWNERSHIP,
-    )
+    def __post_init__(self):
+        super().__post_init__()
+        if self.columns is not None and len(self.columns) == 0:
+            raise ValueError("columns can't be empty")
+
+
+class View(Resource):
+    resource_type = ResourceType.VIEW
     props = Props(
         secure=FlagProp("secure"),
         volatile=FlagProp("volatile"),
@@ -47,23 +48,35 @@ class View(SchemaScoped, Resource):
         comment=StringProp("comment"),
         as_=QueryProp("as"),
     )
+    scope = SchemaScope()
+    spec = _View
 
-    name: str
-    owner: str = "SYSADMIN"
-
-    secure: bool = None
-    volatile: bool = None
-    recursive: bool = None
-    columns: List[dict] = None
-    tags: Dict[str, str] = None
-    change_tracking: bool = None
-    copy_grants: bool = None
-    comment: str = None
-    as_: str
-
-    @field_validator("columns")
-    @classmethod
-    def validate_columns(cls, columns):
-        if isinstance(columns, list):
-            assert len(columns) > 0, "columns must not be empty"
-        return columns
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        secure: bool = None,
+        volatile: bool = None,
+        recursive: bool = None,
+        columns: list[dict] = None,
+        tags: dict[str, str] = None,
+        change_tracking: bool = None,
+        copy_grants: bool = None,
+        comment: str = None,
+        as_: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _View(
+            name=name,
+            owner=owner,
+            secure=secure,
+            volatile=volatile,
+            recursive=recursive,
+            columns=columns,
+            tags=tags,
+            change_tracking=change_tracking,
+            copy_grants=copy_grants,
+            comment=comment,
+            as_=as_,
+        )

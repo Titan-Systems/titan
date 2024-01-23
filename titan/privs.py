@@ -1,5 +1,6 @@
 from .helpers import listify
-from .enums import ParseableEnum
+from .enums import ParseableEnum, ResourceType
+from .identifiers import URN
 
 
 class Privs:
@@ -12,14 +13,22 @@ class Privs:
 
 class GlobalPriv(ParseableEnum):
     ALL = "ALL"
+    APPLY_AUTHENTICATION_POLICY = "APPLY AUTHENTICATION POLICY"
     APPLY_MASKING_POLICY = "APPLY MASKING POLICY"
     APPLY_PASSWORD_POLICY = "APPLY PASSWORD POLICY"
+    APPLY_RESOURCE_GROUP = "APPLY RESOURCE GROUP"
     APPLY_ROW_ACCESS_POLICY = "APPLY ROW ACCESS POLICY"
     APPLY_SESSION_POLICY = "APPLY SESSION POLICY"
     APPLY_TAG = "APPLY TAG"
     ATTACH_POLICY = "ATTACH POLICY"
     AUDIT = "AUDIT"
+    BIND_SERVICE_ENDPOINT = "BIND SERVICE ENDPOINT"
+    CANCEL_QUERY = "CANCEL QUERY"
     CREATE_ACCOUNT = "CREATE ACCOUNT"
+    CREATE_API_INTEGRATION = "CREATE API INTEGRATION"
+    CREATE_APPLICATION = "CREATE APPLICATION"
+    CREATE_APPLICATION_PACKAGE = "CREATE APPLICATION PACKAGE"
+    CREATE_CREDENTIAL = "CREATE CREDENTIAL"
     CREATE_DATA_EXCHANGE_LISTING = "CREATE DATA EXCHANGE LISTING"
     CREATE_DATABASE = "CREATE DATABASE"
     CREATE_FAILOVER_GROUP = "CREATE FAILOVER GROUP"
@@ -31,11 +40,14 @@ class GlobalPriv(ParseableEnum):
     CREATE_USER = "CREATE USER"
     CREATE_WAREHOUSE = "CREATE WAREHOUSE"
     EXECUTE_ALERT = "EXECUTE ALERT"
+    EXECUTE_DATA_METRIC_FUNCTION = "EXECUTE DATA METRIC FUNCTION"
     EXECUTE_MANAGED_TASK = "EXECUTE MANAGED TASK"
     EXECUTE_TASK = "EXECUTE TASK"
     IMPORT_SHARE = "IMPORT SHARE"
     MANAGE_ACCOUNT_SUPPORT_CASES = "MANAGE ACCOUNT SUPPORT CASES"
+    MANAGE_EVENT_SHARING = "MANAGE EVENT SHARING"
     MANAGE_GRANTS = "MANAGE GRANTS"
+    MANAGE_USER_SUPPORT_CASES = "MANAGE USER SUPPORT CASES"
     MANAGE_WAREHOUSES = "MANAGE WAREHOUSES"
     MODIFY_LOG_LEVEL = "MODIFY LOG LEVEL"
     MODIFY_SESSION_LOG_LEVEL = "MODIFY SESSION LOG LEVEL"
@@ -46,6 +58,7 @@ class GlobalPriv(ParseableEnum):
     MONITOR_SECURITY = "MONITOR SECURITY"
     MONITOR_USAGE = "MONITOR USAGE"
     OVERRIDE_SHARE_RESTRICTIONS = "OVERRIDE SHARE RESTRICTIONS"
+    PURCHASE_DATA_EXCHANGE_LISTING = "PURCHASE DATA EXCHANGE LISTING"
     RESOLVE_ALL = "RESOLVE ALL"
 
 
@@ -99,8 +112,15 @@ class DatabasePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class ProcedurePriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
 class RolePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
 
 
 class SchemaPriv(ParseableEnum):
@@ -131,6 +151,14 @@ class SchemaPriv(ParseableEnum):
     MONITOR = "MONITOR"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
+
+
+class StagePriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    READ = "READ"
+    USAGE = "USAGE"
+    WRITE = "WRITE"
 
 
 class TablePriv(ParseableEnum):
@@ -164,3 +192,41 @@ class WarehousePriv(ParseableEnum):
     OPERATE = "OPERATE"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
+
+
+RESOURCE_GRANTS_MAP = {
+    ResourceType.ACCOUNT: GlobalPriv,
+    ResourceType.DATABASE: DatabasePriv,
+    ResourceType.PROCEDURE: ProcedurePriv,
+    ResourceType.ROLE: RolePriv,
+    ResourceType.SCHEMA: SchemaPriv,
+    ResourceType.STAGE: StagePriv,
+    ResourceType.TABLE: TablePriv,
+    ResourceType.USER: UserPriv,
+    ResourceType.VIEW: ViewPriv,
+    ResourceType.WAREHOUSE: WarehousePriv,
+}
+
+
+def priv_for_principal(principal: URN, priv: str):
+    if principal.resource_type not in RESOURCE_GRANTS_MAP:
+        raise Exception(f"Unsupported resource type: {principal.resource_type}")
+    return RESOURCE_GRANTS_MAP[principal.resource_type](priv)
+
+
+def create_priv_for_resource_type(resource_type):
+    if resource_type == "database":
+        return GlobalPriv.CREATE_DATABASE
+    elif resource_type == "schema":
+        return DatabasePriv.CREATE_SCHEMA
+    elif resource_type == "table":
+        return SchemaPriv.CREATE_TABLE
+    elif resource_type == "view":
+        return SchemaPriv.CREATE_VIEW
+    elif resource_type == "procedure":
+        return SchemaPriv.CREATE_PROCEDURE
+    return None
+
+
+def is_ownership_priv(priv):
+    return str(priv) == "OWNERSHIP"

@@ -1,6 +1,10 @@
 from typing import Optional
 
-from inflection import underscore
+from .enums import ResourceType
+
+
+def _params_to_str(params: dict) -> str:
+    return "&".join([f"{k.lower()}={v}" for k, v in params.items()])
 
 
 class FQN:
@@ -9,44 +13,27 @@ class FQN:
         name: str,
         database: Optional[str] = None,
         schema: Optional[str] = None,
+        arg_types: Optional[list] = None,
         params: dict = {},
     ) -> None:
-        self.name = name
+        self.name = name.upper()
         self.database = database
         self.schema = schema
+        self.arg_types = arg_types
         self.params = params
-
-    @classmethod
-    def from_str(cls, fqn_str, resource_key=None):
-        # TODO: This needs to support periods and question marks in double quoted identifiers
-        scoped_name, param_str = fqn_str.split("?") if "?" in fqn_str else (fqn_str, "")
-        params = {}
-        if param_str:
-            for param in param_str.split("&"):
-                k, v = param.split("=")
-                params[k] = v
-        name_parts = scoped_name.split(".")
-        if len(name_parts) == 1:
-            return cls(name=name_parts[0], params=params)
-        elif len(name_parts) == 2:
-            if resource_key in ["schema"]:
-                return cls(database=name_parts[0], name=name_parts[1], params=params)
-            else:
-                return cls(schema=name_parts[0], name=name_parts[1], params=params)
-        elif len(name_parts) == 3:
-            return cls(database=name_parts[0], schema=name_parts[1], name=name_parts[2], params=params)
-        raise Exception(f"Invalid FQN string: {fqn_str}")
 
     def __str__(self):
         db = f"{self.database}." if self.database else ""
         schema = f"{self.schema}." if self.schema else ""
-        params = "?" + "&".join([f"{k.lower()}={v}" for k, v in self.params.items()]) if self.params else ""
-        return f"{db}{schema}{self.name}{params}"
+        arg_types = f"({', '.join(self.arg_types)})" if self.arg_types else ""
+        params = "?" + _params_to_str(self.params) if self.params else ""
+        return f"{db}{schema}{self.name}{arg_types}{params}"
 
     def __repr__(self):
-        db = f", db={self.database}." if self.database else ""
-        schema = f", schema={self.schema}." if self.schema else ""
-        return f"FQN(name={self.name}{db}{schema})"
+        db = f", db={self.database}" if self.database else ""
+        schema = f", schema={self.schema}" if self.schema else ""
+        params = "?" + _params_to_str(self.params) if self.params else ""
+        return f"FQN(name={self.name}{db}{schema}{params})"
 
 
 class URN:
@@ -67,44 +54,60 @@ class URN:
                              Fully Qualified Name
     """
 
-    def __init__(self, resource_type: str, fqn: FQN, account: str = "", organization: str = "") -> None:
-        self.resource_type = underscore(resource_type)
+    def __init__(self, resource_type: ResourceType, fqn: FQN, account_locator: str) -> None:
+        if not isinstance(resource_type, ResourceType):
+            raise Exception(f"Invalid resource type: {resource_type}")
+        self.resource_type = resource_type
+        self.resource_label = str(resource_type).replace(" ", "_").lower()
         self.fqn = fqn
-        self.account = account
-        self.organization = organization
+        self.account_locator = account_locator
+        self.organization = ""
 
     def __str__(self):
-        return f"urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn}"
+        return f"urn:{self.organization}:{self.account_locator}:{self.resource_label}/{self.fqn}"
 
     def __repr__(self):
-        return f"URN(urn:{self.organization}:{self.account}:{self.resource_type}/{self.fqn})"
-
-    @classmethod
-    def from_str(cls, urn_str):
-        parts = urn_str.split(":")
-        if len(parts) != 4:
-            raise Exception(f"Invalid URN string: {urn_str}")
-        if parts[0] != "urn":
-            raise Exception(f"Invalid URN string: {urn_str}")
-        resource_type, fqn_str = parts[3].split("/")
-        # FIXME: This is a hack to get around the fact that we don't have a resource class yet
-        fqn = FQN.from_str(fqn_str, resource_key=resource_type)
-        return cls(
-            organization=parts[1],
-            account=parts[2],
-            resource_type=resource_type,
-            fqn=fqn,
-        )
+        org = getattr(self, "organization", "")
+        acct = getattr(self, "account_locator", "")
+        label = getattr(self, "resource_label", "")
+        fqn = getattr(self, "fqn", "")
+        return f"URN(urn:{org}:{acct}:{label}/{fqn})"
 
     @classmethod
     def from_resource(cls, resource, **kwargs):
         return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
 
+    # @classmethod
+    # def from_locator(cls, locator: "ResourceLocator"):
+    #     if locator.star:
+    #         raise Exception("Cannot create URN from a wildcard locator")
+    #     return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
+
     @classmethod
-    def from_locator(cls, locator: "ResourceLocator"):
-        if locator.star:
-            raise Exception("Cannot create URN from a wildcard locator")
-        return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
+    def from_session_ctx(cls, session_ctx):
+        return cls(
+            resource_type=ResourceType.ACCOUNT,
+            fqn=FQN(name=session_ctx["account"]),
+            account_locator=session_ctx["account_locator"],
+        )
+
+    def database(self):
+        if not self.fqn.database:
+            raise Exception(f"URN does not have a database: {self}")
+        return URN(
+            resource_type=ResourceType.DATABASE,
+            account_locator=self.account_locator,
+            fqn=FQN(name=self.fqn.database),
+        )
+
+    def schema(self):
+        if not self.fqn.schema:
+            raise Exception(f"URN does not have a schema: {self}")
+        return URN(
+            resource_type=ResourceType.SCHEMA,
+            account_locator=self.account_locator,
+            fqn=FQN(name=self.fqn.schema, database=self.fqn.database),
+        )
 
 
 class ResourceLocator:
