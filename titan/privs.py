@@ -112,6 +112,13 @@ class DatabasePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class IntegrationPriv(ParseableEnum):
+    ALL = "ALL"
+    USAGE = "USAGE"
+    USE_ANY_ROLE = "USE_ANY_ROLE"
+    OWNERSHIP = "OWNERSHIP"
+
+
 class ProcedurePriv(ParseableEnum):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
@@ -197,6 +204,7 @@ class WarehousePriv(ParseableEnum):
 RESOURCE_GRANTS_MAP = {
     ResourceType.ACCOUNT: GlobalPriv,
     ResourceType.DATABASE: DatabasePriv,
+    ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,

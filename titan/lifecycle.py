@@ -152,6 +152,7 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
 
 CREATE_RESOURCE_PRIV_MAP = {
     ResourceType.DATABASE: [GlobalPriv.CREATE_DATABASE],
+    ResourceType.EXTERNAL_ACCESS_INTEGRATION: [GlobalPriv.CREATE_INTEGRATION],
     ResourceType.FUNCTION: [SchemaPriv.CREATE_FUNCTION, SchemaPriv.USAGE, DatabasePriv.USAGE],
     ResourceType.GRANT: [],  # TODO
     ResourceType.PROCEDURE: [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],
