@@ -119,6 +119,10 @@ class IntegrationPriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
+class NetworkRulePriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+
+
 class ProcedurePriv(ParseableEnum):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
@@ -139,6 +143,7 @@ class SchemaPriv(ParseableEnum):
     CREATE_FUNCTION = "CREATE FUNCTION"
     CREATE_MASKING_POLICY = "CREATE MASKING POLICY"
     CREATE_MATERIALIZED_VIEW = "CREATE MATERIALIZED VIEW"
+    CREATE_NETWORK_RULE = "CREATE NETWORK RULE"
     CREATE_PASSWORD_POLICY = "CREATE PASSWORD POLICY"
     CREATE_PIPE = "CREATE PIPE"
     CREATE_PROCEDURE = "CREATE PROCEDURE"
@@ -205,6 +210,7 @@ RESOURCE_GRANTS_MAP = {
     ResourceType.ACCOUNT: GlobalPriv,
     ResourceType.DATABASE: DatabasePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
+    ResourceType.NETWORK_RULE: NetworkRulePriv,
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,

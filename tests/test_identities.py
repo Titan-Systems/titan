@@ -167,6 +167,18 @@ resources = [
         },
     },
     {
+        "test": "network_rule",
+        "resource_cls": resources.NetworkRule,
+        "data": {
+            "name": "SOMERULE",
+            "owner": "SYSADMIN",
+            "type": "AWSVPCEID",
+            "value_list": ["vpce-1234567890abcdef0"],
+            "mode": "INTERNAL_STAGE",
+            "comment": "corporate privatelink endpoint",
+        },
+    },
+    {
         "test": "pipe",
         "resource_cls": resources.Pipe,
         "data": {

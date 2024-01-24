@@ -9,6 +9,7 @@ from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
 from .grant import Grant, RoleGrant
+from .network_rule import NetworkRule
 from .pipe import Pipe
 from .procedure import PythonStoredProcedure
 from .resource_monitor import ResourceMonitor
@@ -69,6 +70,7 @@ __all__ = [
     "Grant",
     "InternalStage",
     "JavascriptUDF",
+    "NetworkRule",
     "NotificationIntegration",
     "Pipe",
     "PythonUDF",
