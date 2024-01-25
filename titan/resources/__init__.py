@@ -16,6 +16,8 @@ from .procedure import PythonStoredProcedure
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
+from .secret import Secret
+
 from .sequence import Sequence
 
 # from .shared_database import SharedDatabase
@@ -83,6 +85,7 @@ __all__ = [
     "RoleGrant",
     "S3StorageIntegration",
     "Schema",
+    "Secret",
     "Sequence",
     # "SharedDatabase",
     "Stage",

@@ -110,6 +110,10 @@ class TestResourceFixtures(unittest.TestCase):
         for sql in load_sql_fixtures("schema.sql"):
             self.validate_from_sql(resources.Schema, sql)
 
+    def test_secret(self):
+        for sql in load_sql_fixtures("secret.sql"):
+            self.validate_from_sql(resources.Secret, sql)
+
     def test_sequence(self):
         for sql in load_sql_fixtures("sequence.sql"):
             self.validate_from_sql(resources.Sequence, sql)

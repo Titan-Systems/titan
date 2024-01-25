@@ -48,6 +48,7 @@ class ResourceType(ParseableEnum):
     ROLE = "ROLE"
     ROLE_GRANT = "ROLE GRANT"
     SCHEMA = "SCHEMA"
+    SECRET = "SECRET"
     SEQUENCE = "SEQUENCE"
     STAGE = "STAGE"
     STORAGE_INTEGRATION = "STORAGE INTEGRATION"

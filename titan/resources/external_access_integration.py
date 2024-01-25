@@ -1,25 +1,23 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .network_rule import NetworkRule
+from .secret import Secret
 from ..enums import ResourceType
 from ..scope import AccountScope
 
-from ..props import (
-    BoolProp,
-    Props,
-    StringProp,
-)
+from ..props import BoolProp, Props, StringProp, IdentifierListProp
 
 
 @dataclass
 class _ExternalAccessIntegration(ResourceSpec):
     name: str
-    owner: str = "ACCOUNTADMIN"
-    allowed_network_rules: list[str]
-    allowed_api_authentication_integrations: list[str]
-    allowed_authentication_secrets: list[str]
+    allowed_network_rules: list[NetworkRule]
+    allowed_api_authentication_integrations: list[str] = None
+    allowed_authentication_secrets: list[Secret] = None
     enabled: bool = True
     comment: str = None
+    owner: str = "ACCOUNTADMIN"
 
 
 class ExternalAccessIntegration(Resource):
@@ -36,7 +34,9 @@ class ExternalAccessIntegration(Resource):
 
     resource_type = ResourceType.EXTERNAL_ACCESS_INTEGRATION
     props = Props(
-        name=StringProp("name"),
+        allowed_network_rules=IdentifierListProp("allowed_network_rules"),
+        allowed_api_authentication_integrations=IdentifierListProp("allowed_api_authentication_integrations"),
+        allowed_authentication_secrets=IdentifierListProp("allowed_authentication_secrets"),
         enabled=BoolProp("enabled"),
         comment=StringProp("comment"),
     )
@@ -46,21 +46,21 @@ class ExternalAccessIntegration(Resource):
     def __init__(
         self,
         name: str,
-        owner: str = "ACCOUNTADMIN",
-        allowed_network_rules: list[str] = [],
-        allowed_api_authentication_integrations: list[str] = [],
-        allowed_authentication_secrets: list[str] = [],
+        allowed_network_rules: list[NetworkRule] = [],
+        allowed_api_authentication_integrations: list[str] = None,
+        allowed_authentication_secrets: list[Secret] = None,
         enabled: bool = True,
         comment: str = None,
+        owner: str = "ACCOUNTADMIN",
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._data: _ExternalAccessIntegration = _ExternalAccessIntegration(
             name=name,
-            owner=owner,
             allowed_network_rules=allowed_network_rules,
             allowed_api_authentication_integrations=allowed_api_authentication_integrations,
             allowed_authentication_secrets=allowed_authentication_secrets,
             enabled=enabled,
             comment=comment,
+            owner=owner,
         )
