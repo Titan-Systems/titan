@@ -179,6 +179,26 @@ resources = [
         },
     },
     {
+        "test": "password_policy",
+        "resource_cls": resources.PasswordPolicy,
+        "data": {
+            "name": "SOMEPOLICY",
+            "owner": "SYSADMIN",
+            "password_min_length": 12,
+            "password_max_length": 24,
+            "password_min_upper_case_chars": 2,
+            "password_min_lower_case_chars": 2,
+            "password_min_numeric_chars": 2,
+            "password_min_special_chars": 2,
+            "password_min_age_days": 1,
+            "password_max_age_days": 30,
+            "password_max_retries": 3,
+            "password_lockout_time_mins": 30,
+            "password_history": 5,
+            "comment": "production account password policy",
+        },
+    },
+    {
         "test": "pipe",
         "resource_cls": resources.Pipe,
         "data": {

@@ -23,6 +23,10 @@ from .parse import (
 __this__ = sys.modules[__name__]
 
 
+def _desc_result_to_dict(desc_result):
+    return dict([(row["property"], row["value"]) for row in desc_result])
+
+
 def _fail_if_not_granted(result, *args):
     if len(result) == 0:
         raise Exception("Failed to create grant")
@@ -353,6 +357,36 @@ def fetch_grant(session, fqn: FQN):
     )
 
 
+def fetch_password_policy(session, fqn: FQN):
+    show_result = execute(session, f"SHOW PASSWORD POLICIES IN SCHEMA {fqn.database}.{fqn.schema}")
+    policies = _filter_result(show_result, name=fqn.name)
+    if len(policies) == 0:
+        return None
+    if len(policies) > 1:
+        raise Exception(f"Found multiple password policies matching {fqn}")
+
+    data = policies[0]
+    desc_result = execute(session, f"DESC PASSWORD POLICY {fqn}")
+    properties = _desc_result_to_dict(desc_result)
+
+    return {
+        "name": data["name"],
+        "password_min_length": int(properties["PASSWORD_MIN_LENGTH"]),
+        "password_max_length": int(properties["PASSWORD_MAX_LENGTH"]),
+        "password_min_upper_case_chars": int(properties["PASSWORD_MIN_UPPER_CASE_CHARS"]),
+        "password_min_lower_case_chars": int(properties["PASSWORD_MIN_LOWER_CASE_CHARS"]),
+        "password_min_numeric_chars": int(properties["PASSWORD_MIN_NUMERIC_CHARS"]),
+        "password_min_special_chars": int(properties["PASSWORD_MIN_SPECIAL_CHARS"]),
+        "password_min_age_days": int(properties["PASSWORD_MIN_AGE_DAYS"]),
+        "password_max_age_days": int(properties["PASSWORD_MAX_AGE_DAYS"]),
+        "password_max_retries": int(properties["PASSWORD_MAX_RETRIES"]),
+        "password_lockout_time_mins": int(properties["PASSWORD_LOCKOUT_TIME_MINS"]),
+        "password_history": int(properties["PASSWORD_HISTORY"]),
+        "comment": properties["COMMENT"] or None,
+        "owner": properties["OWNER"],
+    }
+
+
 def fetch_procedure(session, fqn: FQN):
     # SHOW PROCEDURES IN SCHEMA {}.{}
     show_result = execute(session, "SHOW PROCEDURES IN SCHEMA", cacheable=True)
@@ -371,7 +405,7 @@ def fetch_procedure(session, fqn: FQN):
     else:
         identifier, returns = _parse_function_arguments_2023_compat(data["arguments"])
     desc_result = execute(session, f"DESC PROCEDURE {str(identifier)}", cacheable=True)
-    properties = dict([(row["property"], row["value"]) for row in desc_result])
+    properties = _desc_result_to_dict(desc_result)
 
     show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {str(identifier)}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")

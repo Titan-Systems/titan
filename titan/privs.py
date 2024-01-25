@@ -123,6 +123,10 @@ class NetworkRulePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
+class PasswordPolicyPriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+
+
 class ProcedurePriv(ParseableEnum):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
@@ -211,6 +215,7 @@ RESOURCE_GRANTS_MAP = {
     ResourceType.DATABASE: DatabasePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
+    ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,

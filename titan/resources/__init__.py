@@ -10,6 +10,7 @@ from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
 from .grant import Grant, RoleGrant
 from .network_rule import NetworkRule
+from .password_policy import PasswordPolicy
 from .pipe import Pipe
 from .procedure import PythonStoredProcedure
 from .resource_monitor import ResourceMonitor
@@ -72,6 +73,7 @@ __all__ = [
     "JavascriptUDF",
     "NetworkRule",
     "NotificationIntegration",
+    "PasswordPolicy",
     "Pipe",
     "PythonUDF",
     "PythonStoredProcedure",

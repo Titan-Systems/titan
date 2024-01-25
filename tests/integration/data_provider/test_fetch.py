@@ -139,6 +139,41 @@ scoped_resources = [
         },
     },
     {
+        "resource_type": ResourceType.PASSWORD_POLICY,
+        "setup_sql": """
+            CREATE PASSWORD POLICY SOMEPOLICY
+                PASSWORD_MIN_LENGTH = 12
+                PASSWORD_MAX_LENGTH = 24
+                PASSWORD_MIN_UPPER_CASE_CHARS = 2
+                PASSWORD_MIN_LOWER_CASE_CHARS = 2
+                PASSWORD_MIN_NUMERIC_CHARS = 2
+                PASSWORD_MIN_SPECIAL_CHARS = 2
+                PASSWORD_MIN_AGE_DAYS = 1
+                PASSWORD_MAX_AGE_DAYS = 30
+                PASSWORD_MAX_RETRIES = 3
+                PASSWORD_LOCKOUT_TIME_MINS = 30
+                PASSWORD_HISTORY = 5
+                COMMENT = 'production account password policy';
+        """,
+        "teardown_sql": "DROP PASSWORD POLICY IF EXISTS SOMEPOLICY",
+        "data": {
+            "name": "SOMEPOLICY",
+            "owner": TEST_ROLE,
+            "password_min_length": 12,
+            "password_max_length": 24,
+            "password_min_upper_case_chars": 2,
+            "password_min_lower_case_chars": 2,
+            "password_min_numeric_chars": 2,
+            "password_min_special_chars": 2,
+            "password_min_age_days": 1,
+            "password_max_age_days": 30,
+            "password_max_retries": 3,
+            "password_lockout_time_mins": 30,
+            "password_history": 5,
+            "comment": "production account password policy",
+        },
+    },
+    {
         "resource_type": ResourceType.PROCEDURE,
         "setup_sql": """
             CREATE PROCEDURE somesproc(ARG1 VARCHAR)

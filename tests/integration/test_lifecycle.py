@@ -7,6 +7,7 @@ import snowflake.connector
 from titan.resources import (
     Database,
     Role,
+    PasswordPolicy,
     Schema,
     Table,
     User,
@@ -57,6 +58,7 @@ resources = [
     {"test": "database", "resource_cls": Database},
     {"test": "schema", "resource_cls": Schema},
     {"test": "role", "resource_cls": Role},
+    {"test": "password_policy", "resource_cls": PasswordPolicy},
     {"test": "table", "resource_cls": Table, "data": {"columns": [{"name": "id", "data_type": "int"}]}},
     {"test": "user", "resource_cls": User},
     {"test": "view", "resource_cls": View, "data": {"as_": "SELECT 1::INT as col"}},
