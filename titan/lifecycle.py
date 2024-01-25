@@ -16,8 +16,8 @@ def create_resource(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
 def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     return tidy_sql(
         "CREATE",
-        "IF NOT EXISTS" if if_not_exists else "",
         urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
         urn.fqn,
         props.render(data),
     )
@@ -116,7 +116,7 @@ def update_schema(urn: URN, data: dict, props: Props) -> str:
 
 
 def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:
-    return getattr(__this__, f"drop_{urn.resource_label}", drop__default)(urn, data, if_exists)
+    return getattr(__this__, f"drop_{urn.resource_label}", drop__default)(urn, data, if_exists=if_exists)
 
 
 def drop__default(urn: URN, data: dict, if_exists: bool) -> str:

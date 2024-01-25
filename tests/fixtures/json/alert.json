@@ -1,0 +1,10 @@
+{
+    "name": "TEST_ALERT",
+    "warehouse": "static_warehouse",
+    "schedule": "5 minutes",
+    "condition": "SELECT 1",
+    "then": "SELECT 2",
+    "owner": "SYSADMIN",
+    "comment": "This is a test alert",
+    "tags": null
+}

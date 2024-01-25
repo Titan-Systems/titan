@@ -4,16 +4,7 @@ import uuid
 import pytest
 import snowflake.connector
 
-from titan.resources import (
-    Database,
-    Role,
-    PasswordPolicy,
-    Schema,
-    Table,
-    User,
-    View,
-    Warehouse,
-)
+from tests.helpers import STATIC_RESOURCES, get_json_fixtures
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -23,6 +14,8 @@ connection_params = {
     "password": os.environ.get("TEST_SNOWFLAKE_PASSWORD"),
     "role": TEST_ROLE,
 }
+
+JSON_FIXTURES = list(get_json_fixtures())
 
 
 @pytest.fixture(scope="session")
@@ -48,35 +41,28 @@ def cursor(suffix, test_db, marked_for_cleanup):
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
         cur.execute(f"CREATE DATABASE {test_db}")
         cur.execute(f"USE ROLE {TEST_ROLE}")
-        yield cur
-        for res in marked_for_cleanup:
-            cur.execute(res.drop_sql(if_exists=True))
-        cur.execute(f"DROP DATABASE {test_db}")
-
-
-resources = [
-    {"test": "database", "resource_cls": Database},
-    {"test": "schema", "resource_cls": Schema},
-    {"test": "role", "resource_cls": Role},
-    {"test": "password_policy", "resource_cls": PasswordPolicy},
-    {"test": "table", "resource_cls": Table, "data": {"columns": [{"name": "id", "data_type": "int"}]}},
-    {"test": "user", "resource_cls": User},
-    {"test": "view", "resource_cls": View, "data": {"as_": "SELECT 1::INT as col"}},
-    {"test": "warehouse", "resource_cls": Warehouse},
-]
+        try:
+            yield cur
+            for res in marked_for_cleanup:
+                cur.execute(res.drop_sql(if_exists=True))
+        finally:
+            cur.execute(f"DROP DATABASE {test_db}")
 
 
 @pytest.fixture(
-    params=resources,
-    ids=[f"test_{config['test']}" for config in resources],
+    params=JSON_FIXTURES,
+    ids=[resource_cls.__name__ for resource_cls, _ in JSON_FIXTURES],
     scope="function",
 )
-def resource(request, suffix, marked_for_cleanup):
-    resource = request.param
-    resource_cls = resource["resource_cls"]
-    data = resource.get("data", {})
-    res = resource_cls(name=f"test_{suffix}", **data)
+def resource(request, cursor, marked_for_cleanup):
+    resource_cls, data = request.param
+    res = resource_cls(**data)
     marked_for_cleanup.append(res)
+    for ref in res.refs:
+        if ref.resource_type in STATIC_RESOURCES:
+            static_res = STATIC_RESOURCES[ref.resource_type]
+            cursor.execute(static_res.create_sql(if_not_exists=True))
+            marked_for_cleanup.append(static_res)
     yield res
 
 

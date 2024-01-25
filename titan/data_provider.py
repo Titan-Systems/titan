@@ -58,7 +58,7 @@ def _urn_from_grant(row, session_ctx):
             name = parse_function_name(id_parts[-1])
             fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
         else:
-            fqn = parse_identifier(row["name"], is_schema=(granted_on == "schema"))
+            fqn = parse_identifier(row["name"], is_db_scoped=(granted_on == "schema"))
         return URN(
             resource_type=ResourceType(granted_on),
             account_locator=session_ctx["account_locator"],

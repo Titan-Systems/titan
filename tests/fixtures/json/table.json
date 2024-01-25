@@ -1,0 +1,27 @@
+{
+    "name": "MYTABLE",
+    "columns": [
+        {
+            "name": "id",
+            "data_type": "INT"
+        },
+        {
+            "name": "amount",
+            "data_type": "NUMBER"
+        }
+    ],
+    "constraints": null,
+    "volatile": false,
+    "transient": false,
+    "cluster_by": null,
+    "enable_schema_evolution": false,
+    "data_retention_time_in_days": null,
+    "max_data_extension_time_in_days": null,
+    "change_tracking": false,
+    "default_ddl_collation": null,
+    "copy_grants": false,
+    "row_access_policy": null,
+    "tags": null,
+    "owner": "SYSADMIN",
+    "comment": null
+}

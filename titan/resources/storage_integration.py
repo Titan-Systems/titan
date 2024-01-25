@@ -21,8 +21,13 @@ class _S3StorageIntegration(ResourceSpec):
     storage_blocked_locations: list[str] = None
     storage_provider: StorageProvider = StorageProvider.S3
     storage_aws_object_acl: str = None
+    type: str = "EXTERNAL_STAGE"
     owner: str = "ACCOUNTADMIN"
     comment: str = None
+
+    def __post_init__(self):
+        if self.type != "EXTERNAL_STAGE":
+            raise ValueError("Type must be 'EXTERNAL_STAGE'")
 
 
 class S3StorageIntegration(Resource):
@@ -44,7 +49,7 @@ class S3StorageIntegration(Resource):
 
     resource_type = ResourceType.STORAGE_INTEGRATION
     props = Props(
-        _start_token="type = external_stage",
+        type=StringProp("type"),
         storage_provider=EnumProp("storage_provider", [StorageProvider.S3]),
         storage_aws_role_arn=StringProp("storage_aws_role_arn"),
         storage_aws_object_acl=StringProp("storage_aws_object_acl"),
@@ -64,19 +69,21 @@ class S3StorageIntegration(Resource):
         storage_allowed_locations: list[str],
         storage_blocked_locations: list[str] = None,
         storage_aws_object_acl: str = None,
+        type: str = "EXTERNAL_STAGE",
         owner: str = "ACCOUNTADMIN",
         comment: str = None,
         **kwargs,
     ):
         kwargs.pop("storage_provider", None)
         super().__init__(**kwargs)
-        self._data = _S3StorageIntegration(
+        self._data: _S3StorageIntegration = _S3StorageIntegration(
             name=name,
             enabled=enabled,
             storage_aws_role_arn=storage_aws_role_arn,
             storage_allowed_locations=storage_allowed_locations,
             storage_blocked_locations=storage_blocked_locations,
             storage_aws_object_acl=storage_aws_object_acl,
+            type=type,
             owner=owner,
             comment=comment,
         )
@@ -133,7 +140,7 @@ class GCSStorageIntegration(Resource):
     ):
         kwargs.pop("storage_provider", None)
         super().__init__(**kwargs)
-        self._data = _GCSStorageIntegration(
+        self._data: _GCSStorageIntegration = _GCSStorageIntegration(
             name=name,
             enabled=enabled,
             storage_allowed_locations=storage_allowed_locations,
@@ -197,7 +204,7 @@ class AzureStorageIntegration(Resource):
     ):
         kwargs.pop("storage_provider", None)
         super().__init__(**kwargs)
-        self._data = _AzureStorageIntegration(
+        self._data: _AzureStorageIntegration = _AzureStorageIntegration(
             name=name,
             enabled=enabled,
             azure_tenant_id=azure_tenant_id,

@@ -557,7 +557,7 @@ def parse_function_name(header: str):
     return prefix
 
 
-def parse_identifier(identifier: str, is_schema=False) -> FQN:
+def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
     # TODO: This needs to support periods and question marks in double quoted identifiers
     scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
     params = {}
@@ -580,7 +580,7 @@ def parse_identifier(identifier: str, is_schema=False) -> FQN:
             arg_types=arg_types,
         )
     elif len(name_parts) == 2:
-        if is_schema:
+        if is_db_scoped:
             return FQN(
                 database=name_parts[0],
                 name=name_parts[1],
@@ -613,7 +613,7 @@ def parse_URN(urn_str: str) -> URN:
         raise Exception(f"Invalid URN string: {urn_str}")
     resource_label, fqn_str = parts[3].split("/")
     resource_type = ResourceType(resource_label.replace("_", " ").upper())
-    fqn = parse_identifier(fqn_str, is_schema=(resource_label == "schema"))
+    fqn = parse_identifier(fqn_str, is_db_scoped=(resource_label == "schema"))
     return URN(
         account_locator=parts[2],
         resource_type=resource_type,

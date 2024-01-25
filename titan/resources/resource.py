@@ -133,7 +133,7 @@ class Resource(metaclass=_Resource):
         resource_types = cls.__types[resource_type]
         if len(resource_types) > 1:
             if data is None:
-                raise Exception(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
+                raise ValueError(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
             else:
                 raise NotImplementedError
         return resource_types[0]
@@ -186,7 +186,7 @@ class Resource(metaclass=_Resource):
         )
 
     def drop_sql(self, if_exists: bool = False):
-        return drop_resource(self.urn, self.to_dict(packed=True), if_exists=if_exists)
+        return drop_resource(self.urn, self.to_dict(), if_exists=if_exists)
 
     def _requires(self, resource: "Resource"):
         if isinstance(resource, Resource):

@@ -1,0 +1,13 @@
+{
+    "name": "MY_PYTHON_UDF",
+    "owner": "SYSADMIN",
+    "args": [],
+    "returns": "VARCHAR",
+    "runtime_version": "3.8",
+    "packages": [
+        "snowflake-snowpark-python",
+        "pyparsing"
+    ],
+    "handler": "main",
+    "as_": "def main(_): return 42"
+}
