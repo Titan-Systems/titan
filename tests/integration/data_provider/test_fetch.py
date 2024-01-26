@@ -249,6 +249,7 @@ def cursor(db_session, suffix, test_db_name):
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
         cur.execute(f"USE ROLE {TEST_ROLE}")
         cur.execute(f"CREATE DATABASE {test_db_name}")
+        cur.execute("CREATE WAREHOUSE IF NOT EXISTS CI WAREHOUSE_SIZE = XSMALL AUTO_SUSPEND = 60 AUTO_RESUME = TRUE")
         cur.execute("USE WAREHOUSE CI")
         yield cur
         cur.execute(f"DROP DATABASE {test_db_name}")
@@ -271,6 +272,7 @@ def scoped_resource(request, cursor, test_db_name):
 
     cursor.execute(f"USE DATABASE {test_db_name}")
     cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute("CREATE WAREHOUSE IF NOT EXISTS CI WAREHOUSE_SIZE = XSMALL AUTO_SUSPEND = 60 AUTO_RESUME = TRUE")
     cursor.execute("USE WAREHOUSE CI")
     for setup_sql in setup_sqls:
         cursor.execute(setup_sql)
