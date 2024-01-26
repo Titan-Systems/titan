@@ -176,7 +176,8 @@ def fetch_session(session):
     )[0]
 
     try:
-        tags = [f"{row['database']}.{row['schema']}.{row['name']}" for row in execute(session, "SHOW TAGS IN ACCOUNT")]
+        show_tags = execute(session, "SHOW TAGS IN ACCOUNT")
+        tags = [f"{row['database_name']}.{row['schema_name']}.{row['name']}" for row in show_tags]
         tag_support = True
     except ProgrammingError as err:
         if err.errno == UNSUPPORTED_FEATURE:
