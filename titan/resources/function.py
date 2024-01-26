@@ -149,7 +149,7 @@ class PythonUDF(Resource):
     ):
         kwargs.pop("language", None)
         super().__init__(**kwargs)
-        self._data = _PythonUDF(
+        self._data: _PythonUDF = _PythonUDF(
             name=name,
             returns=returns,
             runtime_version=runtime_version,
@@ -167,6 +167,11 @@ class PythonUDF(Resource):
             secure=secure,
             volatility=volatility,
         )
+
+    @property
+    def fqn(self):
+        name = f"{self._data.name}({', '.join([str(arg['data_type']) for arg in self._data.args])})"
+        return self.scope.fully_qualified_name(self._container, name)
 
 
 FunctionMap = {

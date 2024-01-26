@@ -1,7 +1,5 @@
 import pytest
 
-
-from titan import resources
 from tests.helpers import get_json_fixtures
 
 

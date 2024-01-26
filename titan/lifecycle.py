@@ -23,6 +23,19 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
+def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    db = f"{urn.fqn.database}." if urn.fqn.database else ""
+    schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
+    name = f"{db}{schema}{data['name']}"
+    return tidy_sql(
+        "CREATE",
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.resource_type,
+        name,
+        props.render(data),
+    )
+
+
 def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     db = f"{urn.fqn.database}." if urn.fqn.database else ""
     schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
@@ -120,6 +133,15 @@ def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:
 
 
 def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
+    return tidy_sql(
+        "DROP",
+        urn.resource_type,
+        "IF EXISTS" if if_exists else "",
+        urn.fqn,
+    )
+
+
+def drop_function(urn: URN, data: dict, if_exists: bool) -> str:
     return tidy_sql(
         "DROP",
         urn.resource_type,

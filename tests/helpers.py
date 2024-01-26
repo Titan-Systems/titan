@@ -7,6 +7,7 @@ from titan.resources import Resource
 from titan.enums import ResourceType
 from titan.parse import _split_statements
 
+
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
 STATIC_RESOURCES = {

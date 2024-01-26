@@ -1,4 +1,3 @@
-import os
 import pytest
 
 from pyparsing import ParseException
@@ -6,7 +5,6 @@ from tests.helpers import load_sql_fixtures, get_json_fixtures, list_sql_fixture
 from titan import resources
 from titan.enums import ResourceType
 from titan.resources.warehouse import WarehouseSize
-from titan.resources.resource import Resource
 
 
 def test_resource_constructors():
