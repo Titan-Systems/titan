@@ -42,7 +42,7 @@ def get_json_fixtures():
             try:
                 resource_cls = _get_resource_cls(resource_name)
             except ValueError as e:
-                print(f"Error reading {f}: {e}")
+                # print(f"Error reading {f}: {e}")
                 continue
             try:
                 data = get_json_fixture(resource_name)

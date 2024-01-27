@@ -609,15 +609,15 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
 
     tag_map = {}
     for tag_ref in tag_refs:
-        in_same_database = tag_ref["tag_database"] == tag_ref["object_database"]
-        in_same_schema = tag_ref["tag_schema"] == tag_ref["object_schema"]
-        tag_in_public_schema = tag_ref["tag_schema"] == "PUBLIC"
+        in_same_database = tag_ref["TAG_DATABASE"] == tag_ref["OBJECT_DATABASE"]
+        in_same_schema = tag_ref["TAG_SCHEMA"] == tag_ref["OBJECT_SCHEMA"]
+        tag_in_public_schema = tag_ref["TAG_SCHEMA"] == "PUBLIC"
 
         if in_same_database and (in_same_schema or tag_in_public_schema):
-            tag_name = tag_ref["tag_name"]
+            tag_name = tag_ref["TAG_NAME"]
         else:
-            tag_name = f"{tag_ref['tag_database']}.{tag_ref['tag_schema']}.{tag_ref['tag_name']}"
-        tag_map[tag_name] = tag_ref["tag_value"]
+            tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
+        tag_map[tag_name] = tag_ref["TAG_VALUE"]
     return tag_map
 
 
