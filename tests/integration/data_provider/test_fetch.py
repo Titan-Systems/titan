@@ -1,15 +1,12 @@
 import os
-
-# import uuid
-
 import pytest
-
-# import snowflake.connector
 
 from titan import data_provider
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from titan.parse import parse_identifier
+
+from tests.helpers import STATIC_RESOURCES
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -308,6 +305,9 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
 @pytest.mark.requires_snowflake
 @pytest.mark.enterprise
 def test_fetch_enterprise_schema(cursor, account_locator, test_db):
+    static_tag = STATIC_RESOURCES[ResourceType.TAG]
+    cursor.execute(static_tag.create_sql(if_not_exists=True))
+
     urn = URN(
         resource_type=ResourceType.SCHEMA,
         fqn=FQN(name="ENTERPRISE_TEST_SCHEMA", database=test_db),

@@ -47,7 +47,7 @@ def get_json_fixtures():
             try:
                 data = get_json_fixture(resource_name)
             except Exception as e:
-                print(f"Error reading {f}: {e}")
+                # print(f"Error reading {f}: {e}")
                 continue
             yield (resource_cls, data)
 
