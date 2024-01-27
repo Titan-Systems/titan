@@ -35,10 +35,10 @@ account_resources = [
     },
     {
         "resource_type": ResourceType.ROLE,
-        "setup_sql": "CREATE ROLE somerole",
-        "teardown_sql": "DROP ROLE IF EXISTS somerole",
+        "setup_sql": "CREATE ROLE thisisatestrole",
+        "teardown_sql": "DROP ROLE IF EXISTS thisisatestrole",
         "data": {
-            "name": "SOMEROLE",
+            "name": "THISISATESTROLE",
             "owner": TEST_ROLE,
         },
     },
