@@ -26,7 +26,7 @@ class Tag(Resource):
         comment=StringProp("comment"),
         allowed_values=StringListProp("allowed_values", eq=False),
     )
-    requires = {AccountEdition.ENTERPRISE}
+    # requires = {AccountEdition.ENTERPRISE}
     scope = AccountScope()
     spec = _Tag
 
@@ -38,7 +38,7 @@ class Tag(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _Tag(
+        self._data: _Tag = _Tag(
             name=name,
             comment=comment,
             allowed_values=allowed_values,

@@ -317,7 +317,7 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         f"""
             CREATE SCHEMA {test_db}.ENTERPRISE_TEST_SCHEMA
                 DATA_RETENTION_TIME_IN_DAYS = 90
-                WITH TAG (TAG1 = 'VALUE1')
+                WITH TAG (STATIC_TAG = 'SOMEVALUE')
         """
     )
 
@@ -329,7 +329,7 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "data_retention_time_in_days": 90,
         "max_data_extension_time_in_days": 14,
         "default_ddl_collation": None,
-        "tags": {"TAG1": "VALUE1"},
+        "tags": {"STATIC_TAG": "SOMEVALUE"},
         "owner": "SYSADMIN",
         "comment": None,
     }

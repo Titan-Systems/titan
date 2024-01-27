@@ -14,6 +14,7 @@ STATIC_RESOURCES = {
     ResourceType.DATABASE: resources.Database(name="static_database"),
     ResourceType.ROLE: resources.Role(name="static_role"),
     ResourceType.TABLE: resources.Table(name="static_table", columns=[{"name": "id", "data_type": "INT"}]),
+    ResourceType.TAG: resources.Tag(name="static_tag"),
     ResourceType.USER: resources.User(name="static_user"),
     ResourceType.WAREHOUSE: resources.Warehouse(name="static_warehouse"),
 }
