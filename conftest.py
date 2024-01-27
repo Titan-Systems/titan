@@ -8,10 +8,6 @@ TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 
 def connection_params():
-    user = os.environ["TEST_SNOWFLAKE_USER"][::-1]
-    raise Exception(f"TEST_SNOWFLAKE_USER: [{user}]")
-    # if user.strip == "":
-    # raise ValueError(f"TEST_SNOWFLAKE_USER must be set {os.environ}")
     return {
         "account": os.environ["TEST_SNOWFLAKE_ACCOUNT"],
         "user": os.environ["TEST_SNOWFLAKE_USER"],
@@ -45,7 +41,7 @@ def test_db(suffix):
 
 
 @pytest.fixture(scope="session")
-def marked_for_cleanup():
+def marked_for_cleanup() -> list:
     """List to keep track of resources created during tests."""
     return []
 
