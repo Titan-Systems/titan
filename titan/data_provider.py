@@ -527,6 +527,7 @@ def fetch_schema(session, fqn: FQN):
         "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
         "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
+        "tags": None,
     }
 
 
@@ -575,21 +576,48 @@ def fetch_table(session, fqn: FQN):
     }
 
 
-def fetch_resource_tags(session, resource_type: str, fqn: FQN):
+def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
+    session_ctx = fetch_session(session)
+    if session_ctx["tag_support"] is False:
+        return None
+
+    """
+    +----------------------+------------+-------------+-----------+--------+----------------------+---------------+-------------+--------+-------------+
+    |     TAG_DATABASE     | TAG_SCHEMA |  TAG_NAME   | TAG_VALUE | LEVEL  |   OBJECT_DATABASE    | OBJECT_SCHEMA | OBJECT_NAME | DOMAIN | COLUMN_NAME |
+    +----------------------+------------+-------------+-----------+--------+----------------------+---------------+-------------+--------+-------------+
+    | TITAN                | SOMESCH    | TASTY_TREAT | muffin    | SCHEMA | TEST_DB_RUN_13287C56 |               | SOMESCH     | SCHEMA |             |
+    | TEST_DB_RUN_13287C56 | PUBLIC     | TRASH       | true      | SCHEMA | TEST_DB_RUN_13287C56 |               | SOMESCH     | SCHEMA |             |
+    +----------------------+------------+-------------+-----------+--------+----------------------+---------------+-------------+--------+-------------+
+
+    """
+
+    if resource_type != ResourceType.SCHEMA or not isinstance(resource_type, ResourceType):
+        raise NotImplementedError
+
     tag_refs = execute(
         session,
         f"""
             SELECT *
             FROM table({fqn.database}.information_schema.tag_references(
-                '{fqn}', '{resource_type.upper()}'
+                '{fqn}', '{str(resource_type)}'
             ))""",
     )
 
     if len(tag_refs) == 0:
         return None
 
-    # TODO
-    return []
+    tag_map = {}
+    for tag_ref in tag_refs:
+        in_same_database = tag_ref["tag_database"] == tag_ref["object_database"]
+        in_same_schema = tag_ref["tag_schema"] == tag_ref["object_schema"]
+        tag_in_public_schema = tag_ref["tag_schema"] == "PUBLIC"
+
+        if in_same_database and (in_same_schema or tag_in_public_schema):
+            tag_name = tag_ref["tag_name"]
+        else:
+            tag_name = f"{tag_ref['tag_database']}.{tag_ref['tag_schema']}.{tag_ref['tag_name']}"
+        tag_map[tag_name] = tag_ref["tag_value"]
+    return tag_map
 
 
 def fetch_user(session, fqn: FQN):

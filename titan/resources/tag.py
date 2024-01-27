@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
 from ..enums import AccountEdition, ResourceType
-from ..scope import AccountScope
+from ..scope import SchemaScope
 from ..props import Props, StringProp, StringListProp
 
 
@@ -27,7 +27,7 @@ class Tag(Resource):
         allowed_values=StringListProp("allowed_values", eq=False),
     )
     # requires = {AccountEdition.ENTERPRISE}
-    scope = AccountScope()
+    scope = SchemaScope()
     spec = _Tag
 
     def __init__(

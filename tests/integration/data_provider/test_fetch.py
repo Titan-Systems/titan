@@ -330,6 +330,6 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "max_data_extension_time_in_days": 14,
         "default_ddl_collation": None,
         "tags": {"STATIC_TAG": "SOMEVALUE"},
-        "owner": "SYSADMIN",
+        "owner": TEST_ROLE,
         "comment": None,
     }
