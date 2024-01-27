@@ -8,6 +8,9 @@ TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 
 def connection_params():
+    user = os.environ["TEST_SNOWFLAKE_USER"]
+    if user == "":
+        raise ValueError(f"TEST_SNOWFLAKE_USER must be set {os.environ}")
     return {
         "account": os.environ["TEST_SNOWFLAKE_ACCOUNT"],
         "user": os.environ["TEST_SNOWFLAKE_USER"],
