@@ -6,12 +6,14 @@ import snowflake.connector
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
-connection_params = {
-    "account": os.environ["TEST_SNOWFLAKE_ACCOUNT"],
-    "user": os.environ["TEST_SNOWFLAKE_USER"],
-    "password": os.environ["TEST_SNOWFLAKE_PASSWORD"],
-    "role": TEST_ROLE,
-}
+
+def connection_params():
+    return {
+        "account": os.environ["TEST_SNOWFLAKE_ACCOUNT"],
+        "user": os.environ["TEST_SNOWFLAKE_USER"],
+        "password": os.environ["TEST_SNOWFLAKE_PASSWORD"],
+        "role": TEST_ROLE,
+    }
 
 
 def pytest_addoption(parser):
@@ -46,7 +48,7 @@ def marked_for_cleanup():
 
 @pytest.fixture(scope="session")
 def cursor(suffix, test_db, marked_for_cleanup):
-    session = snowflake.connector.connect(**connection_params)
+    session = snowflake.connector.connect(**connection_params())
     with session.cursor() as cur:
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
         cur.execute(f"CREATE DATABASE {test_db}")
