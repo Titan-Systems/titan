@@ -13,13 +13,6 @@ from titan.parse import parse_identifier
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
-# connection_params = {
-#     "account": os.environ.get("TEST_SNOWFLAKE_ACCOUNT"),
-#     "user": os.environ.get("TEST_SNOWFLAKE_USER"),
-#     "password": os.environ.get("TEST_SNOWFLAKE_PASSWORD"),
-#     "role": TEST_ROLE,
-# }
-
 account_resources = [
     {
         "resource_type": ResourceType.DATABASE,
@@ -310,3 +303,33 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == account_resource["data"]
+
+
+@pytest.mark.requires_snowflake
+@pytest.mark.enterprise
+def test_fetch_enterprise_schema(cursor, account_locator, test_db):
+    urn = URN(
+        resource_type=ResourceType.SCHEMA,
+        fqn=FQN(name="ENTERPRISE_TEST_SCHEMA", database=test_db),
+        account_locator=account_locator,
+    )
+    cursor.execute(
+        f"""
+            CREATE SCHEMA {test_db}.ENTERPRISE_TEST_SCHEMA
+                DATA_RETENTION_TIME_IN_DAYS = 90
+                WITH TAG (TAG1 = 'VALUE1')
+        """
+    )
+
+    result = data_provider.fetch_resource(cursor, urn)
+    assert result == {
+        "name": "ENTERPRISE_TEST_SCHEMA",
+        "transient": False,
+        "managed_access": False,
+        "data_retention_time_in_days": 90,
+        "max_data_extension_time_in_days": 14,
+        "default_ddl_collation": None,
+        "tags": {"TAG1": "VALUE1"},
+        "owner": "SYSADMIN",
+        "comment": None,
+    }
