@@ -30,6 +30,12 @@ def pytest_runtest_setup(item):
         pytest.skip("need --snowflake option to run this test")
 
 
+def pytest_collection_modifyitems(items):
+    for item in items:
+        if not item.get_closest_marker("enterprise"):
+            item.add_marker("standard")
+
+
 @pytest.fixture(scope="session")
 def suffix():
     return str(uuid.uuid4())[:8]
