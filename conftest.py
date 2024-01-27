@@ -1,5 +1,4 @@
 import pytest
-import json
 import os
 import uuid
 
@@ -8,9 +7,9 @@ import snowflake.connector
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 connection_params = {
-    "account": os.environ.get("TEST_SNOWFLAKE_ACCOUNT"),
-    "user": os.environ.get("TEST_SNOWFLAKE_USER"),
-    "password": os.environ.get("TEST_SNOWFLAKE_PASSWORD"),
+    "account": os.environ["TEST_SNOWFLAKE_ACCOUNT"],
+    "user": os.environ["TEST_SNOWFLAKE_USER"],
+    "password": os.environ["TEST_SNOWFLAKE_PASSWORD"],
     "role": TEST_ROLE,
 }
 
