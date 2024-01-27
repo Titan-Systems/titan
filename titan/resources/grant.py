@@ -6,6 +6,7 @@ from .role import Role
 from .user import User
 from ..enums import ResourceType
 from ..identifiers import FQN
+from ..parse import _parse_grant, _parse_props
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
 from ..props import Props, FlagProp, IdentifierProp
 from ..scope import AccountScope
@@ -321,16 +322,11 @@ class RoleGrant(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        # props = _parse_props(cls.props, sql)
-        # return RoleGrant(**props)
-        raise NotImplementedError
+        props = _parse_grant(sql)
+        return RoleGrant(**props)
 
     @property
     def fqn(self):
         subject = "user" if self._data.to_user else "role"
         name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
         return FQN(name=self._data.role.name, params={subject: name})
-
-    # @property
-    # def name(self):
-    #     return self._data.role.name

@@ -67,6 +67,23 @@ def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     )
 
 
+def create_view(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    data = data.copy()
+    secure = data.pop("secure", None)
+    volatile = data.pop("volatile", None)
+    recursive = data.pop("recursive", None)
+    return tidy_sql(
+        "CREATE",
+        "SECURE" if secure else "",
+        "VOLATILE" if volatile else "",
+        "RECURSIVE" if recursive else "",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
+        props.render(data),
+    )
+
+
 def update_resource(urn: URN, data: dict, props: Props) -> str:
     return getattr(__this__, f"update_{urn.resource_label}", update__default)(urn, data, props)
 

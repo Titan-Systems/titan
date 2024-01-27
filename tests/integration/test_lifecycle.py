@@ -2,6 +2,7 @@ import pytest
 
 from tests.helpers import STATIC_RESOURCES, get_json_fixtures
 
+from titan.enums import ResourceType
 
 JSON_FIXTURES = list(get_json_fixtures())
 
@@ -20,6 +21,10 @@ def resource(request, cursor, marked_for_cleanup):
             static_res = STATIC_RESOURCES[ref.resource_type]
             cursor.execute(static_res.create_sql(if_not_exists=True))
             marked_for_cleanup.append(static_res)
+    if res.resource_type == ResourceType.VIEW:
+        static_table = STATIC_RESOURCES[ResourceType.TABLE]
+        cursor.execute(static_table.create_sql(if_not_exists=True))
+        marked_for_cleanup.append(static_table)
     yield res
 
 

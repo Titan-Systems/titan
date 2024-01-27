@@ -23,6 +23,7 @@ class TestBlueprint(unittest.TestCase):
         udf = PythonUDF(
             name="SOMEUDF",
             returns="VARCHAR",
+            args=[],
             runtime_version="3.9",
             handler="main",
             comment="This is a UDF comment",
@@ -99,9 +100,9 @@ class TestBlueprint(unittest.TestCase):
                 "comment": None,
             },
         )
-        self.assertIn("urn::ABCD123:function/DB.PUBLIC.SOMEUDF", manifest)
+        self.assertIn("urn::ABCD123:function/DB.PUBLIC.SOMEUDF()", manifest)
         self.assertDictEqual(
-            manifest["urn::ABCD123:function/DB.PUBLIC.SOMEUDF"],
+            manifest["urn::ABCD123:function/DB.PUBLIC.SOMEUDF()"],
             {
                 "name": "SOMEUDF",
                 "owner": "SYSADMIN",
@@ -109,7 +110,7 @@ class TestBlueprint(unittest.TestCase):
                 "handler": "main",
                 "runtime_version": "3.9",
                 "comment": "This is a UDF comment",
-                "args": None,
+                "args": [],
                 "as_": None,
                 "copy_grants": False,
                 "language": "PYTHON",

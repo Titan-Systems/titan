@@ -10,6 +10,7 @@ from ..props import (
     FlagProp,
     IdentifierListProp,
     Props,
+    ReturnsProp,
     StringListProp,
     StringProp,
 )
@@ -92,8 +93,8 @@ class _PythonUDF(ResourceSpec):
     returns: str
     runtime_version: str
     handler: str
+    args: list[Arg]
     language: Language = Language.PYTHON
-    args: list[Arg] = None
     as_: str = None
     comment: str = None
     copy_grants: bool = False
@@ -112,7 +113,8 @@ class PythonUDF(Resource):
     props = Props(
         secure=FlagProp("secure"),
         args=ArgsProp(),
-        returns=EnumProp("returns", DataType, eq=False),
+        # returns=EnumProp("returns", DataType, eq=False),
+        returns=ReturnsProp("returns", eq=False),
         language=EnumProp("language", [Language.PYTHON], eq=False),
         null_handling=EnumFlagProp(NullHandling),
         volatility=EnumFlagProp(Volatility),
@@ -133,7 +135,7 @@ class PythonUDF(Resource):
         returns: str,
         runtime_version: str,
         handler: str,
-        args: list = None,
+        args: list,
         as_: str = None,
         comment: str = None,
         copy_grants: bool = False,

@@ -5,7 +5,6 @@ from ..scope import SchemaScope
 from ..enums import DataType, ExecutionRights, NullHandling, Language, ResourceType
 from ..props import (
     ArgsProp,
-    EnumFlagProp,
     EnumProp,
     FlagProp,
     IdentifierListProp,

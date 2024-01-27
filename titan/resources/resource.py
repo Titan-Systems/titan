@@ -18,6 +18,11 @@ class Arg(TypedDict):
     data_type: DataType
 
 
+class Returns(TypedDict):
+    data_type: DataType
+    metadata: str
+
+
 @dataclass
 class ResourceSpec:
     def __post_init__(self):
@@ -55,6 +60,16 @@ class ResourceSpec:
                 if "default" in field_value:
                     arg_dict["default"] = field_value["default"]
                 return arg_dict
+
+            # Coerce returns
+            elif field_type == Returns:
+                returns_dict = {
+                    "data_type": DataType(field_value["data_type"]),
+                    "metadata": field_value["metadata"],
+                }
+                if "returns_null" in field_value:
+                    returns_dict["returns_null"] = field_value["returns_null"]
+                return returns_dict
 
             # Coerce resources
             elif issubclass(field_type, Resource):

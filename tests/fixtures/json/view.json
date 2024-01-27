@@ -6,8 +6,7 @@
     "change_tracking": null,
     "columns": [
         {
-            "name": "id",
-            "data_type": "INT"
+            "name": "id"
         }
     ],
     "comment": "This is a view",
