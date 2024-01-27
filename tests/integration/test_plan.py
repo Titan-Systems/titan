@@ -1,6 +1,6 @@
 import pytest
 
-from titan import Blueprint, User, Resource, Role, RoleGrant
+from titan import Blueprint, User, Resource, Role, RoleGrant, data_provider
 
 
 @pytest.fixture(scope="session")
@@ -28,19 +28,5 @@ def test_blueprint_plan(cursor, user, role):
     changes = bp.plan(session)
     assert len(changes) == 1
     bp.apply(session, changes)
-
-
-@pytest.mark.requires_snowflake
-def test_role_permissions(cursor, user, role):
-    session = cursor.connection
-    user_grant = RoleGrant(role=role, to_user=user)
-    sysadmin_grant = RoleGrant(role=role, to_role="SYSADMIN")
-
-    bp = Blueprint(name="test")
-    bp.add(
-        role,
-        user_grant,
-        sysadmin_grant,
-    )
-    changes = bp.plan(session)
-    assert len(changes) == 2
+    role_grant_remote = data_provider.fetch_role_grant(session, role_grant.fqn)
+    assert role_grant_remote
