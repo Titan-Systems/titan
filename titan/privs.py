@@ -124,6 +124,11 @@ class NetworkRulePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
+class PackagesPolicyPriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
 class PasswordPolicyPriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
@@ -149,6 +154,7 @@ class SchemaPriv(ParseableEnum):
     CREATE_MASKING_POLICY = "CREATE MASKING POLICY"
     CREATE_MATERIALIZED_VIEW = "CREATE MATERIALIZED VIEW"
     CREATE_NETWORK_RULE = "CREATE NETWORK RULE"
+    CREATE_PACKAGES_POLICY = "CREATE PACKAGES POLICY"
     CREATE_PASSWORD_POLICY = "CREATE PASSWORD POLICY"
     CREATE_PIPE = "CREATE PIPE"
     CREATE_PROCEDURE = "CREATE PROCEDURE"
@@ -217,6 +223,7 @@ RESOURCE_GRANTS_MAP = {
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
     ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
+    ResourceType.PACKAGES_POLICY: PackagesPolicyPriv,
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,

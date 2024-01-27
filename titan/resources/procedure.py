@@ -21,7 +21,6 @@ class _PythonStoredProcedure(ResourceSpec):
     args: list[Arg]
     returns: DataType
     runtime_version: str
-    # FIXME: this is a situation where scrubbing defaults when an object is serialized is bad
     packages: list  # = ["snowflake-snowpark-python"]
     handler: str
     language: Language = Language.PYTHON
