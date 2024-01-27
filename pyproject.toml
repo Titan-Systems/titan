@@ -18,7 +18,10 @@ line-length = 120
 
 [tool.pytest.ini_options]
 # addopts = "-n 4"
-markers = "requires_snowflake"
+markers = [
+    "requires_snowflake: Mark a test as requiring a Snowflake connection.",
+    "enterprise: Mark a test as an enterprise test."
+]
 filterwarnings = [
     "ignore:.*urllib3.contrib.pyopenssl.*:DeprecationWarning"
 ]
