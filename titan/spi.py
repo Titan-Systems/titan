@@ -102,7 +102,7 @@ def install(sp_session):
                     returns=DataType.OBJECT,
                     runtime_version="3.9",
                     packages=["snowflake-snowpark-python", "inflection", "pyparsing"],
-                    imports=[f"@{stage['fqn']}/releases/titan-0.1.0.zip"],
+                    imports=[f"@{stage['fqn']}/releases/titan-0.1.1.zip"],
                     handler=f"titan.spi.{name}",
                     execute_as="CALLER",
                 ),
@@ -141,7 +141,7 @@ def _create_or_update_resource(
     config: dict,
     dry_run: bool = False,
 ):
-    fqn = parse_identifier(config["name"], is_schema=(resource_type == ResourceType.SCHEMA))
+    fqn = parse_identifier(config["name"], is_db_scoped=(resource_type == ResourceType.SCHEMA))
 
     resource_cls = resources.Resource.resolve_resource_cls(resource_type)
     session_ctx = dp.fetch_session(sf_session)
@@ -257,7 +257,7 @@ def fetch_schema(sp_session, name: str) -> dict:
     """
     Returns a schema's configuration.
     """
-    fqn = parse_identifier(name, is_schema=True)
+    fqn = parse_identifier(name, is_db_scoped=True)
     if fqn.database is None:
         fqn.database = sp_session.get_current_database()
     return dp.fetch_schema(sp_session.connection, fqn)

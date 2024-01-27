@@ -28,6 +28,7 @@ class GlobalPriv(ParseableEnum):
     CREATE_API_INTEGRATION = "CREATE API INTEGRATION"
     CREATE_APPLICATION = "CREATE APPLICATION"
     CREATE_APPLICATION_PACKAGE = "CREATE APPLICATION PACKAGE"
+    CREATE_COMPUTE_POOL = "CREATE COMPUTE POOL"
     CREATE_CREDENTIAL = "CREATE CREDENTIAL"
     CREATE_DATA_EXCHANGE_LISTING = "CREATE DATA EXCHANGE LISTING"
     CREATE_DATABASE = "CREATE DATABASE"
@@ -112,6 +113,21 @@ class DatabasePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class IntegrationPriv(ParseableEnum):
+    ALL = "ALL"
+    USAGE = "USAGE"
+    USE_ANY_ROLE = "USE_ANY_ROLE"
+    OWNERSHIP = "OWNERSHIP"
+
+
+class NetworkRulePriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+
+
+class PasswordPolicyPriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+
+
 class ProcedurePriv(ParseableEnum):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
@@ -132,6 +148,7 @@ class SchemaPriv(ParseableEnum):
     CREATE_FUNCTION = "CREATE FUNCTION"
     CREATE_MASKING_POLICY = "CREATE MASKING POLICY"
     CREATE_MATERIALIZED_VIEW = "CREATE MATERIALIZED VIEW"
+    CREATE_NETWORK_RULE = "CREATE NETWORK RULE"
     CREATE_PASSWORD_POLICY = "CREATE PASSWORD POLICY"
     CREATE_PIPE = "CREATE PIPE"
     CREATE_PROCEDURE = "CREATE PROCEDURE"
@@ -197,6 +214,9 @@ class WarehousePriv(ParseableEnum):
 RESOURCE_GRANTS_MAP = {
     ResourceType.ACCOUNT: GlobalPriv,
     ResourceType.DATABASE: DatabasePriv,
+    ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
+    ResourceType.NETWORK_RULE: NetworkRulePriv,
+    ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,

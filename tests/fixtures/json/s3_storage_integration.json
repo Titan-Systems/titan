@@ -1,0 +1,15 @@
+{
+    "name": "S3_INT",
+    "type": "EXTERNAL_STAGE",
+    "storage_provider": "S3",
+    "storage_aws_role_arn": "arn:aws:iam::001234567890:role/myrole",
+    "enabled": true,
+    "storage_allowed_locations": [
+        "s3://mybucket1/path1/",
+        "s3://mybucket2/path2/"
+    ],
+    "storage_blocked_locations": null,
+    "comment": null,
+    "owner": "ACCOUNTADMIN",
+    "storage_aws_object_acl": "bucket-owner-full-control"
+}

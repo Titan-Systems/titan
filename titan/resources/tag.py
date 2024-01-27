@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
 from ..enums import AccountEdition, ResourceType
-from ..scope import AccountScope
+from ..scope import SchemaScope
 from ..props import Props, StringProp, StringListProp
 
 
@@ -26,8 +26,8 @@ class Tag(Resource):
         comment=StringProp("comment"),
         allowed_values=StringListProp("allowed_values", eq=False),
     )
-    requires = {AccountEdition.ENTERPRISE}
-    scope = AccountScope()
+    # requires = {AccountEdition.ENTERPRISE}
+    scope = SchemaScope()
     spec = _Tag
 
     def __init__(
@@ -38,7 +38,7 @@ class Tag(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _Tag(
+        self._data: _Tag = _Tag(
             name=name,
             comment=comment,
             allowed_values=allowed_values,

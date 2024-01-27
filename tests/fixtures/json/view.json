@@ -1,0 +1,17 @@
+{
+    "name": "MY_VIEW",
+    "owner": "SYSADMIN",
+    "volatile": true,
+    "as_": "SELECT id FROM STATIC_TABLE",
+    "change_tracking": null,
+    "columns": [
+        {
+            "name": "id"
+        }
+    ],
+    "comment": "This is a view",
+    "copy_grants": null,
+    "recursive": null,
+    "secure": null,
+    "tags": null
+}

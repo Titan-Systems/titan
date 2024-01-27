@@ -18,6 +18,11 @@ class Arg(TypedDict):
     data_type: DataType
 
 
+class Returns(TypedDict):
+    data_type: DataType
+    metadata: str
+
+
 @dataclass
 class ResourceSpec:
     def __post_init__(self):
@@ -55,6 +60,16 @@ class ResourceSpec:
                 if "default" in field_value:
                     arg_dict["default"] = field_value["default"]
                 return arg_dict
+
+            # Coerce returns
+            elif field_type == Returns:
+                returns_dict = {
+                    "data_type": DataType(field_value["data_type"]),
+                    "metadata": field_value["metadata"],
+                }
+                if "returns_null" in field_value:
+                    returns_dict["returns_null"] = field_value["returns_null"]
+                return returns_dict
 
             # Coerce resources
             elif issubclass(field_type, Resource):
@@ -133,7 +148,7 @@ class Resource(metaclass=_Resource):
         resource_types = cls.__types[resource_type]
         if len(resource_types) > 1:
             if data is None:
-                raise Exception(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
+                raise ValueError(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
             else:
                 raise NotImplementedError
         return resource_types[0]
@@ -186,7 +201,7 @@ class Resource(metaclass=_Resource):
         )
 
     def drop_sql(self, if_exists: bool = False):
-        return drop_resource(self.urn, self.to_dict(packed=True), if_exists=if_exists)
+        return drop_resource(self.urn, self.to_dict(), if_exists=if_exists)
 
     def _requires(self, resource: "Resource"):
         if isinstance(resource, Resource):

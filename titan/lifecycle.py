@@ -16,9 +16,22 @@ def create_resource(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
 def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     return tidy_sql(
         "CREATE",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
+        props.render(data),
+    )
+
+
+def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    db = f"{urn.fqn.database}." if urn.fqn.database else ""
+    schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
+    name = f"{db}{schema}{data['name']}"
+    return tidy_sql(
+        "CREATE",
         "IF NOT EXISTS" if if_not_exists else "",
         urn.resource_type,
-        urn.fqn,
+        name,
         props.render(data),
     )
 
@@ -50,6 +63,23 @@ def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
 def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     return tidy_sql(
         "GRANT",
+        props.render(data),
+    )
+
+
+def create_view(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    data = data.copy()
+    secure = data.pop("secure", None)
+    volatile = data.pop("volatile", None)
+    recursive = data.pop("recursive", None)
+    return tidy_sql(
+        "CREATE",
+        "SECURE" if secure else "",
+        "VOLATILE" if volatile else "",
+        "RECURSIVE" if recursive else "",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
         props.render(data),
     )
 
@@ -116,10 +146,19 @@ def update_schema(urn: URN, data: dict, props: Props) -> str:
 
 
 def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:
-    return getattr(__this__, f"drop_{urn.resource_label}", drop__default)(urn, data, if_exists)
+    return getattr(__this__, f"drop_{urn.resource_label}", drop__default)(urn, data, if_exists=if_exists)
 
 
 def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
+    return tidy_sql(
+        "DROP",
+        urn.resource_type,
+        "IF EXISTS" if if_exists else "",
+        urn.fqn,
+    )
+
+
+def drop_function(urn: URN, data: dict, if_exists: bool) -> str:
     return tidy_sql(
         "DROP",
         urn.resource_type,
@@ -152,6 +191,7 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
 
 CREATE_RESOURCE_PRIV_MAP = {
     ResourceType.DATABASE: [GlobalPriv.CREATE_DATABASE],
+    ResourceType.EXTERNAL_ACCESS_INTEGRATION: [GlobalPriv.CREATE_INTEGRATION],
     ResourceType.FUNCTION: [SchemaPriv.CREATE_FUNCTION, SchemaPriv.USAGE, DatabasePriv.USAGE],
     ResourceType.GRANT: [],  # TODO
     ResourceType.PROCEDURE: [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],

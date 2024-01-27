@@ -1,0 +1,7 @@
+{
+    "name": "SOMESEQ",
+    "owner": "SYSADMIN",
+    "start": 1,
+    "increment": 2,
+    "comment": "+3"
+}

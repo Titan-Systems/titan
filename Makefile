@@ -1,4 +1,5 @@
 .PHONY: install install-dev test integration style check clean
+EDITION ?= standard
 
 install:
 	pip install -e .
@@ -10,7 +11,7 @@ test:
 	python -m pytest
 
 integration:
-	python -m pytest --snowflake
+	python -m pytest --snowflake -m $(EDITION)
 
 style:
 	python -m black .

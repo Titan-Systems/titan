@@ -1,0 +1,22 @@
+{
+    "name": "MY_PYTHON_UDF",
+    "owner": "SYSADMIN",
+    "args": [],
+    "returns": "NUMBER(38,0)",
+    "runtime_version": "3.8",
+    "packages": [
+        "snowflake-snowpark-python",
+        "pyparsing"
+    ],
+    "handler": "main",
+    "as_": "def main(): return 42",
+    "language": "PYTHON",
+    "comment": null,
+    "copy_grants": false,
+    "external_access_integrations": null,
+    "imports": null,
+    "null_handling": null,
+    "secrets": null,
+    "secure": null,
+    "volatility": null
+}

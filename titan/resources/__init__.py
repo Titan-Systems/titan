@@ -9,11 +9,15 @@ from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
 from .grant import Grant, RoleGrant
+from .network_rule import NetworkRule
+from .password_policy import PasswordPolicy
 from .pipe import Pipe
 from .procedure import PythonStoredProcedure
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
+from .secret import Secret
+
 from .sequence import Sequence
 
 # from .shared_database import SharedDatabase
@@ -69,7 +73,9 @@ __all__ = [
     "Grant",
     "InternalStage",
     "JavascriptUDF",
+    "NetworkRule",
     "NotificationIntegration",
+    "PasswordPolicy",
     "Pipe",
     "PythonUDF",
     "PythonStoredProcedure",
@@ -79,6 +85,7 @@ __all__ = [
     "RoleGrant",
     "S3StorageIntegration",
     "Schema",
+    "Secret",
     "Sequence",
     # "SharedDatabase",
     "Stage",

@@ -1,22 +1,14 @@
 import os
-import uuid
-
 import pytest
-import snowflake.connector
 
 from titan import data_provider
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from titan.parse import parse_identifier
 
-TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
+from tests.helpers import STATIC_RESOURCES
 
-connection_params = {
-    "account": os.environ.get("TEST_SNOWFLAKE_ACCOUNT"),
-    "user": os.environ.get("TEST_SNOWFLAKE_USER"),
-    "password": os.environ.get("TEST_SNOWFLAKE_PASSWORD"),
-    "role": TEST_ROLE,
-}
+TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 account_resources = [
     {
@@ -33,10 +25,10 @@ account_resources = [
     },
     {
         "resource_type": ResourceType.ROLE,
-        "setup_sql": "CREATE ROLE somerole",
-        "teardown_sql": "DROP ROLE IF EXISTS somerole",
+        "setup_sql": "CREATE ROLE thisisatestrole",
+        "teardown_sql": "DROP ROLE IF EXISTS thisisatestrole",
         "data": {
-            "name": "SOMEROLE",
+            "name": "THISISATESTROLE",
             "owner": TEST_ROLE,
         },
     },
@@ -139,6 +131,41 @@ scoped_resources = [
         },
     },
     {
+        "resource_type": ResourceType.PASSWORD_POLICY,
+        "setup_sql": """
+            CREATE PASSWORD POLICY SOMEPOLICY
+                PASSWORD_MIN_LENGTH = 12
+                PASSWORD_MAX_LENGTH = 24
+                PASSWORD_MIN_UPPER_CASE_CHARS = 2
+                PASSWORD_MIN_LOWER_CASE_CHARS = 2
+                PASSWORD_MIN_NUMERIC_CHARS = 2
+                PASSWORD_MIN_SPECIAL_CHARS = 2
+                PASSWORD_MIN_AGE_DAYS = 1
+                PASSWORD_MAX_AGE_DAYS = 30
+                PASSWORD_MAX_RETRIES = 3
+                PASSWORD_LOCKOUT_TIME_MINS = 30
+                PASSWORD_HISTORY = 5
+                COMMENT = 'production account password policy';
+        """,
+        "teardown_sql": "DROP PASSWORD POLICY IF EXISTS SOMEPOLICY",
+        "data": {
+            "name": "SOMEPOLICY",
+            "owner": TEST_ROLE,
+            "password_min_length": 12,
+            "password_max_length": 24,
+            "password_min_upper_case_chars": 2,
+            "password_min_lower_case_chars": 2,
+            "password_min_numeric_chars": 2,
+            "password_min_special_chars": 2,
+            "password_min_age_days": 1,
+            "password_max_age_days": 30,
+            "password_max_retries": 3,
+            "password_lockout_time_mins": 30,
+            "password_history": 5,
+            "comment": "production account password policy",
+        },
+    },
+    {
         "resource_type": ResourceType.PROCEDURE,
         "setup_sql": """
             CREATE PROCEDURE somesproc(ARG1 VARCHAR)
@@ -194,34 +221,8 @@ scoped_resources = [
 
 
 @pytest.fixture(scope="session")
-def suffix():
-    return str(uuid.uuid4())[:8].upper()
-
-
-@pytest.fixture(scope="session")
-def test_db_name(suffix):
-    return f"TEST_DB_RUN_{suffix}"
-
-
-@pytest.fixture(scope="session")
-def db_session():
-    return snowflake.connector.connect(**connection_params)
-
-
-@pytest.fixture(scope="session")
-def cursor(db_session, suffix, test_db_name):
-    with db_session.cursor() as cur:
-        cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
-        cur.execute(f"USE ROLE {TEST_ROLE}")
-        cur.execute(f"CREATE DATABASE {test_db_name}")
-        cur.execute("USE WAREHOUSE CI")
-        yield cur
-        cur.execute(f"DROP DATABASE {test_db_name}")
-
-
-@pytest.fixture(scope="session")
-def account_locator(db_session):
-    return data_provider.fetch_account_locator(db_session)
+def account_locator(cursor):
+    return data_provider.fetch_account_locator(cursor)
 
 
 @pytest.fixture(
@@ -229,14 +230,13 @@ def account_locator(db_session):
     ids=[f"test_fetch_{config['resource_type']}" for config in scoped_resources],
     scope="function",
 )
-def scoped_resource(request, cursor, test_db_name):
+def scoped_resource(request, cursor, test_db):
     config = request.param
     setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
     teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]
 
-    cursor.execute(f"USE DATABASE {test_db_name}")
+    cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute("USE SCHEMA PUBLIC")
-    cursor.execute("USE WAREHOUSE CI")
     for setup_sql in setup_sqls:
         cursor.execute(setup_sql)
     try:
@@ -247,10 +247,10 @@ def scoped_resource(request, cursor, test_db_name):
 
 
 @pytest.mark.requires_snowflake
-def test_fetch_scoped_resource(scoped_resource, db_session, account_locator, test_db_name):
+def test_fetch_scoped_resource(scoped_resource, cursor, account_locator, test_db):
     fqn = FQN(
         name=scoped_resource["data"]["name"],
-        database=test_db_name,
+        database=test_db,
         schema=None if scoped_resource["resource_type"] == ResourceType.SCHEMA else "PUBLIC",
     )
     urn = URN(
@@ -258,8 +258,8 @@ def test_fetch_scoped_resource(scoped_resource, db_session, account_locator, tes
         fqn=fqn,
         account_locator=account_locator,
     )
-
-    result = data_provider.fetch_resource(db_session, urn)
+    cursor.execute("USE WAREHOUSE CI")
+    result = data_provider.fetch_resource(cursor, urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == scoped_resource["data"]
@@ -285,8 +285,7 @@ def account_resource(request, cursor):
 
 
 @pytest.mark.requires_snowflake
-def test_fetch_account_resource(account_resource, db_session, account_locator):
-    # fqn = FQN(name=account_resource["data"]["name"])
+def test_fetch_account_resource(account_resource, cursor, account_locator):
     if "name" in account_resource["data"]:
         fqn = parse_identifier(account_resource["data"]["name"])
     else:
@@ -297,7 +296,40 @@ def test_fetch_account_resource(account_resource, db_session, account_locator):
         account_locator=account_locator,
     )
 
-    result = data_provider.fetch_resource(db_session, urn)
+    result = data_provider.fetch_resource(cursor, urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == account_resource["data"]
+
+
+@pytest.mark.requires_snowflake
+@pytest.mark.enterprise
+def test_fetch_enterprise_schema(cursor, account_locator, test_db):
+    static_tag = STATIC_RESOURCES[ResourceType.TAG]
+    cursor.execute(static_tag.create_sql(if_not_exists=True))
+
+    urn = URN(
+        resource_type=ResourceType.SCHEMA,
+        fqn=FQN(name="ENTERPRISE_TEST_SCHEMA", database=test_db),
+        account_locator=account_locator,
+    )
+    cursor.execute(
+        f"""
+            CREATE SCHEMA {test_db}.ENTERPRISE_TEST_SCHEMA
+                DATA_RETENTION_TIME_IN_DAYS = 90
+                WITH TAG (STATIC_TAG = 'SOMEVALUE')
+        """
+    )
+
+    result = data_provider.fetch_resource(cursor, urn)
+    assert result == {
+        "name": "ENTERPRISE_TEST_SCHEMA",
+        "transient": False,
+        "managed_access": False,
+        "data_retention_time_in_days": 90,
+        "max_data_extension_time_in_days": 14,
+        "default_ddl_collation": None,
+        "tags": {"STATIC_TAG": "SOMEVALUE"},
+        "owner": TEST_ROLE,
+        "comment": None,
+    }

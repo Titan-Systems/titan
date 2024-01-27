@@ -7,8 +7,7 @@ from typing import Dict
 import pyparsing as pp
 
 from .builder import tidy_sql
-from .enums import DataType, Language, ExecutionRights, NullHandling
-from .identifiers import URN
+from .enums import DataType
 from .parse import (
     _parser_has_results_name,
     _parse_props,
@@ -17,7 +16,6 @@ from .parse import (
     Identifier,
     Keywords,
     Literals,
-    StringLiteral,
     FullyQualifiedIdentifier,
     EQUALS,
     ARROW,
@@ -291,6 +289,34 @@ class DictProp(Prop):
         return f"{self.label}{eq}({kv_pairs})"
 
 
+class ReturnsProp(Prop):
+    """
+    RETURNS VARIANT
+    RETURNS VARCHAR NOT NULL
+    RETURNS NUMBER(38,0)
+    RETURNS TABLE (event_date DATE, city VARCHAR, temperature NUMBER)
+    """
+
+    def __init__(self, label, **kwargs):
+        data_type = pp.MatchFirst([Keywords(val.value) for val in set(DataType)]) | Keyword("TABLE")
+        value_expr = pp.delimited_list(data_type + pp.Optional(pp.original_text_for(pp.nested_expr())))
+        super().__init__(label, value_expr, **kwargs)
+
+    def typecheck(self, prop_value):
+        return "".join(prop_value)
+        # if isinstance(prop_value, list):
+        #     if len(prop_value) == 1:
+        #         return {"data_type": DataType(prop_value[0])}
+        #     else:
+        #         return {"data_type": DataType(prop_value[0]), "metadata": prop_value[1]}
+
+    def render(self, value):
+        if value is None:
+            return ""
+        eq = " = " if self.eq else " "
+        return f"{self.label}{eq}{str(value)}"
+
+
 class EnumProp(Prop):
     def __init__(self, label, enum_or_list, **kwargs):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
@@ -483,6 +509,17 @@ class ColumnNamesProp(Prop):
                 column["comment"] = column["comment"]
             columns.append(column)
         return columns
+
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return "()"
+        columns = []
+        for column in values:
+            name = column["name"]
+            comment = f" COMMENT '{column['comment']}'" if "comment" in column else ""
+            column_str = f"{name}{comment}"
+            columns.append(column_str)
+        return f"({', '.join(columns)})"
 
 
 class SchemaProp(Prop):

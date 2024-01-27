@@ -138,6 +138,22 @@ def _parse_create_header(sql, resource_cls):
 
 
 def _parse_grant(sql: Union[str, SQL]):
+    if isinstance(sql, SQL):
+        sql = str(sql)
+
+    # Check for role grant
+    if _contains(Keywords("GRANT ROLE"), sql):
+        return _parse_role_grant(sql)
+
+    # Check for ownership grant
+    elif _contains(Keywords("GRANT OWNERSHIP"), sql):
+        raise NotImplementedError("Ownership grant not supported")
+        # return {"resource_key": "ownership_grant"}
+    else:
+        return _parse_priv_grant(sql)
+
+
+def _parse_priv_grant(sql: str):
     """
     GRANT {
           { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
@@ -149,20 +165,6 @@ def _parse_grant(sql: Union[str, SQL]):
     }
     TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
     """
-
-    if isinstance(sql, SQL):
-        sql = str(sql)
-
-    # Check for role grant
-    if _contains(Keywords("GRANT ROLE"), sql):
-        raise NotImplementedError("Role grant not supported")
-        # return {"resource_key": "role_grant"}
-
-    # Check for ownership grant
-    if _contains(Keywords("GRANT OWNERSHIP"), sql):
-        raise NotImplementedError("Ownership grant not supported")
-        # return {"resource_key": "ownership_grant"}
-
     grant = (
         GRANT
         + pp.SkipTo(ON)("privs")
@@ -196,6 +198,29 @@ def _parse_grant(sql: Union[str, SQL]):
             on_keyword: on_arg,
             "to": results["to"],
         }
+    except pp.ParseException as err:
+        raise pp.ParseException("Failed to parse grant") from err
+
+
+def _parse_role_grant(sql: str):
+    """
+    GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
+    """
+
+    # TODO: support TO USER
+    grant = (
+        GRANT
+        + Keyword("ROLE").suppress()
+        + Identifier("role")
+        + TO
+        + Keyword("ROLE").suppress()
+        + Identifier("to_role")
+    )
+    grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
+
+    try:
+        results = grant.parse_string(sql, parse_all=True)
+        return results.as_dict()
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse grant") from err
 
@@ -557,7 +582,7 @@ def parse_function_name(header: str):
     return prefix
 
 
-def parse_identifier(identifier: str, is_schema=False) -> FQN:
+def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
     # TODO: This needs to support periods and question marks in double quoted identifiers
     scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
     params = {}
@@ -580,7 +605,7 @@ def parse_identifier(identifier: str, is_schema=False) -> FQN:
             arg_types=arg_types,
         )
     elif len(name_parts) == 2:
-        if is_schema:
+        if is_db_scoped:
             return FQN(
                 database=name_parts[0],
                 name=name_parts[1],
@@ -613,7 +638,7 @@ def parse_URN(urn_str: str) -> URN:
         raise Exception(f"Invalid URN string: {urn_str}")
     resource_label, fqn_str = parts[3].split("/")
     resource_type = ResourceType(resource_label.replace("_", " ").upper())
-    fqn = parse_identifier(fqn_str, is_schema=(resource_label == "schema"))
+    fqn = parse_identifier(fqn_str, is_db_scoped=(resource_label == "schema"))
     return URN(
         account_locator=parts[2],
         resource_type=resource_type,

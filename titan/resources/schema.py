@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceContainer, ResourceSpec
+from .tag import Tag
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..scope import DatabaseScope
@@ -64,7 +65,7 @@ class Schema(Resource, ResourceContainer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _Schema(
+        self._data: _Schema = _Schema(
             name=name,
             transient=transient,
             managed_access=managed_access,
@@ -75,3 +76,6 @@ class Schema(Resource, ResourceContainer):
             owner=owner,
             comment=comment,
         )
+        if self._data.tags:
+            for tag_name in self._data.tags.keys():
+                self.requires(Tag(name=tag_name, stub=True))

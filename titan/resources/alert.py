@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .warehouse import Warehouse
 from ..enums import ResourceType
 from ..scope import SchemaScope
 
@@ -10,7 +11,7 @@ from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 @dataclass
 class _Alert(ResourceSpec):
     name: str
-    warehouse: str
+    warehouse: Warehouse
     schedule: str
     condition: str
     then: str
@@ -48,7 +49,7 @@ class Alert(Resource):
     def __init__(
         self,
         name: str,
-        warehouse: str,
+        warehouse: Warehouse,
         schedule: str,
         condition: str,
         then: str,
@@ -68,3 +69,4 @@ class Alert(Resource):
             comment=comment,
             tags=tags,
         )
+        self.requires(self._data.warehouse)

@@ -42,7 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        environment: [snowflake-aws-enterprise, snowflake-aws-standard]
+        include:
+          - environment: snowflake-aws-standard
+            edition: standard
+          - environment: snowflake-aws-enterprise
+            edition: enterprise
     environment: ${{ matrix.environment }}
     steps:
     - uses: actions/checkout@v3
@@ -61,7 +65,7 @@ jobs:
     - name: Run integration tests
       run: |
         source ./.venv/bin/activate
-        make integration
+        make integration EDITION=${{ matrix.edition }}
       env:
         TEST_SNOWFLAKE_ACCOUNT: ${{ secrets.TEST_SNOWFLAKE_ACCOUNT }}
         TEST_SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
