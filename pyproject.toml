@@ -20,7 +20,8 @@ line-length = 120
 # addopts = "-n 4"
 markers = [
     "requires_snowflake: Mark a test as requiring a Snowflake connection.",
-    "enterprise: Mark a test as an enterprise test."
+    "enterprise: Mark a test that only works on Enterprise Edition Snowflake.",
+    "standard: Mark a test that works on Standard Edition Snowflake.",
 ]
 filterwarnings = [
     "ignore:.*urllib3.contrib.pyopenssl.*:DeprecationWarning"

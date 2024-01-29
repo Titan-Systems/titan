@@ -101,6 +101,13 @@ GLOBAL_PRIV_DEFAULT_OWNERS = {
 }
 
 
+class AlertPriv(ParseableEnum):
+    ALL = "ALL"
+    MONITOR = "MONITOR"
+    OPERATE = "OPERATE"
+    OWNERSHIP = "OWNERSHIP"
+
+
 class DatabasePriv(ParseableEnum):
     ALL = "ALL"
     CREATE_DATABASE_ROLE = "CREATE DATABASE ROLE"
@@ -148,6 +155,7 @@ class SchemaPriv(ParseableEnum):
     ALL = "ALL"
     ADD_SEARCH_OPTIMIZATION = "ADD SEARCH OPTIMIZATION"
     CREATE_ALERT = "CREATE ALERT"
+    CREATE_DYNAMIC_TABLE = "CREATE DYNAMIC TABLE"
     CREATE_EXTERNAL_TABLE = "CREATE EXTERNAL TABLE"
     CREATE_FILE_FORMAT = "CREATE FILE FORMAT"
     CREATE_FUNCTION = "CREATE FUNCTION"
@@ -172,6 +180,12 @@ class SchemaPriv(ParseableEnum):
     CREATE_VIEW = "CREATE VIEW"
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
+class SequencePriv(ParseableEnum):
+    ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
@@ -217,8 +231,9 @@ class WarehousePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
-RESOURCE_GRANTS_MAP = {
+PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.ACCOUNT: GlobalPriv,
+    ResourceType.ALERT: AlertPriv,
     ResourceType.DATABASE: DatabasePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
@@ -227,6 +242,7 @@ RESOURCE_GRANTS_MAP = {
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,
+    ResourceType.SEQUENCE: SequencePriv,
     ResourceType.STAGE: StagePriv,
     ResourceType.TABLE: TablePriv,
     ResourceType.USER: UserPriv,
@@ -236,23 +252,43 @@ RESOURCE_GRANTS_MAP = {
 
 
 def priv_for_principal(principal: URN, priv: str):
-    if principal.resource_type not in RESOURCE_GRANTS_MAP:
-        raise Exception(f"Unsupported resource type: {principal.resource_type}")
-    return RESOURCE_GRANTS_MAP[principal.resource_type](priv)
+    if principal.resource_type not in PRIVS_FOR_RESOURCE_TYPE:
+        # raise Exception(f"Unsupported resource type: {principal.resource_type}")
+        return None
+    return PRIVS_FOR_RESOURCE_TYPE[principal.resource_type](priv)
 
 
-def create_priv_for_resource_type(resource_type):
-    if resource_type == "database":
-        return GlobalPriv.CREATE_DATABASE
-    elif resource_type == "schema":
-        return DatabasePriv.CREATE_SCHEMA
-    elif resource_type == "table":
-        return SchemaPriv.CREATE_TABLE
-    elif resource_type == "view":
-        return SchemaPriv.CREATE_VIEW
-    elif resource_type == "procedure":
-        return SchemaPriv.CREATE_PROCEDURE
-    return None
+CREATE_PRIV_FOR_RESOURCE_TYPE = {
+    ResourceType.ACCOUNT: GlobalPriv.CREATE_ACCOUNT,
+    ResourceType.ALERT: SchemaPriv.CREATE_ALERT,
+    ResourceType.API_INTEGRATION: GlobalPriv.CREATE_API_INTEGRATION,
+    ResourceType.DATABASE: GlobalPriv.CREATE_DATABASE,
+    ResourceType.DYNAMIC_TABLE: SchemaPriv.CREATE_DYNAMIC_TABLE,
+    ResourceType.EXTERNAL_ACCESS_INTEGRATION: GlobalPriv.CREATE_INTEGRATION,
+    ResourceType.EXTERNAL_FUNCTION: SchemaPriv.CREATE_FUNCTION,
+    ResourceType.FAILOVER_GROUP: GlobalPriv.CREATE_FAILOVER_GROUP,
+    ResourceType.FUNCTION: SchemaPriv.CREATE_FUNCTION,
+    # ResourceType.GRANT: GlobalPriv.CREATE_GRANT,
+    ResourceType.NETWORK_RULE: SchemaPriv.CREATE_NETWORK_RULE,
+    ResourceType.PACKAGES_POLICY: SchemaPriv.CREATE_PACKAGES_POLICY,
+    ResourceType.PASSWORD_POLICY: SchemaPriv.CREATE_PASSWORD_POLICY,
+    ResourceType.PIPE: SchemaPriv.CREATE_PIPE,
+    ResourceType.PROCEDURE: SchemaPriv.CREATE_PROCEDURE,
+    # ResourceType.RESOURCE_MONITOR: GlobalPriv.CREATE_RESOURCE_MONITOR, # only ACCOUNTADMIN
+    ResourceType.ROLE: GlobalPriv.CREATE_ROLE,
+    ResourceType.ROLE_GRANT: RolePriv.OWNERSHIP,
+    ResourceType.SCHEMA: DatabasePriv.CREATE_SCHEMA,
+    ResourceType.SECRET: SchemaPriv.CREATE_SECRET,
+    ResourceType.SEQUENCE: SchemaPriv.CREATE_SEQUENCE,
+    ResourceType.STAGE: SchemaPriv.CREATE_STAGE,
+    ResourceType.STREAM: SchemaPriv.CREATE_STREAM,
+    ResourceType.TABLE: SchemaPriv.CREATE_TABLE,
+    ResourceType.TAG: SchemaPriv.CREATE_TAG,
+    ResourceType.TASK: SchemaPriv.CREATE_TASK,
+    ResourceType.USER: GlobalPriv.CREATE_USER,
+    ResourceType.VIEW: SchemaPriv.CREATE_VIEW,
+    ResourceType.WAREHOUSE: GlobalPriv.CREATE_WAREHOUSE,
+}
 
 
 def is_ownership_priv(priv):

@@ -102,7 +102,7 @@ def install(sp_session):
                     returns=DataType.OBJECT,
                     runtime_version="3.9",
                     packages=["snowflake-snowpark-python", "inflection", "pyparsing"],
-                    imports=[f"@{stage['fqn']}/releases/titan-0.1.1.zip"],
+                    imports=[f"@{stage['fqn']}/releases/titan-0.1.2.zip"],
                     handler=f"titan.spi.{name}",
                     execute_as="CALLER",
                 ),

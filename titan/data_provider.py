@@ -532,6 +532,24 @@ def fetch_schema(session, fqn: FQN):
     }
 
 
+def fetch_sequence(session, fqn: FQN):
+    show_result = execute(session, f"SHOW SEQUENCES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple sequences matching {fqn}")
+
+    data = show_result[0]
+
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "start": data["next_value"],
+        "increment": data["interval"],
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_shared_database(session, fqn: FQN):
     show_result = execute(session, "SELECT SYSTEM$SHOW_IMPORTED_DATABASES()", cacheable=True)
     show_result = json.loads(show_result[0]["SYSTEM$SHOW_IMPORTED_DATABASES()"])
