@@ -88,7 +88,7 @@ def install(sp_session):
 
     titan_db = stage["database_name"]
 
-    blueprint = Blueprint("titan")
+    blueprint = Blueprint("titan", allow_role_switching=False)
 
     sprocs = []
     for name, func in vars(__this__).items():
