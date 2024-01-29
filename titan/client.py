@@ -43,7 +43,8 @@ def _execute(conn_or_cursor: Union[SnowflakeConnection, SnowflakeCursor], sql, u
         cur = conn_or_cursor
         cur._use_dict_result = True
     else:
-        raise Exception(f"Unknown connection type: {type(conn_or_cursor)}, {conn_or_cursor}")
+        # Undocumented snowpark-specific type snowflake.connector.connection.StoredProcConnection
+        # raise Exception(f"Unknown connection type: {type(conn_or_cursor)}, {conn_or_cursor}")
         session = conn_or_cursor
         cur = session.cursor(snowflake.connector.DictCursor)
 
