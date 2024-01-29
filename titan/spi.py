@@ -108,9 +108,9 @@ def install(sp_session):
             )
 
     blueprint.add(
-        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators"),
-        resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
-        resources.Grant(priv="USAGE", on_database=titan_db, to="TITAN_ADMIN"),
+        # resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators"),
+        # resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
+        # resources.Grant(priv="USAGE", on_database=titan_db, to="TITAN_ADMIN"),
         *sprocs,
     )
     plan = blueprint.plan(conn)
