@@ -8,7 +8,7 @@ import sys
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
 from . import data_provider as dp
-from . import lifecycle, resources
+from . import lifecycle, resources, __version__
 from .blueprint import Blueprint
 from .diff import diff
 from .enums import DataType, ResourceType
@@ -97,19 +97,18 @@ def install(sp_session):
                 resources.PythonStoredProcedure(
                     name=name,
                     owner="SYSADMIN",
-                    # args=[{"name": "name", "data_type": DataType.VARCHAR}],
                     args=func.__sproc_args__,
                     returns=DataType.OBJECT,
                     runtime_version="3.9",
                     packages=["snowflake-snowpark-python", "inflection", "pyparsing"],
-                    imports=[f"@{stage['fqn']}/releases/titan-0.1.2.zip"],
+                    imports=[f"@{stage['fqn']}/releases/titan-{__version__}.zip"],
                     handler=f"titan.spi.{name}",
                     execute_as="CALLER",
                 ),
             )
 
     blueprint.add(
-        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators", owner="SYSADMIN"),
+        resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators"),
         resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
         resources.Grant(priv="USAGE", on_database=titan_db, to="TITAN_ADMIN"),
         *sprocs,

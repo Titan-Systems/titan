@@ -15,6 +15,7 @@ from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
     DatabasePriv,
+    RolePriv,
     SchemaPriv,
     priv_for_principal,
     is_ownership_priv,
@@ -108,10 +109,21 @@ def _collect_required_privs(session_ctx, plan):
         resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
         privs = []
         if action == DiffAction.ADD:
-            # privs = lifecycle.privs_for_create(urn, data)
             create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(urn.resource_type)
             if create_priv:
                 privs.append(create_priv)
+
+            # Check for situations that require OWNERSHIP or USAGE on an attached resource
+            # For example, to create a RoleGrant you need OWNERSHIP on the role.
+            if urn.resource_type == ResourceType.ROLE_GRANT:
+                _add(
+                    URN(
+                        resource_type=ResourceType.ROLE,
+                        fqn=FQN(urn.fqn.name),
+                        account_locator=session_ctx["account_locator"],
+                    ),
+                    RolePriv.OWNERSHIP,
+                )
 
             if isinstance(resource_cls.scope, DatabaseScope):
                 privs.append(DatabasePriv.USAGE)

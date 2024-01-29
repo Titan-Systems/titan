@@ -276,7 +276,7 @@ CREATE_PRIV_FOR_RESOURCE_TYPE = {
     ResourceType.PROCEDURE: SchemaPriv.CREATE_PROCEDURE,
     # ResourceType.RESOURCE_MONITOR: GlobalPriv.CREATE_RESOURCE_MONITOR, # only ACCOUNTADMIN
     ResourceType.ROLE: GlobalPriv.CREATE_ROLE,
-    ResourceType.ROLE_GRANT: RolePriv.OWNERSHIP,
+    # ResourceType.ROLE_GRANT: RolePriv.OWNERSHIP,
     ResourceType.SCHEMA: DatabasePriv.CREATE_SCHEMA,
     ResourceType.SECRET: SchemaPriv.CREATE_SECRET,
     ResourceType.SEQUENCE: SchemaPriv.CREATE_SEQUENCE,
