@@ -14,7 +14,8 @@ Literal = pp.CaselessLiteral
 
 Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
 FullyQualifiedIdentifier = (
-    pp.delimited_list(Identifier, delim=".", min=3, max=3)
+    pp.delimited_list(Identifier, delim=".", min=4, max=4)
+    ^ pp.delimited_list(Identifier, delim=".", min=3, max=3)
     ^ pp.delimited_list(Identifier, delim=".", min=2, max=2)
     ^ Identifier
 )
@@ -620,6 +621,15 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
                 arg_types=arg_types,
             )
     elif len(name_parts) == 3:
+        return FQN(
+            database=name_parts[0],
+            schema=name_parts[1],
+            name=name_parts[2],
+            params=params,
+            arg_types=arg_types,
+        )
+    elif len(name_parts) == 4:
+        params["entity"] = name_parts[3]
         return FQN(
             database=name_parts[0],
             schema=name_parts[1],
