@@ -180,3 +180,10 @@ FunctionMap = {
     Language.JAVASCRIPT: JavascriptUDF,
     Language.PYTHON: PythonUDF,
 }
+
+
+def _resolver(data: dict):
+    return FunctionMap[Language(data["language"])]
+
+
+Resource.__resolvers__[ResourceType.FUNCTION] = _resolver

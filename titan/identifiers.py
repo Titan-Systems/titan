@@ -57,11 +57,11 @@ class URN:
     def __init__(self, resource_type: ResourceType, fqn: FQN, account_locator: str) -> None:
         if not isinstance(resource_type, ResourceType):
             raise Exception(f"Invalid resource type: {resource_type}")
-        self.resource_type = resource_type
-        self.resource_label = str(resource_type).replace(" ", "_").lower()
-        self.fqn = fqn
-        self.account_locator = account_locator
-        self.organization = ""
+        self.resource_type: ResourceType = resource_type
+        self.resource_label: str = str(resource_type).replace(" ", "_").lower()
+        self.fqn: FQN = fqn
+        self.account_locator: str = account_locator
+        self.organization: str = ""
 
     def __str__(self):
         return f"urn:{self.organization}:{self.account_locator}:{self.resource_label}/{self.fqn}"

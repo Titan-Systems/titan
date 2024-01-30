@@ -42,8 +42,12 @@ def _execute(conn_or_cursor: Union[SnowflakeConnection, SnowflakeCursor], sql, u
         session = conn_or_cursor.connection
         cur = conn_or_cursor
         cur._use_dict_result = True
+    else:
+        # Undocumented snowpark-specific type snowflake.connector.connection.StoredProcConnection
+        # raise Exception(f"Unknown connection type: {type(conn_or_cursor)}, {conn_or_cursor}")
+        session = conn_or_cursor
+        cur = session.cursor(snowflake.connector.DictCursor)
 
-    # with session.cursor(snowflake.connector.DictCursor) as cur:
     try:
         if use_role:
             print(f"[{session.user}:{session.role}] >", f"USE ROLE {use_role}")

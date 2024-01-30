@@ -1,9 +1,7 @@
 import sys
 
 from .builder import tidy_sql
-from .enums import ResourceType
 from .identifiers import URN
-from .privs import GlobalPriv, DatabasePriv, RolePriv, SchemaPriv
 from .props import Props
 
 __this__ = sys.modules[__name__]
@@ -187,24 +185,3 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
         "ROLE" if data.get("to_role") else "USER",
         data["to_role"] if data.get("to_role") else data["to_user"],
     )
-
-
-CREATE_RESOURCE_PRIV_MAP = {
-    ResourceType.DATABASE: [GlobalPriv.CREATE_DATABASE],
-    ResourceType.EXTERNAL_ACCESS_INTEGRATION: [GlobalPriv.CREATE_INTEGRATION],
-    ResourceType.FUNCTION: [SchemaPriv.CREATE_FUNCTION, SchemaPriv.USAGE, DatabasePriv.USAGE],
-    ResourceType.GRANT: [],  # TODO
-    ResourceType.PROCEDURE: [SchemaPriv.CREATE_PROCEDURE, SchemaPriv.USAGE, DatabasePriv.USAGE],
-    ResourceType.ROLE_GRANT: [RolePriv.OWNERSHIP],
-    ResourceType.ROLE: [GlobalPriv.CREATE_ROLE],
-    ResourceType.SCHEMA: [DatabasePriv.CREATE_SCHEMA],
-    ResourceType.TABLE: [SchemaPriv.CREATE_TABLE, SchemaPriv.USAGE, DatabasePriv.USAGE],
-    ResourceType.USER: [GlobalPriv.CREATE_USER],
-}
-
-
-def privs_for_create(urn: URN, data: dict):
-    if urn.resource_type not in CREATE_RESOURCE_PRIV_MAP:
-        raise Exception(f"Unsupported resource: {urn}")
-        # return []
-    return CREATE_RESOURCE_PRIV_MAP[urn.resource_type]

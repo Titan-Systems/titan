@@ -9,20 +9,26 @@ import snowflake.connector
 from . import data_provider, lifecycle
 from .client import ALREADY_EXISTS_ERR, execute
 from .diff import diff, DiffAction
+from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
 from .parse import parse_URN
 from .privs import (
+    CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
     DatabasePriv,
+    RolePriv,
     SchemaPriv,
     priv_for_principal,
     is_ownership_priv,
-    create_priv_for_resource_type,
 )
 from .resources import Account, Database, Schema
 from .resources.resource import Resource, ResourceContainer, ResourceType
 from .resources.validators import coerce_from_str
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
+
+
+class MissingPrivilegeException(Exception):
+    pass
 
 
 def print_diffs(diffs):
@@ -91,32 +97,81 @@ def _walk(resource: Resource):
             yield from _walk(item)
 
 
-def _collect_required_privs(session_ctx, plan):
-    priv_map = defaultdict(set)
-
-    def _add(urn, priv):
-        priv_map[str(urn)].add(priv)
+def _collect_required_privs(session_ctx, plan) -> list:
+    """
+    For each action in the plan, generate a
+    """
+    required_priv_list = []
 
     account_urn = URN.from_session_ctx(session_ctx)
 
     for action, urn_str, data in plan:
         urn = parse_URN(urn_str)
-        privs = []
+        resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+        # privs = []
+        privs = And()
         if action == DiffAction.ADD:
-            privs = lifecycle.privs_for_create(urn, data)
+            # Special cases
 
-        for priv in privs:
-            if isinstance(priv, GlobalPriv):
-                _add(account_urn, priv)
-            elif isinstance(priv, DatabasePriv):
-                _add(urn.database(), priv)
-            elif isinstance(priv, SchemaPriv):
-                _add(urn.schema(), priv)
+            # GRANT ROLE
+            # For example, to create a RoleGrant you need OWNERSHIP on the role.
+            if urn.resource_type == ResourceType.ROLE_GRANT:
+                role_urn = URN(
+                    resource_type=ResourceType.ROLE,
+                    fqn=FQN(urn.fqn.name),
+                    account_locator=session_ctx["account_locator"],
+                )
+                privs = privs & (
+                    LogicalGrant(role_urn, RolePriv.OWNERSHIP) | LogicalGrant(account_urn, GlobalPriv.MANAGE_GRANTS)
+                )
 
-    return dict(priv_map)
+            if isinstance(resource_cls.scope, DatabaseScope):
+                privs = privs & (
+                    LogicalGrant(urn.database(), DatabasePriv.USAGE)
+                    | LogicalGrant(urn.database(), DatabasePriv.OWNERSHIP)
+                )
+            elif isinstance(resource_cls.scope, SchemaScope):
+                privs = (
+                    privs
+                    & (
+                        LogicalGrant(urn.database(), DatabasePriv.USAGE)
+                        | LogicalGrant(urn.database(), DatabasePriv.OWNERSHIP)
+                    )
+                    & (LogicalGrant(urn.schema(), SchemaPriv.USAGE) | LogicalGrant(urn.schema(), SchemaPriv.OWNERSHIP))
+                )
+
+            create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(urn.resource_type)
+            if create_priv:
+                if isinstance(create_priv, GlobalPriv):
+                    principal = account_urn
+                elif isinstance(create_priv, DatabasePriv):
+                    principal = urn.database()
+                elif isinstance(create_priv, SchemaPriv):
+                    principal = urn.schema()
+                else:
+                    raise Exception(f"Unsupported privilege type {type(create_priv)}")
+                privs = privs & LogicalGrant(principal, create_priv)
+
+        required_priv_list.append(privs)
+
+    return required_priv_list
 
 
-def _collect_available_privs(session_ctx, session, plan):
+def _collect_available_privs(session_ctx, session, plan, usable_roles):
+    """
+    The `priv_map` dictionary structure:
+    {
+        "SOME_ROLE": {
+            "urn::ABC123:database/SOMEDB": {
+                privilege1,
+                privilege2,
+                ...
+            },
+            ...
+        },
+        ...
+    }
+    """
     priv_map = {}
 
     def _add(role, principal, priv):
@@ -135,7 +190,7 @@ def _collect_available_privs(session_ctx, session, plan):
 
     account_urn = URN.from_session_ctx(session_ctx)
 
-    for role in session_ctx["available_roles"]:
+    for role in usable_roles:
         priv_map[role] = {}
 
         if role.startswith("SNOWFLAKE.LOCAL"):
@@ -149,22 +204,27 @@ def _collect_available_privs(session_ctx, session, plan):
                 _add(role, principal, priv)
 
         # Implied privilege grants in the context of our plan
-        for action, urn_str, _ in plan:
+        for action, urn_str, data in plan:
             urn = parse_URN(urn_str)
+
             # If we plan to add a new resource and we have the privs to create it, we can assume
             # that we have the OWNERSHIP priv on that resource
             if action == DiffAction.ADD:
-                create_priv = create_priv_for_resource_type(urn.resource_type)
+                resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+                create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(urn.resource_type)
                 if create_priv is None:
                     continue
-                ownership_priv = priv_for_principal(urn, "OWNERSHIP")
-                if urn.resource_type == ResourceType.DATABASE:
+
+                if isinstance(resource_cls.scope, AccountScope):
                     parent_urn = account_urn
-                elif urn.resource_type == ResourceType.SCHEMA:
+                elif isinstance(resource_cls.scope, DatabaseScope):
                     parent_urn = urn.database()
-                else:
+                elif isinstance(resource_cls.scope, SchemaScope):
                     parent_urn = urn.schema()
+                else:
+                    raise Exception(f"Unsupported resource type {type(resource_cls)}")
                 if _contains(role, str(parent_urn), create_priv):
+                    ownership_priv = priv_for_principal(urn, "OWNERSHIP")
                     _add(role, urn_str, ownership_priv)
                     if urn.resource_type == ResourceType.DATABASE:
                         public_schema = URN(
@@ -183,28 +243,52 @@ def _collect_available_privs(session_ctx, session, plan):
     return priv_map
 
 
-def _raise_if_missing_privs(required: dict, available: dict):
-    for principal, privs in required.items():
-        required_privs = privs.copy()
-        for priv_map in available.values():
-            if principal in priv_map:
-                # If OWNERSHIP in priv_map[principal], we can assume we pass requirements
-                for priv in priv_map[principal]:
-                    if is_ownership_priv(priv):
-                        required_privs = set()
-                        break
-                required_privs -= priv_map[principal]
-        if required_privs:
-            raise Exception(f"Missing privileges for {principal}: {required_privs}")
+# TODO
+def _raise_if_missing_privs(required: list, available: dict):
+    return
+    missing = []
+    for expr in required:
+        pass
+
+    if missing:
+        raise MissingPrivilegeException(f"Missing privileges")  #  for {principal}: {required_privs}
+
+    # for principal, privs in required.items():
+    #     required_privs = privs.copy()
+    #     for priv_map in available.values():
+    #         if principal in priv_map:
+    #             # If OWNERSHIP in priv_map[principal], we can assume we pass requirements
+    #             for priv in priv_map[principal]:
+    #                 if is_ownership_priv(priv):
+    #                     required_privs = set()
+    #                     break
+    #             required_privs -= priv_map[principal]
+    #     if required_privs:
+    #         raise MissingPrivilegeException(f"Missing privileges for {principal}: {required_privs}")
 
 
 def _fetch_remote_state(session, manifest):
     state = {}
-    for urn_str in manifest["_urns"]:
+    urns = manifest["_urns"].copy()
+    for urn_str, _data in manifest.items():
+        if urn_str.startswith("_"):
+            continue
+        urns.remove(urn_str)
+        urn = parse_URN(urn_str)
+        resource_cls = Resource.resolve_resource_cls(urn.resource_type, _data)
+        data = data_provider.fetch_resource(session, urn)
+        if urn_str in manifest and data is not None:
+            if isinstance(data, list):
+                normalized = [resource_cls.defaults() | d for d in data]
+            else:
+                normalized = resource_cls.defaults() | data
+            state[urn_str] = normalized
+
+    for urn_str in urns:
         urn = parse_URN(urn_str)
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
-        if urn_str in manifest and data is not None:
+        if data is not None:
             if isinstance(data, list):
                 normalized = [resource_cls.defaults() | d for d in data]
             else:
@@ -222,15 +306,25 @@ class Blueprint:
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
         resources: List[Resource] = [],
+        allow_role_switching: bool = True,
         enforce_requirements: bool = False,
     ) -> None:
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
+        self._allow_role_switching: bool = allow_role_switching
+        self._enforce_requirements: bool = enforce_requirements
+
         self.name = name
         self.account: Optional[Account] = coerce_from_str(Account)(account) if account else None
         self.database: Optional[Database] = coerce_from_str(Database)(database) if database else None
         self.schema: Optional[Schema] = coerce_from_str(Schema)(schema) if schema else None
+
+        if self.account and self.database:
+            self.account.add(self.database)
+
+        if self.database and self.schema:
+            self.database.add(self.schema)
 
         self.add(resources or [])
         self.add([res for res in [self.account, self.database, self.schema] if res is not None])
@@ -262,8 +356,12 @@ class Blueprint:
         # Add all databases and other account scoped resources to the root
         for resource in acct_scoped:
             self._root.add(resource)
-        if session_context.get("database") is not None:
-            self._root.add(Database(name=session_context["database"], stub=True))
+
+        # If we haven't specified a database, use the one from the session context
+        if self.database is None and session_context.get("database") is not None:
+            existing_databases = [db.name for db in self._root.databases()]
+            if session_context["database"] not in existing_databases:
+                self._root.add(Database(name=session_context["database"], stub=True))
 
         databases: list[Database] = self._root.databases()
 
@@ -283,6 +381,13 @@ class Blueprint:
                         public_schema.add(resource)
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
+            elif resource.container.stub:
+                print("HERE")
+                for db in databases:
+                    for schema in db.items(resource_type=ResourceType.SCHEMA):
+                        if schema.name == resource.container.name:
+                            schema.add(resource)
+                            break
 
     def generate_manifest(self, session_context: dict = {}):
         manifest = {}
@@ -348,10 +453,14 @@ class Blueprint:
         """
 
         session_ctx = data_provider.fetch_session(session)
+        usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
         required_privs = _collect_required_privs(session_ctx, plan)
-        available_privs = _collect_available_privs(session_ctx, session, plan)
+        available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
 
         _raise_if_missing_privs(required_privs, available_privs)
+
+        print(self._staged)
+        print(plan)
 
         action_queue = []
         actions_taken = []
@@ -367,7 +476,7 @@ class Blueprint:
         for action, urn_str, data in plan:
             urn = parse_URN(urn_str)
 
-            props = Resource.props_for_resource_type(urn.resource_type)
+            props = Resource.props_for_resource_type(urn.resource_type, data)
 
             _queue_action(urn, data, props)
 

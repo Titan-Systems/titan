@@ -95,6 +95,7 @@ class ResourceSpec:
 
 class _Resource(type):
     __types = {}
+    __resolvers__ = {}
 
     def __new__(cls, name, bases, attrs):
         cls_ = super().__new__(cls, name, bases, attrs)
@@ -140,8 +141,8 @@ class Resource(metaclass=_Resource):
             raise pp.ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
     @classmethod
-    def props_for_resource_type(cls, resource_type: ResourceType):
-        return cls.resolve_resource_cls(resource_type).props
+    def props_for_resource_type(cls, resource_type: ResourceType, data: dict = None):
+        return cls.resolve_resource_cls(resource_type, data).props
 
     @classmethod
     def resolve_resource_cls(cls, resource_type: ResourceType, data: dict = None) -> Type["Resource"]:
@@ -150,7 +151,8 @@ class Resource(metaclass=_Resource):
             if data is None:
                 raise ValueError(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
             else:
-                raise NotImplementedError
+                resolver = cls.__resolvers__[resource_type]
+                return resolver(data)
         return resource_types[0]
 
     @classmethod
@@ -256,7 +258,7 @@ class ResourceContainer:
         if isinstance(items[0], list):
             items = items[0]
         for item in items:
-            if item.container:
+            if item.container and not item.container.stub:
                 raise RuntimeError(f"{item} already belongs to a container")
             item._container = self
             item.requires(self)

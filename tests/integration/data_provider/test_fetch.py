@@ -208,6 +208,18 @@ scoped_resources = [
         },
     },
     {
+        "resource_type": ResourceType.SEQUENCE,
+        "setup_sql": "CREATE SEQUENCE someseq START 1 INCREMENT 2 COMMENT = '+3'",
+        "teardown_sql": "DROP SEQUENCE IF EXISTS someseq",
+        "data": {
+            "name": "SOMESEQ",
+            "owner": TEST_ROLE,
+            "start": 1,
+            "increment": 2,
+            "comment": "+3",
+        },
+    },
+    {
         "resource_type": ResourceType.TABLE,
         "setup_sql": "CREATE TABLE sometbl (id INT)",
         "teardown_sql": "DROP TABLE IF EXISTS sometbl",

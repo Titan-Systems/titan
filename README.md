@@ -169,6 +169,91 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 
 
 
+# Resource support
+
+| Name                          | Supported | SPI |
+|-------------------------------|-----------|-----|
+| **Account Resources**         |           |     |
+| API Integration               | ✅         | ❌   |
+| Catalog Integration           | ❌         | ❌   |
+| Compute Pool                  | ❌         | ❌   |
+| Connection                    | ❌         | ❌   |
+| Database                      | ✅         | ✅   |
+| External Access Integration   | ✅         | ❌   |
+| External Volume               | ❌         | ❌   |
+| Network Policy                | ✅         | ❌   |
+| Notification Integration      | WIP        | ❌   |
+| ↪ Email                       | ✅         | ❌   |
+| ↪ AWS                         | ❌         | ❌   |
+| ↪ Azure                       | ❌         | ❌   |
+| ↪ GCP                         | ❌         | ❌   |
+| Resource Monitor              | ✅         | ❌   |
+| Role                          | ✅         | ✅   |
+| Security Integration          | ❌         | ❌   |
+| Share                         | ❌         | ❌   |
+| Storage Integration           | WIP        | ❌   |
+| ↪ AWS                         | ✅         | ❌   |
+| ↪ Azure                       | ❌         | ❌   |
+| ↪ GCP                         | ❌         | ❌   |
+| User                          | ✅         | ✅   |
+| Warehouse                     | ✅         | ✅   |
+|                               |            |     |
+| **Database Resources**        |            |     |
+| Database Role                 | ✅         | ❌   |
+| Schema                        | ✅         | ✅   |
+|                               |            |     |
+| **Schema Resources**          |            |     |
+| Alert                         | ✅         | ❌   |
+| Dynamic Table                 | ✅         | ❌   |
+| External Function             | ✅         | ❌   |
+| External Stage                | ✅         | ❌   |
+| External Table                | ❌         | ❌   |
+| Failover Group                | ✅         | ❌   |
+| File Format                   | ❌         | ❌   |
+| ↪ CSV                         | ❌         | ❌   |
+| ↪ JSON                        | ❌         | ❌   |
+| ↪ AVRO                        | ❌         | ❌   |
+| ↪ ORC                         | ❌         | ❌   |
+| ↪ Parquet                     | ❌         | ❌   |
+| Grant                         | WIP        | ❌   |
+| ↪ Privilege Grant             | ✅         | ❌   |
+| ↪ Future Grant                | ❌         | ❌   |
+| Iceberg Table                 | ❌         | ❌   |
+| Image Repository              | ❌         | ❌   |
+| Internal Stage                | ✅         | ❌   |
+| Masking Policy                | ❌         | ❌   |
+| Materialized View             | ❌         | ❌   |
+| Model                         | ❌         | ❌   |
+| Network Rule                  | ✅         | ❌   |
+| Packages Policy               | ✅         | ❌   |
+| Password Policy               | ✅         | ❌   |
+| Pipe                          | ✅         | ❌   |
+| Role Grant                    | ✅         | ❌   |
+| Row Access Policy             | ❌         | ❌   |
+| Secret                        | ✅         | ❌   |
+| Sequence                      | ✅         | ❌   |
+| Service                       | ❌         | ❌   |
+| Session Policy                | ❌         | ❌   |
+| Stage                         | ✅         | ❌   |
+| Stored Procedure              | WIP        | ❌   |
+| ↪ Java                        | ❌         | ❌   |
+| ↪ Javascript                  | ❌         | ❌   |
+| ↪ Python                      | ✅         | ❌   |
+| ↪ Scala                       | ❌         | ❌   |
+| ↪ SQL                         | ❌         | ❌   |
+| Stream                        | ✅         | ❌   |
+| Streamlit                     | ❌         | ❌   |
+| Table                         | ✅         | ❌   |
+| Tag                           | ✅         | ❌   |
+| Task                          | ✅         | ❌   |
+| User-Defined Function         | WIP        | ❌   |
+| ↪ Java                        | ❌         | ❌   |
+| ↪ Javascript                  | ✅         | ❌   |
+| ↪ Python                      | ✅         | ❌   |
+| ↪ Scala                       | ❌         | ❌   |
+| ↪ SQL                         | ❌         | ❌   |
+| View                          | ✅         | ❌   |
+
 
 
 ## Examples
