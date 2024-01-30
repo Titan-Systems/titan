@@ -20,4 +20,5 @@ style:
 check: style test
 
 clean:
+	rm -rf build dist *.egg-info
 	find . -name "__pycache__" -type d -exec rm -rf {} +

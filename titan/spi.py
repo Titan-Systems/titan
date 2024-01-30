@@ -1,6 +1,5 @@
 # Stored Procedure Interface (spi)
 import inspect
-import json
 import pydoc
 import re
 import sys
@@ -10,7 +9,7 @@ from snowflake.snowpark.exceptions import SnowparkSQLException
 from . import data_provider as dp
 from . import lifecycle, resources, __version__
 from .blueprint import Blueprint
-from .diff import diff
+from .diff import DiffAction, diff
 from .enums import DataType, ResourceType
 from .identifiers import FQN, URN
 from .parse import parse_identifier
@@ -53,13 +52,17 @@ def _python_args_to_sproc_args(parameters):
     return sproc_args
 
 
-def procedure(func):
-    def wrapper(*args, **kwargs):
-        return func(*args, **kwargs)
+def procedure(schema="PUBLIC"):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
 
-    wrapper.is_procedure = True
-    wrapper.__sproc_args__ = _python_args_to_sproc_args(inspect.signature(func).parameters)
-    return wrapper
+        wrapper.is_procedure = True
+        wrapper.sproc_args = _python_args_to_sproc_args(inspect.signature(func).parameters)
+        wrapper.schema = schema
+        return wrapper
+
+    return decorator
 
 
 def install(sp_session):
@@ -88,7 +91,7 @@ def install(sp_session):
 
     titan_db = stage["database_name"]
 
-    blueprint = Blueprint("titan", allow_role_switching=False)
+    blueprint = Blueprint("titan", database=titan_db, allow_role_switching=False)
 
     sprocs = []
     for name, func in vars(__this__).items():
@@ -97,28 +100,29 @@ def install(sp_session):
                 resources.PythonStoredProcedure(
                     name=name,
                     owner="SYSADMIN",
-                    args=func.__sproc_args__,
+                    args=func.sproc_args,
                     returns=DataType.OBJECT,
                     runtime_version="3.9",
                     packages=["snowflake-snowpark-python", "inflection", "pyparsing"],
                     imports=[f"@{stage['fqn']}/releases/titan-{__version__}.zip"],
                     handler=f"titan.spi.{name}",
                     execute_as="CALLER",
+                    schema=func.schema,
                 ),
             )
 
     blueprint.add(
-        # resources.Role(name="TITAN_ADMIN", comment="Role for Titan administrators"),
-        # resources.RoleGrant(role="TITAN_ADMIN", to_role="SYSADMIN"),
-        # resources.Grant(priv="USAGE", on_database=titan_db, to="TITAN_ADMIN"),
+        resources.Schema(name="BLUEPRINT", comment="Blueprint functions"),
         *sprocs,
     )
     plan = blueprint.plan(conn)
     result = blueprint.apply(conn, plan)
-    return {
-        "plan": [json.dumps(action, default=str) for action in plan],
-        "actions": json.dumps(result, default=str),
-    }
+    return _to_object(
+        {
+            "plan": plan,
+            "actions": result,
+        }
+    )
 
 
 def _execute(sf_session, sql: list):
@@ -127,6 +131,37 @@ def _execute(sf_session, sql: list):
             sf_session.execute_string(sql_text)
         except SnowparkSQLException as err:
             raise SnowparkSQLException(f"failed to execute sql, [{sql_text}]", error_code=err.error_code) from err
+
+
+def _to_object(obj):
+    if isinstance(obj, dict):
+        return {_to_object(k): _to_object(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_to_object(v) for v in obj]
+    if isinstance(obj, (DiffAction, URN)):
+        return str(obj)
+    if obj is None:
+        return obj
+    if not isinstance(obj, (int, float, str, bool)):
+        raise Exception(f"Cannot convert {type(obj)} to JSON")
+    return obj
+
+
+###############################################################################
+# Blueprint functions
+###############################################################################
+
+
+# @procedure()(schema="BLUEPRINT")
+# def blueprint_plan(sp_session, blueprint: dict):
+#     conn = sp_session.connection
+#     bp = Blueprint(**blueprint)
+#     plan = blueprint.plan(conn)
+#     return _to_object(
+#         {
+#             "plan": plan,
+#         }
+#     )
 
 
 ###############################################################################
@@ -162,12 +197,12 @@ def _create_or_update_resource(
     return {"sql": sql}
 
 
-@procedure
+@procedure()
 def create_or_update_database(sp_session, config: dict, dry_run: bool = False):
     return _create_or_update_resource(sp_session.connection, ResourceType.DATABASE, config, dry_run)
 
 
-@procedure
+@procedure()
 def create_or_update_schema(sp_session, config: dict, dry_run: bool = False):
     """
     Takes configuration (either as an OBJECT or a YAML string) and creates or updates a schema.
@@ -204,7 +239,7 @@ def create_or_update_schema(sp_session, config: dict, dry_run: bool = False):
     return _create_or_update_resource(sp_session.connection, ResourceType.SCHEMA, config, dry_run)
 
 
-@procedure
+@procedure()
 def create_or_update_user(sp_session, config: dict, dry_run: bool = False):
     """
     Takes configuration (either as an OBJECT or a YAML string) and creates or updates a user.
@@ -228,12 +263,12 @@ def create_or_update_user(sp_session, config: dict, dry_run: bool = False):
     return _create_or_update_resource(sp_session.connection, ResourceType.USER, config, dry_run)
 
 
-@procedure
+@procedure()
 def create_or_update_warehouse(sp_session, config: dict, dry_run: bool = False):
     return _create_or_update_resource(sp_session.connection, ResourceType.WAREHOUSE, config, dry_run)
 
 
-@procedure
+@procedure()
 def create_or_update_role(sp_session, config: dict, dry_run: bool = False):
     return _create_or_update_resource(sp_session.connection, ResourceType.ROLE, config, dry_run)
 
@@ -243,7 +278,7 @@ def create_or_update_role(sp_session, config: dict, dry_run: bool = False):
 ###############################################################################
 
 
-@procedure
+@procedure()
 def fetch_database(sp_session, name: str) -> dict:
     """
     Returns a database's configuration.
@@ -251,7 +286,7 @@ def fetch_database(sp_session, name: str) -> dict:
     return dp.fetch_database(sp_session.connection, FQN(name))
 
 
-@procedure
+@procedure()
 def fetch_schema(sp_session, name: str) -> dict:
     """
     Returns a schema's configuration.
@@ -262,7 +297,7 @@ def fetch_schema(sp_session, name: str) -> dict:
     return dp.fetch_schema(sp_session.connection, fqn)
 
 
-@procedure
+@procedure()
 def fetch_user(sp_session, name: str) -> dict:
     """
     Returns a user's configuration.
@@ -270,7 +305,7 @@ def fetch_user(sp_session, name: str) -> dict:
     return dp.fetch_user(sp_session.connection, FQN(name))
 
 
-@procedure
+@procedure()
 def fetch_warehouse(sp_session, name: str) -> dict:
     """
     Returns a user's configuration.
@@ -278,7 +313,7 @@ def fetch_warehouse(sp_session, name: str) -> dict:
     return dp.fetch_warehouse(sp_session.connection, FQN(name))
 
 
-@procedure
+@procedure()
 def fetch_role(sp_session, name: str) -> dict:
     """
     Returns a user's configuration.

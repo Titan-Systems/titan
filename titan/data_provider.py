@@ -390,7 +390,7 @@ def fetch_password_policy(session, fqn: FQN):
 
 def fetch_procedure(session, fqn: FQN):
     # SHOW PROCEDURES IN SCHEMA {}.{}
-    show_result = execute(session, "SHOW PROCEDURES IN SCHEMA", cacheable=True)
+    show_result = execute(session, f"SHOW PROCEDURES IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True)
     sprocs = _filter_result(show_result, name=fqn.name)
     if len(sprocs) == 0:
         return None
@@ -405,10 +405,10 @@ def fetch_procedure(session, fqn: FQN):
         identifier, returns = _parse_function_arguments(data["arguments"])
     else:
         identifier, returns = _parse_function_arguments_2023_compat(data["arguments"])
-    desc_result = execute(session, f"DESC PROCEDURE {str(identifier)}", cacheable=True)
+    desc_result = execute(session, f"DESC PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
 
-    show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {str(identifier)}")
+    show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
 
     return {
@@ -760,7 +760,7 @@ def list_schemas(session):
 
 
 def list_stages(session):
-    show_result = execute(session, "SHOW STAGES")
+    show_result = execute(session, "SHOW STAGES IN DATABASE")
     stages = []
     for row in show_result:
         row["fqn"] = f"{row['database_name']}.{row['schema_name']}.{row['name']}"
