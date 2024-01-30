@@ -438,7 +438,11 @@ def fetch_role_grants(session, role: str):
     priv_map = defaultdict(list)
 
     for row in show_result:
-        urn = _urn_from_grant(row, session_ctx)
+        try:
+            urn = _urn_from_grant(row, session_ctx)
+        except ValueError:
+            # Grant for a Snowflake resource type that Titan doesn't support yet
+            continue
         priv_map[str(urn)].append(
             {
                 "priv": row["privilege"],
