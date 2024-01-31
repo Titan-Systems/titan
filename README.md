@@ -144,7 +144,7 @@ bp.apply(session, plan)
 |-----------------------------------------|----------------|----------------|----------------|
 | Plan and Execute Changes                | ✅              | ✅              | ❌              |
 | Declarative Configuration               | ✅              | ✅              | ❌              |
-| Python-Based Definitions                | ✅              | ❌              | ❌              |
+| Python-Based Definitions                | ✅              | w/ CDKTF       | ❌              |
 | SQL Support                             | ✅              | ❌              | ✅              |
 | Multi-Role Support                      | ✅              | ❌              | N/A            |
 | No State File Dependency                | ✅              | ❌              | ✅              |
