@@ -13,6 +13,8 @@ on:
         required: true
       TEST_SNOWFLAKE_PASSWORD:
         required: true
+      CODECOV_TOKEN:
+        required: true
 
 jobs:
   build:
@@ -71,3 +73,7 @@ jobs:
         TEST_SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
         TEST_SNOWFLAKE_PASSWORD: ${{ secrets.TEST_SNOWFLAKE_PASSWORD }}
         TEST_SNOWFLAKE_ROLE: ACCOUNTADMIN
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
