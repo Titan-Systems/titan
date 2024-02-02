@@ -1,7 +1,8 @@
 {
-    "name": "azure_int",
+    "name": "AZURE_INT",
     "type": "EXTERNAL_STAGE",
     "storage_provider": "AZURE",
+    "owner": "ACCOUNTADMIN",
     "enabled": true,
     "azure_tenant_id": "a123b4c5-1234-123a-a12b-1a23b45678c9",
     "storage_allowed_locations": [
@@ -11,5 +12,6 @@
     "storage_blocked_locations": [
         "azure://myaccount.blob.core.windows.net/mycontainer/path3/",
         "azure://myaccount.blob.core.windows.net/mycontainer/path4/"
-    ]
+    ],
+    "comment": "This is an external stage for Azure."
 }

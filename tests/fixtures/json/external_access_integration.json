@@ -1,5 +1,5 @@
 {
-    "name": "ExternalAccessIntegrationExample",
+    "name": "SOME_INT",
     "allowed_network_rules": [
         "public_network",
         "private_network"

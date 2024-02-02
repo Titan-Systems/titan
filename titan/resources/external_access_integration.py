@@ -12,9 +12,9 @@ from ..props import BoolProp, Props, StringProp, IdentifierListProp
 @dataclass
 class _ExternalAccessIntegration(ResourceSpec):
     name: str
-    allowed_network_rules: list[NetworkRule]
+    allowed_network_rules: list[str]  # NetworkRule
     allowed_api_authentication_integrations: list[str] = None
-    allowed_authentication_secrets: list[Secret] = None
+    allowed_authentication_secrets: list[str] = None  # Secret
     enabled: bool = True
     comment: str = None
     owner: str = "ACCOUNTADMIN"
@@ -34,9 +34,11 @@ class ExternalAccessIntegration(Resource):
 
     resource_type = ResourceType.EXTERNAL_ACCESS_INTEGRATION
     props = Props(
-        allowed_network_rules=IdentifierListProp("allowed_network_rules"),
-        allowed_api_authentication_integrations=IdentifierListProp("allowed_api_authentication_integrations"),
-        allowed_authentication_secrets=IdentifierListProp("allowed_authentication_secrets"),
+        allowed_network_rules=IdentifierListProp("allowed_network_rules", eq=True, parens=True),
+        allowed_api_authentication_integrations=IdentifierListProp(
+            "allowed_api_authentication_integrations", eq=True, parens=True
+        ),
+        allowed_authentication_secrets=IdentifierListProp("allowed_authentication_secrets", eq=True, parens=True),
         enabled=BoolProp("enabled"),
         comment=StringProp("comment"),
     )
