@@ -106,7 +106,6 @@ class PythonStoredProcedure(Resource):
         # for import_location in imports:
         #     stage = _parse_stage_path(import_location)
         #     # TODO: fix polymorphic resources
-        #     # self.requires(Stage(name="stage", stub=True))
         kwargs.pop("language", None)
         super().__init__(**kwargs)
 

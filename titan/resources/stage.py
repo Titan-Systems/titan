@@ -147,6 +147,11 @@ class _ExternalStage(ResourceSpec):
     tags: dict[str, str] = None
     comment: str = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.type != StageType.EXTERNAL:
+            raise ValueError("Type must be EXTERNAL for _ExternalStage")
+
 
 class ExternalStage(Resource):
     """

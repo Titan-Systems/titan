@@ -27,7 +27,7 @@ class _S3StorageIntegration(ResourceSpec):
 
     def __post_init__(self):
         if self.type != "EXTERNAL_STAGE":
-            raise ValueError("Type must be 'EXTERNAL_STAGE'")
+            raise ValueError("Type must be 'EXTERNAL_STAGE' for _S3StorageIntegration")
 
 
 class S3StorageIntegration(Resource):
@@ -96,8 +96,14 @@ class _GCSStorageIntegration(ResourceSpec):
     storage_allowed_locations: list[str]
     storage_blocked_locations: list[str] = None
     storage_provider: StorageProvider = StorageProvider.GCS
+    type: str = "EXTERNAL_STAGE"
     owner: str = "ACCOUNTADMIN"
     comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.type != "EXTERNAL_STAGE":
+            raise ValueError("Type must be 'EXTERNAL_STAGE' for _GCSStorageIntegration")
 
 
 class GCSStorageIntegration(Resource):
@@ -118,7 +124,7 @@ class GCSStorageIntegration(Resource):
 
     resource_type = ResourceType.STORAGE_INTEGRATION
     props = Props(
-        _start_token="type = external_stage",
+        type=StringProp("type"),
         storage_provider=EnumProp("storage_provider", [StorageProvider.GCS]),
         enabled=BoolProp("enabled"),
         storage_allowed_locations=StringListProp("storage_allowed_locations", parens=True),
@@ -134,6 +140,7 @@ class GCSStorageIntegration(Resource):
         enabled: bool,
         storage_allowed_locations: list[str],
         storage_blocked_locations: list[str] = None,
+        type: str = "EXTERNAL_STAGE",
         owner: str = "ACCOUNTADMIN",
         comment: str = None,
         **kwargs,
@@ -145,6 +152,7 @@ class GCSStorageIntegration(Resource):
             enabled=enabled,
             storage_allowed_locations=storage_allowed_locations,
             storage_blocked_locations=storage_blocked_locations,
+            type=type,
             owner=owner,
             comment=comment,
         )
@@ -158,8 +166,14 @@ class _AzureStorageIntegration(ResourceSpec):
     storage_allowed_locations: list[str]
     storage_blocked_locations: list[str] = None
     storage_provider: StorageProvider = StorageProvider.AZURE
+    type: str = "EXTERNAL_STAGE"
     owner: str = "ACCOUNTADMIN"
     comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.type != "EXTERNAL_STAGE":
+            raise ValueError("Type must be 'EXTERNAL_STAGE' for _AzureStorageIntegration")
 
 
 class AzureStorageIntegration(Resource):
@@ -180,7 +194,7 @@ class AzureStorageIntegration(Resource):
 
     resource_type = ResourceType.STORAGE_INTEGRATION
     props = Props(
-        _start_token="type = external_stage",
+        type=StringProp("type"),
         storage_provider=EnumProp("storage_provider", [StorageProvider.AZURE]),
         azure_tenant_id=StringProp("azure_tenant_id"),
         enabled=BoolProp("enabled"),
@@ -198,6 +212,7 @@ class AzureStorageIntegration(Resource):
         azure_tenant_id: str,
         storage_allowed_locations: list[str],
         storage_blocked_locations: list[str] = None,
+        type: str = "EXTERNAL_STAGE",
         owner: str = "ACCOUNTADMIN",
         comment: str = None,
         **kwargs,
@@ -210,6 +225,7 @@ class AzureStorageIntegration(Resource):
             azure_tenant_id=azure_tenant_id,
             storage_allowed_locations=storage_allowed_locations,
             storage_blocked_locations=storage_blocked_locations,
+            type=type,
             owner=owner,
             comment=comment,
         )
@@ -222,14 +238,8 @@ StorageIntegrationMap = {
 }
 
 
-class StorageIntegration:
-    def __new__(cls, storage_provider: StorageProvider, **kwargs) -> Resource:
-        if isinstance(storage_provider, str):
-            storage_provider = StorageProvider(storage_provider)
-        storage_integration_cls = StorageIntegrationMap[storage_provider]
-        return storage_integration_cls(**kwargs)
+def _resolver(data: dict):
+    return StorageIntegrationMap[StorageProvider(data["storage_provider"])]
 
-    # @classmethod
-    # def from_sql(cls, sql):
-    #     resource_cls = Resource.classes[_resolve_resource_class(sql)]
-    #     return resource_cls.from_sql(sql)
+
+Resource.__resolvers__[ResourceType.STORAGE_INTEGRATION] = _resolver

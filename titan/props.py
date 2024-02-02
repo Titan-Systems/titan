@@ -65,7 +65,7 @@ class Prop(ABC):
 
         self.parser = pp.And(expressions)
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"{self.__class__.__name__}('{self.label}')"
 
     def parse(self, sql):

@@ -29,7 +29,7 @@ class FQN:
         params = "?" + _params_to_str(self.params) if self.params else ""
         return f"{db}{schema}{self.name}{arg_types}{params}"
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         db = f", db={self.database}" if self.database else ""
         schema = f", schema={self.schema}" if self.schema else ""
         params = "?" + _params_to_str(self.params) if self.params else ""
@@ -66,7 +66,7 @@ class URN:
     def __str__(self):
         return f"urn:{self.organization}:{self.account_locator}:{self.resource_label}/{self.fqn}"
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         org = getattr(self, "organization", "")
         acct = getattr(self, "account_locator", "")
         label = getattr(self, "resource_label", "")
@@ -155,5 +155,5 @@ class ResourceLocator:
     def __str__(self):
         return f"{self.resource_key}:{self.locator}"
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"ResourceLocator(resource_key='{self.resource_key}', locator='{self.locator}')"

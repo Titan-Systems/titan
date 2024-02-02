@@ -1,0 +1,10 @@
+{
+    "name": "gcs_int",
+    "type": "EXTERNAL_STAGE",
+    "storage_provider": "GCS",
+    "enabled": true,
+    "storage_allowed_locations": [
+        "gcs://mybucket1/path1/",
+        "gcs://mybucket2/path2/"
+    ]
+}

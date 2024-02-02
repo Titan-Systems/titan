@@ -396,36 +396,23 @@ class AzureInboundNotificationIntegration(Resource):
         )
 
 
-class NotificationIntegration:
-    def __new__(
-        cls,
-        type: NotificationType,
-        direction: NotificationDirection = None,
-        notification_provider: NotificationProvider = None,
-        **kwargs,
-    ) -> Resource:
-        if isinstance(type, str):
-            type = NotificationType(type)
-        if type == NotificationType.EMAIL:
-            return EmailNotificationIntegration(**kwargs)
-        elif type == NotificationType.QUEUE:
-            if direction == NotificationDirection.INBOUND:
-                if notification_provider == NotificationProvider.GCP_PUBSUB:
-                    return GCPInboundNotificationIntegration(**kwargs)
-                elif notification_provider == NotificationProvider.AZURE_STORAGE_QUEUE:
-                    return AzureInboundNotificationIntegration(**kwargs)
-            elif direction == NotificationDirection.OUTBOUND:
-                if notification_provider == NotificationProvider.AWS_SNS:
-                    return AWSOutboundNotificationIntegration(**kwargs)
-                elif notification_provider == NotificationProvider.GCP_PUBSUB:
-                    return GCPOutboundNotificationIntegration(**kwargs)
-                elif notification_provider == NotificationProvider.AZURE_EVENT_GRID:
-                    return AzureOutboundNotificationIntegration(**kwargs)
-        raise Exception("Invalid Notification Integration")
+def _notification_resolver(data: dict):
+    if "direction" in data and "notification_provider" in data:
+        direction = NotificationDirection(data["direction"])
+        provider = NotificationProvider(data["notification_provider"])
+        if direction == NotificationDirection.INBOUND:
+            if provider == NotificationProvider.AZURE_STORAGE_QUEUE:
+                return AzureInboundNotificationIntegration
+            elif provider == NotificationProvider.GCP_PUBSUB:
+                return GCPInboundNotificationIntegration
+        elif direction == NotificationDirection.OUTBOUND:
+            if provider == NotificationProvider.AWS_SNS:
+                return AWSOutboundNotificationIntegration
+            elif provider == NotificationProvider.AZURE_EVENT_GRID:
+                return AzureOutboundNotificationIntegration
+            elif provider == NotificationProvider.GCP_PUBSUB:
+                return GCPOutboundNotificationIntegration
+    raise ValueError("Invalid direction or notification provider")
 
-    @classmethod
-    def from_sql(cls, sql) -> Resource:
-        # camelize(_resolve_resource_class(sql))
-        # resource_cls = Resource.classes[]
-        # return resource_cls.from_sql(sql)
-        raise NotImplementedError
+
+Resource.__resolvers__[ResourceType.NOTIFICATION_INTEGRATION] = _notification_resolver

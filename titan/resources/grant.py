@@ -216,7 +216,7 @@ class Grant(Resource):
         granted_on = Resource.resolve_resource_cls(on_type)(name=on, stub=True)
         self.requires(granted_on)
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         priv = getattr(self, "priv", "")
         on = getattr(self, "on", "")
         to = getattr(self, "to", "")
