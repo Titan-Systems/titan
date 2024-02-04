@@ -1,10 +1,17 @@
+# TODO:
+# the error_integration field is a reference to a notification integration resource.
+# This is a critical edge case of polymorphic resources. This requires the implementation
+# of ResourcePointers
+
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .table import Table
+from .stage import Stage
 from ..enums import ResourceType
-from ..scope import SchemaScope
-
+from ..parse import _parse_copy_into
 from ..props import BoolProp, Props, StringProp, QueryProp
+from ..scope import SchemaScope
 
 
 @dataclass
@@ -56,7 +63,7 @@ class Pipe(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self._data = _Pipe(
+        self._data: _Pipe = _Pipe(
             name=name,
             as_=as_,
             owner=owner,
@@ -66,3 +73,8 @@ class Pipe(Resource):
             integration=integration,
             comment=comment,
         )
+        # copy_into = _parse_copy_into(as_)
+        # self.requires(
+        #     Table(name=copy_into["destination"], stub=True),
+        #     Stage(name=copy_into["stage"], stub=True),
+        # )

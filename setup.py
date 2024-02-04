@@ -31,12 +31,13 @@ setup(
     extras_require={
         "dev": [
             "black",
-            "tabulate",
+            "codespell==2.2.6",
+            "pytest-cov",
+            "pytest-xdist",
             "pytest>=6.0",
             "ruff",
             "snowflake-cli-labs",
-            "pytest-xdist",
-            "codespell==2.2.6",
+            "tabulate",
         ]
     },
 )

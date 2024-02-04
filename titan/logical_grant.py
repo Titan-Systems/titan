@@ -3,7 +3,7 @@ class LogicalGrant:
         self.urn = urn
         self.priv = priv
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"LogicalGrant({self.urn}, {self.priv})"
 
     def __eq__(self, other):
@@ -25,7 +25,7 @@ class LogicalExpression:
     def __init__(self, *args):
         self.args = args
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"{self.__class__.__name__}({', '.join(map(str, self.args))})"
 
 

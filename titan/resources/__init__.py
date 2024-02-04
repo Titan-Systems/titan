@@ -5,6 +5,7 @@ from .api_integration import APIIntegration
 from .column import Column
 from .database import Database
 from .dynamic_table import DynamicTable
+from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
@@ -32,7 +33,6 @@ from .view import View
 from .warehouse import Warehouse
 
 from .notification_integration import (
-    NotificationIntegration,
     EmailNotificationIntegration,
     AWSOutboundNotificationIntegration,
     GCPOutboundNotificationIntegration,
@@ -42,7 +42,6 @@ from .notification_integration import (
 )
 
 from .storage_integration import (
-    StorageIntegration,
     S3StorageIntegration,
     GCSStorageIntegration,
     AzureStorageIntegration,
@@ -63,6 +62,7 @@ __all__ = [
     "DatabaseRole",
     "DynamicTable",
     "EmailNotificationIntegration",
+    "ExternalAccessIntegration",
     "ExternalFunction",
     "ExternalStage",
     "ExternalTableStream",
@@ -75,7 +75,6 @@ __all__ = [
     "InternalStage",
     "JavascriptUDF",
     "NetworkRule",
-    "NotificationIntegration",
     "PackagesPolicy",
     "PasswordPolicy",
     "Pipe",
@@ -92,7 +91,6 @@ __all__ = [
     # "SharedDatabase",
     "Stage",
     "StageStream",
-    "StorageIntegration",
     "Stream",
     "Table",
     "TableStream",

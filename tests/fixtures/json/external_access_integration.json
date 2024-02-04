@@ -1,0 +1,11 @@
+{
+    "name": "SOME_INT",
+    "allowed_network_rules": [
+        "STATIC_NETWORK_RULE"
+    ],
+    "allowed_api_authentication_integrations": null,
+    "allowed_authentication_secrets": null,
+    "enabled": true,
+    "comment": "Example external access integration for demonstration purposes.",
+    "owner": "ACCOUNTADMIN"
+}

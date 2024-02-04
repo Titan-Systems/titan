@@ -12,7 +12,16 @@ FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 
 STATIC_RESOURCES = {
     ResourceType.DATABASE: resources.Database(name="static_database"),
+    ResourceType.NETWORK_RULE: resources.NetworkRule(
+        name="static_network_rule",
+        type=resources.network_rule.NetworkIdentifierType.HOST_PORT,
+        value_list=["example.com:443"],
+        mode=resources.network_rule.NetworkRuleMode.EGRESS,
+    ),
     ResourceType.ROLE: resources.Role(name="static_role"),
+    ResourceType.SECRET: resources.Secret(
+        name="static_secret", type=resources.secret.SecretType.PASSWORD, username="someuser", password="somepass"
+    ),
     ResourceType.TABLE: resources.Table(name="static_table", columns=[{"name": "id", "data_type": "INT"}]),
     ResourceType.TAG: resources.Tag(name="static_tag"),
     ResourceType.USER: resources.User(name="static_user"),

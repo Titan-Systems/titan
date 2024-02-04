@@ -19,6 +19,18 @@ class _ExternalAccessIntegration(ResourceSpec):
     comment: str = None
     owner: str = "ACCOUNTADMIN"
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.allowed_network_rules is not None and len(self.allowed_network_rules) < 1:
+            raise ValueError("allowed_network_rules must have at least one element if not None")
+        if (
+            self.allowed_api_authentication_integrations is not None
+            and len(self.allowed_api_authentication_integrations) < 1
+        ):
+            raise ValueError("allowed_api_authentication_integrations must have at least one element if not None")
+        if self.allowed_authentication_secrets is not None and len(self.allowed_authentication_secrets) < 1:
+            raise ValueError("allowed_authentication_secrets must have at least one element if not None")
+
 
 class ExternalAccessIntegration(Resource):
     """
@@ -34,9 +46,11 @@ class ExternalAccessIntegration(Resource):
 
     resource_type = ResourceType.EXTERNAL_ACCESS_INTEGRATION
     props = Props(
-        allowed_network_rules=IdentifierListProp("allowed_network_rules"),
-        allowed_api_authentication_integrations=IdentifierListProp("allowed_api_authentication_integrations"),
-        allowed_authentication_secrets=IdentifierListProp("allowed_authentication_secrets"),
+        allowed_network_rules=IdentifierListProp("allowed_network_rules", eq=True, parens=True),
+        allowed_api_authentication_integrations=IdentifierListProp(
+            "allowed_api_authentication_integrations", eq=True, parens=True
+        ),
+        allowed_authentication_secrets=IdentifierListProp("allowed_authentication_secrets", eq=True, parens=True),
         enabled=BoolProp("enabled"),
         comment=StringProp("comment"),
     )
@@ -64,3 +78,5 @@ class ExternalAccessIntegration(Resource):
             comment=comment,
             owner=owner,
         )
+        self.requires(self._data.allowed_network_rules)
+        self.requires(self._data.allowed_authentication_secrets)

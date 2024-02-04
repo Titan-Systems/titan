@@ -159,7 +159,7 @@ class Resource(metaclass=_Resource):
     def defaults(cls):
         return {f.name: f.default for f in fields(cls.spec)}
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: no cover
         return f"{self.__class__.__name__}({str(self.fqn)})"
 
     def to_dict(self, packed=False):
@@ -281,3 +281,12 @@ class ResourceContainer:
     @property
     def name(self):
         return self._data.name
+
+
+class ResourcePointer:
+    def __init__(self, name: str, resource_type: ResourceType):
+        self.name = name
+        self.resource_type = resource_type
+
+    def __repr__(self):  # pragma: no cover
+        return f"ResourcePointer({self.resource_type}:{self.name})"

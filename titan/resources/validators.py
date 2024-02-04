@@ -12,11 +12,3 @@ def coerce_from_str(cls: "Resource") -> callable:
             return name_or_resource
 
     return _coerce
-
-
-def serialize_as_named_resource(name_or_resource) -> "Resource":
-    if isinstance(name_or_resource, str):
-        return name_or_resource
-    else:
-        res = name_or_resource
-        return f"{res.resource_type} {res.fqn}"

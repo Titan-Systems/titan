@@ -1,0 +1,16 @@
+{
+    "name": "GCS_INT",
+    "type": "EXTERNAL_STAGE",
+    "storage_provider": "GCS",
+    "owner": "ACCOUNTADMIN",
+    "enabled": true,
+    "storage_allowed_locations": [
+        "gcs://mybucket1/path1/",
+        "gcs://mybucket2/path2/"
+    ],
+    "comment": "GCS external stage for mybucket1 and mybucket2",
+    "storage_blocked_locations": [
+        "gcs://mybucket1/path1/secret/",
+        "gcs://mybucket2/path2/secret/"
+    ]
+}

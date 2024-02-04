@@ -43,7 +43,7 @@ class Secret(Resource):
 
     CREATE [ OR REPLACE ] SECRET <name>
        TYPE = { OAUTH2 | PASSWORD | GENERIC_STRING }
-       API_AUTHENTICATION = '<security_integration_name>'
+       [ API_AUTHENTICATION = '<security_integration_name>' ]
        [ OAUTH_SCOPES = ( '<scope_1>' [, '<scope_2>', ... ] ) ]
        [ OAUTH_REFRESH_TOKEN = '<string_literal>' ]
        [ OAUTH_REFRESH_TOKEN_EXPIRY_TIME = '<string_literal>' ]
