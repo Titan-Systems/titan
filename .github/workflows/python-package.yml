@@ -71,7 +71,7 @@ jobs:
     - name: Run integration tests
       run: |
         source ./.venv/bin/activate
-        python -m pytest --snowflake -m ${{ matrix.edition }} --cov=./ --cov-report=xml
+        python -m pytest --snowflake -m "standard or ${{ matrix.edition }}" --cov=./ --cov-report=xml
       env:
         TEST_SNOWFLAKE_ACCOUNT: ${{ secrets.TEST_SNOWFLAKE_ACCOUNT }}
         TEST_SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
