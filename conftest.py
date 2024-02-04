@@ -70,13 +70,23 @@ def cursor(suffix, test_db, marked_for_cleanup):
             cur.execute("ALTER WAREHOUSE CI SUSPEND")
 
 
+@pytest.fixture(scope="session")
+def dummy_cursor(request):
+    if not request.config.getoption("--snowflake"):
+        yield None
+    else:
+        yield request.getfixturevalue("cursor")
+
+
 @pytest.fixture(autouse=True)
-def reset_cursor_context(cursor, test_db):
+def reset_cursor_context(dummy_cursor, test_db):
     """
     This fixture resets the cursor's context to the initial test database before each test.
     It uses `autouse=True` to automatically apply it to each test without needing to explicitly include it.
     """
-    cursor.execute(f"USE ROLE {TEST_ROLE}")
-    cursor.execute("USE WAREHOUSE CI")
-    cursor.execute(f"USE DATABASE {test_db}")
+    cursor = dummy_cursor
+    if cursor:
+        cursor.execute(f"USE ROLE {TEST_ROLE}")
+        cursor.execute("USE WAREHOUSE CI")
+        cursor.execute(f"USE DATABASE {test_db}")
     yield
