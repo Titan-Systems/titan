@@ -1,0 +1,7 @@
+// {
+//     "name": "SOME_PIPE",
+//     "auto_ingest": false,
+//     "integration": null,
+//     "aws_sns_topic": null,
+//     "as_": "copy into STATIC_TABLE from @STATIC_STAGE"
+// }

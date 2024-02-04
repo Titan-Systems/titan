@@ -654,3 +654,41 @@ def parse_URN(urn_str: str) -> URN:
         resource_type=resource_type,
         fqn=fqn,
     )
+
+
+def _parse_copy_into(sql: str):
+    """
+    /* Standard data load */
+    COPY INTO [<namespace>.]<table_name>
+         FROM { internalStage | externalStage | externalLocation }
+    [ FILES = ( '<file_name>' [ , '<file_name>' ] [ , ... ] ) ]
+    [ PATTERN = '<regex_pattern>' ]
+    [ FILE_FORMAT = ( { FORMAT_NAME = '[<namespace>.]<file_format_name>' |
+                        TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ] } ) ]
+    [ copyOptions ]
+    [ VALIDATION_MODE = RETURN_<n>_ROWS | RETURN_ERRORS | RETURN_ALL_ERRORS ]
+
+    /* Data load with transformation */
+    COPY INTO [<namespace>.]<table_name> [ ( <col_name> [ , <col_name> ... ] ) ]
+         FROM ( SELECT [<alias>.]$<file_col_num>[.<element>] [ , [<alias>.]$<file_col_num>[.<element>] ... ]
+                FROM { internalStage | externalStage } )
+    [ FILES = ( '<file_name>' [ , '<file_name>' ] [ , ... ] ) ]
+    [ PATTERN = '<regex_pattern>' ]
+    [ FILE_FORMAT = ( { FORMAT_NAME = '[<namespace>.]<file_format_name>' |
+                        TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML } [ formatTypeOptions ] } ) ]
+    [ copyOptions ]
+    """
+
+    copy_into_parser = (
+        Keyword("COPY").suppress()
+        + Keyword("INTO").suppress()
+        + FullyQualifiedIdentifier("destination")
+        + Keyword("FROM").suppress()
+        + (Literal("@") + FullyQualifiedIdentifier("stage"))
+    )
+
+    try:
+        results = copy_into_parser.parse_string(sql, parse_all=True)
+        return results.as_dict()
+    except pp.ParseException as err:
+        raise Exception(f"Failed to parse COPY INTO statement: {err}")
