@@ -1,17 +1,10 @@
 {
     "name": "SOME_INT",
     "allowed_network_rules": [
-        "public_network",
-        "private_network"
+        "STATIC_NETWORK_RULE"
     ],
-    "allowed_api_authentication_integrations": [
-        "api_integration_1",
-        "api_integration_2"
-    ],
-    "allowed_authentication_secrets": [
-        "secret_1",
-        "secret_2"
-    ],
+    "allowed_api_authentication_integrations": null,
+    "allowed_authentication_secrets": null,
     "enabled": true,
     "comment": "Example external access integration for demonstration purposes.",
     "owner": "ACCOUNTADMIN"

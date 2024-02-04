@@ -12,12 +12,24 @@ from ..props import BoolProp, Props, StringProp, IdentifierListProp
 @dataclass
 class _ExternalAccessIntegration(ResourceSpec):
     name: str
-    allowed_network_rules: list[str]  # NetworkRule
+    allowed_network_rules: list[NetworkRule]
     allowed_api_authentication_integrations: list[str] = None
-    allowed_authentication_secrets: list[str] = None  # Secret
+    allowed_authentication_secrets: list[Secret] = None
     enabled: bool = True
     comment: str = None
     owner: str = "ACCOUNTADMIN"
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.allowed_network_rules is not None and len(self.allowed_network_rules) < 1:
+            raise ValueError("allowed_network_rules must have at least one element if not None")
+        if (
+            self.allowed_api_authentication_integrations is not None
+            and len(self.allowed_api_authentication_integrations) < 1
+        ):
+            raise ValueError("allowed_api_authentication_integrations must have at least one element if not None")
+        if self.allowed_authentication_secrets is not None and len(self.allowed_authentication_secrets) < 1:
+            raise ValueError("allowed_authentication_secrets must have at least one element if not None")
 
 
 class ExternalAccessIntegration(Resource):
@@ -66,3 +78,5 @@ class ExternalAccessIntegration(Resource):
             comment=comment,
             owner=owner,
         )
+        self.requires(self._data.allowed_network_rules)
+        self.requires(self._data.allowed_authentication_secrets)

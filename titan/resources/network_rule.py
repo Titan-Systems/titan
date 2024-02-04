@@ -34,6 +34,11 @@ class _NetworkRule(ResourceSpec):
     comment: str = None
     owner: str = "SYSADMIN"
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.type == NetworkIdentifierType.HOST_PORT and self.mode != NetworkRuleMode.EGRESS:
+            raise ValueError("When TYPE is HOST_PORT, MODE must be set to EGRESS.")
+
 
 class NetworkRule(Resource):
     """
