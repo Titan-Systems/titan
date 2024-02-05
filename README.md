@@ -1,7 +1,7 @@
 # `Titan Core` - Snowflake infrastructure as code
 
 <div align="center">
-    <img src="./images/github.png" style="padding-bottom: 20px; width: 620px;"/>
+    <img src="./images/github-explainer.png" style="padding-bottom: 20px; width: 830px;"/>
 </div>
 
 Titan Core helps you provision, deploy, and secure resources in Snowflake. It replaces infrastructure tools like Terraform or Schemachange.
@@ -193,8 +193,8 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Share                         | ❌         | ❌   |
 | Storage Integration           | WIP        | ❌   |
 | ↪ AWS                         | ✅         | ❌   |
-| ↪ Azure                       | ❌         | ❌   |
-| ↪ GCP                         | ❌         | ❌   |
+| ↪ Azure                       | ✅         | ❌   |
+| ↪ GCP                         | ✅         | ❌   |
 | User                          | ✅         | ✅   |
 | Warehouse                     | ✅         | ✅   |
 |                               |            |     |
