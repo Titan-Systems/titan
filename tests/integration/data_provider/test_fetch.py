@@ -4,9 +4,9 @@ import pytest
 from titan import data_provider
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
-from titan.parse import parse_identifier
-
 from tests.helpers import STATIC_RESOURCES
+from titan.parse import parse_identifier
+from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -231,6 +231,47 @@ scoped_resources = [
     },
 ]
 
+grants = [
+    {
+        "setup_sql": [
+            "CREATE ROLE IF NOT EXISTS thatrole",
+            "GRANT USAGE ON DATABASE STATIC_DATABASE TO ROLE thatrole",
+        ],
+        "teardown_sql": [
+            "DROP ROLE IF EXISTS thatrole",
+        ],
+        "test_name": "test_usage_grant",
+        "resource_type": ResourceType.GRANT,
+        "data": {
+            "priv": "USAGE",
+            "on_type": "DATABASE",
+            "on": "STATIC_DATABASE",
+            "to": "THATROLE",
+            "owner": TEST_ROLE,
+            "grant_option": False,
+        },
+    },
+    {
+        "setup_sql": [
+            "CREATE ROLE IF NOT EXISTS thatrole",
+            "GRANT USAGE ON FUTURE SCHEMAS IN DATABASE STATIC_DATABASE TO ROLE thatrole",
+        ],
+        "teardown_sql": [
+            "DROP ROLE IF EXISTS thatrole",
+        ],
+        "test_name": "test_future_grant",
+        "resource_type": ResourceType.FUTURE_GRANT,
+        "data": {
+            "priv": "USAGE",
+            "on_type": "SCHEMA",
+            "in_type": "DATABASE",
+            "in_name": "STATIC_DATABASE",
+            "to": "THATROLE",
+            "grant_option": False,
+        },
+    },
+]
+
 
 @pytest.fixture(scope="session")
 def account_locator(cursor):
@@ -296,8 +337,51 @@ def account_resource(request, cursor):
             cursor.execute(teardown_sql)
 
 
+@pytest.fixture(
+    params=grants,
+    ids=[config["test_name"] for config in grants],
+    scope="function",
+)
+def grant_resource(request, cursor, account_locator):
+    config = request.param
+
+    static_db = STATIC_RESOURCES[ResourceType.DATABASE]
+    cursor.execute(static_db.create_sql(if_not_exists=True))
+
+    setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
+    teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]
+
+    if config["resource_type"] == ResourceType.GRANT:
+        fqn = grant_fqn(_Grant(**config["data"]))
+        urn = URN(
+            resource_type=config["resource_type"],
+            fqn=fqn,
+            account_locator=account_locator,
+        )
+        config["urn"] = urn
+    elif config["resource_type"] == ResourceType.FUTURE_GRANT:
+        fqn = future_grant_fqn(_FutureGrant(**config["data"]))
+        urn = URN(
+            resource_type=config["resource_type"],
+            fqn=fqn,
+            account_locator=account_locator,
+        )
+        config["urn"] = urn
+    else:
+        raise ValueError(f"Invalid resource type: {config['resource_type']}")
+
+    for setup_sql in setup_sqls:
+        cursor.execute(setup_sql)
+    try:
+        yield config
+    finally:
+        for teardown_sql in teardown_sqls:
+            cursor.execute(teardown_sql)
+
+
 @pytest.mark.requires_snowflake
 def test_fetch_account_resource(account_resource, cursor, account_locator):
+
     if "name" in account_resource["data"]:
         fqn = parse_identifier(account_resource["data"]["name"])
     else:
@@ -312,6 +396,15 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == account_resource["data"]
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_grant(grant_resource, cursor):
+    result = data_provider.fetch_resource(cursor, grant_resource["urn"])
+    assert result is not None
+    assert len(result) == 1
+    result = data_provider.remove_none_values(result[0])
+    assert result == grant_resource["data"]
 
 
 @pytest.mark.requires_snowflake

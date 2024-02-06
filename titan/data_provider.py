@@ -322,6 +322,56 @@ def fetch_function(session, fqn: FQN):
     }
 
 
+def fetch_future_grant(session, fqn: FQN):
+    try:
+        show_result = execute(session, f"SHOW FUTURE GRANTS TO ROLE {fqn.name}")
+        """
+        {
+            'created_on': datetime.datetime(2024, 2, 5, 19, 39, 50, 146000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
+            'privilege': 'USAGE',
+            'grant_on': 'SCHEMA',
+            'name': 'STATIC_DATABASE.<SCHEMA>',
+            'grant_to': 'ROLE',
+            'grantee_name': 'THATROLE',
+            'grant_option': 'false'
+        }
+        """
+
+    except ProgrammingError as err:
+        if err.errno == DOEST_NOT_EXIST_ERR:
+            return None
+        raise
+
+    grant_on = fqn.params["on_type"]
+    name = f"{fqn.params['in_name']}.<{grant_on}>"
+    grantee_name = fqn.name
+    grants = _filter_result(
+        show_result,
+        grant_on=grant_on,
+        name=name,
+        grantee_name=grantee_name,
+    )
+
+    if len(grants) == 0:
+        return []
+
+    return sorted(
+        [
+            {
+                "priv": row["privilege"],
+                "on_type": row["grant_on"],
+                "in_type": fqn.params["in_type"],
+                "in_name": row["name"].split(".")[0],
+                "to": row["grantee_name"],
+                "grant_option": row["grant_option"] == "true",
+                "owner": None,
+            }
+            for row in grants
+        ],
+        key=lambda g: (g["priv"], g["owner"]),
+    )
+
+
 def fetch_grant(session, fqn: FQN):
     try:
         show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}")
