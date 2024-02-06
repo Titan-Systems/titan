@@ -120,6 +120,34 @@ class DatabasePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class EventTablePriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    SELECT = "SELECT"
+    INSERT = "INSERT"
+
+
+class FailoverGroupPriv(ParseableEnum):
+    ALL = "ALL"
+    FAILOVER = "FAILOVER"
+    MODIFY = "MODIFY"
+    MONITOR = "MONITOR"
+    OWNERSHIP = "OWNERSHIP"
+    REPLICATE = "REPLICATE"
+
+
+class FileFormatPriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
+class FunctionPriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
 class IntegrationPriv(ParseableEnum):
     ALL = "ALL"
     USAGE = "USAGE"
@@ -137,6 +165,14 @@ class PackagesPolicyPriv(ParseableEnum):
 
 
 class PasswordPolicyPriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+
+
+class PipePriv(ParseableEnum):
+    ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    MONITOR = "MONITOR"
+    OPERATE = "OPERATE"
     OWNERSHIP = "OWNERSHIP"
 
 
@@ -184,6 +220,12 @@ class SchemaPriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class SecretPriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+    READ = "READ"
+    USAGE = "USAGE"
+
+
 class SequencePriv(ParseableEnum):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
@@ -198,6 +240,12 @@ class StagePriv(ParseableEnum):
     WRITE = "WRITE"
 
 
+class StreamPriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    SELECT = "SELECT"
+
+
 class TablePriv(ParseableEnum):
     ALL = "ALL"
     DELETE = "DELETE"
@@ -207,6 +255,20 @@ class TablePriv(ParseableEnum):
     SELECT = "SELECT"
     TRUNCATE = "TRUNCATE"
     UPDATE = "UPDATE"
+
+
+class TagPriv(ParseableEnum):
+    APPLY = "APPLY"
+    OWNERSHIP = "OWNERSHIP"
+    READ = "READ"
+
+
+class TaskPriv(ParseableEnum):
+    ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    MONITOR = "MONITOR"
+    OPERATE = "OPERATE"
+    OWNERSHIP = "OWNERSHIP"
 
 
 class UserPriv(ParseableEnum):
@@ -234,17 +296,27 @@ class WarehousePriv(ParseableEnum):
 PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.ACCOUNT: GlobalPriv,
     ResourceType.ALERT: AlertPriv,
+    ResourceType.API_INTEGRATION: IntegrationPriv,
     ResourceType.DATABASE: DatabasePriv,
+    ResourceType.DYNAMIC_TABLE: TablePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
+    ResourceType.EXTERNAL_FUNCTION: FunctionPriv,
+    ResourceType.FAILOVER_GROUP: FailoverGroupPriv,
+    ResourceType.FUNCTION: FunctionPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
-    ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
     ResourceType.PACKAGES_POLICY: PackagesPolicyPriv,
+    ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
+    ResourceType.PIPE: PipePriv,
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,
+    ResourceType.SECRET: SecretPriv,
     ResourceType.SEQUENCE: SequencePriv,
     ResourceType.STAGE: StagePriv,
+    ResourceType.STREAM: StreamPriv,
     ResourceType.TABLE: TablePriv,
+    ResourceType.TAG: TagPriv,
+    ResourceType.TASK: TaskPriv,
     ResourceType.USER: UserPriv,
     ResourceType.VIEW: ViewPriv,
     ResourceType.WAREHOUSE: WarehousePriv,
