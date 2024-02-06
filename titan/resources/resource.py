@@ -185,15 +185,15 @@ class Resource(metaclass=_Resource):
         serialized = {}
 
         def _serialize(value):
-            if isinstance(value, Resource):
+            if isinstance(value, ResourcePointer):
+                return value.name
+            elif isinstance(value, Resource):
                 if hasattr(value, "serialize"):
                     return value.serialize()
                 elif hasattr(value._data, "name"):
                     return getattr(value._data, "name")
                 else:
                     raise Exception(f"Cannot serialize {value}")
-            elif isinstance(value, ResourcePointer):
-                return value.name
             elif isinstance(value, ParseableEnum):
                 return str(value)
             elif isinstance(value, list):
@@ -299,16 +299,17 @@ class ResourceContainer:
         return self._data.name
 
 
-class ResourcePointer(ResourceContainer):
+class ResourcePointer(Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-        super().__init__()
+
         self._name: str = name
         self._resource_type: ResourceType = resource_type
-        self._container: "ResourceContainer" = None
+        # self._container: "ResourceContainer" = None
         if resource_type == ResourceType.ACCOUNT:
-            self._scope = OrganizationScope()
+            self.scope = OrganizationScope()
         else:
-            self._scope = Resource.resolve_resource_cls(resource_type).scope
+            self.scope = Resource.resolve_resource_cls(resource_type).scope
+        super().__init__()
 
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
@@ -321,7 +322,7 @@ class ResourcePointer(ResourceContainer):
 
     @property
     def fqn(self):
-        return self._scope.fully_qualified_name(self.container, self.name)
+        return self.scope.fully_qualified_name(self.container, self.name)
 
     @property
     def name(self):
@@ -330,3 +331,6 @@ class ResourcePointer(ResourceContainer):
     @property
     def resource_type(self):
         return self._resource_type
+
+    def to_dict(self, packed=False):
+        return {"name": self.name}
