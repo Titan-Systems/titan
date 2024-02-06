@@ -33,6 +33,7 @@ setup(
             "black",
             "codespell==2.2.6",
             "pytest-cov",
+            "pytest-profiling",
             "pytest-xdist",
             "pytest>=6.0",
             "ruff",

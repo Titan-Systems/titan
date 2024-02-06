@@ -184,7 +184,6 @@ class Grant(Resource):
                     if keyword.startswith("on_all"):
                         raise NotImplementedError
                     elif keyword.startswith("on_future"):
-                        # on_future = keyword[10:].replace("_", " ").upper()
                         raise NotImplementedError
                 else:
                     # Grant targeting a specific resource
@@ -216,8 +215,11 @@ class Grant(Resource):
             owner=owner,
         )
 
-        granted_on = Resource.resolve_resource_cls(on_type)(name=on, stub=True)
-        self.requires(granted_on, to)
+        self.requires(to)
+        granted_on = None
+        if on_type:
+            granted_on = Resource.resolve_resource_cls(on_type)(name=on, stub=True)
+            self.requires(granted_on)
 
     def __repr__(self):  # pragma: no cover
         priv = getattr(self, "priv", "")

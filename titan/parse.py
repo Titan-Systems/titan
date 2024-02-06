@@ -208,13 +208,12 @@ def _parse_role_grant(sql: str):
     GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
     """
 
-    # TODO: support TO USER
     grant = (
         GRANT
         + Keyword("ROLE").suppress()
         + Identifier("role")
         + TO
-        + Keyword("ROLE").suppress()
+        + pp.MatchFirst([Keyword("ROLE"), Keyword("USER")]).suppress()
         + Identifier("to_role")
     )
     grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)

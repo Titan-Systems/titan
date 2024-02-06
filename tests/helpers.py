@@ -50,26 +50,35 @@ def get_json_fixtures():
             resource_name = f.split(".")[0]
             try:
                 resource_cls = _get_resource_cls(resource_name)
-            except ValueError as e:
-                # print(f"Error reading {f}: {e}")
+            except ValueError:
                 continue
             try:
                 data = get_json_fixture(resource_name)
-            except Exception as e:
-                # print(f"Error reading {f}: {e}")
+                yield (resource_cls, data)
+            except Exception:
                 continue
-            yield (resource_cls, data)
 
 
-def list_sql_fixtures():
+def get_sql_fixtures():
     files = os.listdir(os.path.join(FIXTURES_DIR, "sql"))
     for f in files:
         if f.endswith(".sql"):
-            yield f
+            resource_name = f.split(".")[0]
+            try:
+                resource_cls = _get_resource_cls(resource_name)
+            except ValueError:
+                continue
+            try:
+                idx = 1
+                for fixture in get_sql_fixture(f):
+                    yield (resource_cls, fixture, idx)
+                    idx += 1
+            except Exception:
+                continue
 
 
-def load_sql_fixtures(filename, lines=False):
-    with open(os.path.join(FIXTURES_DIR, filename), encoding="utf-8") as f:
+def get_sql_fixture(filename, lines=False):
+    with open(os.path.join(FIXTURES_DIR, "sql", filename), encoding="utf-8") as f:
         if lines:
             yield from f.read().splitlines()
         else:

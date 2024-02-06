@@ -146,7 +146,13 @@ class Resource(metaclass=_Resource):
 
     @classmethod
     def resolve_resource_cls(cls, resource_type: ResourceType, data: dict = None) -> Type["Resource"]:
+
+        if not isinstance(resource_type, ResourceType):
+            raise ValueError(f"Expected ResourceType, got {resource_type}({type(resource_type)})")
+        if resource_type not in cls.__types:
+            raise ValueError(f"Unknown resource type {resource_type}")
         resource_types = cls.__types[resource_type]
+
         if len(resource_types) > 1:
             if data is None:
                 raise ValueError(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
