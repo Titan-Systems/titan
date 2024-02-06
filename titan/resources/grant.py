@@ -3,7 +3,7 @@ from typing import Any
 
 from inflection import singularize
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
 from ..enums import ResourceType
@@ -117,7 +117,7 @@ class Grant(Resource):
         self,
         priv: str = None,
         on: Any = None,
-        to: str = None,
+        to: Role = None,
         grant_option: bool = False,
         owner: str = None,
         **kwargs,
@@ -151,9 +151,6 @@ class Grant(Resource):
         if on_type:
             on_type = ResourceType(on_type)
 
-        # FIXME: simple type coercion should be done in resource spec
-        to = to if isinstance(to, Role) else Role(name=to, stub=True)
-
         # Collect on_ kwargs
         on_kwargs = {}
         for keyword, arg in kwargs.copy().items():
@@ -181,14 +178,16 @@ class Grant(Resource):
                         on = arg
                         on_type = ResourceType(resource_type)
 
+                    # on_all is not currently supported
                     if keyword.startswith("on_all"):
                         raise NotImplementedError
+                    # on_future should be handled by FutureGrant
                     elif keyword.startswith("on_future"):
-                        raise NotImplementedError
+                        raise ValueError("You must use FutureGrant for future grants")
                 else:
                     # Grant targeting a specific resource
                     # on_{resource} kwargs
-                    # on_schema="foo" -> on=Schema(name="foo", stub=True)
+                    # on_schema="foo" -> on=Schema(name="foo")
                     on = arg
                     on_type = ResourceType(keyword[3:])
         # Handle on= kwarg
@@ -215,10 +214,10 @@ class Grant(Resource):
             owner=owner,
         )
 
-        self.requires(to)
+        self.requires(self._data.to)
         granted_on = None
         if on_type:
-            granted_on = Resource.resolve_resource_cls(on_type)(name=on, stub=True)
+            granted_on = ResourcePointer(name=on, resource_type=on_type)
             self.requires(granted_on)
 
     def __repr__(self):  # pragma: no cover
@@ -353,8 +352,8 @@ class FutureGrant(Resource):
             to=to,
             grant_option=grant_option,
         )
-        granted_in = Resource.resolve_resource_cls(in_type)(name=in_name, stub=True)
-        self.requires(granted_in, to)
+        granted_in = ResourcePointer(name=in_name, resource_type=in_type)
+        self.requires(granted_in, self._data.to)
 
     @classmethod
     def from_sql(cls, sql):

@@ -136,12 +136,6 @@ class Table(Resource):
 
         identifier, remainder = _parse_create_header(sql, cls)
         table_schema, remainder = _parse_table_schema(remainder)
-        # if "schema" in identifier:
-        #     schema = Schema(name=identifier["schema"], stub=True)
-        #     if "database" in identifier:
-        #         schema.database = identifier["database"]
-        #         del identifier["database"]
-        #     identifier["schema"] = schema
         props = _parse_props(cls.props, remainder)
         return cls(**identifier, **table_schema, **props)
 

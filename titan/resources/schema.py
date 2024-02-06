@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourceSpec
-from .tag import Tag
+from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..scope import DatabaseScope
@@ -78,4 +77,4 @@ class Schema(Resource, ResourceContainer):
         )
         if self._data.tags:
             for tag_name in self._data.tags.keys():
-                self.requires(Tag(name=tag_name, stub=True))
+                self.requires(ResourcePointer(name=tag_name, resource_type=ResourceType.TAG))

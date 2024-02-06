@@ -1,13 +1,10 @@
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from titan.resources import Resource
+from titan.resources.resource import Resource, ResourcePointer
 
 
-def coerce_from_str(cls: "Resource") -> callable:
+def coerce_from_str(cls: Resource) -> callable:
     def _coerce(name_or_resource):
         if isinstance(name_or_resource, str):
-            return cls(name=name_or_resource, stub=True)
+            return ResourcePointer(name=name_or_resource, resource_type=cls.resource_type)
         else:
             return name_or_resource
 

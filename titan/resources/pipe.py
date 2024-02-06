@@ -6,8 +6,6 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
-from .table import Table
-from .stage import Stage
 from ..enums import ResourceType
 from ..parse import _parse_copy_into
 from ..props import BoolProp, Props, StringProp, QueryProp

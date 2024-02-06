@@ -9,6 +9,7 @@ import snowflake.connector
 from . import data_provider, lifecycle
 from .client import ALREADY_EXISTS_ERR, execute
 from .diff import diff, DiffAction
+from .enums import ResourceType
 from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
 from .parse import parse_URN
@@ -22,7 +23,7 @@ from .privs import (
     is_ownership_priv,
 )
 from .resources import Account, Database, Schema
-from .resources.resource import Resource, ResourceContainer, ResourceType
+from .resources.resource import Resource, ResourceContainer, ResourcePointer
 from .resources.validators import coerce_from_str
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
@@ -312,6 +313,7 @@ class Blueprint:
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
+        self._account_locator: str = None
         self._allow_role_switching: bool = allow_role_switching
         self._enforce_requirements: bool = enforce_requirements
 
@@ -346,11 +348,8 @@ class Blueprint:
             self._root = org_scoped[0]
         else:
             # Otherwise, create a stub account from the session context
-            self._root = Account(
-                name=session_context["account"],
-                locator=session_context["account_locator"],
-                stub=True,
-            )
+            self._root = ResourcePointer(name=session_context["account"], resource_type=ResourceType.ACCOUNT)
+            self._account_locator = session_context["account_locator"]
             self.account = self._root
 
         # Add all databases and other account scoped resources to the root
@@ -359,11 +358,11 @@ class Blueprint:
 
         # If we haven't specified a database, use the one from the session context
         if self.database is None and session_context.get("database") is not None:
-            existing_databases = [db.name for db in self._root.databases()]
+            existing_databases = [db.name for db in self._root.items(resource_type=ResourceType.DATABASE)]
             if session_context["database"] not in existing_databases:
-                self._root.add(Database(name=session_context["database"], stub=True))
+                self._root.add(ResourcePointer(name=session_context["database"], resource_type=ResourceType.DATABASE))
 
-        databases: list[Database] = self._root.databases()
+        databases: list[Database] = self._root.items(resource_type=ResourceType.DATABASE)
 
         # Add all schemas and database roles to their respective databases
         for resource in db_scoped:
@@ -381,13 +380,13 @@ class Blueprint:
                         public_schema.add(resource)
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
-            elif resource.container.stub:
-                print("HERE")
+            elif isinstance(resource.container, ResourcePointer):
                 for db in databases:
                     for schema in db.items(resource_type=ResourceType.SCHEMA):
                         if schema.name == resource.container.name:
                             schema.add(resource)
                             break
+                raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
 
     def generate_manifest(self, session_context: dict = {}):
         manifest = {}
@@ -397,14 +396,18 @@ class Blueprint:
         self._finalize(session_context)
 
         for resource in _walk(self._root):
-            if resource.implicit:
+            if isinstance(resource, Resource) and resource.implicit:
                 continue
 
-            urn = URN.from_resource(account_locator=self.account.locator, resource=resource)
+            # urn = URN.from_resource(account_locator=self._account_locator, resource=resource)
+            # return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
+            # resource_fqn = resource.fqn if isinstance(resource, Resource) else resource.fqn
+
+            urn = URN(resource_type=resource.resource_type, fqn=resource.fqn, account_locator=self._account_locator)
             data = resource.to_dict()
 
-            if resource.stub:
-                data["_stub"] = True
+            if isinstance(resource, ResourcePointer):
+                data["_pointer"] = True
 
             manifest_key = str(urn)
 
@@ -419,7 +422,7 @@ class Blueprint:
             urns.append(manifest_key)
 
             for ref in resource.refs:
-                ref_urn = URN.from_resource(account_locator=self.account.locator, resource=ref)
+                ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
                 refs.append((str(urn), str(ref_urn)))
         manifest["_refs"] = refs
         manifest["_urns"] = urns
