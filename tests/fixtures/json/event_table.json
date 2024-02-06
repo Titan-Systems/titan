@@ -1,0 +1,11 @@
+{
+    "name": "EXAMPLE_EVENT_TABLE",
+    "cluster_by": null,
+    "data_retention_time_in_days": 1,
+    "max_data_extension_time_in_days": 1,
+    "change_tracking": true,
+    "default_ddl_collation": "en_US",
+    "copy_grants": false,
+    "comment": "This is an example event table for logging user events.",
+    "tags": null
+}

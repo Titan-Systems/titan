@@ -17,7 +17,6 @@ JSON_FIXTURES = list(get_json_fixtures())
 def resource(request, test_db, cursor, marked_for_cleanup):
     resource_cls, data = request.param
     res = resource_cls(**data)
-    marked_for_cleanup.append(res)
     test_schema = Schema(name="public", database=test_db)
     for ref in res.refs:
         if ref.resource_type in STATIC_RESOURCES:

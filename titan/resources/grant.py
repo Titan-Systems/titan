@@ -333,13 +333,13 @@ class FutureGrant(Resource):
             if on_kwargs:
                 for keyword, arg in on_kwargs.items():
                     if isinstance(arg, Resource):
-                        on_type = ResourceType(singularize(keyword[11:-3]))
+                        on_type = ResourceType(singularize(keyword[10:-3]))
                         in_type = arg.resource_type
                         in_name = arg._data.name
                     else:
                         on_stmt, in_stmt = keyword.split("_in_")
-                        on_type = ResourceType(singularize(on_stmt[11:]))
-                        in_type = ResourceType(in_stmt[3:])
+                        on_type = ResourceType(singularize(on_stmt[10:]))
+                        in_type = ResourceType(in_stmt)
                         in_name = arg
 
         super().__init__(**kwargs)
@@ -353,6 +353,11 @@ class FutureGrant(Resource):
         )
         granted_in = Resource.resolve_resource_cls(in_type)(name=in_name, stub=True)
         self.requires(granted_in, to)
+
+    @classmethod
+    def from_sql(cls, sql):
+        parsed = _parse_grant(sql)
+        return cls(**parsed)
 
     @property
     def fqn(self):

@@ -5,6 +5,7 @@ from .api_integration import APIIntegration
 from .column import Column
 from .database import Database
 from .dynamic_table import DynamicTable
+from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
@@ -62,6 +63,7 @@ __all__ = [
     "DatabaseRole",
     "DynamicTable",
     "EmailNotificationIntegration",
+    "EventTable",
     "ExternalAccessIntegration",
     "ExternalFunction",
     "ExternalStage",

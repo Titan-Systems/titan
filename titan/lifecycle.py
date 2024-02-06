@@ -182,6 +182,21 @@ def drop_function(urn: URN, data: dict, if_exists: bool) -> str:
     )
 
 
+def drop_future_grant(urn: URN, data: dict, **kwargs):
+    return tidy_sql(
+        "REVOKE",
+        data["priv"],
+        "ON FUTURE",
+        pluralize(data["on_type"]).upper(),
+        "IN",
+        data["in_type"],
+        data["in_name"],
+        "FROM",
+        data["to"],
+        # props.render(data), #TODO grant option
+    )
+
+
 def drop_grant(urn: URN, data: dict, **kwargs):
     return tidy_sql(
         "REVOKE",
