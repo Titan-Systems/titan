@@ -1,7 +1,7 @@
 {
     "name": "SOME_STAGE_STREAM",
     "on_stage": "STATIC_STAGE",
-    "owner": null,
+    "owner": "SYSADMIN",
     "copy_grants": null,
     "comment": null
 }
