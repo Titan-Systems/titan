@@ -1,19 +1,35 @@
 import pytest
 
-from tests.helpers import get_sql_fixtures, get_json_fixtures
 from titan import resources
-from titan.enums import ResourceType
+from tests.helpers import get_sql_fixtures, get_json_fixtures
 from titan.resources.warehouse import WarehouseSize
 
 
-def test_resource_constructors():
-    try:
-        resources.Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
-        resources.Task(name="TASK", as_="SELECT 1", warehouse=resources.Warehouse(name="wh"))
-        resources.Task(name="TASK", as_="SELECT 1", warehouse={"name": "wh"})
-        resources.Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}})
-    except Exception:
-        pytest.fail("Resource constructor raised an exception unexpectedly!")
+# def test_resource_init_from_sql():
+#     res = resources.Resource.from_sql("CREATE TASK MY_TASK AS SELECT 1")
+#     assert res.resource_type == resources.ResourceType.TASK
+
+
+def test_resource_init_with_dict_pointer():
+    resources.Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}})
+
+
+def test_resource_init_with_resource_pointer():
+    resources.Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse=resources.Warehouse(name="wh"))
+
+
+def test_resource_init_with_resource_name():
+    resources.Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
+
+
+def test_resource_init_with_type():
+    resources.Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}, "resource_type": "TASK"})
+
+
+def test_resource_init_from_dict():
+    resources.Resource.from_dict(
+        {"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}, "resource_type": "TASK"}
+    )
 
 
 def test_view_fails_with_empty_columns():
@@ -30,26 +46,7 @@ def test_enum_field_serialization():
     assert resources.Warehouse(name="WH", warehouse_size="XSMALL")._data.warehouse_size == WarehouseSize.XSMALL
 
 
-JSON_FIXTURES = list(get_json_fixtures())
 SQL_FIXTURES = list(get_sql_fixtures())
-
-
-@pytest.fixture(
-    params=JSON_FIXTURES,
-    ids=[resource_cls.__name__ for resource_cls, _ in JSON_FIXTURES],
-    scope="function",
-)
-def json_fixture(request):
-    resource_cls, data = request.param
-    yield resource_cls, data
-
-
-def test_init_from_json(json_fixture):
-    resource_cls, data = json_fixture
-    try:
-        resource_cls(**data)
-    except Exception:
-        pytest.fail(f"Failed to construct {resource_cls.__name__} from JSON fixture")
 
 
 @pytest.fixture(

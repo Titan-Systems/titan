@@ -21,12 +21,11 @@ from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
 from .secret import Secret
-
 from .sequence import Sequence
 
 # from .shared_database import SharedDatabase
-from .stage import Stage, InternalStage, ExternalStage
-from .stream import Stream, TableStream, ExternalTableStream, ViewStream, StageStream
+from .stage import InternalStage, ExternalStage
+from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
 from .table import Table
 from .tag import Tag
 from .task import Task
@@ -68,9 +67,8 @@ __all__ = [
     "ExternalAccessIntegration",
     "ExternalFunction",
     "ExternalStage",
-    "ExternalTableStream",
+    # "ExternalTableStream",
     "FailoverGroup",
-    # "FileFormat",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
@@ -93,9 +91,7 @@ __all__ = [
     "Secret",
     "Sequence",
     # "SharedDatabase",
-    "Stage",
     "StageStream",
-    "Stream",
     "Table",
     "TableStream",
     "Tag",

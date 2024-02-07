@@ -12,7 +12,6 @@ from ..props import (
     StringListProp,
     StringProp,
 )
-from .stage import Stage
 
 
 @dataclass

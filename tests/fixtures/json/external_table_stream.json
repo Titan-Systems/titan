@@ -1,0 +1,10 @@
+{
+    "name": "SOME_EXTERNAL_TABLE_STREAM",
+    "on_external_table": "my_ext_table",
+    "owner": "SYSADMIN",
+    "copy_grants": null,
+    "at": null,
+    "before": null,
+    "insert_only": true,
+    "comment": null
+}

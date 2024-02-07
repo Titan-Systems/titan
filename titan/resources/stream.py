@@ -1,10 +1,14 @@
 from dataclasses import dataclass
-from typing import Union
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourcePointer, ResourceSpec
+from .table import Table
+from .view import View
+
+# from .external_table import ExternalTable
+# from .stage import Stage
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
-from ..props import Props, FlagProp, StringProp, BoolProp, TimeTravelProp
+from ..props import BoolProp, FlagProp, IdentifierProp, Props, StringProp, TimeTravelProp
 
 
 class StreamType(ParseableEnum):
@@ -17,7 +21,7 @@ class StreamType(ParseableEnum):
 @dataclass
 class _TableStream(ResourceSpec):
     name: str
-    on_table: str
+    on_table: Table
     owner: str = "SYSADMIN"
     copy_grants: bool = None
     at: dict[str, str] = None
@@ -25,6 +29,12 @@ class _TableStream(ResourceSpec):
     append_only: bool = None
     show_initial_rows: bool = None
     comment: str = None
+
+    def __post_init__(self):
+        if self.at:
+            self.at = {k.lower(): v for k, v in self.at.items()}
+        if self.before:
+            self.before = {k.lower(): v for k, v in self.before.items()}
 
 
 class TableStream(Resource):
@@ -43,7 +53,7 @@ class TableStream(Resource):
     resource_type = ResourceType.STREAM
     props = Props(
         copy_grants=FlagProp("copy grants"),
-        on_table=StringProp("on table", eq=False),
+        on_table=IdentifierProp("on table", eq=False),
         at=TimeTravelProp("at"),
         before=TimeTravelProp("before"),
         append_only=BoolProp("append_only"),
@@ -78,66 +88,71 @@ class TableStream(Resource):
             show_initial_rows=show_initial_rows,
             comment=comment,
         )
+        self.requires(self._data.on_table)
+        if self._data.at and "stream" in self._data.at:
+            self.requires(ResourcePointer(name=self._data.at["stream"], resource_type=ResourceType.STREAM))
+        if self._data.before and "stream" in self._data.before:
+            self.requires(ResourcePointer(name=self._data.before["stream"], resource_type=ResourceType.STREAM))
 
 
-@dataclass
-class _ExternalTableStream(ResourceSpec):
-    name: str
-    on_external_table: str
-    owner: str = "SYSADMIN"
-    copy_grants: bool = None
-    at: dict[str, str] = None
-    before: dict[str, str] = None
-    insert_only: bool = None
-    comment: str = None
+# @dataclass
+# class _ExternalTableStream(ResourceSpec):
+#     name: str
+#     on_external_table: str
+#     owner: str = "SYSADMIN"
+#     copy_grants: bool = None
+#     at: dict[str, str] = None
+#     before: dict[str, str] = None
+#     insert_only: bool = None
+#     comment: str = None
 
 
-class ExternalTableStream(Resource):
-    """
-    CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
-      <name>
-      [ COPY GRANTS ]
-      ON EXTERNAL TABLE <external_table_name>
-      [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> | STREAM => '<name>' } ) ]
-      [ INSERT_ONLY = TRUE ]
-      [ COMMENT = '<string_literal>' ]
-    """
+# class ExternalTableStream(Resource):
+#     """
+#     CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
+#       <name>
+#       [ COPY GRANTS ]
+#       ON EXTERNAL TABLE <external_table_name>
+#       [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> | STREAM => '<name>' } ) ]
+#       [ INSERT_ONLY = TRUE ]
+#       [ COMMENT = '<string_literal>' ]
+#     """
 
-    resource_type = ResourceType.STREAM
-    props = Props(
-        copy_grants=FlagProp("copy grants"),
-        on_external_table=StringProp("on external table", eq=False),
-        at=TimeTravelProp("at"),
-        before=TimeTravelProp("before"),
-        insert_only=BoolProp("insert_only"),
-        comment=StringProp("comment"),
-    )
-    scope = SchemaScope()
-    spec = _ExternalTableStream
+#     resource_type = ResourceType.STREAM
+#     props = Props(
+#         copy_grants=FlagProp("copy grants"),
+#         on_external_table=IdentifierProp("on external table", eq=False),
+#         at=TimeTravelProp("at"),
+#         before=TimeTravelProp("before"),
+#         insert_only=BoolProp("insert_only"),
+#         comment=StringProp("comment"),
+#     )
+#     scope = SchemaScope()
+#     spec = _ExternalTableStream
 
-    def __init__(
-        self,
-        name: str,
-        on_external_table: str,
-        owner: str = "SYSADMIN",
-        copy_grants: bool = None,
-        at: dict[str, str] = None,
-        before: dict[str, str] = None,
-        insert_only: bool = None,
-        comment: str = None,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self._data = _ExternalTableStream(
-            name=name,
-            on_external_table=on_external_table,
-            owner=owner,
-            copy_grants=copy_grants,
-            at=at,
-            before=before,
-            insert_only=insert_only,
-            comment=comment,
-        )
+#     def __init__(
+#         self,
+#         name: str,
+#         on_external_table: str,
+#         owner: str = "SYSADMIN",
+#         copy_grants: bool = None,
+#         at: dict[str, str] = None,
+#         before: dict[str, str] = None,
+#         insert_only: bool = None,
+#         comment: str = None,
+#         **kwargs,
+#     ):
+#         super().__init__(**kwargs)
+#         self._data = _ExternalTableStream(
+#             name=name,
+#             on_external_table=on_external_table,
+#             owner=owner,
+#             copy_grants=copy_grants,
+#             at=at,
+#             before=before,
+#             insert_only=insert_only,
+#             comment=comment,
+#         )
 
 
 @dataclass
@@ -162,7 +177,7 @@ class StageStream(Resource):
     resource_type = ResourceType.STREAM
     props = Props(
         copy_grants=FlagProp("copy grants"),
-        on_stage=StringProp("on stage", eq=False),
+        on_stage=IdentifierProp("on stage", eq=False),
         comment=StringProp("comment"),
     )
     scope = SchemaScope()
@@ -185,12 +200,13 @@ class StageStream(Resource):
             copy_grants=copy_grants,
             comment=comment,
         )
+        self.requires(ResourcePointer(name=self._data.on_stage, resource_type=ResourceType.STAGE))
 
 
 @dataclass
 class _ViewStream(ResourceSpec):
     name: str
-    on_view: str
+    on_view: View
     owner: str = "SYSADMIN"
     copy_grants: bool = None
     at: dict[str, str] = None
@@ -215,7 +231,7 @@ class ViewStream(Resource):
     resource_type = ResourceType.STREAM
     props = Props(
         copy_grants=FlagProp("copy grants"),
-        on_view=StringProp("on view", eq=False),
+        on_view=IdentifierProp("on view", eq=False),
         at=TimeTravelProp("at"),
         before=TimeTravelProp("before"),
         append_only=BoolProp("append_only"),
@@ -250,27 +266,26 @@ class ViewStream(Resource):
             show_initial_rows=show_initial_rows,
             comment=comment,
         )
+        self.requires(self._data.on_view)
 
 
 StreamTypeMap = {
     StreamType.TABLE: TableStream,
-    StreamType.EXTERNAL_TABLE: ExternalTableStream,
+    # StreamType.EXTERNAL_TABLE: ExternalTableStream,
     StreamType.STAGE: StageStream,
     StreamType.VIEW: ViewStream,
 }
 
 
-class Stream:
-    def __new__(
-        cls, type: Union[str, StreamType], **kwargs
-    ) -> Union[TableStream, ExternalTableStream, StageStream, ViewStream]:
-        if isinstance(type, str):
-            type = StreamType(type)
+def _resolver(data: dict):
+    if "on_table" in data:
+        return TableStream
+    # elif "on_external_table" in data:
+    #     return ExternalTableStream
+    elif "on_stage" in data:
+        return StageStream
+    elif "on_view" in data:
+        return ViewStream
 
-        file_type_cls = StreamTypeMap[type]
-        return file_type_cls(**kwargs)
 
-    # @classmethod
-    # def from_sql(cls, sql):
-    #     resource_cls = Resource.classes[_resolve_resource_class(sql)]
-    #     return resource_cls.from_sql(sql)
+Resource.__resolvers__[ResourceType.STREAM] = _resolver

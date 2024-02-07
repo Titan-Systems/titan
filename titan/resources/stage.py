@@ -2,19 +2,17 @@ from dataclasses import dataclass
 from typing import Union
 
 from .resource import Resource, ResourceSpec
-
-# from .file_format import FileFormatProp
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
-
 from ..props import (
     BoolProp,
     EnumProp,
+    IdentifierProp,
     IntProp,
     Props,
+    PropSet,
     StringProp,
     TagsProp,
-    PropSet,
 )
 
 
@@ -69,6 +67,16 @@ class _InternalStage(ResourceSpec):
     tags: dict[str, str] = None
     comment: str = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.type != StageType.INTERNAL:
+            raise ValueError("Type must be INTERNAL for _InternalStage")
+        if self.encryption and self.encryption["type"] not in [
+            EncryptionType.SNOWFLAKE_FULL,
+            EncryptionType.SNOWFLAKE_SSE,
+        ]:
+            raise ValueError("Encryption type must be SNOWFLAKE_FULL or SNOWFLAKE_SSE for InternalStage")
+
 
 class InternalStage(Resource):
     """
@@ -94,7 +102,7 @@ class InternalStage(Resource):
     props = Props(
         encryption=PropSet(
             "encryption",
-            Props(type=EnumProp("type", [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE])),
+            Props(type=StringProp("type")),
         ),
         directory=PropSet(
             "directory", Props(enable=BoolProp("ENABLE"), refresh_on_create=BoolProp("REFRESH_ON_CREATE"))
@@ -121,7 +129,7 @@ class InternalStage(Resource):
     ):
         kwargs.pop("type", None)
         super().__init__(**kwargs)
-        self._data = _InternalStage(
+        self._data: _InternalStage = _InternalStage(
             name=name,
             owner=owner,
             encryption=encryption,
@@ -140,7 +148,7 @@ class _ExternalStage(ResourceSpec):
     owner: str = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
     storage_integration: str = None
-    encryption: dict[str, EncryptionType] = None
+    encryption: dict[str, str] = None
     file_format: Union[str, dict] = None
     directory: dict[str, bool] = None
     copy_options: dict = None
@@ -151,6 +159,11 @@ class _ExternalStage(ResourceSpec):
         super().__post_init__()
         if self.type != StageType.EXTERNAL:
             raise ValueError("Type must be EXTERNAL for _ExternalStage")
+        valid_encryption_types = ["AWS_CSE", "AWS_SSE_S3", "AWS_SSE_KMS", "GCS_SSE_KMS", "AZURE_CSE", "NONE"]
+        if self.encryption and self.encryption["type"] not in valid_encryption_types:
+            raise ValueError(
+                f"Invalid encryption type: {self.encryption.get('type')}. Must be one of {valid_encryption_types}."
+            )
 
 
 class ExternalStage(Resource):
@@ -198,11 +211,11 @@ class ExternalStage(Resource):
     resource_type = ResourceType.STAGE
     props = Props(
         url=StringProp("url"),
-        storage_integration=StringProp("storage_integration"),
+        storage_integration=IdentifierProp("storage_integration"),
         encryption=PropSet(
             "encryption",
             Props(
-                type=EnumProp("type", EncryptionType),
+                type=StringProp("type"),
                 master_key=StringProp("master_key"),
                 kms_key_id=StringProp("kms_key_id"),
             ),
@@ -239,7 +252,7 @@ class ExternalStage(Resource):
     ):
         kwargs.pop("type", None)
         super().__init__(**kwargs)
-        self._data = _ExternalStage(
+        self._data: _ExternalStage = _ExternalStage(
             name=name,
             url=url,
             owner=owner,
@@ -260,14 +273,8 @@ StageTypeMap = {
 }
 
 
-class Stage:
-    def __new__(cls, type: StageType, **kwargs) -> Union[InternalStage, ExternalStage]:
-        if isinstance(type, str):
-            type = StageType(type)
-        stage_cls = StageTypeMap[type]
-        return stage_cls(**kwargs)
+def _resolver(data: dict):
+    return StageTypeMap[StageType(data["type"])]
 
-    # @classmethod
-    # def from_sql(cls, sql):
-    #     resource_cls = Resource.classes[_resolve_resource_class(sql)]
-    #     return resource_cls.from_sql(sql)
+
+Resource.__resolvers__[ResourceType.STAGE] = _resolver

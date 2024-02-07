@@ -134,7 +134,7 @@ class Table(Resource):
         [ COMMENT = '<string_literal>' ]
         """
 
-        identifier, remainder = _parse_create_header(sql, cls)
+        identifier, remainder = _parse_create_header(sql, cls.resource_type, cls.scope)
         table_schema, remainder = _parse_table_schema(remainder)
         props = _parse_props(cls.props, remainder)
         return cls(**identifier, **table_schema, **props)

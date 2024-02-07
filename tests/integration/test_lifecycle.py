@@ -18,8 +18,17 @@ def resource(request, test_db, cursor, marked_for_cleanup):
     resource_cls, data = request.param
     res = resource_cls(**data)
     test_schema = Schema(name="public", database=test_db)
+
+    # Always create STATIC_TABLE, a hack until we add proper SQL parsing for view code
+
+    static_table = STATIC_RESOURCES[ResourceType.TABLE]
+    cursor.execute(static_table.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(static_table)
+
     for ref in res.refs:
         if ref.resource_type in STATIC_RESOURCES:
+            if ref.resource_type == ResourceType.TABLE:
+                continue
             print(f"Creating static resource {ref.resource_type} for {res.urn}")
             static_res = STATIC_RESOURCES[ref.resource_type]
             if isinstance(res.scope, DatabaseScope):
@@ -28,11 +37,6 @@ def resource(request, test_db, cursor, marked_for_cleanup):
                 static_res._register_scope(schema=test_schema)
             cursor.execute(static_res.create_sql(if_not_exists=True))
             marked_for_cleanup.append(static_res)
-    # A hack until we add proper SQL parsing for view code
-    if res.resource_type == ResourceType.VIEW:
-        static_table = STATIC_RESOURCES[ResourceType.TABLE]
-        cursor.execute(static_table.create_sql(if_not_exists=True))
-        marked_for_cleanup.append(static_table)
 
     if AccountEdition.STANDARD not in resource_cls.edition:
         pytest.skip(f"Skipping {resource_cls.__name__}, it's not supported in standard edition")

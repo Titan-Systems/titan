@@ -12,7 +12,6 @@ __all__ = [
     "Schema",
     "Sequence",
     "SharedDatabase",
-    "Stream",
     "Table",
     "Tag",
     "Task",

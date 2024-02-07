@@ -116,14 +116,14 @@ def _make_scoped_identifier(identifier_list, scope):
         raise Exception(f"Unsupported identifier list: {identifier_list}")
 
 
-def _parse_create_header(sql, resource_cls):
+def _parse_create_header(sql, resource_type, scope):
     header = pp.And(
         [
             CREATE,
             pp.Opt(OR_REPLACE)("or_replace"),
             pp.Opt(TEMPORARY)("temporary"),
             ...,
-            Keywords(str(resource_cls.resource_type))("resource_type"),
+            Keywords(str(resource_type))("resource_type"),
             pp.Opt(IF_NOT_EXISTS)("if_not_exists"),
             FullyQualifiedIdentifier("resource_identifier"),
             REST_OF_STRING("remainder"),
@@ -132,7 +132,7 @@ def _parse_create_header(sql, resource_cls):
     try:
         results = header.parse_string(sql, parse_all=True).as_dict()
         remainder = (results["_skipped"][0] + " " + results.get("remainder", "")).strip(" ;")
-        identifier = _make_scoped_identifier(results["resource_identifier"], resource_cls.scope)
+        identifier = _make_scoped_identifier(results["resource_identifier"], scope)
         return (identifier, remainder)
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse header") from err
@@ -301,32 +301,32 @@ def _resolve_resource_class(sql):
 
     lexicon = Lexicon(
         {
-            "ALERT": "alert",
-            "DATABASE": _resolve_database,
-            "DYNAMIC TABLE": "dynamic_table",
-            "EXTERNAL FUNCTION": "external_function",
-            "FILE FORMAT": _resolve_file_format,
-            "NOTIFICATION INTEGRATION": _resolve_notification_integration,
-            "PIPE": "pipe",
-            "RESOURCE MONITOR": "resource_monitor",
-            "ROLE": "role",
-            "SCHEMA": "schema",
-            "SEQUENCE": "sequence",
-            "STAGE": _resolve_stage,
-            "STORAGE INTEGRATION": _resolve_storage_integration,
-            "STREAM": _resolve_stream,
-            "TABLE": "table",
-            "TAG": "tag",
-            "TASK": "task",
-            "USER": "user",
-            "VIEW": "view",
-            "WAREHOUSE": "warehouse",
+            "ALERT": ResourceType.ALERT,
+            "DATABASE": ResourceType.DATABASE,
+            "DYNAMIC TABLE": ResourceType.DYNAMIC_TABLE,
+            "EXTERNAL FUNCTION": ResourceType.EXTERNAL_FUNCTION,
+            "FILE FORMAT": ResourceType.FILE_FORMAT,
+            "NOTIFICATION INTEGRATION": ResourceType.NOTIFICATION_INTEGRATION,
+            "PIPE": ResourceType.PIPE,
+            "RESOURCE MONITOR": ResourceType.RESOURCE_MONITOR,
+            "ROLE": ResourceType.ROLE,
+            "SCHEMA": ResourceType.SCHEMA,
+            "SEQUENCE": ResourceType.SEQUENCE,
+            "STAGE": ResourceType.STAGE,
+            "STORAGE INTEGRATION": ResourceType.STORAGE_INTEGRATION,
+            "STREAM": ResourceType.STREAM,
+            "TABLE": ResourceType.TABLE,
+            "TAG": ResourceType.TAG,
+            "TASK": ResourceType.TASK,
+            "USER": ResourceType.USER,
+            "VIEW": ResourceType.VIEW,
+            "WAREHOUSE": ResourceType.WAREHOUSE,
         }
     )
 
     try:
-        resource_key = convert_match(lexicon, sql)
-        return resource_key
+        resource_type = convert_match(lexicon, sql)
+        return resource_type
     except pp.ParseException as err:
         raise pp.ParseException(f"Could not resolve resource class for SQL: {sql}") from err
 

@@ -182,6 +182,14 @@ class ProcedurePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class ReplicationGroupPriv(ParseableEnum):
+    ALL = "ALL"
+    MODIFY = "MODIFY"
+    MONITOR = "MONITOR"
+    OWNERSHIP = "OWNERSHIP"
+    REPLICATE = "REPLICATE"
+
+
 class RolePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
@@ -299,6 +307,7 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.API_INTEGRATION: IntegrationPriv,
     ResourceType.DATABASE: DatabasePriv,
     ResourceType.DYNAMIC_TABLE: TablePriv,
+    ResourceType.EVENT_TABLE: EventTablePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.EXTERNAL_FUNCTION: FunctionPriv,
     ResourceType.FAILOVER_GROUP: FailoverGroupPriv,
@@ -308,6 +317,7 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
     ResourceType.PIPE: PipePriv,
     ResourceType.PROCEDURE: ProcedurePriv,
+    ResourceType.REPLICATION_GROUP: ReplicationGroupPriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,
     ResourceType.SECRET: SecretPriv,
@@ -336,6 +346,7 @@ CREATE_PRIV_FOR_RESOURCE_TYPE = {
     ResourceType.API_INTEGRATION: GlobalPriv.CREATE_API_INTEGRATION,
     ResourceType.DATABASE: GlobalPriv.CREATE_DATABASE,
     ResourceType.DYNAMIC_TABLE: SchemaPriv.CREATE_DYNAMIC_TABLE,
+    ResourceType.EVENT_TABLE: SchemaPriv.CREATE_TABLE,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: GlobalPriv.CREATE_INTEGRATION,
     ResourceType.EXTERNAL_FUNCTION: SchemaPriv.CREATE_FUNCTION,
     ResourceType.FAILOVER_GROUP: GlobalPriv.CREATE_FAILOVER_GROUP,
@@ -347,6 +358,7 @@ CREATE_PRIV_FOR_RESOURCE_TYPE = {
     ResourceType.PIPE: SchemaPriv.CREATE_PIPE,
     ResourceType.PROCEDURE: SchemaPriv.CREATE_PROCEDURE,
     # ResourceType.RESOURCE_MONITOR: GlobalPriv.CREATE_RESOURCE_MONITOR, # only ACCOUNTADMIN
+    ResourceType.REPLICATION_GROUP: GlobalPriv.CREATE_REPLICATION_GROUP,
     ResourceType.ROLE: GlobalPriv.CREATE_ROLE,
     # ResourceType.ROLE_GRANT: RolePriv.OWNERSHIP,
     ResourceType.SCHEMA: DatabasePriv.CREATE_SCHEMA,

@@ -9,7 +9,7 @@ from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
-from ..parse import _parse_create_header, _parse_props
+from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 from ..scope import ResourceScope, OrganizationScope, DatabaseScope, SchemaScope
 
 
@@ -43,6 +43,15 @@ class ResourceSpec:
                 if len(dict_types) < 2:
                     raise RuntimeError(f"Unexpected field type {field_type}")
                 return {k: _coerce(v, field_type=dict_types[1]) for k, v in field_value.items()}
+
+            # Check for field_value's type in a Union
+            if get_origin(field_type) == Union:
+                union_types = get_args(field_type)
+                for union_type in union_types:
+                    expected_type = get_origin(union_type) or union_type
+                    if isinstance(field_value, expected_type):
+                        return _coerce(field_value, field_type=expected_type)
+                raise RuntimeError(f"Unexpected field type {field_type}")
 
             if not isclass(field_type):
                 raise RuntimeError(f"Unexpected field type {field_type}")
@@ -116,15 +125,20 @@ class Resource(metaclass=_Resource):
     scope: ResourceScope
     spec: Type[ResourceSpec]
 
-    def __init__(self, implicit: bool = False, stub: bool = False, **scope_kwargs):
+    def __init__(self, implicit: bool = False, **kwargs):
         super().__init__()
         self._data: ResourceSpec = None
         self._container: "ResourceContainer" = None
         self.implicit = implicit
         self.refs = set()
-        self._register_scope(**scope_kwargs)
-        if stub:
-            raise Exception("Stub resources are deprecated")
+
+        # Consume resource_type from kwargs if it exists
+        resource_type = kwargs.pop("resource_type", None)
+        resource_type = ResourceType(resource_type) if resource_type else None
+        if resource_type and resource_type != self.resource_type:
+            raise ValueError(f"Unexpected resource_type {resource_type} for {self.resource_type}")
+
+        self._register_scope(**kwargs)
 
     @classmethod
     def from_sql(cls, sql):
@@ -133,15 +147,25 @@ class Resource(metaclass=_Resource):
             # FIXME: we need to change the way we handle polymorphic resources
             # make a new function called _parse_resource_type_from_create
             # resource_cls = Resource.classes[_resolve_resource_class(sql)]
-            raise NotImplementedError
+            # raise NotImplementedError
+            resource_type = _resolve_resource_class(sql)
+            scope = RESOURCE_SCOPES[resource_type]
+        else:
+            resource_type = resource_cls.resource_type
+            scope = resource_cls.scope
 
-        identifier, remainder_sql = _parse_create_header(sql, resource_cls)
+        identifier, remainder_sql = _parse_create_header(sql, resource_type, scope)
 
         try:
             props = _parse_props(resource_cls.props, remainder_sql) if remainder_sql else {}
             return resource_cls(**identifier, **props)
         except pp.ParseException as err:
             raise pp.ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        resource_cls = cls.resolve_resource_cls(ResourceType(data["resource_type"]), data)
+        return resource_cls(**data)
 
     @classmethod
     def props_for_resource_type(cls, resource_type: ResourceType, data: dict = None):
@@ -169,7 +193,8 @@ class Resource(metaclass=_Resource):
         return {f.name: f.default for f in fields(cls.spec)}
 
     def __repr__(self):  # pragma: no cover
-        return f"{self.__class__.__name__}({str(self.fqn)})"
+        name = getattr(self._data, "name", None)
+        return f"{self.__class__.__name__}({name})"
 
     def to_dict(self):
         defaults = {f.name: f.default for f in fields(self.spec)}
