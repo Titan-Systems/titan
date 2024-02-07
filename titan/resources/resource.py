@@ -104,17 +104,24 @@ class ResourceSpec:
                 setattr(self, field.name, _coerce(field_value, field.type))
 
 
+RESOURCE_SCOPES = {
+    ResourceType.ACCOUNT: OrganizationScope(),
+}
+
+
 class _Resource(type):
     __types__ = {}
     __resolvers__ = {}
 
     def __new__(cls, name, bases, attrs):
         cls_ = super().__new__(cls, name, bases, attrs)
-        if cls_.__name__ in ["Resource", "_Resource"]:
+        if cls_.__name__ in ["Resource", "_Resource", "ResourcePointer"]:
             return cls_
         if cls_.resource_type not in cls.__types__:
             cls.__types__[cls_.resource_type] = []
         cls.__types__[cls_.resource_type].append(cls_)
+        if cls_.resource_type not in RESOURCE_SCOPES:
+            RESOURCE_SCOPES[cls_.resource_type] = cls_.scope
         return cls_
 
 
@@ -304,11 +311,7 @@ class ResourcePointer(Resource, ResourceContainer):
 
         self._name: str = name
         self._resource_type: ResourceType = resource_type
-        # self._container: "ResourceContainer" = None
-        if resource_type == ResourceType.ACCOUNT:
-            self.scope = OrganizationScope()
-        else:
-            self.scope = Resource.resolve_resource_cls(resource_type).scope
+        self.scope = RESOURCE_SCOPES[resource_type]
         super().__init__()
 
     def __repr__(self):  # pragma: no cover
