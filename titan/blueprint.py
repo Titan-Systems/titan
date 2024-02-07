@@ -82,8 +82,28 @@ def _plan(remote_state, manifest):
     del manifest["_urns"]
 
     changes = []
+    marked_for_replacement = set()
     for action, urn_str, data in diff(remote_state, manifest):
-        changes.append((action, urn_str, data))
+        if action == DiffAction.CHANGE:
+            if urn_str in marked_for_replacement:
+                continue
+
+            # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
+            attr = list(data.keys())[0]
+            urn = parse_URN(urn_str)
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, remote_state[urn_str])
+            attr_metadata = resource_cls.spec.get_metadata(attr)
+            if attr_metadata.get("triggers_replacement", False):
+                marked_for_replacement.add(urn_str)
+            else:
+                changes.append((action, urn_str, data))
+        else:
+            changes.append((action, urn_str, data))
+
+    for urn_str in marked_for_replacement:
+        changes.append((DiffAction.REMOVE, urn_str, remote_state[urn_str]))
+        changes.append((DiffAction.ADD, urn_str, manifest[urn_str]))
+
     return sorted(changes, key=lambda change: sort_order[change[1]])
 
 
@@ -377,6 +397,7 @@ class Blueprint:
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
+                # TODO: clean this up
                 found = False
                 for db in databases:
                     for schema in db.items(resource_type=ResourceType.SCHEMA):
@@ -384,6 +405,8 @@ class Blueprint:
                             schema.add(resource)
                             found = True
                             break
+                    if found:
+                        break
                 if not found:
                     raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
 

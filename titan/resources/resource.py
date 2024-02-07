@@ -96,6 +96,10 @@ class ResourceSpec:
             else:
                 setattr(self, field.name, _coerce(field_value, field.type))
 
+    @classmethod
+    def get_metadata(cls, field_name: str):
+        return {f.name: f.metadata for f in fields(cls)}[field_name]
+
 
 RESOURCE_SCOPES = {
     ResourceType.ACCOUNT: OrganizationScope(),
@@ -318,11 +322,16 @@ class ResourceContainer:
 
 class ResourcePointer(Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-
         self._name: str = name
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
         super().__init__()
+
+        # Don't want to do this for all implicit resources but making an exception for PUBLIC schema
+
+        # If this points to a database, assume it includes a PUBLIC schema
+        if self._resource_type == ResourceType.DATABASE:
+            self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
 
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)

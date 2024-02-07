@@ -69,8 +69,6 @@ def diff(original, new):
             if new[key].get("_pointer", False):
                 continue
 
-            # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
-
             delta = dict_delta(original[key], new[key])
             for attr, value in delta.items():
                 yield DiffAction.CHANGE, key, {attr: value}

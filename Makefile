@@ -24,4 +24,6 @@ clean:
 	find . -name "__pycache__" -type d -exec rm -rf {} +
 
 build:
-	python setup.py sdist --formats=zip
+	mkdir -p dist
+	zip -vrX dist/titan-$(shell python setup.py -V).zip titan/
+

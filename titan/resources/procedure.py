@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Arg, Resource, ResourceSpec
 from ..scope import SchemaScope
@@ -28,7 +28,7 @@ class _PythonStoredProcedure(ResourceSpec):
     copy_grants: bool = False
     execute_as: ExecutionRights = ExecutionRights.OWNER
     external_access_integrations: list = None
-    imports: list = None
+    imports: list = field(default_factory=None, metadata={"triggers_replacement": True})
     null_handling: NullHandling = NullHandling.CALLED_ON_NULL_INPUT
     owner: str = "SYSADMIN"
     secure: bool = False
