@@ -189,7 +189,7 @@ class Grant(Resource):
                     # on_{resource} kwargs
                     # on_schema="foo" -> on=Schema(name="foo")
                     on = arg
-                    on_type = ResourceType(keyword[3:])
+                    on_type = ResourceType(keyword[3:].replace("_", " ").upper())
         # Handle on= kwarg
         else:
             if on is None:

@@ -1,11 +1,11 @@
 from dataclasses import asdict, dataclass, fields
-from typing import Any, TypedDict, Type, get_args, get_origin
+from typing import Any, TypedDict, Type, Union, get_args, get_origin
 from inspect import isclass
 from itertools import chain
 
 import pyparsing as pp
 
-from ..enums import DataType, ParseableEnum, ResourceType
+from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
@@ -73,23 +73,7 @@ class ResourceSpec:
 
             # Coerce resources
             elif issubclass(field_type, Resource):
-                if isinstance(field_value, str):
-                    return ResourcePointer(name=field_value, resource_type=field_type.resource_type)
-                elif isinstance(field_value, dict):
-                    # We permit two types of anonymous resource declarations in the constructor of another resource:
-                    # 1. A dict with a single key, the name of the resource
-                    # Example:
-                    #   grant = Grant(priv='SELECT', on='table', to={'name': 'some_role'})
-                    # 2. A dict representing a column or column-like object
-                    # Example:
-                    #   table = Table(name='my_table', columns=[{'name': 'id', 'data_type': 'int'}])
-
-                    if field_type.__name__ == "Column":
-                        return field_type(**field_value)
-                    else:
-                        return ResourcePointer(**field_value, resource_type=field_type.resource_type)
-                elif isinstance(field_value, field_type):
-                    return field_value
+                return convert_to_resource(field_type, field_value)
             else:
                 return field_value
 
@@ -126,6 +110,7 @@ class _Resource(type):
 
 
 class Resource(metaclass=_Resource):
+    edition = {AccountEdition.STANDARD, AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     props: ResourceProps
     resource_type: ResourceType
     scope: ResourceScope
@@ -186,7 +171,7 @@ class Resource(metaclass=_Resource):
     def __repr__(self):  # pragma: no cover
         return f"{self.__class__.__name__}({str(self.fqn)})"
 
-    def to_dict(self, packed=False):
+    def to_dict(self):
         defaults = {f.name: f.default for f in fields(self.spec)}
 
         serialized = {}
@@ -223,7 +208,7 @@ class Resource(metaclass=_Resource):
     def create_sql(self, **kwargs):
         return create_resource(
             self.urn,
-            self.to_dict(packed=True),
+            self.to_dict(),
             self.props,
             **kwargs,
         )
@@ -335,5 +320,44 @@ class ResourcePointer(Resource, ResourceContainer):
     def resource_type(self):
         return self._resource_type
 
-    def to_dict(self, packed=False):
+    def to_dict(self):
         return {"name": self.name}
+
+
+def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource]) -> Resource:
+    """Convert a resource descriptor to a resource instance
+
+    Args:
+        cls (Resource): The resource class to convert to
+        resource_or_descriptor (Union[str, dict, Resource]): The resource descriptor to convert
+
+    Returns:
+        Resource: A new or existing resource instance based on the provided descriptor.
+
+    Examples:
+        >>> convert_to_resource(Database, "my_database")
+        Database(name='my_database')
+
+        >>> convert_to_resource(Database, {"name": "my_database"})
+        Database(name='my_database')
+
+        >>> convert_to_resource(Database, Database(name="my_database"))
+        Database(name='my_database')
+    """
+    if isinstance(resource_or_descriptor, str):
+        return ResourcePointer(name=resource_or_descriptor, resource_type=cls.resource_type)
+    elif isinstance(resource_or_descriptor, dict):
+        # We permit two types of anonymous resource descriptors
+        # 1. A dict with a single key, the name of the resource
+        # Example:
+        #   grant = Grant(priv='SELECT', on='table', to={'name': 'some_role'})
+        # 2. A dict representing a column or column-like object
+        # Example:
+        #   table = Table(name='my_table', columns=[{'name': 'id', 'data_type': 'int'}])
+
+        if cls.__name__ == "Column":
+            return cls(**resource_or_descriptor)
+        else:
+            return ResourcePointer(**resource_or_descriptor, resource_type=cls.resource_type)
+    elif isinstance(resource_or_descriptor, cls):
+        return resource_or_descriptor

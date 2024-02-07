@@ -21,12 +21,12 @@ class Tag(Resource):
         [ ALLOWED_VALUES '<val_1>' [ , '<val_2>' , [ ... ] ] ]
     """
 
+    edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.TAG
     props = Props(
         comment=StringProp("comment"),
         allowed_values=StringListProp("allowed_values", eq=False),
     )
-    # requires = {AccountEdition.ENTERPRISE}
     scope = SchemaScope()
     spec = _Tag
 

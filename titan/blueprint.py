@@ -1,6 +1,3 @@
-import json
-
-from collections import defaultdict
 from typing import List, Optional, Union
 from queue import Queue
 
@@ -23,8 +20,7 @@ from .privs import (
     is_ownership_priv,
 )
 from .resources import Account, Database, Schema
-from .resources.resource import Resource, ResourceContainer, ResourcePointer
-from .resources.validators import coerce_from_str
+from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 
@@ -318,9 +314,9 @@ class Blueprint:
         self._enforce_requirements: bool = enforce_requirements
 
         self.name = name
-        self.account: Optional[Account] = coerce_from_str(Account)(account) if account else None
-        self.database: Optional[Database] = coerce_from_str(Database)(database) if database else None
-        self.schema: Optional[Schema] = coerce_from_str(Schema)(schema) if schema else None
+        self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
+        self.database: Optional[Database] = convert_to_resource(Database, database) if database else None
+        self.schema: Optional[Schema] = convert_to_resource(Schema, schema) if schema else None
 
         if self.account and self.database:
             self.account.add(self.database)
@@ -399,11 +395,11 @@ class Blueprint:
             if isinstance(resource, Resource) and resource.implicit:
                 continue
 
-            # urn = URN.from_resource(account_locator=self._account_locator, resource=resource)
-            # return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
-            # resource_fqn = resource.fqn if isinstance(resource, Resource) else resource.fqn
-
-            urn = URN(resource_type=resource.resource_type, fqn=resource.fqn, account_locator=self._account_locator)
+            urn = URN(
+                resource_type=resource.resource_type,
+                fqn=resource.fqn,
+                account_locator=self._account_locator,
+            )
             data = resource.to_dict()
 
             if isinstance(resource, ResourcePointer):

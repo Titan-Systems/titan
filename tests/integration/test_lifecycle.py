@@ -2,7 +2,7 @@ import pytest
 
 from tests.helpers import STATIC_RESOURCES, get_json_fixtures
 
-from titan.enums import ResourceType
+from titan.enums import AccountEdition, ResourceType
 from titan.scope import DatabaseScope, SchemaScope
 from titan.resources.schema import Schema
 
@@ -33,6 +33,10 @@ def resource(request, test_db, cursor, marked_for_cleanup):
         static_table = STATIC_RESOURCES[ResourceType.TABLE]
         cursor.execute(static_table.create_sql(if_not_exists=True))
         marked_for_cleanup.append(static_table)
+
+    if AccountEdition.STANDARD not in resource_cls.edition:
+        pytest.skip(f"Skipping {resource_cls.__name__}, it's not supported in standard edition")
+
     yield res
 
 

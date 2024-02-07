@@ -16,6 +16,7 @@ from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
 from .pipe import Pipe
 from .procedure import PythonStoredProcedure
+from .replication_group import ReplicationGroup
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
@@ -82,6 +83,7 @@ __all__ = [
     "Pipe",
     "PythonUDF",
     "PythonStoredProcedure",
+    "ReplicationGroup",
     "Resource",
     "ResourceMonitor",
     "Role",
