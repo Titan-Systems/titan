@@ -12,7 +12,6 @@ __all__ = [
     "Schema",
     "Sequence",
     "SharedDatabase",
-    "Stream",
     "Table",
     "Tag",
     "Task",
@@ -21,7 +20,7 @@ __all__ = [
     "Warehouse",
 ]
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 LOGO = r"""
     __  _ __          

@@ -51,7 +51,7 @@ class TestBlueprint(unittest.TestCase):
             manifest["urn::ABCD123:schema/DB.SCHEMA"],
             {
                 "comment": None,
-                "data_retention_time_in_days": None,
+                "data_retention_time_in_days": 1,
                 "default_ddl_collation": None,
                 "managed_access": False,
                 "max_data_extension_time_in_days": 14,

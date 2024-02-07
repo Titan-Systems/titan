@@ -1,0 +1,8 @@
+{
+    "priv": "USAGE",
+    "on_type": "SCHEMA",
+    "in_type": "DATABASE",
+    "in_name": "STATIC_DATABASE",
+    "to": "STATIC_ROLE",
+    "grant_option": false
+}

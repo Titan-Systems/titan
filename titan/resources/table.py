@@ -134,14 +134,8 @@ class Table(Resource):
         [ COMMENT = '<string_literal>' ]
         """
 
-        identifier, remainder = _parse_create_header(sql, cls)
+        identifier, remainder = _parse_create_header(sql, cls.resource_type, cls.scope)
         table_schema, remainder = _parse_table_schema(remainder)
-        # if "schema" in identifier:
-        #     schema = Schema(name=identifier["schema"], stub=True)
-        #     if "database" in identifier:
-        #         schema.database = identifier["database"]
-        #         del identifier["database"]
-        #     identifier["schema"] = schema
         props = _parse_props(cls.props, remainder)
         return cls(**identifier, **table_schema, **props)
 

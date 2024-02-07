@@ -1,0 +1,11 @@
+{
+    "name": "SOME_VIEW_STREAM",
+    "on_view": "STATIC_VIEW",
+    "owner": "SYSADMIN",
+    "copy_grants": null,
+    "at": null,
+    "before": null,
+    "append_only": null,
+    "show_initial_rows": null,
+    "comment": null
+}

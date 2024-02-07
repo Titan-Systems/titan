@@ -120,6 +120,34 @@ class DatabasePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class EventTablePriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    SELECT = "SELECT"
+    INSERT = "INSERT"
+
+
+class FailoverGroupPriv(ParseableEnum):
+    ALL = "ALL"
+    FAILOVER = "FAILOVER"
+    MODIFY = "MODIFY"
+    MONITOR = "MONITOR"
+    OWNERSHIP = "OWNERSHIP"
+    REPLICATE = "REPLICATE"
+
+
+class FileFormatPriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
+class FunctionPriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
 class IntegrationPriv(ParseableEnum):
     ALL = "ALL"
     USAGE = "USAGE"
@@ -140,10 +168,26 @@ class PasswordPolicyPriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
+class PipePriv(ParseableEnum):
+    ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    MONITOR = "MONITOR"
+    OPERATE = "OPERATE"
+    OWNERSHIP = "OWNERSHIP"
+
+
 class ProcedurePriv(ParseableEnum):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
+
+
+class ReplicationGroupPriv(ParseableEnum):
+    ALL = "ALL"
+    MODIFY = "MODIFY"
+    MONITOR = "MONITOR"
+    OWNERSHIP = "OWNERSHIP"
+    REPLICATE = "REPLICATE"
 
 
 class RolePriv(ParseableEnum):
@@ -184,6 +228,12 @@ class SchemaPriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class SecretPriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+    READ = "READ"
+    USAGE = "USAGE"
+
+
 class SequencePriv(ParseableEnum):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
@@ -198,6 +248,12 @@ class StagePriv(ParseableEnum):
     WRITE = "WRITE"
 
 
+class StreamPriv(ParseableEnum):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    SELECT = "SELECT"
+
+
 class TablePriv(ParseableEnum):
     ALL = "ALL"
     DELETE = "DELETE"
@@ -207,6 +263,20 @@ class TablePriv(ParseableEnum):
     SELECT = "SELECT"
     TRUNCATE = "TRUNCATE"
     UPDATE = "UPDATE"
+
+
+class TagPriv(ParseableEnum):
+    APPLY = "APPLY"
+    OWNERSHIP = "OWNERSHIP"
+    READ = "READ"
+
+
+class TaskPriv(ParseableEnum):
+    ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    MONITOR = "MONITOR"
+    OPERATE = "OPERATE"
+    OWNERSHIP = "OWNERSHIP"
 
 
 class UserPriv(ParseableEnum):
@@ -234,17 +304,29 @@ class WarehousePriv(ParseableEnum):
 PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.ACCOUNT: GlobalPriv,
     ResourceType.ALERT: AlertPriv,
+    ResourceType.API_INTEGRATION: IntegrationPriv,
     ResourceType.DATABASE: DatabasePriv,
+    ResourceType.DYNAMIC_TABLE: TablePriv,
+    ResourceType.EVENT_TABLE: EventTablePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
+    ResourceType.EXTERNAL_FUNCTION: FunctionPriv,
+    ResourceType.FAILOVER_GROUP: FailoverGroupPriv,
+    ResourceType.FUNCTION: FunctionPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
-    ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
     ResourceType.PACKAGES_POLICY: PackagesPolicyPriv,
+    ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
+    ResourceType.PIPE: PipePriv,
     ResourceType.PROCEDURE: ProcedurePriv,
+    ResourceType.REPLICATION_GROUP: ReplicationGroupPriv,
     ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,
+    ResourceType.SECRET: SecretPriv,
     ResourceType.SEQUENCE: SequencePriv,
     ResourceType.STAGE: StagePriv,
+    ResourceType.STREAM: StreamPriv,
     ResourceType.TABLE: TablePriv,
+    ResourceType.TAG: TagPriv,
+    ResourceType.TASK: TaskPriv,
     ResourceType.USER: UserPriv,
     ResourceType.VIEW: ViewPriv,
     ResourceType.WAREHOUSE: WarehousePriv,
@@ -264,6 +346,7 @@ CREATE_PRIV_FOR_RESOURCE_TYPE = {
     ResourceType.API_INTEGRATION: GlobalPriv.CREATE_API_INTEGRATION,
     ResourceType.DATABASE: GlobalPriv.CREATE_DATABASE,
     ResourceType.DYNAMIC_TABLE: SchemaPriv.CREATE_DYNAMIC_TABLE,
+    ResourceType.EVENT_TABLE: SchemaPriv.CREATE_TABLE,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: GlobalPriv.CREATE_INTEGRATION,
     ResourceType.EXTERNAL_FUNCTION: SchemaPriv.CREATE_FUNCTION,
     ResourceType.FAILOVER_GROUP: GlobalPriv.CREATE_FAILOVER_GROUP,
@@ -275,6 +358,7 @@ CREATE_PRIV_FOR_RESOURCE_TYPE = {
     ResourceType.PIPE: SchemaPriv.CREATE_PIPE,
     ResourceType.PROCEDURE: SchemaPriv.CREATE_PROCEDURE,
     # ResourceType.RESOURCE_MONITOR: GlobalPriv.CREATE_RESOURCE_MONITOR, # only ACCOUNTADMIN
+    ResourceType.REPLICATION_GROUP: GlobalPriv.CREATE_REPLICATION_GROUP,
     ResourceType.ROLE: GlobalPriv.CREATE_ROLE,
     # ResourceType.ROLE_GRANT: RolePriv.OWNERSHIP,
     ResourceType.SCHEMA: DatabasePriv.CREATE_SCHEMA,

@@ -427,10 +427,15 @@ class TimeTravelProp(Prop):
         key, value = prop_value
         return {key: value}
 
-    def render(self, value):
-        if value is None:
+    def render(self, values):
+        if values is None:
             return ""
-        return f"{self.label} ({value})"
+
+        key, value = values.popitem()
+        if key.upper() == "STREAM":
+            value = f"'{value}'"
+        time_point = f"{key} => {value}"
+        return f"{self.label} ({time_point})"
 
 
 class AlertConditionProp(Prop):

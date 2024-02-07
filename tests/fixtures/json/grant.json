@@ -1,0 +1,8 @@
+{
+    "priv": "USAGE",
+    "on_type": "DATABASE",
+    "on": "STATIC_DATABASE",
+    "to": "STATIC_ROLE",
+    "owner": "SYSADMIN",
+    "grant_option": false
+}

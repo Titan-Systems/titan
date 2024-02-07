@@ -1,16 +1,16 @@
 from dataclasses import asdict, dataclass, fields
-from typing import _GenericAlias, Any, TypedDict, Type, Union, get_args, get_origin, get_type_hints
+from typing import Any, TypedDict, Type, Union, get_args, get_origin
 from inspect import isclass
 from itertools import chain
 
 import pyparsing as pp
 
-from ..enums import DataType, ParseableEnum, ResourceType
-from ..identifiers import FQN, URN
+from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
+from ..identifiers import URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
-from ..parse import _parse_create_header, _parse_props
-from ..scope import ResourceScope, DatabaseScope, SchemaScope
+from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..scope import ResourceScope, OrganizationScope, DatabaseScope, SchemaScope
 
 
 class Arg(TypedDict):
@@ -44,6 +44,15 @@ class ResourceSpec:
                     raise RuntimeError(f"Unexpected field type {field_type}")
                 return {k: _coerce(v, field_type=dict_types[1]) for k, v in field_value.items()}
 
+            # Check for field_value's type in a Union
+            if get_origin(field_type) == Union:
+                union_types = get_args(field_type)
+                for union_type in union_types:
+                    expected_type = get_origin(union_type) or union_type
+                    if isinstance(field_value, expected_type):
+                        return _coerce(field_value, field_type=expected_type)
+                raise RuntimeError(f"Unexpected field type {field_type}")
+
             if not isclass(field_type):
                 raise RuntimeError(f"Unexpected field type {field_type}")
 
@@ -73,12 +82,7 @@ class ResourceSpec:
 
             # Coerce resources
             elif issubclass(field_type, Resource):
-                if isinstance(field_value, str):
-                    return field_type(name=field_value, stub=True)
-                elif isinstance(field_value, dict):
-                    return field_type(**field_value, stub=True)
-                elif isinstance(field_value, field_type):
-                    return field_value
+                return convert_to_resource(field_type, field_value)
             else:
                 return field_value
 
@@ -92,36 +96,53 @@ class ResourceSpec:
             else:
                 setattr(self, field.name, _coerce(field_value, field.type))
 
+    @classmethod
+    def get_metadata(cls, field_name: str):
+        return {f.name: f.metadata for f in fields(cls)}[field_name]
+
+
+RESOURCE_SCOPES = {
+    ResourceType.ACCOUNT: OrganizationScope(),
+}
+
 
 class _Resource(type):
-    __types = {}
+    __types__ = {}
     __resolvers__ = {}
 
     def __new__(cls, name, bases, attrs):
         cls_ = super().__new__(cls, name, bases, attrs)
-        try:
-            if cls_.resource_type not in cls._Resource__types:
-                cls.__types[cls_.resource_type] = []
-            cls.__types[cls_.resource_type].append(cls_)
-        except AttributeError:
-            pass
+        if cls_.__name__ in ["Resource", "_Resource", "ResourcePointer"]:
+            return cls_
+        if cls_.resource_type not in cls.__types__:
+            cls.__types__[cls_.resource_type] = []
+        cls.__types__[cls_.resource_type].append(cls_)
+        if cls_.resource_type not in RESOURCE_SCOPES:
+            RESOURCE_SCOPES[cls_.resource_type] = cls_.scope
         return cls_
 
 
 class Resource(metaclass=_Resource):
+    edition = {AccountEdition.STANDARD, AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     props: ResourceProps
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
 
-    def __init__(self, implicit: bool = False, stub: bool = False, **scope_kwargs):
+    def __init__(self, implicit: bool = False, **kwargs):
         super().__init__()
         self._data: ResourceSpec = None
         self._container: "ResourceContainer" = None
         self.implicit = implicit
-        self.stub = stub
         self.refs = set()
-        self._register_scope(**scope_kwargs)
+
+        # Consume resource_type from kwargs if it exists
+        resource_type = kwargs.pop("resource_type", None)
+        resource_type = ResourceType(resource_type) if resource_type else None
+        if resource_type and resource_type != self.resource_type:
+            raise ValueError(f"Unexpected resource_type {resource_type} for {self.resource_type}")
+
+        self._register_scope(**kwargs)
 
     @classmethod
     def from_sql(cls, sql):
@@ -130,9 +151,14 @@ class Resource(metaclass=_Resource):
             # FIXME: we need to change the way we handle polymorphic resources
             # make a new function called _parse_resource_type_from_create
             # resource_cls = Resource.classes[_resolve_resource_class(sql)]
-            raise NotImplementedError
+            # raise NotImplementedError
+            resource_type = _resolve_resource_class(sql)
+            scope = RESOURCE_SCOPES[resource_type]
+        else:
+            resource_type = resource_cls.resource_type
+            scope = resource_cls.scope
 
-        identifier, remainder_sql = _parse_create_header(sql, resource_cls)
+        identifier, remainder_sql = _parse_create_header(sql, resource_type, scope)
 
         try:
             props = _parse_props(resource_cls.props, remainder_sql) if remainder_sql else {}
@@ -141,12 +167,23 @@ class Resource(metaclass=_Resource):
             raise pp.ParseException(f"Error parsing {resource_cls.__name__} props {identifier}") from err
 
     @classmethod
+    def from_dict(cls, data: dict):
+        resource_cls = cls.resolve_resource_cls(ResourceType(data["resource_type"]), data)
+        return resource_cls(**data)
+
+    @classmethod
     def props_for_resource_type(cls, resource_type: ResourceType, data: dict = None):
         return cls.resolve_resource_cls(resource_type, data).props
 
     @classmethod
     def resolve_resource_cls(cls, resource_type: ResourceType, data: dict = None) -> Type["Resource"]:
-        resource_types = cls.__types[resource_type]
+
+        if not isinstance(resource_type, ResourceType):
+            raise ValueError(f"Expected ResourceType, got {resource_type}({type(resource_type)})")
+        if resource_type not in cls.__types__:
+            raise ValueError(f"Resource class for type not found {resource_type}")
+        resource_types = cls.__types__[resource_type]
+
         if len(resource_types) > 1:
             if data is None:
                 raise ValueError(f"Cannot resolve polymorphic resource class [{resource_type}] without data")
@@ -160,15 +197,18 @@ class Resource(metaclass=_Resource):
         return {f.name: f.default for f in fields(cls.spec)}
 
     def __repr__(self):  # pragma: no cover
-        return f"{self.__class__.__name__}({str(self.fqn)})"
+        name = getattr(self._data, "name", None)
+        return f"{self.__class__.__name__}({name})"
 
-    def to_dict(self, packed=False):
+    def to_dict(self):
         defaults = {f.name: f.default for f in fields(self.spec)}
 
         serialized = {}
 
         def _serialize(value):
-            if isinstance(value, Resource):
+            if isinstance(value, ResourcePointer):
+                return value.name
+            elif isinstance(value, Resource):
                 if hasattr(value, "serialize"):
                     return value.serialize()
                 elif hasattr(value._data, "name"):
@@ -197,7 +237,7 @@ class Resource(metaclass=_Resource):
     def create_sql(self, **kwargs):
         return create_resource(
             self.urn,
-            self.to_dict(packed=True),
+            self.to_dict(),
             self.props,
             **kwargs,
         )
@@ -206,7 +246,7 @@ class Resource(metaclass=_Resource):
         return drop_resource(self.urn, self.to_dict(), if_exists=if_exists)
 
     def _requires(self, resource: "Resource"):
-        if isinstance(resource, Resource):
+        if isinstance(resource, (Resource, ResourcePointer)):
             self.refs.add(resource)
 
     def requires(self, *resources: "Resource"):
@@ -217,12 +257,10 @@ class Resource(metaclass=_Resource):
 
     def _register_scope(self, database=None, schema=None):
         if isinstance(database, str):
-            resource_cls = Resource.resolve_resource_cls(ResourceType.DATABASE)
-            database: ResourceContainer = resource_cls(name=database, stub=True)
+            database: ResourceContainer = ResourcePointer(name=database, resource_type=ResourceType.DATABASE)
 
         if isinstance(schema, str):
-            resource_cls = Resource.resolve_resource_cls(ResourceType.SCHEMA)
-            schema: ResourceContainer = resource_cls(name=schema, stub=True)
+            schema: ResourceContainer = ResourcePointer(name=schema, resource_type=ResourceType.SCHEMA)
 
         if isinstance(self.scope, DatabaseScope):
             if schema is not None:
@@ -240,10 +278,8 @@ class Resource(metaclass=_Resource):
 
     @property
     def fqn(self):
-        if not hasattr(self._data, "name"):
-            raise Exception
         name = getattr(self._data, "name")
-        return self.scope.fully_qualified_name(self._container, name)
+        return self.scope.fully_qualified_name(self.container, name)
 
     @property
     def urn(self):
@@ -258,7 +294,8 @@ class ResourceContainer:
         if isinstance(items[0], list):
             items = items[0]
         for item in items:
-            if item.container and not item.container.stub:
+
+            if item.container and not isinstance(item.container, ResourcePointer):
                 raise RuntimeError(f"{item} already belongs to a container")
             item._container = self
             item.requires(self)
@@ -283,10 +320,78 @@ class ResourceContainer:
         return self._data.name
 
 
-class ResourcePointer:
+class ResourcePointer(Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-        self.name = name
-        self.resource_type = resource_type
+        self._name: str = name
+        self._resource_type: ResourceType = resource_type
+        self.scope = RESOURCE_SCOPES[resource_type]
+        super().__init__()
+
+        # Don't want to do this for all implicit resources but making an exception for PUBLIC schema
+
+        # If this points to a database, assume it includes a PUBLIC schema
+        if self._resource_type == ResourceType.DATABASE:
+            self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
 
     def __repr__(self):  # pragma: no cover
-        return f"ResourcePointer({self.resource_type}:{self.name})"
+        resource_type = getattr(self, "resource_type", None)
+        name = getattr(self, "name", None)
+        return f"ResourcePointer({resource_type}:{name})"
+
+    @property
+    def container(self):
+        return self._container
+
+    @property
+    def fqn(self):
+        return self.scope.fully_qualified_name(self.container, self.name)
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def resource_type(self):
+        return self._resource_type
+
+    def to_dict(self):
+        return {"name": self.name}
+
+
+def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource]) -> Resource:
+    """Convert a resource descriptor to a resource instance
+
+    Args:
+        cls (Resource): The resource class to convert to
+        resource_or_descriptor (Union[str, dict, Resource]): The resource descriptor to convert
+
+    Returns:
+        Resource: A new or existing resource instance based on the provided descriptor.
+
+    Examples:
+        >>> convert_to_resource(Database, "my_database")
+        Database(name='my_database')
+
+        >>> convert_to_resource(Database, {"name": "my_database"})
+        Database(name='my_database')
+
+        >>> convert_to_resource(Database, Database(name="my_database"))
+        Database(name='my_database')
+    """
+    if isinstance(resource_or_descriptor, str):
+        return ResourcePointer(name=resource_or_descriptor, resource_type=cls.resource_type)
+    elif isinstance(resource_or_descriptor, dict):
+        # We permit two types of anonymous resource descriptors
+        # 1. A dict with a single key, the name of the resource
+        # Example:
+        #   grant = Grant(priv='SELECT', on='table', to={'name': 'some_role'})
+        # 2. A dict representing a column or column-like object
+        # Example:
+        #   table = Table(name='my_table', columns=[{'name': 'id', 'data_type': 'int'}])
+
+        if cls.__name__ == "Column":
+            return cls(**resource_or_descriptor)
+        else:
+            return ResourcePointer(**resource_or_descriptor, resource_type=cls.resource_type)
+    elif isinstance(resource_or_descriptor, cls):
+        return resource_or_descriptor

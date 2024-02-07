@@ -22,9 +22,17 @@ STATIC_RESOURCES = {
     ResourceType.SECRET: resources.Secret(
         name="static_secret", type=resources.secret.SecretType.PASSWORD, username="someuser", password="somepass"
     ),
+    ResourceType.SCHEMA: resources.Schema(name="static_schema"),
+    ResourceType.STAGE: resources.InternalStage(
+        name="static_stage", directory={"enable": True, "refresh_on_create": True}
+    ),
+    ResourceType.STREAM: resources.TableStream(name="static_stream", on_table="static_table"),
     ResourceType.TABLE: resources.Table(name="static_table", columns=[{"name": "id", "data_type": "INT"}]),
     ResourceType.TAG: resources.Tag(name="static_tag"),
     ResourceType.USER: resources.User(name="static_user"),
+    ResourceType.VIEW: resources.View(
+        name="static_view", columns=[{"name": "id", "data_type": "INT"}], as_="SELECT id FROM static_table"
+    ),
     ResourceType.WAREHOUSE: resources.Warehouse(name="static_warehouse"),
 }
 
@@ -50,26 +58,35 @@ def get_json_fixtures():
             resource_name = f.split(".")[0]
             try:
                 resource_cls = _get_resource_cls(resource_name)
-            except ValueError as e:
-                # print(f"Error reading {f}: {e}")
+            except ValueError:
                 continue
             try:
                 data = get_json_fixture(resource_name)
-            except Exception as e:
-                # print(f"Error reading {f}: {e}")
+                yield (resource_cls, data)
+            except Exception:
                 continue
-            yield (resource_cls, data)
 
 
-def list_sql_fixtures():
+def get_sql_fixtures():
     files = os.listdir(os.path.join(FIXTURES_DIR, "sql"))
     for f in files:
         if f.endswith(".sql"):
-            yield f
+            resource_name = f.split(".")[0]
+            try:
+                resource_cls = _get_resource_cls(resource_name)
+            except ValueError:
+                continue
+            try:
+                idx = 1
+                for fixture in get_sql_fixture(f):
+                    yield (resource_cls, fixture, idx)
+                    idx += 1
+            except Exception:
+                continue
 
 
-def load_sql_fixtures(filename, lines=False):
-    with open(os.path.join(FIXTURES_DIR, filename), encoding="utf-8") as f:
+def get_sql_fixture(filename, lines=False):
+    with open(os.path.join(FIXTURES_DIR, "sql", filename), encoding="utf-8") as f:
         if lines:
             yield from f.read().splitlines()
         else:

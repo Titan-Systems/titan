@@ -55,8 +55,8 @@ def diff(original, new):
 
     # Resources in the manifest but not in remote state should be added
     for key in new_keys - original_keys:
-        if isinstance(new[key], dict) and new[key].get("_stub", False):
-            raise Exception(f"Stubbed resource doesn't exist or isn't visible in session: {key}")
+        if isinstance(new[key], dict) and new[key].get("_pointer", False):
+            raise Exception(f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {key}")
         elif isinstance(new[key], list):
             for item in new[key]:
                 yield DiffAction.ADD, key, item
@@ -65,11 +65,9 @@ def diff(original, new):
 
     for key in original_keys & new_keys:
         if isinstance(original[key], dict):
-            # We don't diff stubbed resources
-            if new[key].get("_stub", False):
+            # We don't diff resource pointers
+            if new[key].get("_pointer", False):
                 continue
-
-            # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
 
             delta = dict_delta(original[key], new[key])
             for attr, value in delta.items():

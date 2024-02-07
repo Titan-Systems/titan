@@ -1,20 +1,35 @@
 import pytest
 
-from pyparsing import ParseException
-from tests.helpers import load_sql_fixtures, get_json_fixtures, list_sql_fixtures
 from titan import resources
-from titan.enums import ResourceType
+from tests.helpers import get_sql_fixtures, get_json_fixtures
 from titan.resources.warehouse import WarehouseSize
 
 
-def test_resource_constructors():
-    try:
-        resources.Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
-        resources.Task(name="TASK", as_="SELECT 1", warehouse=resources.Warehouse(name="wh"))
-        resources.Task(name="TASK", as_="SELECT 1", warehouse={"name": "wh"})
-        resources.Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}})
-    except Exception:
-        pytest.fail("Resource constructor raised an exception unexpectedly!")
+# def test_resource_init_from_sql():
+#     res = resources.Resource.from_sql("CREATE TASK MY_TASK AS SELECT 1")
+#     assert res.resource_type == resources.ResourceType.TASK
+
+
+def test_resource_init_with_dict_pointer():
+    resources.Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}})
+
+
+def test_resource_init_with_resource_pointer():
+    resources.Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse=resources.Warehouse(name="wh"))
+
+
+def test_resource_init_with_resource_name():
+    resources.Task(name="TASK", schedule="1 minute", as_="SELECT 1", warehouse="wh")
+
+
+def test_resource_init_with_type():
+    resources.Task(**{"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}, "resource_type": "TASK"})
+
+
+def test_resource_init_from_dict():
+    resources.Resource.from_dict(
+        {"name": "TASK", "as_": "SELECT 1", "warehouse": {"name": "wh"}, "resource_type": "TASK"}
+    )
 
 
 def test_view_fails_with_empty_columns():
@@ -31,40 +46,22 @@ def test_enum_field_serialization():
     assert resources.Warehouse(name="WH", warehouse_size="XSMALL")._data.warehouse_size == WarehouseSize.XSMALL
 
 
-class TestResourceFixtures:
-    @staticmethod
-    def validate_from_sql(resource_cls, sql):
-        try:
-            resource_cls.from_sql(sql)
-        except ParseException:
-            pytest.fail(f"Failed to parse {resource_cls.__name__} from SQL: {sql}")
-
-    # def test_sql_fixtures(self, sql_fixture_file, resource_cls):
-    #     for sql in load_sql_fixtures(sql_fixture_file):
-    #         self.validate_from_sql(resource_cls, sql)
-
-    def test_json(self, resource_cls, json_fixture):
-        try:
-            resource_cls(**json_fixture)
-        except Exception:
-            pytest.fail(f"Failed to construct {resource_cls.__name__} from JSON fixture")
+SQL_FIXTURES = list(get_sql_fixtures())
 
 
-def pytest_generate_tests(metafunc):
-    # if "sql_fixture_file" and "resource_cls" in metafunc.fixturenames:
-    #     params = []
-    #     for f in list_sql_fixtures():
-    #         resource_name = f.split(".")[0]
-    #         try:
-    #             resource_cls = Resource.resolve_resource_cls(ResourceType(resource_name.replace("_", " ")))
-    #         except ValueError:
-    #             continue
-    #         params.append((f, resource_cls))
-    #     ids = [resource_name for _, resource_name in params]
-    #     metafunc.parametrize("sql_fixture_file, resource_cls", params, ids=ids)
-    if "resource_cls" and "json_fixture" in metafunc.fixturenames:
-        params = []
-        for resource_cls, fixture in get_json_fixtures():
-            params.append((resource_cls, fixture))
-        ids = [resource_cls.__name__ for resource_cls, _ in params]
-        metafunc.parametrize("resource_cls, json_fixture", params, ids=ids)
+@pytest.fixture(
+    params=SQL_FIXTURES,
+    ids=[f"{resource_cls.__name__}({idx})" for resource_cls, _, idx in SQL_FIXTURES],
+    scope="function",
+)
+def sql_fixture(request):
+    resource_cls, data, idx = request.param
+    yield resource_cls, data
+
+
+def test_init_from_sql(sql_fixture):
+    resource_cls, data = sql_fixture
+    try:
+        resource_cls.from_sql(data)
+    except Exception:
+        pytest.fail(f"Failed to construct {resource_cls.__name__} from SQL fixture")

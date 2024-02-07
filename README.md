@@ -1,7 +1,7 @@
 # `Titan Core` - Snowflake infrastructure as code
 
 <div align="center">
-    <img src="./images/github.png" style="padding-bottom: 20px; width: 620px;"/>
+    <img src="./images/github-explainer.png" style="padding-bottom: 20px; width: 830px;"/>
 </div>
 
 Titan Core helps you provision, deploy, and secure resources in Snowflake. It replaces infrastructure tools like Terraform or Schemachange.
@@ -181,20 +181,24 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Database                      | ✅         | ✅   |
 | External Access Integration   | ✅         | ❌   |
 | External Volume               | ❌         | ❌   |
+| Grant                         | ✅         | ❌   |
+| ↳ Privilege Grant             | ✅         | ❌   |
+| ↳ Future Grant                | ✅         | ❌   |
 | Network Policy                | ✅         | ❌   |
 | Notification Integration      | WIP        | ❌   |
-| ↪ Email                       | ✅         | ❌   |
-| ↪ AWS                         | ❌         | ❌   |
-| ↪ Azure                       | ❌         | ❌   |
-| ↪ GCP                         | ❌         | ❌   |
+| ↳ Email                       | ✅         | ❌   |
+| ↳ AWS                         | ❌         | ❌   |
+| ↳ Azure                       | ❌         | ❌   |
+| ↳ GCP                         | ❌         | ❌   |
+| Replication Group             | ✅         | ❌   |
 | Resource Monitor              | ✅         | ❌   |
 | Role                          | ✅         | ✅   |
 | Security Integration          | ❌         | ❌   |
 | Share                         | ❌         | ❌   |
 | Storage Integration           | WIP        | ❌   |
-| ↪ AWS                         | ✅         | ❌   |
-| ↪ Azure                       | ❌         | ❌   |
-| ↪ GCP                         | ❌         | ❌   |
+| ↳ AWS                         | ✅         | ❌   |
+| ↳ Azure                       | ✅         | ❌   |
+| ↳ GCP                         | ✅         | ❌   |
 | User                          | ✅         | ✅   |
 | Warehouse                     | ✅         | ✅   |
 |                               |            |     |
@@ -205,19 +209,17 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | **Schema Resources**          |            |     |
 | Alert                         | ✅         | ❌   |
 | Dynamic Table                 | ✅         | ❌   |
+| Event Table                   | ✅         | ❌   |
 | External Function             | ✅         | ❌   |
 | External Stage                | ✅         | ❌   |
 | External Table                | ❌         | ❌   |
 | Failover Group                | ✅         | ❌   |
 | File Format                   | ❌         | ❌   |
-| ↪ CSV                         | ❌         | ❌   |
-| ↪ JSON                        | ❌         | ❌   |
-| ↪ AVRO                        | ❌         | ❌   |
-| ↪ ORC                         | ❌         | ❌   |
-| ↪ Parquet                     | ❌         | ❌   |
-| Grant                         | WIP        | ❌   |
-| ↪ Privilege Grant             | ✅         | ❌   |
-| ↪ Future Grant                | ❌         | ❌   |
+| ↳ CSV                         | ❌         | ❌   |
+| ↳ JSON                        | ❌         | ❌   |
+| ↳ AVRO                        | ❌         | ❌   |
+| ↳ ORC                         | ❌         | ❌   |
+| ↳ Parquet                     | ❌         | ❌   |
 | Iceberg Table                 | ❌         | ❌   |
 | Image Repository              | ❌         | ❌   |
 | Internal Stage                | ✅         | ❌   |
@@ -235,23 +237,29 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Service                       | ❌         | ❌   |
 | Session Policy                | ❌         | ❌   |
 | Stage                         | ✅         | ❌   |
+| ↳ External                    | ✅         | ❌   |
+| ↳ Internal                    | ✅         | ❌   |
 | Stored Procedure              | WIP        | ❌   |
-| ↪ Java                        | ❌         | ❌   |
-| ↪ Javascript                  | ❌         | ❌   |
-| ↪ Python                      | ✅         | ❌   |
-| ↪ Scala                       | ❌         | ❌   |
-| ↪ SQL                         | ❌         | ❌   |
-| Stream                        | ✅         | ❌   |
+| ↳ Java                        | ❌         | ❌   |
+| ↳ Javascript                  | ❌         | ❌   |
+| ↳ Python                      | ✅         | ❌   |
+| ↳ Scala                       | ❌         | ❌   |
+| ↳ SQL                         | ❌         | ❌   |
+| Stream                        | WIP        | ❌   |
+| ↳ External Table              | ❌         | ❌   |
+| ↳ Stage                       | ✅         | ❌   |
+| ↳ Table                       | ✅         | ❌   |
+| ↳ View                        | ✅         | ❌   |
 | Streamlit                     | ❌         | ❌   |
 | Table                         | ✅         | ❌   |
 | Tag                           | ✅         | ❌   |
 | Task                          | ✅         | ❌   |
 | User-Defined Function         | WIP        | ❌   |
-| ↪ Java                        | ❌         | ❌   |
-| ↪ Javascript                  | ✅         | ❌   |
-| ↪ Python                      | ✅         | ❌   |
-| ↪ Scala                       | ❌         | ❌   |
-| ↪ SQL                         | ❌         | ❌   |
+| ↳ Java                        | ❌         | ❌   |
+| ↳ Javascript                  | ✅         | ❌   |
+| ↳ Python                      | ✅         | ❌   |
+| ↳ Scala                       | ❌         | ❌   |
+| ↳ SQL                         | ❌         | ❌   |
 | View                          | ✅         | ❌   |
 
 

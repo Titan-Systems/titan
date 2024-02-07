@@ -1,0 +1,19 @@
+{
+    "name": "SOME_REPLICATION_GROUP",
+    "object_types": [
+        "DATABASES",
+        "SHARES"
+    ],
+    "allowed_databases": [
+        "db1"
+    ],
+    "allowed_shares": [
+        "s1"
+    ],
+    "allowed_integration_types": null,
+    "allowed_accounts": [
+        "myorg.myaccount2"
+    ],
+    "ignore_edition_check": null,
+    "replication_schedule": "10 MINUTE"
+}

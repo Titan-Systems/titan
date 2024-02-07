@@ -1,5 +1,7 @@
 import sys
 
+from inflection import pluralize
+
 from .builder import tidy_sql
 from .identifiers import URN
 from .props import Props
@@ -44,6 +46,21 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
         urn.resource_type,
         name,
         props.render(data),
+    )
+
+
+def create_future_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
+    return tidy_sql(
+        "GRANT",
+        data["priv"],
+        "ON FUTURE",
+        pluralize(data["on_type"]).upper(),
+        "IN",
+        data["in_type"],
+        data["in_name"],
+        "TO",
+        data["to"],
+        # props.render(data), #TODO grant option
     )
 
 
@@ -165,11 +182,27 @@ def drop_function(urn: URN, data: dict, if_exists: bool) -> str:
     )
 
 
+def drop_future_grant(urn: URN, data: dict, **kwargs):
+    return tidy_sql(
+        "REVOKE",
+        data["priv"],
+        "ON FUTURE",
+        pluralize(data["on_type"]).upper(),
+        "IN",
+        data["in_type"],
+        data["in_name"],
+        "FROM",
+        data["to"],
+        # props.render(data), #TODO grant option
+    )
+
+
 def drop_grant(urn: URN, data: dict, **kwargs):
     return tidy_sql(
         "REVOKE",
         data["priv"],
         "ON",
+        data["on_type"],
         data["on"],
         "FROM",
         data["to"],

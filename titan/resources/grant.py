@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from typing import Any
 
-from .resource import Resource, ResourceSpec
+from inflection import singularize
+
+from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
 from ..enums import ResourceType
@@ -115,7 +117,7 @@ class Grant(Resource):
         self,
         priv: str = None,
         on: Any = None,
-        to: str = None,
+        to: Role = None,
         grant_option: bool = False,
         owner: str = None,
         **kwargs,
@@ -144,11 +146,10 @@ class Grant(Resource):
         >>> Grant(priv="SELECT", on_future_tables_in=Database(name="somedb"), to="somerole")
 
         """
-        # on_all = None
-        # on_future = None
-        on_type = None
-
-        to = to if isinstance(to, Role) else Role(name=to, stub=True)
+        # Handle instantiation from data dict
+        on_type = kwargs.pop("on_type", None)
+        if on_type:
+            on_type = ResourceType(on_type)
 
         # Collect on_ kwargs
         on_kwargs = {}
@@ -177,18 +178,18 @@ class Grant(Resource):
                         on = arg
                         on_type = ResourceType(resource_type)
 
+                    # on_all is not currently supported
                     if keyword.startswith("on_all"):
-                        # on_all = keyword[7:].replace("_", " ").upper()
                         raise NotImplementedError
+                    # on_future should be handled by FutureGrant
                     elif keyword.startswith("on_future"):
-                        # on_future = keyword[10:].replace("_", " ").upper()
-                        raise NotImplementedError
+                        raise ValueError("You must use FutureGrant for future grants")
                 else:
                     # Grant targeting a specific resource
                     # on_{resource} kwargs
-                    # on_schema="foo" -> on=Schema(name="foo", stub=True)
+                    # on_schema="foo" -> on=Schema(name="foo")
                     on = arg
-                    on_type = ResourceType(keyword[3:])
+                    on_type = ResourceType(keyword[3:].replace("_", " ").upper())
         # Handle on= kwarg
         else:
             if on is None:
@@ -213,8 +214,11 @@ class Grant(Resource):
             owner=owner,
         )
 
-        granted_on = Resource.resolve_resource_cls(on_type)(name=on, stub=True)
-        self.requires(granted_on)
+        self.requires(self._data.to)
+        granted_on = None
+        if on_type:
+            granted_on = ResourcePointer(name=on, resource_type=on_type)
+            self.requires(granted_on)
 
     def __repr__(self):  # pragma: no cover
         priv = getattr(self, "priv", "")
@@ -224,19 +228,12 @@ class Grant(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        # parsed = _parse_grant(sql)
-        # return cls(**parsed)
-        raise NotImplementedError
+        parsed = _parse_grant(sql)
+        return cls(**parsed)
 
     @property
     def fqn(self):
-        return FQN(
-            name=self._data.to.name,
-            params={
-                "on": self._data.on,
-                "type": str(self._data.on_type),
-            },
-        )
+        return grant_fqn(self._data)
 
     @property
     def name(self):
@@ -253,14 +250,6 @@ class Grant(Resource):
     def on_type(self) -> ResourceType:
         return self._data.on_type
 
-    # @property
-    # def on_all(self):
-    #     return self._data.on_all
-
-    # @property
-    # def on_future(self):
-    #     return self._data.on_future
-
     @property
     def to(self):
         return self._data.to
@@ -268,6 +257,119 @@ class Grant(Resource):
     @property
     def priv(self):
         return self._data.priv
+
+
+def grant_fqn(grant: _Grant):
+    return FQN(name=grant.to.name, params={"on": grant.on, "type": str(grant.on_type)})
+
+
+@dataclass
+class _FutureGrant(ResourceSpec):
+    priv: str
+    on_type: ResourceType
+    in_type: ResourceType
+    in_name: str
+    to: Role
+    grant_option: bool = False
+    # owner: str = None # Future grants might not have owners
+
+
+class FutureGrant(Resource):
+    """
+    GRANT <privilege> ON FUTURE <on_type> IN <in_type> <in_name> TO <to> [ WITH GRANT OPTION ]
+    """
+
+    resource_type = ResourceType.FUTURE_GRANT
+    props = Props(
+        priv=IdentifierProp("priv", eq=False),
+        on_type=IdentifierProp("on type", eq=False),
+        database=IdentifierProp("database", eq=False),
+        to=IdentifierProp("to", eq=False),
+    )
+    scope = AccountScope()
+    spec = _FutureGrant
+
+    def __init__(
+        self,
+        priv: str,
+        to: Role,
+        grant_option: bool = False,
+        owner: str = None,
+        **kwargs,
+    ):
+        """
+
+        Usage
+        -----
+
+        Database Object Privs:
+        >>> Grant(priv="CREATE TABLE", on_future_schemas_in=Database(name="somedb"), to="somerole")
+        >>> Grant(priv="CREATE TABLE", on_future_schemas_in_database="somedb", to="somerole")
+
+        Schema Object Privs:
+        >>> Grant(priv="SELECT", on_future_tables_in=Schema(name="someschema"), to="somerole")
+        >>> Grant(priv="READ", on_future_image_repositories_in_schema="someschema", to="somerole")
+
+        """
+        on_type = kwargs.pop("on_type", None)
+        in_type = kwargs.pop("in_type", None)
+        in_name = kwargs.pop("in_name", None)
+
+        if all([on_type, in_type, in_name]):
+            in_type = ResourceType(in_type)
+            on_type = ResourceType(on_type)
+
+        else:
+
+            # Collect on_ kwargs
+            on_kwargs = {}
+            for keyword, _ in kwargs.copy().items():
+                if keyword.startswith("on_future_"):
+                    on_kwargs[keyword] = kwargs.pop(keyword)
+
+            if len(on_kwargs) != 1:
+                raise ValueError("You must specify one 'on_future_' parameter")
+
+            # Handle on_future_ kwargs
+            if on_kwargs:
+                for keyword, arg in on_kwargs.items():
+                    if isinstance(arg, Resource):
+                        on_type = ResourceType(singularize(keyword[10:-3]))
+                        in_type = arg.resource_type
+                        in_name = arg._data.name
+                    else:
+                        on_stmt, in_stmt = keyword.split("_in_")
+                        on_type = ResourceType(singularize(on_stmt[10:]))
+                        in_type = ResourceType(in_stmt)
+                        in_name = arg
+
+        super().__init__(**kwargs)
+        self._data: _FutureGrant = _FutureGrant(
+            priv=priv,
+            on_type=on_type,
+            in_type=in_type,
+            in_name=in_name,
+            to=to,
+            grant_option=grant_option,
+        )
+        granted_in = ResourcePointer(name=in_name, resource_type=in_type)
+        self.requires(granted_in, self._data.to)
+
+    @classmethod
+    def from_sql(cls, sql):
+        parsed = _parse_grant(sql)
+        return cls(**parsed)
+
+    @property
+    def fqn(self):
+        return future_grant_fqn(self._data)
+
+
+def future_grant_fqn(grant: _FutureGrant):
+    return FQN(
+        name=grant.to.name,
+        params={"on_type": str(grant.on_type), "in_type": str(grant.in_type), "in_name": grant.in_name},
+    )
 
 
 @dataclass
