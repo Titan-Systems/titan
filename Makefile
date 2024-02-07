@@ -1,4 +1,4 @@
-.PHONY: install install-dev test integration style check clean
+.PHONY: install install-dev test integration style check clean build
 EDITION ?= standard
 
 install:
@@ -22,3 +22,6 @@ check: style test
 clean:
 	rm -rf build dist *.egg-info
 	find . -name "__pycache__" -type d -exec rm -rf {} +
+
+build:
+	python setup.py sdist --formats=zip

@@ -377,12 +377,15 @@ class Blueprint:
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
+                found = False
                 for db in databases:
                     for schema in db.items(resource_type=ResourceType.SCHEMA):
                         if schema.name == resource.container.name:
                             schema.add(resource)
+                            found = True
                             break
-                raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
+                if not found:
+                    raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
 
     def generate_manifest(self, session_context: dict = {}):
         manifest = {}
