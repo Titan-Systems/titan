@@ -341,6 +341,9 @@ class ResourcePointer(Resource, ResourceContainer):
         if self._resource_type == ResourceType.DATABASE:
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
 
+    # def __copy__(self):
+    #     return ResourcePointer(self._name, self._resource_type)
+
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
         name = getattr(self, "name", None)
@@ -352,7 +355,11 @@ class ResourcePointer(Resource, ResourceContainer):
         return self.name == other.name and self.resource_type == other.resource_type
 
     def __hash__(self):
-        return hash((self.name, self.resource_type))
+        # when Resource.to_dict is called, this method is failing.
+        # in Resource.to_dict, the function dataclass.asdict is called. That attempts to deep copy the _data
+        # attribute.
+        # The only place this fails currently is ReplicationGroup, the only resource with a list of resources
+        return hash((getattr(self, "_name", None), getattr(self, "_resource_type", None)))
 
     @property
     def container(self):

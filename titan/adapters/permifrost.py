@@ -2,9 +2,8 @@ import yaml
 
 from titan.enums import ResourceType
 from titan.identifiers import FQN
-from titan.parse import parse_identifier
-from titan.privs import DatabasePriv, SchemaPriv, WarehousePriv
-from titan.resources import FutureGrant, Grant, RoleGrant
+from titan.privs import DatabasePriv, TablePriv, SchemaPriv, ViewPriv, WarehousePriv
+from titan.resources import AllGrant, FutureGrant, Grant, RoleGrant
 from titan.resources.resource import ResourcePointer
 
 
@@ -39,7 +38,16 @@ SCHEMA_WRITE_PRIVS = [
     SchemaPriv.CREATE_TASK,
     SchemaPriv.CREATE_VIEW,
 ]
-
+TABLE_READ_PRIVS = [TablePriv.SELECT]
+TABLE_WRITE_PRIVS = [
+    TablePriv.SELECT,
+    TablePriv.INSERT,
+    TablePriv.UPDATE,
+    TablePriv.DELETE,
+    TablePriv.TRUNCATE,
+    TablePriv.REFERENCES,
+]
+VIEW_READ_PRIVS = [ViewPriv.SELECT]
 WAREHOUSE_PRIVS = [WarehousePriv.USAGE, WarehousePriv.OPERATE, WarehousePriv.MONITOR]
 
 
@@ -138,7 +146,47 @@ def _get_role_resources(roles: list):
         for schema in schema_write:
             _add_schema_grants(resources, schema, SCHEMA_WRITE_PRIVS, role)
 
-        # TODO: tables
+        table_read = config.get("privileges", {}).get("tables", {}).get("read", [])
+        table_write = config.get("privileges", {}).get("tables", {}).get("write", [])
+
+        def _add_table_grants(resources, table_identifier, privs, role):
+            if table_identifier.endswith(".*.*"):
+                database = _parse_permifrost_identifier(table_identifier).database
+                for priv in privs:
+                    resources.append(AllGrant(priv=priv, on_all_tables_in_database=database, to=role))
+                    resources.append(FutureGrant(priv=priv, on_future_tables_in_database=database, to=role))
+            elif table_identifier.endswith(".*"):
+                schema = _parse_permifrost_identifier(table_identifier).schema
+                for priv in privs:
+                    resources.append(AllGrant(priv=priv, on_all_tables_in_schema=schema, to=role))
+                    resources.append(FutureGrant(priv=priv, on_future_tables_in_schema=schema, to=role))
+            else:
+                resources.append(ResourcePointer(name=table_identifier, resource_type=ResourceType.TABLE))
+                for priv in privs:
+                    resources.append(Grant(priv=priv, on_table=table_identifier, to=role))
+
+        def _add_view_grants(resources, view_identifier, privs, role):
+            if view_identifier.endswith(".*.*"):
+                database = _parse_permifrost_identifier(view_identifier).database
+                for priv in privs:
+                    resources.append(AllGrant(priv=priv, on_all_views_in_database=database, to=role))
+                    resources.append(FutureGrant(priv=priv, on_future_views_in_database=database, to=role))
+            elif view_identifier.endswith(".*"):
+                schema = _parse_permifrost_identifier(view_identifier).schema
+                for priv in privs:
+                    resources.append(AllGrant(priv=priv, on_all_views_in_schema=schema, to=role))
+                    resources.append(FutureGrant(priv=priv, on_future_views_in_schema=schema, to=role))
+            else:
+                resources.append(ResourcePointer(name=view_identifier, resource_type=ResourceType.VIEW))
+                for priv in privs:
+                    resources.append(Grant(priv=priv, on_view=view_identifier, to=role))
+
+        for table in table_read:
+            _add_table_grants(resources, table, TABLE_READ_PRIVS, role)
+            _add_view_grants(resources, table, VIEW_READ_PRIVS, role)
+        for table in table_write:
+            _add_table_grants(resources, table, TABLE_WRITE_PRIVS, role)
+
         # TODO: owns
 
     return resources
