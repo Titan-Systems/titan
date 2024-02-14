@@ -9,7 +9,7 @@ from ..scope import AccountScope
 from ..props import BoolProp, Props, StringProp, IdentifierListProp
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _ExternalAccessIntegration(ResourceSpec):
     name: str
     allowed_network_rules: list[NetworkRule]

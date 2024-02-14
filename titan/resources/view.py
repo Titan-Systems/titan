@@ -15,7 +15,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _View(ResourceSpec):
     name: str
     owner: str = "SYSADMIN"

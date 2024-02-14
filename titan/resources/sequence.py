@@ -7,7 +7,7 @@ from ..scope import SchemaScope
 from ..props import Props, IntProp, StringProp
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Sequence(ResourceSpec):
     name: str
     owner: str = "SYSADMIN"

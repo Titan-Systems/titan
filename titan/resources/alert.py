@@ -8,7 +8,7 @@ from ..scope import SchemaScope
 from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Alert(ResourceSpec):
     name: str
     warehouse: Warehouse

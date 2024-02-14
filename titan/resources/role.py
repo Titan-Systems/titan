@@ -7,7 +7,7 @@ from ..props import Props, StringProp, TagsProp
 from ..scope import AccountScope, DatabaseScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Role(ResourceSpec):
     name: str
     owner: str = "SYSADMIN"

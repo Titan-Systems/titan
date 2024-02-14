@@ -11,7 +11,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _PasswordPolicy(ResourceSpec):
     name: str
     password_min_length: int = 8

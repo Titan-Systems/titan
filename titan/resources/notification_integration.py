@@ -26,7 +26,7 @@ class NotificationDirection(ParseableEnum):
     OUTBOUND = "OUTBOUND"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _EmailNotificationIntegration(ResourceSpec):
     name: str
     enabled: bool
@@ -81,7 +81,7 @@ class EmailNotificationIntegration(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _AWSOutboundNotificationIntegration(ResourceSpec):
     name: str
     enabled: bool
@@ -148,7 +148,7 @@ class AWSOutboundNotificationIntegration(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _GCPOutboundNotificationIntegration(ResourceSpec):
     name: str
     enabled: bool
@@ -209,7 +209,7 @@ class GCPOutboundNotificationIntegration(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _AzureOutboundNotificationIntegration(ResourceSpec):
     name: str
     enabled: bool
@@ -275,7 +275,7 @@ class AzureOutboundNotificationIntegration(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _GCPInboundNotificationIntegration(ResourceSpec):
     name: str
     enabled: bool
@@ -333,7 +333,7 @@ class GCPInboundNotificationIntegration(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _AzureInboundNotificationIntegration(ResourceSpec):
     name: str
     enabled: bool

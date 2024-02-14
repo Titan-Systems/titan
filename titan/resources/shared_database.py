@@ -6,7 +6,7 @@
 # from ..props import Props, IdentifierProp
 
 
-# @dataclass
+# @dataclass(unsafe_hash=True)
 # class _SharedDatabase(ResourceSpec):
 #     name: str
 #     from_share: str

@@ -18,7 +18,7 @@ from ..props import (
 from ..scope import AccountScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Task(ResourceSpec):
     name: str
     owner: str = "SYSADMIN"

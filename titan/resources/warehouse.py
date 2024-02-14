@@ -56,7 +56,7 @@ class WarehouseScalingPolicy(ParseableEnum):
     ECONOMY = "ECONOMY"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Warehouse(ResourceSpec):
     name: str
     owner: str = "SYSADMIN"

@@ -14,7 +14,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _PythonStoredProcedure(ResourceSpec):
     name: str
     args: list[Arg]

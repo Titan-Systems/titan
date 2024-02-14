@@ -6,7 +6,7 @@ from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..scope import DatabaseScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Schema(ResourceSpec):
     name: str
     transient: bool = False

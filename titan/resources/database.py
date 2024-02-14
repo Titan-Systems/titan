@@ -7,7 +7,7 @@ from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..scope import AccountScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Database(ResourceSpec):
     name: str
     transient: bool = False

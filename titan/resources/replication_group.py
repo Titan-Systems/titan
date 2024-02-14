@@ -33,7 +33,7 @@ class IntegrationType(ParseableEnum):
     NOTIFICATION_INTEGRATIONS = "NOTIFICATION INTEGRATIONS"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _ReplicationGroup(ResourceSpec):
     name: str
     object_types: list[ObjectType]

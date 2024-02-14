@@ -14,7 +14,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _EventTable(ResourceSpec):
     name: str
     cluster_by: str = None

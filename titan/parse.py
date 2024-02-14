@@ -597,7 +597,10 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
         scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
         arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
 
-    name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
+    try:
+        name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
+    except pp.ParseException:
+        raise pp.ParseException(f"Failed to parse identifier: {identifier}")
     if len(name_parts) == 1:
         return FQN(
             name=name_parts[0],

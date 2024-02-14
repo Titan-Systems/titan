@@ -55,7 +55,7 @@ copy_options = Props(
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _InternalStage(ResourceSpec):
     name: str
     owner: str = "SYSADMIN"
@@ -141,7 +141,7 @@ class InternalStage(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _ExternalStage(ResourceSpec):
     name: str
     url: str

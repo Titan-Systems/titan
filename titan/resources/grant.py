@@ -14,7 +14,7 @@ from ..props import Props, FlagProp, IdentifierProp
 from ..scope import AccountScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Grant(ResourceSpec):
     priv: str
     on: str
@@ -221,9 +221,9 @@ class Grant(Resource):
             self.requires(granted_on)
 
     def __repr__(self):  # pragma: no cover
-        priv = getattr(self, "priv", "")
-        on = getattr(self, "on", "")
-        to = getattr(self, "to", "")
+        priv = getattr(self._data, "priv", "")
+        on = getattr(self._data, "on", "")
+        to = getattr(self._data, "to", "")
         return f"{self.__class__.__name__}(priv={priv}, on={on}, to={to})"
 
     @classmethod
@@ -263,7 +263,7 @@ def grant_fqn(grant: _Grant):
     return FQN(name=grant.to.name, params={"on": grant.on, "type": str(grant.on_type)})
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _FutureGrant(ResourceSpec):
     priv: str
     on_type: ResourceType
@@ -372,7 +372,7 @@ def future_grant_fqn(grant: _FutureGrant):
     )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _RoleGrant(ResourceSpec):
     role: Role
     to_role: Role = None
@@ -426,6 +426,13 @@ class RoleGrant(Resource):
     def from_sql(cls, sql):
         props = _parse_grant(sql)
         return RoleGrant(**props)
+
+    def __repr__(self):  # pragma: no cover
+        role = getattr(self._data, "role", "")
+        to_role = getattr(self._data, "to_role", "")
+        to_user = getattr(self._data, "to_user", "")
+        to = to_role or to_user
+        return f"RoleGrant(role={role}, to={to})"
 
     @property
     def fqn(self):

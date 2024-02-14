@@ -19,7 +19,7 @@ class InitializeBehavior(ParseableEnum):
     ON_SCHEDULE = "ON_SCHEDULE"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _DynamicTable(ResourceSpec):
     name: str
     columns: list[Column]

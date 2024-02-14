@@ -26,7 +26,7 @@ class IntegrationTypes(ParseableEnum):
     NOTIFICATION_INTEGRATIONS = "NOTIFICATION INTEGRATIONS"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _FailoverGroup(ResourceSpec):
     name: str
     object_types: list[ObjectType]

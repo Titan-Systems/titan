@@ -20,7 +20,7 @@ class ResourceMonitorFrequency(ParseableEnum):
     NEVER = "NEVER"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _ResourceMonitor(ResourceSpec):
     name: str
     credit_quota: int = None

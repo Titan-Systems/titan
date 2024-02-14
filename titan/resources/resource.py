@@ -200,6 +200,14 @@ class Resource(metaclass=_Resource):
         name = getattr(self._data, "name", None)
         return f"{self.__class__.__name__}({name})"
 
+    def __eq__(self, other):
+        if not isinstance(other, Resource):
+            return False
+        return self._data == other._data
+
+    def __hash__(self):
+        return hash(self._data)
+
     def to_dict(self):
         defaults = {f.name: f.default for f in fields(self.spec)}
 
@@ -336,7 +344,15 @@ class ResourcePointer(Resource, ResourceContainer):
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
         name = getattr(self, "name", None)
-        return f"ResourcePointer({resource_type}:{name})"
+        return f"[{resource_type}:{name}]"
+
+    def __eq__(self, other):
+        if not isinstance(other, ResourcePointer):
+            return False
+        return self.name == other.name and self.resource_type == other.resource_type
+
+    def __hash__(self):
+        return hash((self.name, self.resource_type))
 
     @property
     def container(self):
@@ -370,13 +386,16 @@ def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, 
 
     Examples:
         >>> convert_to_resource(Database, "my_database")
-        Database(name='my_database')
+        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
 
         >>> convert_to_resource(Database, {"name": "my_database"})
-        Database(name='my_database')
+        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
 
         >>> convert_to_resource(Database, Database(name="my_database"))
-        Database(name='my_database')
+        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
+
+        >>> convert_to_resource(Database, ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE))
+        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
     """
     if isinstance(resource_or_descriptor, str):
         return ResourcePointer(name=resource_or_descriptor, resource_type=cls.resource_type)
@@ -395,3 +414,10 @@ def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, 
             return ResourcePointer(**resource_or_descriptor, resource_type=cls.resource_type)
     elif isinstance(resource_or_descriptor, cls):
         return resource_or_descriptor
+    elif isinstance(resource_or_descriptor, ResourcePointer):
+        if resource_or_descriptor.resource_type == cls.resource_type:
+            return resource_or_descriptor
+        else:
+            raise ValueError(f"Unexpected resource type {resource_or_descriptor}")
+    else:
+        raise ValueError(f"Unexpected resource descriptor {resource_or_descriptor}")
