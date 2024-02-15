@@ -196,6 +196,21 @@ class Resource(metaclass=_Resource):
     def defaults(cls):
         return {f.name: f.default for f in fields(cls.spec)}
 
+    # def __copy__(self):
+    #     cls = self.__class__
+    #     result = cls.__new__(cls)
+    #     result.__dict__.update(self.__dict__)
+    #     return result
+
+    # def __deepcopy__(self, memo):
+    #     cls = self.__class__
+    #     print(f"[DEEPCOPY] >> {cls.__name__}")
+    #     result = cls.__new__(cls)
+    #     memo[id(self)] = result
+    #     for k, v in self.__dict__.items():
+    #         setattr(result, k, deepcopy(v, memo))
+    #     return result
+
     def __repr__(self):  # pragma: no cover
         name = getattr(self._data, "name", None)
         return f"{self.__class__.__name__}({name})"
@@ -341,8 +356,13 @@ class ResourcePointer(Resource, ResourceContainer):
         if self._resource_type == ResourceType.DATABASE:
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
 
-    # def __copy__(self):
-    #     return ResourcePointer(self._name, self._resource_type)
+    def __copy__(self):
+        return ResourcePointer(self._name, self._resource_type)
+
+    def __deepcopy__(self, memo):
+        result = ResourcePointer(self._name, self._resource_type)
+        memo[id(self)] = result
+        return result
 
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
@@ -355,11 +375,7 @@ class ResourcePointer(Resource, ResourceContainer):
         return self.name == other.name and self.resource_type == other.resource_type
 
     def __hash__(self):
-        # when Resource.to_dict is called, this method is failing.
-        # in Resource.to_dict, the function dataclass.asdict is called. That attempts to deep copy the _data
-        # attribute.
-        # The only place this fails currently is ReplicationGroup, the only resource with a list of resources
-        return hash((getattr(self, "_name", None), getattr(self, "_resource_type", None)))
+        return hash((self._name, self._resource_type))
 
     @property
     def container(self):
