@@ -2,7 +2,7 @@ import pytest
 
 from titan import resources
 from tests.helpers import get_sql_fixtures, get_json_fixtures
-from titan.resources.warehouse import WarehouseSize
+from titan.enums import WarehouseSize
 
 
 # def test_resource_init_from_sql():

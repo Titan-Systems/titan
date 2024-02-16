@@ -96,6 +96,7 @@ class User(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
+        name = name.upper()
         self._data: _User = _User(
             name=name,
             owner=owner,

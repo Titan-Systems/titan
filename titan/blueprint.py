@@ -287,6 +287,9 @@ def _raise_if_missing_privs(required: list, available: dict):
 def _fetch_remote_state(session, manifest):
     state = {}
     urns = manifest["_urns"].copy()
+
+    session.cursor().execute("USE ROLE ACCOUNTADMIN")
+
     for urn_str, _data in manifest.items():
         if urn_str.startswith("_"):
             continue
@@ -426,6 +429,7 @@ class Blueprint:
                 fqn=resource.fqn,
                 account_locator=self._account_locator,
             )
+            print(urn, resource)
             data = resource.to_dict()
 
             if isinstance(resource, ResourcePointer):
@@ -484,14 +488,19 @@ class Blueprint:
 
         _raise_if_missing_privs(required_privs, available_privs)
 
-        print(self._staged)
-        print(plan)
+        # print(self._staged)
+        # print(plan)
 
         action_queue = []
         actions_taken = []
 
         def _queue_action(urn, data, props):
             if action == DiffAction.ADD:
+                if "owner" in data:
+                    if data["owner"] in usable_roles:
+                        action_queue.append(f"USE ROLE {data['owner']}")
+                    else:
+                        raise Exception(f"Role {data['owner']} required for {urn} but isn't available")
                 action_queue.append(lifecycle.create_resource(urn, data, props))
             elif action == DiffAction.CHANGE:
                 action_queue.append(lifecycle.update_resource(urn, data, props))
@@ -500,20 +509,18 @@ class Blueprint:
 
         for action, urn_str, data in plan:
             urn = parse_URN(urn_str)
-
             props = Resource.props_for_resource_type(urn.resource_type, data)
-
             _queue_action(urn, data, props)
 
-            while action_queue:
-                sql = action_queue.pop(0)
-                actions_taken.append(sql)
-                try:
-                    execute(session, sql)
-                except snowflake.connector.errors.ProgrammingError as err:
-                    if err.errno == ALREADY_EXISTS_ERR:
-                        print(f"Resource already exists: {urn_str}, skipping...")
-                    raise err
+        while action_queue:
+            sql = action_queue.pop(0)
+            actions_taken.append(sql)
+            try:
+                execute(session, sql)
+            except snowflake.connector.errors.ProgrammingError as err:
+                if err.errno == ALREADY_EXISTS_ERR:
+                    print(f"Resource already exists: {urn_str}, skipping...")
+                raise err
         return actions_taken
 
     def destroy(self, session, manifest=None):

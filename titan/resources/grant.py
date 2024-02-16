@@ -490,7 +490,7 @@ class _RoleGrant(ResourceSpec):
     role: Role
     to_role: Role = None
     to_user: User = None
-    # owner: str = None  # "USERADMIN"
+    owner: str = "SECURITYADMIN"
 
     def __post_init__(self):
         super().__post_init__()

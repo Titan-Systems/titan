@@ -10,7 +10,7 @@ from ..scope import AccountScope, DatabaseScope
 @dataclass(unsafe_hash=True)
 class _Role(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
+    owner: str = "USERADMIN"
     tags: dict[str, str] = None
     comment: str = None
 
@@ -24,15 +24,10 @@ class Role(Resource):
     scope = AccountScope()
     spec = _Role
 
-    name: str
-    owner: str = "SYSADMIN"
-    tags: dict[str, str] = None
-    comment: str = None
-
     def __init__(
         self,
         name: str,
-        owner: str = "SYSADMIN",
+        owner: str = "USERADMIN",
         tags: dict[str, str] = None,
         comment: str = None,
         **kwargs,
@@ -64,16 +59,11 @@ class DatabaseRole(Resource):
     scope = DatabaseScope()
     spec = _Role
 
-    name: str
-    owner: str = "SYSADMIN"
-    tags: dict[str, str] = None
-    comment: str = None
-
     def __init__(
         self,
         name: str,
         database: str = None,
-        owner: str = "SYSADMIN",
+        owner: str = "USERADMIN",
         tags: dict[str, str] = None,
         comment: str = None,
         **kwargs,

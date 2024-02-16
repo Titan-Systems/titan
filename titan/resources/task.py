@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
-from .warehouse import Warehouse, WarehouseSize
-from ..enums import ResourceType
+from .warehouse import Warehouse
+from ..enums import ResourceType, WarehouseSize
 from ..props import (
     BoolProp,
     EnumProp,

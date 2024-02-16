@@ -9,7 +9,7 @@ from inflection import pluralize
 from snowflake.connector.errors import ProgrammingError
 
 from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
-from .enums import ResourceType
+from .enums import ResourceType, WarehouseSize
 from .identifiers import URN, FQN
 from .parse import (
     FullyQualifiedIdentifier,
@@ -25,6 +25,10 @@ __this__ = sys.modules[__name__]
 
 def _desc_result_to_dict(desc_result):
     return dict([(row["property"], row["value"]) for row in desc_result])
+
+
+def _desc_type2_result_to_dict(desc_result):
+    return dict([(row["property"], row["property_value"]) for row in desc_result])
 
 
 def _fail_if_not_granted(result, *args):
@@ -118,6 +122,12 @@ def _parse_signature(signature: str) -> list:
     if signature:
         return [_parse_column(col.strip(" ")) for col in signature.split(",")]
     return []
+
+
+def _parse_comma_separated_values(values: str) -> list:
+    if values is None or values == "":
+        return None
+    return [value.strip(" ") for value in values.split(",")]
 
 
 def params_result_to_dict(params_result):
@@ -308,7 +318,7 @@ def fetch_function(session, fqn: FQN):
     data = udfs[0]
     inputs, output = data["arguments"].split(" RETURN ")
     desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
-    properties = dict([(row["property"], row["value"]) for row in desc_result])
+    properties = _desc_result_to_dict(desc_result)
 
     return {
         "name": data["name"],
@@ -627,6 +637,37 @@ def fetch_stage(session, fqn: FQN):
     raise NotImplementedError
 
 
+def fetch_storage_integration(session, fqn: FQN):
+    show_result = execute(session, "SHOW INTEGRATIONS")
+    integrations = _filter_result(show_result, name=fqn.name, category="STORAGE")
+
+    if len(integrations) == 0:
+        return None
+    if len(integrations) > 1:
+        raise Exception(f"Found multiple storage integrations matching {fqn}")
+
+    data = integrations[0]
+
+    desc_result = execute(session, f"DESC INTEGRATION {fqn.name}")
+    properties = _desc_type2_result_to_dict(desc_result)
+
+    show_grants = execute(session, f"SHOW GRANTS ON INTEGRATION {fqn.name}")
+    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+
+    return {
+        "name": data["name"],
+        "type": data["type"],
+        "enabled": data["enabled"] == "true",
+        "comment": data["comment"] or None,
+        "storage_provider": properties["STORAGE_PROVIDER"],
+        "storage_aws_role_arn": properties.get("STORAGE_AWS_ROLE_ARN"),
+        "storage_allowed_locations": _parse_comma_separated_values(properties.get("STORAGE_ALLOWED_LOCATIONS")),
+        "storage_blocked_locations": _parse_comma_separated_values(properties.get("STORAGE_BLOCKED_LOCATIONS")),
+        "storage_aws_object_acl": properties.get("STORAGE_AWS_OBJECT_ACL"),
+        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
+    }
+
+
 def fetch_table(session, fqn: FQN):
     show_result = execute(session, "SHOW TABLES")
 
@@ -695,7 +736,9 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
 
 def fetch_user(session, fqn: FQN):
     # SHOW USERS requires the MANAGE GRANTS privilege
-    show_result = execute(session, "SHOW USERS", cacheable=True)  # , use_role="SECURITYADMIN"
+    # Other roles can see the list of users but don't get access to other metadata such as login_name.
+    # This causes incorrect drift
+    show_result = execute(session, "SHOW USERS", cacheable=True)  # , use_role="SECURITYADMIN" , use_role="USERADMIN"
 
     users = _filter_result(show_result, name=fqn.name)
 
@@ -778,11 +821,13 @@ def fetch_warehouse(session, fqn: FQN):
     if query_accel:
         query_accel = query_accel == "true"
 
+    print(data)
+
     return {
         "name": data["name"],
         "owner": data["owner"],
         "warehouse_type": data["type"],
-        "warehouse_size": data["size"].upper(),
+        "warehouse_size": str(WarehouseSize(data["size"])),
         # "max_cluster_count": data["max_cluster_count"],
         # "min_cluster_count": data["min_cluster_count"],
         # "scaling_policy": data["scaling_policy"],
