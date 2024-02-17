@@ -286,7 +286,7 @@ def _raise_if_missing_privs(required: list, available: dict):
 
 def _fetch_remote_state(session, manifest):
     state = {}
-    urns = manifest["_urns"].copy()
+    urns = set(manifest["_urns"].copy())
 
     session.cursor().execute("USE ROLE ACCOUNTADMIN")
 

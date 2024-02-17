@@ -369,23 +369,21 @@ def fetch_future_grant(session, fqn: FQN):
     )
 
     if len(grants) == 0:
-        return []
+        return None
+    elif len(grants) > 1:
+        raise Exception(f"Found multiple future grants matching {fqn}")
 
-    return sorted(
-        [
-            {
-                "priv": row["privilege"],
-                "on_type": row["grant_on"],
-                "in_type": fqn.params["in_type"],
-                "in_name": row["name"].split(".")[0],
-                "to": row["grantee_name"],
-                "grant_option": row["grant_option"] == "true",
-                "owner": None,
-            }
-            for row in grants
-        ],
-        key=lambda g: (g["priv"], g["owner"]),
-    )
+    data = grants[0]
+
+    return {
+        "priv": data["privilege"],
+        "on_type": data["grant_on"],
+        "in_type": fqn.params["in_type"],
+        "in_name": data["name"].split(".")[0],
+        "to": data["grantee_name"],
+        "grant_option": data["grant_option"] == "true",
+        "owner": None,
+    }
 
 
 def fetch_grant(session, fqn: FQN):
@@ -426,7 +424,7 @@ def fetch_grant(session, fqn: FQN):
 
 def fetch_grant_on_all(session, fqn: FQN):
     # All grants are expensive to fetch, so we will assume they are always out of date
-    return []
+    return None
 
 
 def fetch_password_policy(session, fqn: FQN):

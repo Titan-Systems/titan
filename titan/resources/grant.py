@@ -556,13 +556,3 @@ class RoleGrant(Resource):
         subject = "user" if self._data.to_user else "role"
         name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
         return FQN(name=self._data.role.name, params={subject: name})
-
-
-# def _resolver(data: dict):
-#     if "in_type" in data:
-#         return GrantOnAll
-#     else:
-#         return Grant
-
-
-# Resource.__resolvers__[ResourceType.GRANT] = _resolver
