@@ -212,6 +212,8 @@ def drop_future_grant(urn: URN, data: dict, **kwargs):
 
 
 def drop_grant(urn: URN, data: dict, **kwargs):
+    if data["priv"] == "OWNERSHIP":
+        return "select 1"
     return tidy_sql(
         "REVOKE",
         data["priv"],

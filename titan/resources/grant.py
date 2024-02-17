@@ -195,7 +195,7 @@ class Grant(Resource):
         super().__init__(**kwargs)
         self._data: _Grant = _Grant(
             priv=priv,
-            on=on,
+            on=on.upper(),
             on_type=on_type,
             to=to,
             grant_option=grant_option,
@@ -343,7 +343,7 @@ class FutureGrant(Resource):
             priv=priv,
             on_type=on_type,
             in_type=in_type,
-            in_name=in_name,
+            in_name=in_name.upper(),
             to=to,
             grant_option=grant_option,
             owner=owner,

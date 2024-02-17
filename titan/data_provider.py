@@ -379,7 +379,7 @@ def fetch_future_grant(session, fqn: FQN):
         "priv": data["privilege"],
         "on_type": data["grant_on"],
         "in_type": fqn.params["in_type"],
-        "in_name": data["name"].split(".")[0],
+        "in_name": fqn.params["in_name"],
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
         "owner": "SECURITYADMIN",

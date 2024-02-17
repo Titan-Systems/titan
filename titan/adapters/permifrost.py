@@ -196,9 +196,12 @@ def _get_role_resources(session, roles: list):
         def _add_view_grants(resources, view_identifier, privs, role):
             if view_identifier.endswith(".*.*"):
                 database = _parse_permifrost_identifier(view_identifier).database
-                for priv in privs:
-                    resources.append(GrantOnAll(priv=priv, on_all_views_in_database=database, to=role))
-                    resources.append(FutureGrant(priv=priv, on_future_views_in_database=database, to=role))
+                for schema in list_schemas(session, database):
+                    if schema.endswith("INFORMATION_SCHEMA") or schema.endswith("PUBLIC"):
+                        continue
+                    for priv in privs:
+                        resources.append(GrantOnAll(priv=priv, on_all_views_in_schema=schema, to=role))
+                        resources.append(FutureGrant(priv=priv, on_future_views_in_schema=schema, to=role))
             elif view_identifier.endswith(".*"):
                 fqn = _parse_permifrost_identifier(view_identifier)
                 if fqn.schema.endswith("*") or fqn.database.upper() == "SNOWFLAKE":
