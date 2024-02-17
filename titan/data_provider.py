@@ -264,20 +264,26 @@ def fetch_database(session, fqn: FQN):
         return None
     if len(show_result) > 1:
         raise Exception(f"Found multiple databases matching {fqn}")
-    if show_result[0]["kind"] != "STANDARD":
+
+    data = show_result[0]
+
+    is_standard_db = data["kind"] == "STANDARD"
+    is_snowflake_builtin = data["kind"] == "APPLICATION" and data["name"] == "SNOWFLAKE"
+
+    if not (is_standard_db or is_snowflake_builtin):
         return None
 
-    options = options_result_to_list(show_result[0]["options"])
+    options = options_result_to_list(data["options"])
     show_params_result = execute(session, f"SHOW PARAMETERS IN DATABASE {fqn.name}")
     params = params_result_to_dict(show_params_result)
 
     return {
-        "name": show_result[0]["name"],
-        "data_retention_time_in_days": int(show_result[0]["retention_time"]),
-        "comment": show_result[0]["comment"] or None,
+        "name": data["name"],
+        "data_retention_time_in_days": int(data["retention_time"]),
+        "comment": data["comment"] or None,
         "transient": "TRANSIENT" in options,
-        "owner": show_result[0]["owner"],
-        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
+        "owner": data["owner"],
+        "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
         "default_ddl_collation": params["default_ddl_collation"],
     }
 
@@ -334,7 +340,7 @@ def fetch_function(session, fqn: FQN):
 
 def fetch_future_grant(session, fqn: FQN):
     try:
-        show_result = execute(session, f"SHOW FUTURE GRANTS TO ROLE {fqn.name}")
+        show_result = execute(session, f"SHOW FUTURE GRANTS TO ROLE {fqn.name}", cacheable=True)
         """
         {
             'created_on': datetime.datetime(2024, 2, 5, 19, 39, 50, 146000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
@@ -384,12 +390,12 @@ def fetch_future_grant(session, fqn: FQN):
 
 def fetch_grant(session, fqn: FQN):
     try:
-        show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}")
+        show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}", cacheable=True)
     except ProgrammingError as err:
         if err.errno == DOEST_NOT_EXIST_ERR:
             return None
         raise
-    granted_on = fqn.params["type"]
+    granted_on = fqn.params["on_type"]
     name = fqn.params["on"]
     grantee_name = fqn.name
     grants = _filter_result(
@@ -416,6 +422,11 @@ def fetch_grant(session, fqn: FQN):
         ],
         key=lambda g: (g["priv"], g["owner"]),
     )
+
+
+def fetch_grant_on_all(session, fqn: FQN):
+    # All grants are expensive to fetch, so we will assume they are always out of date
+    return []
 
 
 def fetch_password_policy(session, fqn: FQN):
@@ -492,7 +503,7 @@ def fetch_procedure(session, fqn: FQN):
 def fetch_role_grants(session, role: str):
     if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
         return {}
-    show_result = execute(session, f"SHOW GRANTS TO ROLE {role}")
+    show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
     session_ctx = fetch_session(session)
 
     priv_map = defaultdict(list)
@@ -589,7 +600,7 @@ def fetch_schema(session, fqn: FQN):
         "owner": data["owner"],
         "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
-        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
+        "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
         "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
         "tags": tags,
@@ -738,7 +749,7 @@ def fetch_user(session, fqn: FQN):
     # SHOW USERS requires the MANAGE GRANTS privilege
     # Other roles can see the list of users but don't get access to other metadata such as login_name.
     # This causes incorrect drift
-    show_result = execute(session, "SHOW USERS", cacheable=True)  # , use_role="SECURITYADMIN" , use_role="USERADMIN"
+    show_result = execute(session, "SHOW USERS", cacheable=True)
 
     users = _filter_result(show_result, name=fqn.name)
 
@@ -820,8 +831,6 @@ def fetch_warehouse(session, fqn: FQN):
     query_accel = data.get("enable_query_acceleration")
     if query_accel:
         query_accel = query_accel == "true"
-
-    print(data)
 
     return {
         "name": data["name"],

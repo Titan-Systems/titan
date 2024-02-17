@@ -345,7 +345,7 @@ class ResourceContainer:
 
 class ResourcePointer(Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-        self._name: str = name
+        self._name: str = name.upper()
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
         super().__init__()
@@ -353,7 +353,7 @@ class ResourcePointer(Resource, ResourceContainer):
         # Don't want to do this for all implicit resources but making an exception for PUBLIC schema
 
         # If this points to a database, assume it includes a PUBLIC schema
-        if self._resource_type == ResourceType.DATABASE:
+        if self._resource_type == ResourceType.DATABASE and self._name != "SNOWFLAKE":
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
 
     def __copy__(self):

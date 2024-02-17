@@ -175,7 +175,7 @@ class Grant(Resource):
 
                     # on_all is not currently supported
                     if keyword.startswith("on_all"):
-                        raise ValueError("You must use AllGrant for all grants")
+                        raise ValueError("You must use GrantOnAll for all grants")
                     # on_future should be handled by FutureGrant
                     elif keyword.startswith("on_future"):
                         raise ValueError("You must use FutureGrant for future grants")
@@ -257,7 +257,7 @@ class Grant(Resource):
 
 
 def grant_fqn(grant: _Grant):
-    return FQN(name=grant.to.name, params={"on": grant.on, "type": str(grant.on_type)})
+    return FQN(name=grant.to.name, params={"on": grant.on, "on_type": str(grant.on_type)})
 
 
 @dataclass(unsafe_hash=True)
@@ -369,7 +369,7 @@ def future_grant_fqn(grant: _FutureGrant):
 
 
 @dataclass(unsafe_hash=True)
-class _AllGrant(ResourceSpec):
+class _GrantOnAll(ResourceSpec):
     priv: str
     on_type: ResourceType
     in_type: ResourceType
@@ -384,7 +384,7 @@ class _AllGrant(ResourceSpec):
             raise ValueError("in_type must be either DATABASE or SCHEMA")
 
 
-class AllGrant(Resource):
+class GrantOnAll(Resource):
     """
     GRANT
           { schemaPrivileges         | ALL [ PRIVILEGES ] } ON ALL SCHEMAS IN DATABASE <db_name>
@@ -393,7 +393,7 @@ class AllGrant(Resource):
     TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
     """
 
-    resource_type = ResourceType.GRANT
+    resource_type = ResourceType.GRANT_ON_ALL
     props = Props(
         priv=IdentifierProp("priv", eq=False),
         on_type=IdentifierProp("on type", eq=False),
@@ -403,7 +403,7 @@ class AllGrant(Resource):
         grant_option=FlagProp("with grant option"),
     )
     scope = AccountScope()
-    spec = _AllGrant
+    spec = _GrantOnAll
 
     def __init__(
         self,
@@ -417,12 +417,12 @@ class AllGrant(Resource):
         -----
 
         Schema Privs:
-        >>> Grant(priv="CREATE TABLE", on_all_schemas_in_database="somedb", to="somerole")
-        >>> Grant(priv="CREATE VIEW", on_all_schemas_in=Database(name="somedb"), to="somerole")
+        >>> GrantOnAll(priv="CREATE TABLE", on_all_schemas_in_database="somedb", to="somerole")
+        >>> GrantOnAll(priv="CREATE VIEW", on_all_schemas_in=Database(name="somedb"), to="somerole")
 
         Schema Object Privs:
-        >>> Grant(priv="SELECT", on_all_tables_in_schema="sch", to="somerole")
-        >>> Grant(priv="SELECT", on_all_views_in_database="somedb", to="somerole")
+        >>> GrantOnAll(priv="SELECT", on_all_tables_in_schema="sch", to="somerole")
+        >>> GrantOnAll(priv="SELECT", on_all_views_in_database="somedb", to="somerole")
 
         """
         on_type = kwargs.pop("on_type", None)
@@ -458,7 +458,7 @@ class AllGrant(Resource):
                         in_name = arg
 
         super().__init__(**kwargs)
-        self._data: _AllGrant = _AllGrant(
+        self._data: _GrantOnAll = _GrantOnAll(
             priv=priv,
             on_type=on_type,
             in_type=in_type,
@@ -475,14 +475,18 @@ class AllGrant(Resource):
 
     @property
     def fqn(self):
-        return FQN(
-            name=self._data.to.name,
-            params={
-                "on_type": str(self._data.on_type),
-                "in_type": str(self._data.in_type),
-                "in_name": self._data.in_name,
-            },
-        )
+        return grant_on_all_fqn(self._data)
+
+
+def grant_on_all_fqn(grant: _GrantOnAll):
+    return FQN(
+        name=grant.to.name,
+        params={
+            "on_type": str(grant.on_type),
+            "in_type": str(grant.in_type),
+            "in_name": grant.in_name,
+        },
+    )
 
 
 @dataclass(unsafe_hash=True)
@@ -519,7 +523,7 @@ class RoleGrant(Resource):
         role: Role,
         to_role: Role = None,
         to_user: User = None,
-        # owner: str = None,  # = "USERADMIN"
+        # owner: str = None,  # = "SECURITYADMIN"
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -552,3 +556,13 @@ class RoleGrant(Resource):
         subject = "user" if self._data.to_user else "role"
         name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
         return FQN(name=self._data.role.name, params={subject: name})
+
+
+# def _resolver(data: dict):
+#     if "in_type" in data:
+#         return GrantOnAll
+#     else:
+#         return Grant
+
+
+# Resource.__resolvers__[ResourceType.GRANT] = _resolver

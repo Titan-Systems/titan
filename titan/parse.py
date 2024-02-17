@@ -4,7 +4,6 @@ from typing import List, Dict, Callable, Union
 
 import pyparsing as pp
 
-from .builder import SQL
 from .enums import ResourceType, Scope
 from .identifiers import FQN, URN
 from .scope import DatabaseScope, SchemaScope
@@ -138,9 +137,7 @@ def _parse_create_header(sql, resource_type, scope):
         raise pp.ParseException("Failed to parse header") from err
 
 
-def _parse_grant(sql: Union[str, SQL]):
-    if isinstance(sql, SQL):
-        sql = str(sql)
+def _parse_grant(sql: str):
 
     # Check for role grant
     if _contains(Keywords("GRANT ROLE"), sql):

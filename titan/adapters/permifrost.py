@@ -3,7 +3,7 @@ import yaml
 from titan.enums import ResourceType
 from titan.identifiers import FQN
 from titan.privs import DatabasePriv, TablePriv, SchemaPriv, ViewPriv, WarehousePriv
-from titan.resources import AllGrant, FutureGrant, Grant, RoleGrant
+from titan.resources import GrantOnAll, FutureGrant, Grant, RoleGrant
 from titan.resources.resource import ResourcePointer
 
 
@@ -136,8 +136,16 @@ def _get_role_resources(roles: list):
                 database = _parse_permifrost_identifier(schema_identifier, is_db_scoped=True).database
                 for priv in privs:
                     resources.append(FutureGrant(priv=priv, on_future_schemas_in_database=database, to=role))
+            elif schema_identifier.endswith("*"):
+                # schema: "db.schema_*"
+                return
             else:
-                resources.append(ResourcePointer(name=schema_identifier, resource_type=ResourceType.SCHEMA))
+                fqn = _parse_permifrost_identifier(schema_identifier, is_db_scoped=True)
+                db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
+                schema = ResourcePointer(name=fqn.name, resource_type=ResourceType.SCHEMA)
+                db.add(schema)
+                resources.append(db)
+                resources.append(schema)
                 for priv in privs:
                     resources.append(Grant(priv=priv, on_schema=schema_identifier, to=role))
 
@@ -153,13 +161,18 @@ def _get_role_resources(roles: list):
             if table_identifier.endswith(".*.*"):
                 database = _parse_permifrost_identifier(table_identifier).database
                 for priv in privs:
-                    resources.append(AllGrant(priv=priv, on_all_tables_in_database=database, to=role))
+                    resources.append(GrantOnAll(priv=priv, on_all_tables_in_database=database, to=role))
                     resources.append(FutureGrant(priv=priv, on_future_tables_in_database=database, to=role))
             elif table_identifier.endswith(".*"):
                 schema = _parse_permifrost_identifier(table_identifier).schema
+                if schema.endswith("*"):
+                    return
                 for priv in privs:
-                    resources.append(AllGrant(priv=priv, on_all_tables_in_schema=schema, to=role))
+                    resources.append(GrantOnAll(priv=priv, on_all_tables_in_schema=schema, to=role))
                     resources.append(FutureGrant(priv=priv, on_future_tables_in_schema=schema, to=role))
+            elif table_identifier.endswith("*"):
+                # table: "db.schema.table_*"
+                return
             else:
                 resources.append(ResourcePointer(name=table_identifier, resource_type=ResourceType.TABLE))
                 for priv in privs:
@@ -169,13 +182,18 @@ def _get_role_resources(roles: list):
             if view_identifier.endswith(".*.*"):
                 database = _parse_permifrost_identifier(view_identifier).database
                 for priv in privs:
-                    resources.append(AllGrant(priv=priv, on_all_views_in_database=database, to=role))
+                    resources.append(GrantOnAll(priv=priv, on_all_views_in_database=database, to=role))
                     resources.append(FutureGrant(priv=priv, on_future_views_in_database=database, to=role))
             elif view_identifier.endswith(".*"):
                 schema = _parse_permifrost_identifier(view_identifier).schema
+                if schema.endswith("*"):
+                    return
                 for priv in privs:
-                    resources.append(AllGrant(priv=priv, on_all_views_in_schema=schema, to=role))
+                    resources.append(GrantOnAll(priv=priv, on_all_views_in_schema=schema, to=role))
                     resources.append(FutureGrant(priv=priv, on_future_views_in_schema=schema, to=role))
+            elif view_identifier.endswith("*"):
+                # table: "db.schema.table_*"
+                return
             else:
                 resources.append(ResourcePointer(name=view_identifier, resource_type=ResourceType.VIEW))
                 for priv in privs:

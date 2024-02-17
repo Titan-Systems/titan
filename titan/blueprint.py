@@ -243,7 +243,7 @@ def _collect_available_privs(session_ctx, session, plan, usable_roles):
                 if _contains(role, str(parent_urn), create_priv):
                     ownership_priv = priv_for_principal(urn, "OWNERSHIP")
                     _add(role, urn_str, ownership_priv)
-                    if urn.resource_type == ResourceType.DATABASE:
+                    if urn.resource_type == ResourceType.DATABASE and urn.fqn.name != "SNOWFLAKE":
                         public_schema = URN(
                             account_locator=account_urn.account_locator,
                             resource_type=ResourceType.SCHEMA,
