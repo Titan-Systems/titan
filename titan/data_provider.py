@@ -382,7 +382,7 @@ def fetch_future_grant(session, fqn: FQN):
         "in_name": data["name"].split(".")[0],
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
-        "owner": None,
+        "owner": "SECURITYADMIN",
     }
 
 
@@ -865,8 +865,9 @@ def list_databases(session):
     return [row["name"] for row in show_result]
 
 
-def list_schemas(session):
-    show_result = execute(session, "SHOW SCHEMAS")
+def list_schemas(session, database=None):
+    db = f" IN DATABASE {database}" if database else ""
+    show_result = execute(session, f"SHOW SCHEMAS{db}")
     return [f"{row['database_name']}.{row['name']}" for row in show_result]
 
 

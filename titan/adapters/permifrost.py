@@ -1,5 +1,6 @@
 import yaml
 
+from titan.data_provider import list_schemas
 from titan.enums import ResourceType
 from titan.identifiers import FQN
 from titan.privs import DatabasePriv, TablePriv, SchemaPriv, ViewPriv, WarehousePriv
@@ -68,7 +69,7 @@ def _parse_permifrost_identifier(identifier: str, is_db_scoped: bool = False):
     return FQN(database=parts[0], schema=parts[1], name=parts[2])
 
 
-def read_permifrost_config(file_path):
+def read_permifrost_config(session, file_path):
     """
     Read the permifrost config file and return the config as a dictionary.
 
@@ -92,14 +93,14 @@ def read_permifrost_config(file_path):
 
     return [
         # *databases,
-        *_get_role_resources(roles),
+        *_get_role_resources(session, roles),
         *_get_user_resources(users),
         # warehouses,
         # integrations,
     ]
 
 
-def _get_role_resources(roles: list):
+def _get_role_resources(session, roles: list):
     resources = []
     for permifrost_role in roles:
         role_name, config = permifrost_role.popitem()
@@ -166,9 +167,12 @@ def _get_role_resources(roles: list):
         def _add_table_grants(resources, table_identifier, privs, role):
             if table_identifier.endswith(".*.*"):
                 database = _parse_permifrost_identifier(table_identifier).database
-                for priv in privs:
-                    resources.append(GrantOnAll(priv=priv, on_all_tables_in_database=database, to=role))
-                    resources.append(FutureGrant(priv=priv, on_future_tables_in_database=database, to=role))
+                for schema in list_schemas(session, database):
+                    if schema.endswith("INFORMATION_SCHEMA") or schema.endswith("PUBLIC"):
+                        continue
+                    for priv in privs:
+                        resources.append(GrantOnAll(priv=priv, on_all_tables_in_schema=schema, to=role))
+                        resources.append(FutureGrant(priv=priv, on_future_tables_in_schema=schema, to=role))
             elif table_identifier.endswith(".*"):
                 fqn = _parse_permifrost_identifier(table_identifier)
                 if fqn.schema.endswith("*") or fqn.database.upper() == "SNOWFLAKE":
