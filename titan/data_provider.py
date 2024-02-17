@@ -501,7 +501,12 @@ def fetch_procedure(session, fqn: FQN):
 def fetch_role_grants(session, role: str):
     if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
         return {}
-    show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
+    try:
+        show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
+    except ProgrammingError as err:
+        if err.errno == DOEST_NOT_EXIST_ERR:
+            return None
+        raise
     session_ctx = fetch_session(session)
 
     priv_map = defaultdict(list)

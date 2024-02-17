@@ -114,6 +114,8 @@ def _get_role_resources(roles: list):
 
         member_of = config.get("member_of", [])
         for parent_role in member_of:
+            if parent_role == "*":
+                continue
             resources.append(RoleGrant(role=role, to_role=parent_role))
 
         database_read = config.get("privileges", {}).get("databases", {}).get("read", [])
@@ -121,6 +123,8 @@ def _get_role_resources(roles: list):
 
         def _add_database_grants(resources, databases, privs, role):
             for db in databases:
+                if db.upper() == "SNOWFLAKE":
+                    continue
                 resources.append(ResourcePointer(name=db, resource_type=ResourceType.DATABASE))
                 for priv in privs:
                     resources.append(Grant(priv=priv, on_database=db, to=role))
@@ -141,6 +145,8 @@ def _get_role_resources(roles: list):
                 return
             else:
                 fqn = _parse_permifrost_identifier(schema_identifier, is_db_scoped=True)
+                if fqn.database.upper() == "SNOWFLAKE":
+                    return
                 db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
                 schema = ResourcePointer(name=fqn.name, resource_type=ResourceType.SCHEMA)
                 db.add(schema)
@@ -164,12 +170,17 @@ def _get_role_resources(roles: list):
                     resources.append(GrantOnAll(priv=priv, on_all_tables_in_database=database, to=role))
                     resources.append(FutureGrant(priv=priv, on_future_tables_in_database=database, to=role))
             elif table_identifier.endswith(".*"):
-                schema = _parse_permifrost_identifier(table_identifier).schema
-                if schema.endswith("*"):
+                fqn = _parse_permifrost_identifier(table_identifier)
+                if fqn.schema.endswith("*") or fqn.database.upper() == "SNOWFLAKE":
                     return
+                db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
+                schema = ResourcePointer(name=fqn.schema, resource_type=ResourceType.SCHEMA)
+                db.add(schema)
+                resources.append(db)
+                resources.append(schema)
                 for priv in privs:
-                    resources.append(GrantOnAll(priv=priv, on_all_tables_in_schema=schema, to=role))
-                    resources.append(FutureGrant(priv=priv, on_future_tables_in_schema=schema, to=role))
+                    resources.append(GrantOnAll(priv=priv, on_all_tables_in=schema, to=role))
+                    resources.append(FutureGrant(priv=priv, on_future_tables_in=schema, to=role))
             elif table_identifier.endswith("*"):
                 # table: "db.schema.table_*"
                 return
@@ -185,12 +196,17 @@ def _get_role_resources(roles: list):
                     resources.append(GrantOnAll(priv=priv, on_all_views_in_database=database, to=role))
                     resources.append(FutureGrant(priv=priv, on_future_views_in_database=database, to=role))
             elif view_identifier.endswith(".*"):
-                schema = _parse_permifrost_identifier(view_identifier).schema
-                if schema.endswith("*"):
+                fqn = _parse_permifrost_identifier(view_identifier)
+                if fqn.schema.endswith("*") or fqn.database.upper() == "SNOWFLAKE":
                     return
+                db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
+                schema = ResourcePointer(name=fqn.schema, resource_type=ResourceType.SCHEMA)
+                db.add(schema)
+                resources.append(db)
+                resources.append(schema)
                 for priv in privs:
-                    resources.append(GrantOnAll(priv=priv, on_all_views_in_schema=schema, to=role))
-                    resources.append(FutureGrant(priv=priv, on_future_views_in_schema=schema, to=role))
+                    resources.append(GrantOnAll(priv=priv, on_all_views_in=schema, to=role))
+                    resources.append(FutureGrant(priv=priv, on_future_views_in=schema, to=role))
             elif view_identifier.endswith("*"):
                 # table: "db.schema.table_*"
                 return
@@ -218,6 +234,8 @@ def _get_user_resources(users: list):
 
         member_of = config.get("member_of", [])
         for role in member_of:
+            if role == "*":
+                continue
             resources.append(RoleGrant(role=role, to_user=user))
 
     return resources

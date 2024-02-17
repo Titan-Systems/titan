@@ -13,6 +13,7 @@ UNSUPPORTED_FEATURE = 2
 ACCESS_CONTROL_ERR = 3001
 DOEST_NOT_EXIST_ERR = 2003
 ALREADY_EXISTS_ERR = 3041  # Not sure this is correct
+INVALID_GRANT_ERR = 3042
 
 connection_params = {
     "account": os.environ.get("SNOWFLAKE_ACCOUNT"),
@@ -51,6 +52,11 @@ def execute(
         # raise Exception(f"Unknown connection type: {type(conn_or_cursor)}, {conn_or_cursor}")
         session = conn_or_cursor
         cur = session.cursor(snowflake.connector.DictCursor)
+
+    if sql.startswith("USE ROLE"):
+        desired_role = sql.split(" ")[-1]
+        if desired_role == session.role:
+            return
 
     if cacheable and session.role in _EXECUTION_CACHE and sql_text in _EXECUTION_CACHE[session.role]:
         print(f"[{session.user}:{session.role}] >", sql_text, end="")

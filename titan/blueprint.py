@@ -4,7 +4,7 @@ from queue import Queue
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .client import ALREADY_EXISTS_ERR, execute
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute
 from .diff import diff, DiffAction
 from .enums import ResourceType
 from .logical_grant import And, LogicalGrant, Or
@@ -215,10 +215,11 @@ def _collect_available_privs(session_ctx, session, plan, usable_roles):
 
         # Existing privilege grants
         role_grants = data_provider.fetch_role_grants(session, role)
-        for principal, grant_list in role_grants.items():
-            for grant in grant_list:
-                priv = priv_for_principal(parse_URN(principal), grant["priv"])
-                _add(role, principal, priv)
+        if role_grants:
+            for principal, grant_list in role_grants.items():
+                for grant in grant_list:
+                    priv = priv_for_principal(parse_URN(principal), grant["priv"])
+                    _add(role, principal, priv)
 
         # Implied privilege grants in the context of our plan
         for action, urn_str, data in plan:
@@ -520,19 +521,31 @@ class Blueprint:
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
                     print(f"Resource already exists: {urn_str}, skipping...")
-                raise err
+                elif err.errno == INVALID_GRANT_ERR:
+                    print(f"Invalid grant: {urn_str}, skipping...")
+                else:
+                    raise err
         return actions_taken
 
     def destroy(self, session, manifest=None):
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
         for urn_str, data in manifest.items():
+            if urn_str.startswith("_"):
+                continue
+
+            if isinstance(data, dict) and data.get("_pointer"):
+                continue
             urn = parse_URN(urn_str)
             if urn.resource_type == ResourceType.GRANT:
                 for grant in data:
                     execute(session, lifecycle.drop_resource(urn, grant))
             else:
-                execute(session, lifecycle.drop_resource(urn, data))
+                try:
+                    execute(session, lifecycle.drop_resource(urn, data))
+                except snowflake.connector.errors.ProgrammingError as err:
+                    print("failed")
+                    continue
 
     def _add(self, resource):
         if self._finalized:

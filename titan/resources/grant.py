@@ -162,21 +162,9 @@ class Grant(Resource):
                 is_scoped_grant = "_in_" in keyword or keyword.endswith("_in")
 
                 if is_scoped_grant:
-                    # if keyword.endswith("_in"):
-                    #     keyword = keyword[:-3]
-                    #     if not isinstance(arg, Resource):
-                    #         raise ValueError(f"Invalid resource type: {arg}")
-                    #     on = arg._data.name
-                    #     on_type = arg.resource_type
-                    # elif "_in_" in keyword:
-                    #     keyword, resource_type = keyword.split("_in_")
-                    #     on = arg
-                    #     on_type = ResourceType(resource_type)
 
-                    # on_all is not currently supported
                     if keyword.startswith("on_all"):
                         raise ValueError("You must use GrantOnAll for all grants")
-                    # on_future should be handled by FutureGrant
                     elif keyword.startswith("on_future"):
                         raise ValueError("You must use FutureGrant for future grants")
                     else:
@@ -198,6 +186,9 @@ class Grant(Resource):
         if owner is None:
             if on == "ACCOUNT" and isinstance(priv, GlobalPriv):
                 owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
+            # Hacky fix
+            elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
+                owner = "ACCOUNTADMIN"
             else:
                 owner = "SYSADMIN"
 
@@ -268,7 +259,7 @@ class _FutureGrant(ResourceSpec):
     in_name: str
     to: Role
     grant_option: bool = False
-    # owner: str = None # Future grants might not have owners
+    owner: str = "SECURITYADMIN"
 
 
 class FutureGrant(Resource):
@@ -329,15 +320,23 @@ class FutureGrant(Resource):
             # Handle on_future_ kwargs
             if on_kwargs:
                 for keyword, arg in on_kwargs.items():
+
+                    # At some point we need to support _in_sometype=SomeType(blah)
+
                     if isinstance(arg, Resource):
                         on_type = ResourceType(singularize(keyword[10:-3]))
                         in_type = arg.resource_type
-                        in_name = arg._data.name
+                        in_name = str(arg.fqn)
                     else:
                         on_stmt, in_stmt = keyword.split("_in_")
                         on_type = ResourceType(singularize(on_stmt[10:]))
                         in_type = ResourceType(in_stmt)
                         in_name = arg
+
+        if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
+            owner = "ACCOUNTADMIN"
+        else:
+            owner = "SECURITYADMIN"
 
         super().__init__(**kwargs)
         self._data: _FutureGrant = _FutureGrant(
@@ -347,6 +346,7 @@ class FutureGrant(Resource):
             in_name=in_name,
             to=to,
             grant_option=grant_option,
+            owner=owner,
         )
         granted_in = ResourcePointer(name=in_name, resource_type=in_type)
         self.requires(granted_in, self._data.to)
@@ -376,7 +376,7 @@ class _GrantOnAll(ResourceSpec):
     in_name: str
     to: Role
     grant_option: bool = False
-    # owner: str = None
+    owner: str = "SECURITYADMIN"
 
     def __post_init__(self):
         super().__post_init__()
@@ -451,11 +451,16 @@ class GrantOnAll(Resource):
                     on_type = ResourceType(singularize(on_keyword))
                     if isinstance(arg, Resource):
                         in_type = arg.resource_type
-                        in_name = arg._data.name
+                        in_name = str(arg.fqn)
                     else:
                         in_stmt = keyword.split("_in_")[1]
                         in_type = ResourceType(in_stmt)
                         in_name = arg
+
+        if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
+            owner = "ACCOUNTADMIN"
+        else:
+            owner = "SECURITYADMIN"
 
         super().__init__(**kwargs)
         self._data: _GrantOnAll = _GrantOnAll(
@@ -465,6 +470,7 @@ class GrantOnAll(Resource):
             in_name=in_name,
             to=to,
             grant_option=grant_option,
+            owner=owner,
         )
         self.requires(self._data.to)
 
