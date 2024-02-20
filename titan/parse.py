@@ -645,7 +645,7 @@ def parse_URN(urn_str: str) -> URN:
         raise Exception(f"Invalid URN string: {urn_str}")
     if parts[0] != "urn":
         raise Exception(f"Invalid URN string: {urn_str}")
-    resource_label, fqn_str = parts[3].split("/")
+    resource_label, fqn_str = parts[3].split("/", 1)
     resource_type = ResourceType(resource_label.replace("_", " ").upper())
     fqn = parse_identifier(fqn_str, is_db_scoped=(resource_label == "schema"))
     return URN(

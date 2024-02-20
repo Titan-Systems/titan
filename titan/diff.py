@@ -35,7 +35,6 @@ def dict_delta(original, new):
         delta[key] = None
 
     for key in original_keys & new_keys:
-        # if original[key] != new[key]:
         if not eq(original[key], new[key], key):
             delta[key] = new[key]
 
@@ -63,6 +62,7 @@ def diff(original, new):
         else:
             yield DiffAction.ADD, key, new[key]
 
+    # Resources in both should be comparedx
     for key in original_keys & new_keys:
         if isinstance(original[key], dict):
             # We don't diff resource pointers
@@ -70,12 +70,16 @@ def diff(original, new):
                 continue
 
             delta = dict_delta(original[key], new[key])
+
             for attr, value in delta.items():
                 yield DiffAction.CHANGE, key, {attr: value}
+
         elif isinstance(original[key], list):
+
             for item in original[key]:
                 if item not in new[key]:
                     yield DiffAction.REMOVE, key, item
+
             for item in new[key]:
                 if item not in original[key]:
                     yield DiffAction.ADD, key, item

@@ -7,6 +7,10 @@ def _params_to_str(params: dict) -> str:
     return "&".join([f"{k.lower()}={v}" for k, v in params.items()])
 
 
+def resource_label_for_type(resource_type: ResourceType) -> str:
+    return str(resource_type).replace(" ", "_").lower()
+
+
 class FQN:
     def __init__(
         self,
@@ -58,7 +62,7 @@ class URN:
         if not isinstance(resource_type, ResourceType):
             raise Exception(f"Invalid resource type: {resource_type}")
         self.resource_type: ResourceType = resource_type
-        self.resource_label: str = str(resource_type).replace(" ", "_").lower()
+        self.resource_label: str = resource_label_for_type(resource_type)
         self.fqn: FQN = fqn
         self.account_locator: str = account_locator
         self.organization: str = ""

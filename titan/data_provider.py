@@ -10,7 +10,7 @@ from snowflake.connector.errors import ProgrammingError
 
 from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
-from .identifiers import URN, FQN
+from .identifiers import URN, FQN, resource_label_for_type
 from .parse import (
     FullyQualifiedIdentifier,
     _parse_dynamic_table_text,
@@ -358,32 +358,41 @@ def fetch_future_grant(session, fqn: FQN):
             return None
         raise
 
-    grant_on = fqn.params["on_type"]
-    name = f"{fqn.params['in_name']}.<{grant_on}>"
+    in_type, in_name = fqn.params["in"].split("/")
+
     grantee_name = fqn.name
     grants = _filter_result(
         show_result,
-        grant_on=grant_on,
-        name=name,
+        # grant_on=grant_on,
+        # name=name,
         grantee_name=grantee_name,
     )
 
     if len(grants) == 0:
         return None
-    elif len(grants) > 1:
-        raise Exception(f"Found multiple future grants matching {fqn}")
 
-    data = grants[0]
+    grant_block = {}
 
-    return {
-        "priv": data["privilege"],
-        "on_type": data["grant_on"],
-        "in_type": fqn.params["in_type"],
-        "in_name": fqn.params["in_name"],
-        "to": data["grantee_name"],
-        "grant_option": data["grant_option"] == "true",
-        "owner": "SECURITYADMIN",
-    }
+    for grant in grants:
+        grant_in_name = grant["name"].split(".<")[0]
+        if in_name != grant_in_name:
+            continue
+        on_type = grant["grant_on"].lower()
+        if on_type not in grant_block:
+            grant_block[on_type] = []
+        grant_block[on_type].append(grant["privilege"])
+
+    return grant_block
+
+    # return {
+    #     "priv": data["privilege"],
+    #     "on_type": data["grant_on"],
+    #     "in_type": fqn.params["in_type"],
+    #     "in_name": fqn.params["in_name"],
+    #     "to": data["grantee_name"],
+    #     "grant_option": data["grant_option"] == "true",
+    #     "owner": "SECURITYADMIN",
+    # }
 
 
 def fetch_grant(session, fqn: FQN):

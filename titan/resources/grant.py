@@ -7,7 +7,7 @@ from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
 from ..enums import ResourceType
-from ..identifiers import FQN
+from ..identifiers import FQN, resource_label_for_type
 from ..parse import _parse_grant, _parse_props
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
 from ..props import Props, FlagProp, IdentifierProp
@@ -364,7 +364,7 @@ class FutureGrant(Resource):
 def future_grant_fqn(grant: _FutureGrant):
     return FQN(
         name=grant.to.name,
-        params={"on_type": str(grant.on_type), "in_type": str(grant.in_type), "in_name": grant.in_name},
+        params={"in": f"{resource_label_for_type(grant.in_type)}/{grant.in_name}"},
     )
 
 

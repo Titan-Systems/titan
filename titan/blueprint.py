@@ -91,6 +91,14 @@ def _plan(remote_state, manifest):
             # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
             attr = list(data.keys())[0]
             urn = parse_URN(urn_str)
+
+            if urn.resource_type == ResourceType.FUTURE_GRANT:
+                print(">>>>>>", data)
+                for on_type, privs in data.items():
+                    for priv in privs:
+                        changes.append((DiffAction.ADD, urn_str, {on_type: [priv]}))
+                continue
+
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, remote_state[urn_str])
             attr_metadata = resource_cls.spec.get_metadata(attr)
             if attr_metadata.get("triggers_replacement", False):
@@ -299,7 +307,9 @@ def _fetch_remote_state(session, manifest):
         resource_cls = Resource.resolve_resource_cls(urn.resource_type, _data)
         data = data_provider.fetch_resource(session, urn)
         if urn_str in manifest and data is not None:
-            if isinstance(data, list):
+            if urn.resource_type == ResourceType.FUTURE_GRANT:
+                normalized = data
+            elif isinstance(data, list):
                 normalized = [resource_cls.defaults() | d for d in data]
             else:
                 normalized = resource_cls.defaults() | data
@@ -310,7 +320,9 @@ def _fetch_remote_state(session, manifest):
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
         if data is not None:
-            if isinstance(data, list):
+            if urn.resource_type == ResourceType.FUTURE_GRANT:
+                normalized = data
+            elif isinstance(data, list):
                 normalized = [resource_cls.defaults() | d for d in data]
             else:
                 normalized = resource_cls.defaults() | data
@@ -430,7 +442,7 @@ class Blueprint:
                 fqn=resource.fqn,
                 account_locator=self._account_locator,
             )
-            print(urn, resource)
+
             data = resource.to_dict()
 
             if isinstance(resource, ResourcePointer):
@@ -438,15 +450,35 @@ class Blueprint:
 
             manifest_key = str(urn)
 
+            #### Special Cases
             if resource.resource_type == ResourceType.GRANT:
                 if manifest_key not in manifest:
                     manifest[manifest_key] = []
                 manifest[manifest_key].append(data)
+            elif resource.resource_type == ResourceType.FUTURE_GRANT:
+                # Role up FUTURE GRANTS on the same role/target to a single entry
+                # TODO: support grant option, use a single character prefix on the priv
+                if manifest_key not in manifest:
+                    manifest[manifest_key] = {}
+                on_type = data["on_type"].lower()
+                if on_type not in manifest[manifest_key]:
+                    manifest[manifest_key][on_type] = []
+                if data["priv"] in manifest[manifest_key][on_type]:
+                    # raise Exception(f"Duplicate resource {urn} with conflicting data")
+                    continue
+                manifest[manifest_key][on_type].append(data["priv"])
+
+            #### Normal Case
             else:
                 if manifest_key in manifest:
-                    continue
+                    if data != manifest[manifest_key]:
+                        # raise Exception(f"Duplicate resource {urn} with conflicting data")
+                        continue
                 manifest[manifest_key] = data
+
             urns.append(manifest_key)
+
+            print(urn, resource)
 
             for ref in resource.refs:
                 ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
