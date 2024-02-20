@@ -1,4 +1,3 @@
-import yaml
 import pytest
 
 from titan.adapters import permifrost
@@ -8,10 +7,9 @@ from titan.resources import Grant, RoleGrant
 from titan.resources.resource import ResourcePointer
 
 
-def test_permifrost():
-    resources = permifrost.read_permifrost_config("tests/fixtures/adapters/permifrost.yml")
-    for resource in resources:
-        print(resource)
+@pytest.mark.requires_snowflake
+def test_permifrost(cursor):
+    resources = permifrost.read_permifrost_config(cursor.connection, "tests/fixtures/adapters/permifrost.yml")
     assert ResourcePointer(name="loading", resource_type=ResourceType.WAREHOUSE) in resources
     assert Grant(priv=WarehousePriv.OPERATE, on_warehouse="loading", to="accountadmin") in resources
     assert RoleGrant(role="engineer", to_role="sysadmin") in resources

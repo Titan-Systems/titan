@@ -142,14 +142,14 @@ bp.apply(session, plan)
 
 | Feature/Capability                      | Titan Core     | Terraform      | Schemachange   |
 |-----------------------------------------|----------------|----------------|----------------|
-| Plan and Execute Changes                | ✅              | ✅              | ❌              |
-| Declarative Configuration               | ✅              | ✅              | ❌              |
-| Python-Based Definitions                | ✅              | w/ CDKTF       | ❌              |
-| SQL Support                             | ✅              | ❌              | ✅              |
-| Multi-Role Support                      | ✅              | ❌              | N/A            |
-| No State File Dependency                | ✅              | ❌              | ✅              |
-| Checks for Required Privileges          | ✅              | ❌              | ❌              |
-| Infrastructure Visualization            | WIP             | ✅              | ❌              |
+| Plan and Execute Changes                | ✅             | ✅              | ❌             |
+| Declarative Configuration               | ✅             | ✅              | ❌             |
+| Python-Based Definitions                | ✅             | w/ CDKTF        | ❌             |
+| SQL Support                             | ✅             | ❌              | ✅             |
+| Multi-Role Support                      | ✅             | ❌              | N/A            |
+| No State File Dependency                | ✅             | ❌              | ✅             |
+| Checks for Required Privileges          | ✅             | ❌              | ❌             |
+| Infrastructure Visualization            | WIP            | ✅              | ❌             |
 
 
 ## Titan Core vs Terraform
@@ -174,93 +174,96 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Name                          | Supported | SPI |
 |-------------------------------|-----------|-----|
 | **Account Resources**         |           |     |
-| API Integration               | ✅         | ❌   |
-| Catalog Integration           | ❌         | ❌   |
-| Compute Pool                  | ❌         | ❌   |
-| Connection                    | ❌         | ❌   |
-| Database                      | ✅         | ✅   |
-| External Access Integration   | ✅         | ❌   |
-| External Volume               | ❌         | ❌   |
-| Grant                         | ✅         | ❌   |
-| ↳ Privilege Grant             | ✅         | ❌   |
-| ↳ Future Grant                | ✅         | ❌   |
-| Network Policy                | ✅         | ❌   |
-| Notification Integration      | WIP        | ❌   |
-| ↳ Email                       | ✅         | ❌   |
-| ↳ AWS                         | ❌         | ❌   |
-| ↳ Azure                       | ❌         | ❌   |
-| ↳ GCP                         | ❌         | ❌   |
-| Replication Group             | ✅         | ❌   |
-| Resource Monitor              | ✅         | ❌   |
-| Role                          | ✅         | ✅   |
-| Security Integration          | ❌         | ❌   |
-| Share                         | ❌         | ❌   |
-| Storage Integration           | WIP        | ❌   |
-| ↳ AWS                         | ✅         | ❌   |
-| ↳ Azure                       | ✅         | ❌   |
-| ↳ GCP                         | ✅         | ❌   |
-| User                          | ✅         | ✅   |
-| Warehouse                     | ✅         | ✅   |
-|                               |            |     |
-| **Database Resources**        |            |     |
-| Database Role                 | ✅         | ❌   |
-| Schema                        | ✅         | ✅   |
-|                               |            |     |
-| **Schema Resources**          |            |     |
-| Alert                         | ✅         | ❌   |
-| Dynamic Table                 | ✅         | ❌   |
-| Event Table                   | ✅         | ❌   |
-| External Function             | ✅         | ❌   |
-| External Stage                | ✅         | ❌   |
-| External Table                | ❌         | ❌   |
-| Failover Group                | ✅         | ❌   |
-| File Format                   | ❌         | ❌   |
-| ↳ CSV                         | ❌         | ❌   |
-| ↳ JSON                        | ❌         | ❌   |
-| ↳ AVRO                        | ❌         | ❌   |
-| ↳ ORC                         | ❌         | ❌   |
-| ↳ Parquet                     | ❌         | ❌   |
-| Iceberg Table                 | ❌         | ❌   |
-| Image Repository              | ❌         | ❌   |
-| Internal Stage                | ✅         | ❌   |
-| Masking Policy                | ❌         | ❌   |
-| Materialized View             | ❌         | ❌   |
-| Model                         | ❌         | ❌   |
-| Network Rule                  | ✅         | ❌   |
-| Packages Policy               | ✅         | ❌   |
-| Password Policy               | ✅         | ❌   |
-| Pipe                          | ✅         | ❌   |
-| Role Grant                    | ✅         | ❌   |
-| Row Access Policy             | ❌         | ❌   |
-| Secret                        | ✅         | ❌   |
-| Sequence                      | ✅         | ❌   |
-| Service                       | ❌         | ❌   |
-| Session Policy                | ❌         | ❌   |
-| Stage                         | ✅         | ❌   |
-| ↳ External                    | ✅         | ❌   |
-| ↳ Internal                    | ✅         | ❌   |
-| Stored Procedure              | WIP        | ❌   |
-| ↳ Java                        | ❌         | ❌   |
-| ↳ Javascript                  | ❌         | ❌   |
-| ↳ Python                      | ✅         | ❌   |
-| ↳ Scala                       | ❌         | ❌   |
-| ↳ SQL                         | ❌         | ❌   |
-| Stream                        | WIP        | ❌   |
-| ↳ External Table              | ❌         | ❌   |
-| ↳ Stage                       | ✅         | ❌   |
-| ↳ Table                       | ✅         | ❌   |
-| ↳ View                        | ✅         | ❌   |
-| Streamlit                     | ❌         | ❌   |
-| Table                         | ✅         | ❌   |
-| Tag                           | ✅         | ❌   |
-| Task                          | ✅         | ❌   |
-| User-Defined Function         | WIP        | ❌   |
-| ↳ Java                        | ❌         | ❌   |
-| ↳ Javascript                  | ✅         | ❌   |
-| ↳ Python                      | ✅         | ❌   |
-| ↳ Scala                       | ❌         | ❌   |
-| ↳ SQL                         | ❌         | ❌   |
-| View                          | ✅         | ❌   |
+| API Integration               | ✅         | ❌  |
+| Catalog Integration           | ❌         | ❌  |
+| Compute Pool                  | ❌         | ❌  |
+| Connection                    | ❌         | ❌  |
+| Database                      | ✅         | ✅  |
+| External Access Integration   | ✅         | ❌  |
+| External Volume               | ❌         | ❌  |
+| Grant                         | ✅         | ❌  |
+| ↳ Future Grant                | WIP        | ❌  |
+| ↳ Privilege Grant             | ✅         | ❌  |
+| ↳ Role Grant                  | ✅         | ❌  |
+| Network Policy                | ✅         | ❌  |
+| Notification Integration      | WIP        | ❌  |
+| ↳ Email                       | ✅         | ❌  |
+| ↳ AWS                         | ❌         | ❌  |
+| ↳ Azure                       | ❌         | ❌  |
+| ↳ GCP                         | ❌         | ❌  |
+| Replication Group             | ✅         | ❌  |
+| Resource Monitor              | ✅         | ❌  |
+| Role                          | ✅         | ✅  |
+| Security Integration          | ❌         | ❌  |
+| Share                         | ❌         | ❌  |
+| Storage Integration           | WIP        | ❌  |
+| ↳ AWS                         | ✅         | ❌  |
+| ↳ Azure                       | ✅         | ❌  |
+| ↳ GCP                         | ✅         | ❌  |
+| User                          | ✅         | ✅  |
+| Warehouse                     | ✅         | ✅  |
+|                               |            |    |
+| **Database Resources**        |            |    |
+| Database Role                 | ✅         | ❌  |
+| Schema                        | ✅         | ✅  |
+|                               |            |    |
+| **Schema Resources**          |            |    |
+| Alert                         | ✅         | ❌  |
+| Aggregation Policy            | ❌         | ❌  |
+| Dynamic Table                 | ✅         | ❌  |
+| Event Table                   | ✅         | ❌  |
+| External Function             | ✅         | ❌  |
+| External Stage                | ✅         | ❌  |
+| External Table                | ❌         | ❌  |
+| Failover Group                | ✅         | ❌  |
+| File Format                   | ❌         | ❌  |
+| ↳ CSV                         | ❌         | ❌  |
+| ↳ JSON                        | ❌         | ❌  |
+| ↳ AVRO                        | ❌         | ❌  |
+| ↳ ORC                         | ❌         | ❌  |
+| ↳ Parquet                     | ❌         | ❌  |
+| Iceberg Table                 | ❌         | ❌  |
+| Image Repository              | ❌         | ❌  |
+| Internal Stage                | ✅         | ❌  |
+| Masking Policy                | ❌         | ❌  |
+| Materialized View             | ❌         | ❌  |
+| Model                         | ❌         | ❌  |
+| Network Rule                  | ✅         | ❌  |
+| Packages Policy               | ✅         | ❌  |
+| Password Policy               | ✅         | ❌  |
+| Pipe                          | ✅         | ❌  |
+| Projection Policy             | ❌         | ❌  |
+| Role Grant                    | ✅         | ❌  |
+| Row Access Policy             | ❌         | ❌  |
+| Secret                        | ✅         | ❌  |
+| Sequence                      | ✅         | ❌  |
+| Service                       | ❌         | ❌  |
+| Session Policy                | ❌         | ❌  |
+| Stage                         | ✅         | ❌  |
+| ↳ External                    | ✅         | ❌  |
+| ↳ Internal                    | ✅         | ❌  |
+| Stored Procedure              | WIP        | ❌  |
+| ↳ Java                        | ❌         | ❌  |
+| ↳ Javascript                  | ❌         | ❌  |
+| ↳ Python                      | ✅         | ❌  |
+| ↳ Scala                       | ❌         | ❌  |
+| ↳ SQL                         | ❌         | ❌  |
+| Stream                        | WIP        | ❌  |
+| ↳ External Table              | ❌         | ❌  |
+| ↳ Stage                       | ✅         | ❌  |
+| ↳ Table                       | ✅         | ❌  |
+| ↳ View                        | ✅         | ❌  |
+| Streamlit                     | ❌         | ❌  |
+| Table                         | ✅         | ❌  |
+| Tag                           | ✅         | ❌  |
+| Task                          | ✅         | ❌  |
+| User-Defined Function         | WIP        | ❌  |
+| ↳ Java                        | ❌         | ❌  |
+| ↳ Javascript                  | ✅         | ❌  |
+| ↳ Python                      | ✅         | ❌  |
+| ↳ Scala                       | ❌         | ❌  |
+| ↳ SQL                         | ❌         | ❌  |
+| View                          | ✅         | ❌  |
 
 
 

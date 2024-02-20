@@ -8,7 +8,7 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
+from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
 from .identifiers import URN, FQN, resource_label_for_type
 from .parse import (
@@ -876,8 +876,13 @@ def list_databases(session):
 
 def list_schemas(session, database=None):
     db = f" IN DATABASE {database}" if database else ""
-    show_result = execute(session, f"SHOW SCHEMAS{db}")
-    return [f"{row['database_name']}.{row['name']}" for row in show_result]
+    try:
+        show_result = execute(session, f"SHOW SCHEMAS{db}")
+        return [f"{row['database_name']}.{row['name']}" for row in show_result]
+    except ProgrammingError as err:
+        if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
+            return []
+        raise
 
 
 def list_stages(session):
