@@ -1,5 +1,7 @@
 import yaml
 
+from functools import cache
+
 from titan.data_provider import list_schemas
 from titan.enums import ResourceType
 from titan.identifiers import FQN
@@ -10,6 +12,9 @@ from titan.resources.resource import ResourcePointer
 
 DATABASE_READ_PRIVS = [DatabasePriv.USAGE]
 DATABASE_WRITE_PRIVS = [DatabasePriv.USAGE, DatabasePriv.MONITOR, DatabasePriv.CREATE_SCHEMA]
+
+STORAGE_INTEGRATION_PRIVS = ["USAGE"]
+
 SCHEMA_READ_PRIVS = [SchemaPriv.USAGE]
 SCHEMA_WRITE_PRIVS = [
     SchemaPriv.USAGE,
@@ -39,6 +44,7 @@ SCHEMA_WRITE_PRIVS = [
     SchemaPriv.CREATE_TASK,
     SchemaPriv.CREATE_VIEW,
 ]
+
 TABLE_READ_PRIVS = [TablePriv.SELECT]
 TABLE_WRITE_PRIVS = [
     TablePriv.SELECT,
@@ -48,7 +54,10 @@ TABLE_WRITE_PRIVS = [
     TablePriv.TRUNCATE,
     TablePriv.REFERENCES,
 ]
+
 VIEW_READ_PRIVS = [ViewPriv.SELECT]
+VIEW_WRITE_PRIVS = [ViewPriv.SELECT]
+
 WAREHOUSE_PRIVS = [WarehousePriv.USAGE, WarehousePriv.OPERATE, WarehousePriv.MONITOR]
 
 
@@ -67,6 +76,11 @@ def _parse_permifrost_identifier(identifier: str, is_db_scoped: bool = False):
     if is_db_scoped:
         return FQN(database=parts[0], name=parts[1])
     return FQN(database=parts[0], schema=parts[1], name=parts[2])
+
+
+@cache
+def _list_schemas(session, database):
+    return list_schemas(session, database)
 
 
 def read_permifrost_config(session, file_path):
@@ -113,6 +127,12 @@ def _get_role_resources(session, roles: list):
             for priv in WAREHOUSE_PRIVS:
                 resources.append(Grant(priv=priv, on_warehouse=wh, to=role))
 
+        integrations = config.get("integrations", [])
+        for integration in integrations:
+            resources.append(ResourcePointer(name=integration, resource_type=ResourceType.STORAGE_INTEGRATION))
+            for priv in STORAGE_INTEGRATION_PRIVS:
+                resources.append(Grant(priv=priv, on_storage_integration=integration, to=role))
+
         member_of = config.get("member_of", [])
         for parent_role in member_of:
             if parent_role == "*":
@@ -139,7 +159,7 @@ def _get_role_resources(session, roles: list):
         def _add_schema_grants(resources, schema_identifier, privs, role):
             if schema_identifier.endswith(".*"):
                 database = _parse_permifrost_identifier(schema_identifier, is_db_scoped=True).database
-                for schema in list_schemas(session, database):
+                for schema in _list_schemas(session, database):
                     if schema.endswith("INFORMATION_SCHEMA"):
                         continue
                     for priv in privs:
@@ -172,7 +192,7 @@ def _get_role_resources(session, roles: list):
         def _add_table_grants(resources, table_identifier, privs, role):
             if table_identifier.endswith(".*.*"):
                 database = _parse_permifrost_identifier(table_identifier).database
-                for schema in list_schemas(session, database):
+                for schema in _list_schemas(session, database):
                     if schema.endswith("INFORMATION_SCHEMA"):
                         continue
                     for priv in privs:
@@ -205,7 +225,7 @@ def _get_role_resources(session, roles: list):
         def _add_view_grants(resources, view_identifier, privs, role):
             if view_identifier.endswith(".*.*"):
                 database = _parse_permifrost_identifier(view_identifier).database
-                for schema in list_schemas(session, database):
+                for schema in _list_schemas(session, database):
                     if schema.endswith("INFORMATION_SCHEMA"):
                         continue
                     for priv in privs:
@@ -240,6 +260,7 @@ def _get_role_resources(session, roles: list):
             _add_view_grants(resources, table, VIEW_READ_PRIVS, role)
         for table in table_write:
             _add_table_grants(resources, table, TABLE_WRITE_PRIVS, role)
+            _add_view_grants(resources, table, VIEW_WRITE_PRIVS, role)
 
         # TODO: owns
 

@@ -52,6 +52,8 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
 def create_future_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     in_type, in_name = urn.fqn.params["in"].split("/")
     on_type, privs = list(data.items())[0]
+    if "INTEGRATION" in on_type:
+        on_type = "INTEGRATION"
     return tidy_sql(
         "GRANT",
         privs[0],
@@ -67,11 +69,14 @@ def create_future_grant(urn: URN, data: dict, props: Props, if_not_exists: bool)
 
 
 def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
+    on_type = data["on_type"]
+    if "INTEGRATION" in on_type:
+        on_type = "INTEGRATION"
     return tidy_sql(
         "GRANT",
         data["priv"],
         "ON",
-        data["on_type"],
+        on_type,
         data["on"],
         props.render(data),
     )

@@ -84,21 +84,21 @@ def _plan(remote_state, manifest):
     changes = []
     marked_for_replacement = set()
     for action, urn_str, data in diff(remote_state, manifest):
-        if action == DiffAction.CHANGE:
+        urn = parse_URN(urn_str)
+
+        if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
+            for on_type, privs in data.items():
+                privs_to_add = privs
+                if action == DiffAction.CHANGE:
+                    privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
+                for priv in privs_to_add:
+                    changes.append((DiffAction.ADD, urn_str, {on_type: [priv]}))
+        elif action == DiffAction.CHANGE:
             if urn_str in marked_for_replacement:
                 continue
 
             # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
             attr = list(data.keys())[0]
-            urn = parse_URN(urn_str)
-
-            if urn.resource_type == ResourceType.FUTURE_GRANT:
-                print(">>>>>>", data)
-                for on_type, privs in data.items():
-                    for priv in privs:
-                        changes.append((DiffAction.ADD, urn_str, {on_type: [priv]}))
-                continue
-
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, remote_state[urn_str])
             attr_metadata = resource_cls.spec.get_metadata(attr)
             if attr_metadata.get("triggers_replacement", False):
@@ -297,6 +297,7 @@ def _fetch_remote_state(session, manifest):
     state = {}
     urns = set(manifest["_urns"].copy())
 
+    # FIXME
     session.cursor().execute("USE ROLE ACCOUNTADMIN")
 
     for urn_str, _data in manifest.items():
@@ -304,9 +305,9 @@ def _fetch_remote_state(session, manifest):
             continue
         urns.remove(urn_str)
         urn = parse_URN(urn_str)
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type, _data)
         data = data_provider.fetch_resource(session, urn)
         if urn_str in manifest and data is not None:
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
             if urn.resource_type == ResourceType.FUTURE_GRANT:
                 normalized = data
             elif isinstance(data, list):
@@ -529,11 +530,15 @@ class Blueprint:
 
         def _queue_action(urn, data, props):
             if action == DiffAction.ADD:
+                switch_to_role = None
                 if "owner" in data:
-                    if data["owner"] in usable_roles:
-                        action_queue.append(f"USE ROLE {data['owner']}")
-                    else:
-                        raise Exception(f"Role {data['owner']} required for {urn} but isn't available")
+                    switch_to_role = data["owner"]
+                elif urn.resource_type == ResourceType.FUTURE_GRANT:
+                    switch_to_role = "SECURITYADMIN"
+                if switch_to_role and switch_to_role in usable_roles:
+                    action_queue.append(f"USE ROLE {switch_to_role}")
+                else:
+                    raise Exception(f"Role {data['owner']} required for {urn} but isn't available")
                 action_queue.append(lifecycle.create_resource(urn, data, props))
             elif action == DiffAction.CHANGE:
                 action_queue.append(lifecycle.update_resource(urn, data, props))

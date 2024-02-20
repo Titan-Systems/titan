@@ -189,6 +189,8 @@ class Grant(Resource):
             # Hacky fix
             elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
                 owner = "ACCOUNTADMIN"
+            elif "INTEGRATION" in str(on_type):
+                owner = "ACCOUNTADMIN"
             else:
                 owner = "SYSADMIN"
 
