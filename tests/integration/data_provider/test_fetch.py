@@ -264,7 +264,15 @@ future_grants = [
         ],
         "test_name": "test_future_grant",
         "resource_type": ResourceType.FUTURE_GRANT,
-        "data": {"schema": ["USAGE"]},
+        "data": {
+            "priv": "USAGE",
+            "on_type": "SCHEMA",
+            "in_type": "DATABASE",
+            "in_name": "STATIC_DATABASE",
+            "to": "thatrole",
+            "grant_option": False,
+        },
+        "response": {"schema": ["USAGE"]},
     },
 ]
 
@@ -368,8 +376,8 @@ def grant_resource(request, cursor, account_locator):
 
 
 @pytest.fixture(
-    params=grants,
-    ids=[config["test_name"] for config in grants],
+    params=future_grants,
+    ids=[config["test_name"] for config in future_grants],
     scope="function",
 )
 def future_grant_resource(request, cursor, account_locator):
@@ -424,6 +432,13 @@ def test_fetch_grant(grant_resource, cursor):
     assert len(result) == 1
     result = data_provider.remove_none_values(result[0])
     assert result == grant_resource["data"]
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_future_grant(future_grant_resource, cursor):
+    result = data_provider.fetch_resource(cursor, future_grant_resource["urn"])
+    assert result is not None
+    assert result == future_grant_resource["response"]
 
 
 @pytest.mark.requires_snowflake

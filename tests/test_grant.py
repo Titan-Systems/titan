@@ -25,34 +25,34 @@ def test_grant_account_obj_priv_with_resource():
     wh = Warehouse(name="somewh")
     grant = Grant(priv="MODIFY", on=wh, to="somerole")
     assert grant.priv == "MODIFY"
-    assert grant.on == "somewh"
+    assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
-    assert grant.to.name == "somerole"
+    assert grant.to.name == "SOMEROLE"
 
 
 def test_grant_account_obj_priv_with_kwarg():
     grant = Grant(priv="MODIFY", on_warehouse="somewh", to="somerole")
     assert grant.priv == "MODIFY"
-    assert grant.on == "somewh"
+    assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
-    assert grant.to.name == "somerole"
+    assert grant.to.name == "SOMEROLE"
 
 
 def test_grant_schema_priv_with_resource():
     sch = Schema(name="someschema")
     grant = Grant(priv="CREATE VIEW", on=sch, to="somerole")
     assert grant.priv == "CREATE VIEW"
-    assert grant.on == "someschema"
+    assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
-    assert grant.to.name == "somerole"
+    assert grant.to.name == "SOMEROLE"
 
 
 def test_grant_schema_priv_with_kwarg():
     grant = Grant(priv="CREATE VIEW", on_schema="someschema", to="somerole")
     assert grant.priv == "CREATE VIEW"
-    assert grant.on == "someschema"
+    assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
-    assert grant.to.name == "somerole"
+    assert grant.to.name == "SOMEROLE"
 
 
 # def test_grant_future_schemas_priv():
