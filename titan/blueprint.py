@@ -335,20 +335,24 @@ def _fetch_remote_state(session, manifest):
 class Blueprint:
     def __init__(
         self,
-        name: str,
+        name: str = None,
         account: Union[None, str, Account] = None,
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
         resources: List[Resource] = [],
+        dry_run: bool = False,
         allow_role_switching: bool = True,
         enforce_requirements: bool = False,
+        resource_types: List[ResourceType] = [],
     ) -> None:
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
         self._account_locator: str = None
+        self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
         self._enforce_requirements: bool = enforce_requirements
+        self._resource_types: List[ResourceType] = resource_types
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -554,7 +558,8 @@ class Blueprint:
             sql = action_queue.pop(0)
             actions_taken.append(sql)
             try:
-                execute(session, sql)
+                if not self._dry_run:
+                    execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
                     print(f"Resource already exists: {urn_str}, skipping...")
