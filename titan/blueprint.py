@@ -584,9 +584,11 @@ class Blueprint:
                     print("failed")
                     continue
 
-    def _add(self, resource):
+    def _add(self, resource: Resource):
         if self._finalized:
             raise Exception("Cannot add resources to a finalized blueprint")
+        if not isinstance(resource, Resource):
+            raise Exception(f"Expected a Resource, got {type(resource)} -> {resource}")
         self._staged.append(resource)
 
     def add(self, *resources):
