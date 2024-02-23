@@ -18,7 +18,7 @@ class StreamType(ParseableEnum):
     VIEW = "VIEW"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _TableStream(ResourceSpec):
     name: str
     on_table: Table
@@ -95,7 +95,7 @@ class TableStream(Resource):
             self.requires(ResourcePointer(name=self._data.before["stream"], resource_type=ResourceType.STREAM))
 
 
-# @dataclass
+# @dataclass(unsafe_hash=True)
 # class _ExternalTableStream(ResourceSpec):
 #     name: str
 #     on_external_table: str
@@ -155,7 +155,7 @@ class TableStream(Resource):
 #         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _StageStream(ResourceSpec):
     name: str
     on_stage: str
@@ -203,7 +203,7 @@ class StageStream(Resource):
         self.requires(ResourcePointer(name=self._data.on_stage, resource_type=ResourceType.STAGE))
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _ViewStream(ResourceSpec):
     name: str
     on_view: View

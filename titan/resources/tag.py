@@ -6,7 +6,7 @@ from ..scope import SchemaScope
 from ..props import Props, StringProp, StringListProp
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Tag(ResourceSpec):
     name: str
     comment: str = None

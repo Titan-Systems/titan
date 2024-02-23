@@ -17,7 +17,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _ExternalFunction(ResourceSpec):
     name: str
     returns: DataType

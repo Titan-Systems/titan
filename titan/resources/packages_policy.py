@@ -11,7 +11,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _PackagesPolicy(ResourceSpec):
     name: str
     language: Language = Language.PYTHON

@@ -10,7 +10,7 @@ from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
-from .grant import Grant, RoleGrant
+from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
 from .network_rule import NetworkRule
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
@@ -69,10 +69,12 @@ __all__ = [
     "ExternalStage",
     # "ExternalTableStream",
     "FailoverGroup",
+    "FutureGrant",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
     "Grant",
+    "GrantOnAll",
     "InternalStage",
     "JavascriptUDF",
     "NetworkRule",

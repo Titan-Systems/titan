@@ -25,7 +25,7 @@ class NetworkRuleMode(ParseableEnum):
     EGRESS = "EGRESS"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _NetworkRule(ResourceSpec):
     name: str
     type: NetworkIdentifierType

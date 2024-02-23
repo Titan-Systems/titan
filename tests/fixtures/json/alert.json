@@ -1,6 +1,6 @@
 {
     "name": "TEST_ALERT",
-    "warehouse": "static_warehouse",
+    "warehouse": "STATIC_WAREHOUSE",
     "schedule": "5 minutes",
     "condition": "SELECT 1",
     "then": "SELECT 2",

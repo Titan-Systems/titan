@@ -12,7 +12,7 @@ from ..props import BoolProp, Props, StringProp, QueryProp
 from ..scope import SchemaScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Pipe(ResourceSpec):
     name: str
     as_: str

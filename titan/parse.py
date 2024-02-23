@@ -4,7 +4,6 @@ from typing import List, Dict, Callable, Union
 
 import pyparsing as pp
 
-from .builder import SQL
 from .enums import ResourceType, Scope
 from .identifiers import FQN, URN
 from .scope import DatabaseScope, SchemaScope
@@ -138,9 +137,7 @@ def _parse_create_header(sql, resource_type, scope):
         raise pp.ParseException("Failed to parse header") from err
 
 
-def _parse_grant(sql: Union[str, SQL]):
-    if isinstance(sql, SQL):
-        sql = str(sql)
+def _parse_grant(sql: str):
 
     # Check for role grant
     if _contains(Keywords("GRANT ROLE"), sql):
@@ -597,7 +594,10 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
         scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
         arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
 
-    name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
+    try:
+        name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
+    except pp.ParseException:
+        raise pp.ParseException(f"Failed to parse identifier: {identifier}")
     if len(name_parts) == 1:
         return FQN(
             name=name_parts[0],
@@ -645,7 +645,7 @@ def parse_URN(urn_str: str) -> URN:
         raise Exception(f"Invalid URN string: {urn_str}")
     if parts[0] != "urn":
         raise Exception(f"Invalid URN string: {urn_str}")
-    resource_label, fqn_str = parts[3].split("/")
+    resource_label, fqn_str = parts[3].split("/", 1)
     resource_type = ResourceType(resource_label.replace("_", " ").upper())
     fqn = parse_identifier(fqn_str, is_db_scoped=(resource_label == "schema"))
     return URN(

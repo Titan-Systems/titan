@@ -21,9 +21,20 @@ class _Parseable(EnumMeta):
 
 
 class ParseableEnum(Enum, metaclass=_Parseable):
-    # Why not??
     def __str__(self):
         return str(self.value)
+
+    @classmethod
+    def synonyms(cls):
+        """Override to provide a dictionary of synonyms for the enum values."""
+        return {}
+
+    @classmethod
+    def _missing_(cls, val):
+        synonyms = cls.synonyms()
+        if val in synonyms:
+            return cls.__members__[synonyms[val]]
+        return super()._missing_(val)
 
 
 class ResourceType(ParseableEnum):
@@ -42,6 +53,7 @@ class ResourceType(ParseableEnum):
     FUNCTION = "FUNCTION"
     FUTURE_GRANT = "FUTURE GRANT"
     GRANT = "GRANT"
+    GRANT_ON_ALL = "GRANT ON ALL"
     NETWORK_RULE = "NETWORK RULE"
     NOTIFICATION_INTEGRATION = "NOTIFICATION INTEGRATION"
     PACKAGES_POLICY = "PACKAGES POLICY"
@@ -236,3 +248,46 @@ class SessionParameter(ParseableEnum):
     USE_CACHED_RESULT = "USE_CACHED_RESULT"
     WEEK_OF_YEAR_POLICY = "WEEK_OF_YEAR_POLICY"
     WEEK_START = "WEEK_START"
+
+
+class WarehouseSize(ParseableEnum):
+    """
+    Represents the size options for a warehouse.
+
+    Available sizes:
+    - XSMALL
+    - SMALL
+    - MEDIUM
+    - LARGE
+    - XLARGE
+    - XXLARGE
+    - XXXLARGE
+    - X4LARGE
+    - X5LARGE (AWS-only)
+    - X6LARGE (AWS-only)
+    """
+
+    XSMALL = "XSMALL"
+    SMALL = "SMALL"
+    MEDIUM = "MEDIUM"
+    LARGE = "LARGE"
+    XLARGE = "XLARGE"
+    XXLARGE = "XXLARGE"
+    XXXLARGE = "XXXLARGE"
+    X4LARGE = "X4LARGE"
+    X5LARGE = "X5LARGE"
+    X6LARGE = "X6LARGE"
+
+    @classmethod
+    def synonyms(cls):
+        return {
+            "X-SMALL": "XSMALL",
+            "X-LARGE": "XLARGE",
+            "X2LARGE": "XXLARGE",
+            "2X-LARGE": "XXLARGE",
+            "X3LARGE": "XXXLARGE",
+            "3X-LARGE": "XXXLARGE",
+            "4X-LARGE": "X4LARGE",
+            "5X-LARGE": "X5LARGE",
+            "6X-LARGE": "X6LARGE",
+        }

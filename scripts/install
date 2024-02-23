@@ -3,7 +3,7 @@ RETURNS OBJECT NOT NULL
 LANGUAGE PYTHON
 RUNTIME_VERSION = '3.9'
 PACKAGES = ('snowflake-snowpark-python', 'inflection', 'pyparsing')
-IMPORTS = ('@titan_aws/releases/titan-0.1.4.zip')
+IMPORTS = ('@titan_aws/releases/titan-0.1.5.zip')
 HANDLER = 'titan.spi.install'
 EXECUTE AS CALLER
 CALL install()

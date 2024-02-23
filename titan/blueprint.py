@@ -4,7 +4,7 @@ from queue import Queue
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .client import ALREADY_EXISTS_ERR, execute
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute
 from .diff import diff, DiffAction
 from .enums import ResourceType
 from .logical_grant import And, LogicalGrant, Or
@@ -84,13 +84,21 @@ def _plan(remote_state, manifest):
     changes = []
     marked_for_replacement = set()
     for action, urn_str, data in diff(remote_state, manifest):
-        if action == DiffAction.CHANGE:
+        urn = parse_URN(urn_str)
+
+        if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
+            for on_type, privs in data.items():
+                privs_to_add = privs
+                if action == DiffAction.CHANGE:
+                    privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
+                for priv in privs_to_add:
+                    changes.append((DiffAction.ADD, urn_str, {on_type: [priv]}))
+        elif action == DiffAction.CHANGE:
             if urn_str in marked_for_replacement:
                 continue
 
             # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
             attr = list(data.keys())[0]
-            urn = parse_URN(urn_str)
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, remote_state[urn_str])
             attr_metadata = resource_cls.spec.get_metadata(attr)
             if attr_metadata.get("triggers_replacement", False):
@@ -215,10 +223,11 @@ def _collect_available_privs(session_ctx, session, plan, usable_roles):
 
         # Existing privilege grants
         role_grants = data_provider.fetch_role_grants(session, role)
-        for principal, grant_list in role_grants.items():
-            for grant in grant_list:
-                priv = priv_for_principal(parse_URN(principal), grant["priv"])
-                _add(role, principal, priv)
+        if role_grants:
+            for principal, grant_list in role_grants.items():
+                for grant in grant_list:
+                    priv = priv_for_principal(parse_URN(principal), grant["priv"])
+                    _add(role, principal, priv)
 
         # Implied privilege grants in the context of our plan
         for action, urn_str, data in plan:
@@ -243,7 +252,7 @@ def _collect_available_privs(session_ctx, session, plan, usable_roles):
                 if _contains(role, str(parent_urn), create_priv):
                     ownership_priv = priv_for_principal(urn, "OWNERSHIP")
                     _add(role, urn_str, ownership_priv)
-                    if urn.resource_type == ResourceType.DATABASE:
+                    if urn.resource_type == ResourceType.DATABASE and urn.fqn.name != "SNOWFLAKE":
                         public_schema = URN(
                             account_locator=account_urn.account_locator,
                             resource_type=ResourceType.SCHEMA,
@@ -286,16 +295,22 @@ def _raise_if_missing_privs(required: list, available: dict):
 
 def _fetch_remote_state(session, manifest):
     state = {}
-    urns = manifest["_urns"].copy()
+    urns = set(manifest["_urns"].copy())
+
+    # FIXME
+    session.cursor().execute("USE ROLE ACCOUNTADMIN")
+
     for urn_str, _data in manifest.items():
         if urn_str.startswith("_"):
             continue
         urns.remove(urn_str)
         urn = parse_URN(urn_str)
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type, _data)
         data = data_provider.fetch_resource(session, urn)
         if urn_str in manifest and data is not None:
-            if isinstance(data, list):
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+            if urn.resource_type == ResourceType.FUTURE_GRANT:
+                normalized = data
+            elif isinstance(data, list):
                 normalized = [resource_cls.defaults() | d for d in data]
             else:
                 normalized = resource_cls.defaults() | data
@@ -306,7 +321,9 @@ def _fetch_remote_state(session, manifest):
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
         if data is not None:
-            if isinstance(data, list):
+            if urn.resource_type == ResourceType.FUTURE_GRANT:
+                normalized = data
+            elif isinstance(data, list):
                 normalized = [resource_cls.defaults() | d for d in data]
             else:
                 normalized = resource_cls.defaults() | data
@@ -318,20 +335,24 @@ def _fetch_remote_state(session, manifest):
 class Blueprint:
     def __init__(
         self,
-        name: str,
+        name: str = None,
         account: Union[None, str, Account] = None,
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
         resources: List[Resource] = [],
+        dry_run: bool = False,
         allow_role_switching: bool = True,
         enforce_requirements: bool = False,
+        resource_types: List[ResourceType] = [],
     ) -> None:
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
         self._account_locator: str = None
+        self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
         self._enforce_requirements: bool = enforce_requirements
+        self._resource_types: List[ResourceType] = resource_types
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -426,6 +447,7 @@ class Blueprint:
                 fqn=resource.fqn,
                 account_locator=self._account_locator,
             )
+
             data = resource.to_dict()
 
             if isinstance(resource, ResourcePointer):
@@ -433,15 +455,35 @@ class Blueprint:
 
             manifest_key = str(urn)
 
+            #### Special Cases
             if resource.resource_type == ResourceType.GRANT:
                 if manifest_key not in manifest:
                     manifest[manifest_key] = []
                 manifest[manifest_key].append(data)
+            elif resource.resource_type == ResourceType.FUTURE_GRANT:
+                # Role up FUTURE GRANTS on the same role/target to a single entry
+                # TODO: support grant option, use a single character prefix on the priv
+                if manifest_key not in manifest:
+                    manifest[manifest_key] = {}
+                on_type = data["on_type"].lower()
+                if on_type not in manifest[manifest_key]:
+                    manifest[manifest_key][on_type] = []
+                if data["priv"] in manifest[manifest_key][on_type]:
+                    # raise Exception(f"Duplicate resource {urn} with conflicting data")
+                    continue
+                manifest[manifest_key][on_type].append(data["priv"])
+
+            #### Normal Case
             else:
                 if manifest_key in manifest:
-                    continue
+                    if data != manifest[manifest_key]:
+                        # raise Exception(f"Duplicate resource {urn} with conflicting data")
+                        continue
                 manifest[manifest_key] = data
+
             urns.append(manifest_key)
+
+            print(urn, resource)
 
             for ref in resource.refs:
                 ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
@@ -484,14 +526,23 @@ class Blueprint:
 
         _raise_if_missing_privs(required_privs, available_privs)
 
-        print(self._staged)
-        print(plan)
+        # print(self._staged)
+        # print(plan)
 
         action_queue = []
         actions_taken = []
 
         def _queue_action(urn, data, props):
             if action == DiffAction.ADD:
+                switch_to_role = None
+                if "owner" in data:
+                    switch_to_role = data["owner"]
+                elif urn.resource_type == ResourceType.FUTURE_GRANT:
+                    switch_to_role = "SECURITYADMIN"
+                if switch_to_role and switch_to_role in usable_roles:
+                    action_queue.append(f"USE ROLE {switch_to_role}")
+                else:
+                    raise Exception(f"Role {data['owner']} required for {urn} but isn't available")
                 action_queue.append(lifecycle.create_resource(urn, data, props))
             elif action == DiffAction.CHANGE:
                 action_queue.append(lifecycle.update_resource(urn, data, props))
@@ -500,19 +551,21 @@ class Blueprint:
 
         for action, urn_str, data in plan:
             urn = parse_URN(urn_str)
-
             props = Resource.props_for_resource_type(urn.resource_type, data)
-
             _queue_action(urn, data, props)
 
-            while action_queue:
-                sql = action_queue.pop(0)
-                actions_taken.append(sql)
-                try:
+        while action_queue:
+            sql = action_queue.pop(0)
+            actions_taken.append(sql)
+            try:
+                if not self._dry_run:
                     execute(session, sql)
-                except snowflake.connector.errors.ProgrammingError as err:
-                    if err.errno == ALREADY_EXISTS_ERR:
-                        print(f"Resource already exists: {urn_str}, skipping...")
+            except snowflake.connector.errors.ProgrammingError as err:
+                if err.errno == ALREADY_EXISTS_ERR:
+                    print(f"Resource already exists: {urn_str}, skipping...")
+                elif err.errno == INVALID_GRANT_ERR:
+                    print(f"Invalid grant: {urn_str}, skipping...")
+                else:
                     raise err
         return actions_taken
 
@@ -520,16 +573,27 @@ class Blueprint:
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
         for urn_str, data in manifest.items():
+            if urn_str.startswith("_"):
+                continue
+
+            if isinstance(data, dict) and data.get("_pointer"):
+                continue
             urn = parse_URN(urn_str)
             if urn.resource_type == ResourceType.GRANT:
                 for grant in data:
                     execute(session, lifecycle.drop_resource(urn, grant))
             else:
-                execute(session, lifecycle.drop_resource(urn, data))
+                try:
+                    execute(session, lifecycle.drop_resource(urn, data))
+                except snowflake.connector.errors.ProgrammingError as err:
+                    print("failed")
+                    continue
 
-    def _add(self, resource):
+    def _add(self, resource: Resource):
         if self._finalized:
             raise Exception("Cannot add resources to a finalized blueprint")
+        if not isinstance(resource, Resource):
+            raise Exception(f"Expected a Resource, got {type(resource)} -> {resource}")
         self._staged.append(resource)
 
     def add(self, *resources):

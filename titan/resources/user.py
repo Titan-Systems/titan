@@ -6,7 +6,7 @@ from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsPr
 from ..scope import AccountScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _User(ResourceSpec):
     name: str
     owner: str = "USERADMIN"
@@ -96,6 +96,7 @@ class User(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
+        name = name.upper()
         self._data: _User = _User(
             name=name,
             owner=owner,

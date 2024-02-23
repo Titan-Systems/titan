@@ -8,9 +8,9 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .client import execute, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
-from .enums import ResourceType
-from .identifiers import URN, FQN
+from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
+from .enums import ResourceType, WarehouseSize
+from .identifiers import URN, FQN, resource_label_for_type
 from .parse import (
     FullyQualifiedIdentifier,
     _parse_dynamic_table_text,
@@ -25,6 +25,10 @@ __this__ = sys.modules[__name__]
 
 def _desc_result_to_dict(desc_result):
     return dict([(row["property"], row["value"]) for row in desc_result])
+
+
+def _desc_type2_result_to_dict(desc_result):
+    return dict([(row["property"], row["property_value"]) for row in desc_result])
 
 
 def _fail_if_not_granted(result, *args):
@@ -118,6 +122,12 @@ def _parse_signature(signature: str) -> list:
     if signature:
         return [_parse_column(col.strip(" ")) for col in signature.split(",")]
     return []
+
+
+def _parse_comma_separated_values(values: str) -> list:
+    if values is None or values == "":
+        return None
+    return [value.strip(" ") for value in values.split(",")]
 
 
 def params_result_to_dict(params_result):
@@ -254,20 +264,26 @@ def fetch_database(session, fqn: FQN):
         return None
     if len(show_result) > 1:
         raise Exception(f"Found multiple databases matching {fqn}")
-    if show_result[0]["kind"] != "STANDARD":
+
+    data = show_result[0]
+
+    is_standard_db = data["kind"] == "STANDARD"
+    is_snowflake_builtin = data["kind"] == "APPLICATION" and data["name"] == "SNOWFLAKE"
+
+    if not (is_standard_db or is_snowflake_builtin):
         return None
 
-    options = options_result_to_list(show_result[0]["options"])
+    options = options_result_to_list(data["options"])
     show_params_result = execute(session, f"SHOW PARAMETERS IN DATABASE {fqn.name}")
     params = params_result_to_dict(show_params_result)
 
     return {
-        "name": show_result[0]["name"],
-        "data_retention_time_in_days": int(show_result[0]["retention_time"]),
-        "comment": show_result[0]["comment"] or None,
+        "name": data["name"],
+        "data_retention_time_in_days": int(data["retention_time"]),
+        "comment": data["comment"] or None,
         "transient": "TRANSIENT" in options,
-        "owner": show_result[0]["owner"],
-        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
+        "owner": data["owner"],
+        "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
         "default_ddl_collation": params["default_ddl_collation"],
     }
 
@@ -308,7 +324,7 @@ def fetch_function(session, fqn: FQN):
     data = udfs[0]
     inputs, output = data["arguments"].split(" RETURN ")
     desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
-    properties = dict([(row["property"], row["value"]) for row in desc_result])
+    properties = _desc_result_to_dict(desc_result)
 
     return {
         "name": data["name"],
@@ -324,7 +340,7 @@ def fetch_function(session, fqn: FQN):
 
 def fetch_future_grant(session, fqn: FQN):
     try:
-        show_result = execute(session, f"SHOW FUTURE GRANTS TO ROLE {fqn.name}")
+        show_result = execute(session, f"SHOW FUTURE GRANTS TO ROLE {fqn.name}", cacheable=True)
         """
         {
             'created_on': datetime.datetime(2024, 2, 5, 19, 39, 50, 146000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
@@ -342,44 +358,51 @@ def fetch_future_grant(session, fqn: FQN):
             return None
         raise
 
-    grant_on = fqn.params["on_type"]
-    name = f"{fqn.params['in_name']}.<{grant_on}>"
+    in_type, in_name = fqn.params["in"].split("/")
+
     grantee_name = fqn.name
     grants = _filter_result(
         show_result,
-        grant_on=grant_on,
-        name=name,
+        # grant_on=grant_on,
+        # name=name,
         grantee_name=grantee_name,
     )
 
     if len(grants) == 0:
-        return []
+        return None
 
-    return sorted(
-        [
-            {
-                "priv": row["privilege"],
-                "on_type": row["grant_on"],
-                "in_type": fqn.params["in_type"],
-                "in_name": row["name"].split(".")[0],
-                "to": row["grantee_name"],
-                "grant_option": row["grant_option"] == "true",
-                "owner": None,
-            }
-            for row in grants
-        ],
-        key=lambda g: (g["priv"], g["owner"]),
-    )
+    grant_block = {}
+
+    for grant in grants:
+        grant_in_name = grant["name"].split(".<")[0]
+        if in_name != grant_in_name:
+            continue
+        on_type = grant["grant_on"].lower()
+        if on_type not in grant_block:
+            grant_block[on_type] = []
+        grant_block[on_type].append(grant["privilege"])
+
+    return grant_block
+
+    # return {
+    #     "priv": data["privilege"],
+    #     "on_type": data["grant_on"],
+    #     "in_type": fqn.params["in_type"],
+    #     "in_name": fqn.params["in_name"],
+    #     "to": data["grantee_name"],
+    #     "grant_option": data["grant_option"] == "true",
+    #     "owner": "SECURITYADMIN",
+    # }
 
 
 def fetch_grant(session, fqn: FQN):
     try:
-        show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}")
+        show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}", cacheable=True)
     except ProgrammingError as err:
         if err.errno == DOEST_NOT_EXIST_ERR:
             return None
         raise
-    granted_on = fqn.params["type"]
+    granted_on = fqn.params["on_type"]
     name = fqn.params["on"]
     grantee_name = fqn.name
     grants = _filter_result(
@@ -406,6 +429,11 @@ def fetch_grant(session, fqn: FQN):
         ],
         key=lambda g: (g["priv"], g["owner"]),
     )
+
+
+def fetch_grant_on_all(session, fqn: FQN):
+    # All grants are expensive to fetch, so we will assume they are always out of date
+    return None
 
 
 def fetch_password_policy(session, fqn: FQN):
@@ -482,7 +510,12 @@ def fetch_procedure(session, fqn: FQN):
 def fetch_role_grants(session, role: str):
     if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
         return {}
-    show_result = execute(session, f"SHOW GRANTS TO ROLE {role}")
+    try:
+        show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
+    except ProgrammingError as err:
+        if err.errno == DOEST_NOT_EXIST_ERR:
+            return None
+        raise
     session_ctx = fetch_session(session)
 
     priv_map = defaultdict(list)
@@ -579,7 +612,7 @@ def fetch_schema(session, fqn: FQN):
         "owner": data["owner"],
         "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
-        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
+        "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
         "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
         "tags": tags,
@@ -625,6 +658,37 @@ def fetch_shared_database(session, fqn: FQN):
 
 def fetch_stage(session, fqn: FQN):
     raise NotImplementedError
+
+
+def fetch_storage_integration(session, fqn: FQN):
+    show_result = execute(session, "SHOW INTEGRATIONS")
+    integrations = _filter_result(show_result, name=fqn.name, category="STORAGE")
+
+    if len(integrations) == 0:
+        return None
+    if len(integrations) > 1:
+        raise Exception(f"Found multiple storage integrations matching {fqn}")
+
+    data = integrations[0]
+
+    desc_result = execute(session, f"DESC INTEGRATION {fqn.name}")
+    properties = _desc_type2_result_to_dict(desc_result)
+
+    show_grants = execute(session, f"SHOW GRANTS ON INTEGRATION {fqn.name}")
+    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+
+    return {
+        "name": data["name"],
+        "type": data["type"],
+        "enabled": data["enabled"] == "true",
+        "comment": data["comment"] or None,
+        "storage_provider": properties["STORAGE_PROVIDER"],
+        "storage_aws_role_arn": properties.get("STORAGE_AWS_ROLE_ARN"),
+        "storage_allowed_locations": _parse_comma_separated_values(properties.get("STORAGE_ALLOWED_LOCATIONS")),
+        "storage_blocked_locations": _parse_comma_separated_values(properties.get("STORAGE_BLOCKED_LOCATIONS")),
+        "storage_aws_object_acl": properties.get("STORAGE_AWS_OBJECT_ACL"),
+        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
+    }
 
 
 def fetch_table(session, fqn: FQN):
@@ -695,7 +759,9 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
 
 def fetch_user(session, fqn: FQN):
     # SHOW USERS requires the MANAGE GRANTS privilege
-    show_result = execute(session, "SHOW USERS", cacheable=True)  # , use_role="SECURITYADMIN"
+    # Other roles can see the list of users but don't get access to other metadata such as login_name.
+    # This causes incorrect drift
+    show_result = execute(session, "SHOW USERS", cacheable=True)
 
     users = _filter_result(show_result, name=fqn.name)
 
@@ -782,7 +848,7 @@ def fetch_warehouse(session, fqn: FQN):
         "name": data["name"],
         "owner": data["owner"],
         "warehouse_type": data["type"],
-        "warehouse_size": data["size"].upper(),
+        "warehouse_size": str(WarehouseSize(data["size"])),
         # "max_cluster_count": data["max_cluster_count"],
         # "min_cluster_count": data["min_cluster_count"],
         # "scaling_policy": data["scaling_policy"],
@@ -808,9 +874,15 @@ def list_databases(session):
     return [row["name"] for row in show_result]
 
 
-def list_schemas(session):
-    show_result = execute(session, "SHOW SCHEMAS")
-    return [f"{row['database_name']}.{row['name']}" for row in show_result]
+def list_schemas(session, database=None):
+    db = f" IN DATABASE {database}" if database else ""
+    try:
+        show_result = execute(session, f"SHOW SCHEMAS{db}")
+        return [f"{row['database_name']}.{row['name']}" for row in show_result]
+    except ProgrammingError as err:
+        if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
+            return []
+        raise
 
 
 def list_stages(session):

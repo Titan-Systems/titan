@@ -1,6 +1,6 @@
 {
     "name": "TEST_ROLE",
-    "owner": "SYSADMIN",
+    "owner": "USERADMIN",
     "tags": null,
     "comment": null
 }

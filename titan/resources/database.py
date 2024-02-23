@@ -7,7 +7,7 @@ from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..scope import AccountScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Database(ResourceSpec):
     name: str
     transient: bool = False
@@ -56,7 +56,7 @@ class Database(Resource, ResourceContainer):
     ):
         super().__init__(**kwargs)
         self._data = _Database(
-            name=name,
+            name=name.upper(),
             transient=transient,
             owner=owner,
             data_retention_time_in_days=data_retention_time_in_days,
@@ -65,10 +65,11 @@ class Database(Resource, ResourceContainer):
             tags=tags,
             comment=comment,
         )
-        self.add(
-            Schema(name="PUBLIC", implicit=True),
-            Schema(name="INFORMATION_SCHEMA", implicit=True),
-        )
+        if self._data.name != "SNOWFLAKE":
+            self.add(
+                Schema(name="PUBLIC", implicit=True),
+                Schema(name="INFORMATION_SCHEMA", implicit=True),
+            )
 
     def schemas(self):
         return self.items(resource_type=ResourceType.SCHEMA)

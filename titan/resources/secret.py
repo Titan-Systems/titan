@@ -16,7 +16,7 @@ class SecretType(ParseableEnum):
     GENERIC_STRING = "GENERIC_STRING"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Secret(ResourceSpec):
     name: str
     type: SecretType

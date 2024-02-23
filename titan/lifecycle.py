@@ -50,28 +50,49 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
 
 
 def create_future_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
+    in_type, in_name = urn.fqn.params["in"].split("/")
+    on_type, privs = list(data.items())[0]
+    if "INTEGRATION" in on_type:
+        on_type = "INTEGRATION"
     return tidy_sql(
         "GRANT",
-        data["priv"],
+        privs[0],
         "ON FUTURE",
-        pluralize(data["on_type"]).upper(),
+        pluralize(on_type).upper(),
         "IN",
-        data["in_type"],
-        data["in_name"],
-        "TO",
-        data["to"],
+        in_type,
+        in_name,
+        "TO ROLE",
+        urn.fqn.name,
         # props.render(data), #TODO grant option
     )
 
 
 def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
+    on_type = data["on_type"]
+    if "INTEGRATION" in on_type:
+        on_type = "INTEGRATION"
     return tidy_sql(
         "GRANT",
         data["priv"],
         "ON",
-        data["on_type"],
+        on_type,
         data["on"],
         props.render(data),
+    )
+
+
+def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool):
+    return tidy_sql(
+        "GRANT",
+        data["priv"],
+        "ON ALL",
+        pluralize(data["on_type"]),
+        "IN",
+        data["in_type"],
+        data["in_name"],
+        "TO ROLE",
+        data["to"],
     )
 
 
@@ -198,6 +219,8 @@ def drop_future_grant(urn: URN, data: dict, **kwargs):
 
 
 def drop_grant(urn: URN, data: dict, **kwargs):
+    if data["priv"] == "OWNERSHIP":
+        return "select 1"
     return tidy_sql(
         "REVOKE",
         data["priv"],
@@ -207,6 +230,18 @@ def drop_grant(urn: URN, data: dict, **kwargs):
         "FROM",
         data["to"],
         # "CASCADE" if cascade else "RESTRICT",
+    )
+
+
+def drop_grant_on_all(urn: URN, data: dict, **kwargs):
+    return tidy_sql(
+        "REVOKE",
+        data["priv"],
+        "ON ALL",
+        data["on_type"],
+        "IN",
+        data["in_type"],
+        data["in_name"],
     )
 
 

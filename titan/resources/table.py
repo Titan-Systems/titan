@@ -19,7 +19,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Table(ResourceSpec):
     name: str
     # TODO: allow columns to be specified as SQL

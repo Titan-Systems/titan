@@ -251,6 +251,9 @@ grants = [
             "grant_option": False,
         },
     },
+]
+
+future_grants = [
     {
         "setup_sql": [
             "CREATE ROLE IF NOT EXISTS thatrole",
@@ -266,9 +269,10 @@ grants = [
             "on_type": "SCHEMA",
             "in_type": "DATABASE",
             "in_name": "STATIC_DATABASE",
-            "to": "THATROLE",
+            "to": "thatrole",
             "grant_option": False,
         },
+        "response": {"schema": ["USAGE"]},
     },
 ]
 
@@ -359,16 +363,39 @@ def grant_resource(request, cursor, account_locator):
             account_locator=account_locator,
         )
         config["urn"] = urn
-    elif config["resource_type"] == ResourceType.FUTURE_GRANT:
-        fqn = future_grant_fqn(_FutureGrant(**config["data"]))
-        urn = URN(
-            resource_type=config["resource_type"],
-            fqn=fqn,
-            account_locator=account_locator,
-        )
-        config["urn"] = urn
     else:
         raise ValueError(f"Invalid resource type: {config['resource_type']}")
+
+    for setup_sql in setup_sqls:
+        cursor.execute(setup_sql)
+    try:
+        yield config
+    finally:
+        for teardown_sql in teardown_sqls:
+            cursor.execute(teardown_sql)
+
+
+@pytest.fixture(
+    params=future_grants,
+    ids=[config["test_name"] for config in future_grants],
+    scope="function",
+)
+def future_grant_resource(request, cursor, account_locator):
+    config = request.param
+
+    static_db = STATIC_RESOURCES[ResourceType.DATABASE]
+    cursor.execute(static_db.create_sql(if_not_exists=True))
+
+    setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
+    teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]
+
+    fqn = future_grant_fqn(_FutureGrant(**config["data"]))
+    urn = URN(
+        resource_type=config["resource_type"],
+        fqn=fqn,
+        account_locator=account_locator,
+    )
+    config["urn"] = urn
 
     for setup_sql in setup_sqls:
         cursor.execute(setup_sql)
@@ -405,6 +432,13 @@ def test_fetch_grant(grant_resource, cursor):
     assert len(result) == 1
     result = data_provider.remove_none_values(result[0])
     assert result == grant_resource["data"]
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_future_grant(future_grant_resource, cursor):
+    result = data_provider.fetch_resource(cursor, future_grant_resource["urn"])
+    assert result is not None
+    assert result == future_grant_resource["response"]
 
 
 @pytest.mark.requires_snowflake

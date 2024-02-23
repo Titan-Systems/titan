@@ -7,7 +7,7 @@ from ..parse import _parse_column, _parse_props
 from ..scope import TableScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Column(ResourceSpec):
     name: str
     data_type: str

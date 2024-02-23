@@ -6,7 +6,7 @@ from ..props import Props
 from ..scope import OrganizationScope
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Account(ResourceSpec):
     name: str
     locator: str

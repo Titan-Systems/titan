@@ -12,7 +12,7 @@ class StorageProvider(ParseableEnum):
     GCS = "GCS"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _S3StorageIntegration(ResourceSpec):
     name: str
     enabled: bool
@@ -89,7 +89,7 @@ class S3StorageIntegration(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _GCSStorageIntegration(ResourceSpec):
     name: str
     enabled: bool
@@ -158,7 +158,7 @@ class GCSStorageIntegration(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _AzureStorageIntegration(ResourceSpec):
     name: str
     enabled: bool

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
 from .resource_monitor import ResourceMonitor
-from ..enums import ParseableEnum, ResourceType
+from ..enums import ParseableEnum, ResourceType, WarehouseSize
 from ..scope import AccountScope
 
 from ..props import (
@@ -21,47 +21,17 @@ class WarehouseType(ParseableEnum):
     SNOWPARK_OPTIMIZED = "SNOWPARK-OPTIMIZED"
 
 
-# TODO: add alias support, eg XSMALL = X-SMALL
-class WarehouseSize(ParseableEnum):
-    """
-    Represents the size options for a warehouse.
-
-    Available sizes:
-    - XSMALL
-    - SMALL
-    - MEDIUM
-    - LARGE
-    - XLARGE
-    - XXLARGE
-    - XXXLARGE
-    - X4LARGE
-    - X5LARGE (AWS-only)
-    - X6LARGE (AWS-only)
-    """
-
-    XSMALL = "XSMALL"
-    SMALL = "SMALL"
-    MEDIUM = "MEDIUM"
-    LARGE = "LARGE"
-    XLARGE = "XLARGE"
-    XXLARGE = "XXLARGE"
-    XXXLARGE = "XXXLARGE"
-    X4LARGE = "X4LARGE"
-    X5LARGE = "X5LARGE"
-    X6LARGE = "X6LARGE"
-
-
 class WarehouseScalingPolicy(ParseableEnum):
     STANDARD = "STANDARD"
     ECONOMY = "ECONOMY"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _Warehouse(ResourceSpec):
     name: str
     owner: str = "SYSADMIN"
     warehouse_type: WarehouseType = "STANDARD"
-    warehouse_size: WarehouseSize = None
+    warehouse_size: WarehouseSize = WarehouseSize.XSMALL
     max_cluster_count: int = None
     min_cluster_count: int = None
     scaling_policy: WarehouseScalingPolicy = None
@@ -109,7 +79,7 @@ class Warehouse(Resource):
         name: str,
         owner: str = "SYSADMIN",
         warehouse_type: WarehouseType = "STANDARD",
-        warehouse_size: WarehouseSize = None,
+        warehouse_size: WarehouseSize = WarehouseSize.XSMALL,
         max_cluster_count: int = None,
         min_cluster_count: int = None,
         scaling_policy: WarehouseScalingPolicy = None,

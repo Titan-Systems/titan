@@ -15,7 +15,7 @@ class ApiProvider(ParseableEnum):
     AWS_GOV_PRIVATE_API_GATEWAY = "AWS_GOV_PRIVATE_API_GATEWAY"
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _APIIntegration(ResourceSpec):
     name: str
     api_provider: ApiProvider

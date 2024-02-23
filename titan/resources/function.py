@@ -16,7 +16,7 @@ from ..props import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _JavascriptUDF(ResourceSpec):
     name: str
     returns: str
@@ -87,7 +87,7 @@ class JavascriptUDF(Resource):
         )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class _PythonUDF(ResourceSpec):
     name: str
     returns: str
