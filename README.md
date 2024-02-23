@@ -1,4 +1,4 @@
-# `Titan Core` - Snowflake infrastructure as code
+# `titan[core]` - Snowflake infrastructure as code
 
 <div align="center">
     <img src="./images/github-explainer.png" style="padding-bottom: 20px; width: 830px;"/>
@@ -9,61 +9,7 @@ Titan Core helps you provision, deploy, and secure resources in Snowflake. It re
 Define any Snowflake resource, including users, roles, schemas, databases, integrations, pipes, stages, functions, and stored procedures, using declarative Python.
 
 
-
 # Installation
-
-The easiest way to get started with Titan is to use the Titan Core Snowflake app.
-
-## Snowflake app installation
-
-```SQL
--- AWS
-USE ROLE SYSADMIN;
-
-CREATE DATABASE titan;
-
-CREATE STAGE titan.public.titan_aws
-  URL = 's3://titan-snowflake/';
-
-EXECUTE IMMEDIATE
-  FROM @titan.public.titan_aws/install;
-```
-
-The Titan Core Snowflake app includes a suite of stored procedures for managing Snowflake resources
-
-```SQL
-// Create or Update
-create_or_update_database(config OBJECT, dry_run BOOLEAN): OBJECT
-create_or_update_schema(config OBJECT, dry_run BOOLEAN): OBJECT
-create_or_update_user(config OBJECT, dry_run BOOLEAN): OBJECT
-create_or_update_warehouse(config OBJECT, dry_run BOOLEAN): OBJECT
-create_or_update_role(config OBJECT, dry_run BOOLEAN): OBJECT
-
-// Fetch
-fetch_database(name VARCHAR): OBJECT
-fetch_schema(name VARCHAR): OBJECT
-fetch_user(name VARCHAR): OBJECT
-fetch_warehouse(name VARCHAR): OBJECT
-fetch_role(name VARCHAR): OBJECT
-```
-
-### Usage
-
-```SQL
-CALL fetch_schema(name => 'TITAN.PUBLIC');
-// {
-//   "comment": null,
-//   "data_retention_time_in_days": 1,
-//   "default_ddl_collation": null,
-//   "managed_access": false,
-//   "max_data_extension_time_in_days": 14,
-//   "name": "PUBLIC",
-//   "owner": "SYSADMIN",
-//   "transient": false
-// }
-```
-
-## Python API installation
 
 If you want to run custom Titan code or use Titan on the command line, you can use the Titan Core Python API.
 
@@ -138,7 +84,7 @@ account:ABC123
 bp.apply(session, plan)
 ```
 
-# Titan vs others
+# `titan[core]` vs others
 
 | Feature/Capability                      | Titan Core     | Terraform      | Schemachange   |
 |-----------------------------------------|----------------|----------------|----------------|
@@ -152,7 +98,7 @@ bp.apply(session, plan)
 | Infrastructure Visualization            | WIP            | ✅              | ❌             |
 
 
-## Titan Core vs Terraform
+## `titan[core]` vs Terraform
 Terraform is an infrastructure-as-code tool using the HCL config language.
 
 The Snowflake provider for Terraform is limited to **1 role per provider**. This limitation is at odds with Snowflake's design, which is built to use multiple roles. This mismatch forces you into a complex multi-provider setup which can result in drift, permission errors, and broken plans.
@@ -162,7 +108,7 @@ Titan Core streamlines this with upfront privileges checks to ensure that plans 
 Titan also doesn’t use a state file, which provides more accurate plans and eliminates state mismatch issues.
 
 
-## Titan Core vs Schemachange
+## `titan[core]` vs Schemachange
 Schemachange is a database migration tool that uses SQL scripts to deploy resources to different environments. As an imperative migration tool, it requires developers to write code for each step, demanding a deep understanding of the database's current state and the exact commands needed for updates. If environments change, your Schemachange scripts may need significant adjustments.
 
 Titan Core simplifies this process with a declarative Python approach. It allows you to define what your environment should look like, without specifying the detailed steps to get there. This is less error-prone and more flexible to changes. Titan Core manages a broader range of Snowflake resources, providing a more integrated and streamlined experience, especially in dynamic and complex data environments.
@@ -171,99 +117,99 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 
 # Resource support
 
-| Name                          | Supported | SPI |
-|-------------------------------|-----------|-----|
-| **Account Resources**         |           |     |
-| API Integration               | ✅         | ❌  |
-| Catalog Integration           | ❌         | ❌  |
-| Compute Pool                  | ❌         | ❌  |
-| Connection                    | ❌         | ❌  |
-| Database                      | ✅         | ✅  |
-| External Access Integration   | ✅         | ❌  |
-| External Volume               | ❌         | ❌  |
-| Grant                         | ✅         | ❌  |
-| ↳ Future Grant                | WIP        | ❌  |
-| ↳ Privilege Grant             | ✅         | ❌  |
-| ↳ Role Grant                  | ✅         | ❌  |
-| Network Policy                | ✅         | ❌  |
-| Notification Integration      | WIP        | ❌  |
-| ↳ Email                       | ✅         | ❌  |
-| ↳ AWS                         | ❌         | ❌  |
-| ↳ Azure                       | ❌         | ❌  |
-| ↳ GCP                         | ❌         | ❌  |
-| Replication Group             | ✅         | ❌  |
-| Resource Monitor              | ✅         | ❌  |
-| Role                          | ✅         | ✅  |
-| Security Integration          | ❌         | ❌  |
-| Share                         | ❌         | ❌  |
-| Storage Integration           | WIP        | ❌  |
-| ↳ AWS                         | ✅         | ❌  |
-| ↳ Azure                       | ✅         | ❌  |
-| ↳ GCP                         | ✅         | ❌  |
-| User                          | ✅         | ✅  |
-| Warehouse                     | ✅         | ✅  |
-|                               |            |    |
-| **Database Resources**        |            |    |
-| Database Role                 | ✅         | ❌  |
-| Schema                        | ✅         | ✅  |
-|                               |            |    |
-| **Schema Resources**          |            |    |
-| Alert                         | ✅         | ❌  |
-| Aggregation Policy            | ❌         | ❌  |
-| Dynamic Table                 | ✅         | ❌  |
-| Event Table                   | ✅         | ❌  |
-| External Function             | ✅         | ❌  |
-| External Stage                | ✅         | ❌  |
-| External Table                | ❌         | ❌  |
-| Failover Group                | ✅         | ❌  |
-| File Format                   | ❌         | ❌  |
-| ↳ CSV                         | ❌         | ❌  |
-| ↳ JSON                        | ❌         | ❌  |
-| ↳ AVRO                        | ❌         | ❌  |
-| ↳ ORC                         | ❌         | ❌  |
-| ↳ Parquet                     | ❌         | ❌  |
-| Iceberg Table                 | ❌         | ❌  |
-| Image Repository              | ❌         | ❌  |
-| Internal Stage                | ✅         | ❌  |
-| Masking Policy                | ❌         | ❌  |
-| Materialized View             | ❌         | ❌  |
-| Model                         | ❌         | ❌  |
-| Network Rule                  | ✅         | ❌  |
-| Packages Policy               | ✅         | ❌  |
-| Password Policy               | ✅         | ❌  |
-| Pipe                          | ✅         | ❌  |
-| Projection Policy             | ❌         | ❌  |
-| Role Grant                    | ✅         | ❌  |
-| Row Access Policy             | ❌         | ❌  |
-| Secret                        | ✅         | ❌  |
-| Sequence                      | ✅         | ❌  |
-| Service                       | ❌         | ❌  |
-| Session Policy                | ❌         | ❌  |
-| Stage                         | ✅         | ❌  |
-| ↳ External                    | ✅         | ❌  |
-| ↳ Internal                    | ✅         | ❌  |
-| Stored Procedure              | WIP        | ❌  |
-| ↳ Java                        | ❌         | ❌  |
-| ↳ Javascript                  | ❌         | ❌  |
-| ↳ Python                      | ✅         | ❌  |
-| ↳ Scala                       | ❌         | ❌  |
-| ↳ SQL                         | ❌         | ❌  |
-| Stream                        | WIP        | ❌  |
-| ↳ External Table              | ❌         | ❌  |
-| ↳ Stage                       | ✅         | ❌  |
-| ↳ Table                       | ✅         | ❌  |
-| ↳ View                        | ✅         | ❌  |
-| Streamlit                     | ❌         | ❌  |
-| Table                         | ✅         | ❌  |
-| Tag                           | ✅         | ❌  |
-| Task                          | ✅         | ❌  |
-| User-Defined Function         | WIP        | ❌  |
-| ↳ Java                        | ❌         | ❌  |
-| ↳ Javascript                  | ✅         | ❌  |
-| ↳ Python                      | ✅         | ❌  |
-| ↳ Scala                       | ❌         | ❌  |
-| ↳ SQL                         | ❌         | ❌  |
-| View                          | ✅         | ❌  |
+| Name                          | Supported |
+|-------------------------------|-----------|
+| **Account Resources**         |           |
+| API Integration               | ✅         |
+| Catalog Integration           | ❌         |
+| Compute Pool                  | ❌         |
+| Connection                    | ❌         |
+| Database                      | ✅         |
+| External Access Integration   | ✅         |
+| External Volume               | ❌         |
+| Grant                         | ✅         |
+| ↳ Future Grant                | WIP        |
+| ↳ Privilege Grant             | ✅         |
+| ↳ Role Grant                  | ✅         |
+| Network Policy                | ✅         |
+| Notification Integration      | WIP        |
+| ↳ Email                       | ✅         |
+| ↳ AWS                         | ❌         |
+| ↳ Azure                       | ❌         |
+| ↳ GCP                         | ❌         |
+| Replication Group             | ✅         |
+| Resource Monitor              | ✅         |
+| Role                          | ✅         |
+| Security Integration          | ❌         |
+| Share                         | ❌         |
+| Storage Integration           | WIP        |
+| ↳ AWS                         | ✅         |
+| ↳ Azure                       | ✅         |
+| ↳ GCP                         | ✅         |
+| User                          | ✅         |
+| Warehouse                     | ✅         |
+|                               |            |
+| **Database Resources**        |            |
+| Database Role                 | ✅         |
+| Schema                        | ✅         |
+|                               |            |
+| **Schema Resources**          |            |
+| Alert                         | ✅         |
+| Aggregation Policy            | ❌         |
+| Dynamic Table                 | ✅         |
+| Event Table                   | ✅         |
+| External Function             | ✅         |
+| External Stage                | ✅         |
+| External Table                | ❌         |
+| Failover Group                | ✅         |
+| File Format                   | ❌         |
+| ↳ CSV                         | ❌         |
+| ↳ JSON                        | ❌         |
+| ↳ AVRO                        | ❌         |
+| ↳ ORC                         | ❌         |
+| ↳ Parquet                     | ❌         |
+| Iceberg Table                 | ❌         |
+| Image Repository              | ❌         |
+| Internal Stage                | ✅         |
+| Masking Policy                | ❌         |
+| Materialized View             | ❌         |
+| Model                         | ❌         |
+| Network Rule                  | ✅         |
+| Packages Policy               | ✅         |
+| Password Policy               | ✅         |
+| Pipe                          | ✅         |
+| Projection Policy             | ❌         |
+| Role Grant                    | ✅         |
+| Row Access Policy             | ❌         |
+| Secret                        | ✅         |
+| Sequence                      | ✅         |
+| Service                       | ❌         |
+| Session Policy                | ❌         |
+| Stage                         | ✅         |
+| ↳ External                    | ✅         |
+| ↳ Internal                    | ✅         |
+| Stored Procedure              | WIP        |
+| ↳ Java                        | ❌         |
+| ↳ Javascript                  | ❌         |
+| ↳ Python                      | ✅         |
+| ↳ Scala                       | ❌         |
+| ↳ SQL                         | ❌         |
+| Stream                        | WIP        |
+| ↳ External Table              | ❌         |
+| ↳ Stage                       | ✅         |
+| ↳ Table                       | ✅         |
+| ↳ View                        | ✅         |
+| Streamlit                     | ❌         |
+| Table                         | ✅         |
+| Tag                           | ✅         |
+| Task                          | ✅         |
+| User-Defined Function         | WIP        |
+| ↳ Java                        | ❌         |
+| ↳ Javascript                  | ✅         |
+| ↳ Python                      | ✅         |
+| ↳ Scala                       | ❌         |
+| ↳ SQL                         | ❌         |
+| View                          | ✅         |
 
 
 
