@@ -226,8 +226,12 @@ def _collect_available_privs(session_ctx, session, plan, usable_roles):
         if role_grants:
             for principal, grant_list in role_grants.items():
                 for grant in grant_list:
-                    priv = priv_for_principal(parse_URN(principal), grant["priv"])
-                    _add(role, principal, priv)
+                    try:
+                        priv = priv_for_principal(parse_URN(principal), grant["priv"])
+                        _add(role, principal, priv)
+                    except ValueError:
+                        # Priv not recognized by Titan
+                        pass
 
         # Implied privilege grants in the context of our plan
         for action, urn_str, data in plan:
@@ -483,8 +487,6 @@ class Blueprint:
 
             urns.append(manifest_key)
 
-            print(urn, resource)
-
             for ref in resource.refs:
                 ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
                 refs.append((str(urn), str(ref_urn)))
@@ -586,7 +588,6 @@ class Blueprint:
                 try:
                     execute(session, lifecycle.drop_resource(urn, data))
                 except snowflake.connector.errors.ProgrammingError as err:
-                    print("failed")
                     continue
 
     def _add(self, resource: Resource):
