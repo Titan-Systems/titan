@@ -46,7 +46,7 @@ def collect_resources_from_config(config: dict):
     users = config.get("users", [])
     warehouses = config.get("warehouses", [])
 
-    databases = [Database(**database) for database in databases]
+    databases = databases_from_config(databases)
     users = [User(**user) for user in users]
     roles = [Role(**role) for role in roles]
     role_grants = role_grants_from_config(role_grants)
