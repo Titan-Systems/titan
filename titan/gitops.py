@@ -1,4 +1,11 @@
-from .resources import Database, Warehouse, Role, User, RoleGrant
+from .resources import (
+    Database,
+    Role,
+    RoleGrant,
+    Schema,
+    User,
+    Warehouse,
+)
 
 
 def role_grants_from_config(role_grants: list) -> list:
@@ -19,6 +26,17 @@ def role_grants_from_config(role_grants: list) -> list:
                 )
             )
     return role_grants
+
+
+def databases_from_config(databases: list) -> list:
+    databases = []
+    for database in databases:
+        schemas = database.pop("schemas", [])
+        db = Database(**database)
+        for schema in schemas:
+            db.add(Schema(**schema))
+        databases.append(db)
+    return databases
 
 
 def collect_resources_from_config(config: dict):
