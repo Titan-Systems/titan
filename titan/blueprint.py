@@ -4,7 +4,7 @@ from queue import Queue
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, _EXECUTION_CACHE
 from .diff import diff, DiffAction
 from .enums import ResourceType
 from .logical_grant import And, LogicalGrant, Or
@@ -495,6 +495,8 @@ class Blueprint:
         return manifest
 
     def plan(self, session):
+        data_provider.fetch_session.cache_clear()
+        _EXECUTION_CACHE.clear()
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = _fetch_remote_state(session, manifest)
