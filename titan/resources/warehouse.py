@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceName, ResourceSpec
 from .resource_monitor import ResourceMonitor
 from ..enums import ParseableEnum, ResourceType, WarehouseSize
 from ..resource_name import ResourceName
