@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceName, ResourceSpec
 from ..enums import ResourceType
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 from ..scope import AccountScope
@@ -8,7 +8,7 @@ from ..scope import AccountScope
 
 @dataclass(unsafe_hash=True)
 class _User(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: str = "USERADMIN"
     password: str = None
     login_name: str = None
@@ -96,7 +96,6 @@ class User(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        name = name.upper()
         self._data: _User = _User(
             name=name,
             owner=owner,

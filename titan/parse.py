@@ -5,7 +5,7 @@ from typing import List, Dict, Callable, Union
 import pyparsing as pp
 
 from .enums import ResourceType, Scope
-from .identifiers import FQN, URN
+from .identifiers import FQN, URN, resource_type_for_label
 from .scope import DatabaseScope, SchemaScope
 
 Keyword = pp.CaselessKeyword
@@ -646,7 +646,7 @@ def parse_URN(urn_str: str) -> URN:
     if parts[0] != "urn":
         raise Exception(f"Invalid URN string: {urn_str}")
     resource_label, fqn_str = parts[3].split("/", 1)
-    resource_type = ResourceType(resource_label.replace("_", " ").upper())
+    resource_type = resource_type_for_label(resource_label)
     fqn = parse_identifier(fqn_str, is_db_scoped=(resource_label == "schema"))
     return URN(
         account_locator=parts[2],

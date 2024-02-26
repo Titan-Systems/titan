@@ -9,7 +9,7 @@ from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
-from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..parse import FullyQualifiedIdentifier, _parse_create_header, _parse_props, _resolve_resource_class
 from ..scope import ResourceScope, OrganizationScope, DatabaseScope, SchemaScope
 
 
@@ -21,6 +21,45 @@ class Arg(TypedDict):
 class Returns(TypedDict):
     data_type: DataType
     metadata: str
+
+
+class ResourceName:
+    def __init__(self, name: Union[str, "ResourceName"]) -> None:
+        if isinstance(name, ResourceName):
+            self._name = name._name
+            self._quoted = name._quoted
+        elif name.startswith('"') and name.endswith('"'):
+            self._name = name[1:-1]
+            self._quoted = True
+        else:
+            self._name = name
+            try:
+                # If we can parse it, we don't need to quote it
+                FullyQualifiedIdentifier.parse_string(name, parse_all=True)
+                self._quoted = False
+            except pp.ParseException:
+                self._quoted = True
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __str__(self):
+        return f'"{self._name}"' if self._quoted else self._name
+
+    def __eq__(self, other: Union[str, "ResourceName"]):
+        if not isinstance(other, (ResourceName, str)):
+            return False
+        if isinstance(other, str):
+            other = ResourceName(other)
+        if self._quoted and other._quoted:
+            return self._name == other._name
+        elif not self._quoted and not other._quoted:
+            return self._name.upper() == other._name.upper()
+        else:
+            return False
+
+    def upper(self):
+        return self
 
 
 @dataclass
@@ -83,6 +122,9 @@ class ResourceSpec:
             # Coerce resources
             elif issubclass(field_type, Resource):
                 return convert_to_resource(field_type, field_value)
+
+            elif field_type == ResourceName:
+                return ResourceName(field_value)
             else:
                 return field_value
 
@@ -244,6 +286,8 @@ class Resource(metaclass=_Resource):
                 return [_serialize(v) for v in value]
             elif isinstance(value, dict):
                 return {k: _serialize(v) for k, v in value.items()}
+            elif isinstance(value, ResourceName):
+                return str(value)
             else:
                 return value
 
@@ -301,7 +345,7 @@ class Resource(metaclass=_Resource):
 
     @property
     def fqn(self):
-        name = getattr(self._data, "name")
+        name = str(getattr(self._data, "name"))
         return self.scope.fully_qualified_name(self.container, name)
 
     @property
@@ -345,7 +389,7 @@ class ResourceContainer:
 
 class ResourcePointer(Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-        self._name: str = name.upper()
+        self._name: ResourceName = ResourceName(name)
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
         super().__init__()

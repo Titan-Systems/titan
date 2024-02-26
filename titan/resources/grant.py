@@ -7,7 +7,7 @@ from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
 from ..enums import ResourceType
-from ..identifiers import FQN, resource_label_for_type
+from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant, _parse_props
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
 from ..props import Props, FlagProp, IdentifierProp
@@ -174,7 +174,7 @@ class Grant(Resource):
                     # on_{resource} kwargs
                     # on_schema="foo" -> on=Schema(name="foo")
                     on = arg
-                    on_type = ResourceType(keyword[3:].replace("_", " ").upper())
+                    on_type = resource_type_for_label(keyword[3:])
         # Handle on= kwarg
         else:
             if on is None:

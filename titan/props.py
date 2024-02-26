@@ -193,7 +193,7 @@ class IdentifierListProp(Prop):
     def render(self, values):
         if values is None:
             return ""
-        value_list = ", ".join(values)
+        value_list = ", ".join(map(str, values))
         if self.parens:
             value_list = f"({value_list})"
         return tidy_sql(

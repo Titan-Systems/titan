@@ -11,6 +11,10 @@ def resource_label_for_type(resource_type: ResourceType) -> str:
     return str(resource_type).replace(" ", "_").lower()
 
 
+def resource_type_for_label(resource_label: str) -> ResourceType:
+    return ResourceType(resource_label.upper().replace("_", " "))
+
+
 class FQN:
     def __init__(
         self,

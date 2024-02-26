@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceName, ResourceSpec
 from .resource_monitor import ResourceMonitor
 from ..enums import ParseableEnum, ResourceType, WarehouseSize
 from ..scope import AccountScope
@@ -28,9 +28,9 @@ class WarehouseScalingPolicy(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _Warehouse(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: str = "SYSADMIN"
-    warehouse_type: WarehouseType = "STANDARD"
+    warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
     max_cluster_count: int = None
     min_cluster_count: int = None
