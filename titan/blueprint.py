@@ -546,6 +546,8 @@ class Blueprint:
                 if switch_to_role and switch_to_role in usable_roles:
                     action_queue.append(f"USE ROLE {switch_to_role}")
                 else:
+                    if 'owner' not in data:
+                        raise Exception(f"Role change required for {urn} but, the owner is not specified")
                     raise Exception(f"Role {data['owner']} required for {urn} but isn't available")
                 action_queue.append(lifecycle.create_resource(urn, data, props))
             elif action == DiffAction.CHANGE:
@@ -560,17 +562,28 @@ class Blueprint:
 
         while action_queue:
             sql = action_queue.pop(0)
-            actions_taken.append(sql)
-            try:
-                if not self._dry_run:
-                    execute(session, sql)
-            except snowflake.connector.errors.ProgrammingError as err:
-                if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {urn_str}, skipping...")
-                elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {urn_str}, skipping...")
-                else:
-                    raise err
+            if sql is None:
+                # this gives the opportunity to decide that a change is not necessary
+                continue
+
+            if isinstance(sql,list):
+                sqls = sql
+            else:
+                sqls = [sql]
+            for sql_stmt in sqls:
+                # this gives the opportunity to make several queries for a single change
+                # Note (type hints were not updated to reflect this change)
+                actions_taken.append(sql_stmt)
+                try:
+                    if not self._dry_run:
+                        execute(session, sql_stmt)
+                except snowflake.connector.errors.ProgrammingError as err:
+                    if err.errno == ALREADY_EXISTS_ERR:
+                        print(f"Resource already exists: {urn_str}, skipping...")
+                    elif err.errno == INVALID_GRANT_ERR:
+                        print(f"Invalid grant: {urn_str}, skipping...")
+                    else:
+                        raise err
         return actions_taken
 
     def destroy(self, session, manifest=None):

@@ -5,6 +5,7 @@ from inflection import pluralize
 from .builder import tidy_sql
 from .identifiers import URN
 from .props import Props
+from .enums import TaskState, ResourceType
 
 __this__ = sys.modules[__name__]
 
@@ -14,6 +15,8 @@ def create_resource(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
 
 
 def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    if len(data) == 0:
+        return None # allows for stripping out proposed changes, this will be skipped over
     return tidy_sql(
         "CREATE",
         urn.resource_type,
@@ -21,6 +24,17 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
         urn.fqn,
         props.render(data),
     )
+
+def create_task(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    if 'state' in data:
+        data.pop('state')
+    return create__default(urn, data, props, if_not_exists)
+
+def create_schema(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    if 'name' in data and data['name'] == 'PUBLIC':
+        # these updates could be superfluous, since the original plan was to create
+        return update_schema(urn, data, props)
+    return create__default(urn, data, props, if_not_exists)
 
 
 def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
@@ -124,17 +138,70 @@ def update_resource(urn: URN, data: dict, props: Props) -> str:
     return getattr(__this__, f"update_{urn.resource_label}", update__default)(urn, data, props)
 
 
+def update_event_table(urn: URN, data: dict, props: Props) -> str:
+    urn.resource_type = "TABLE" # when event tables are being altered, they are just tables (Unsupported feature 'EVENT')
+    return update__default(urn, data, props)
+
+def update_stream(urn: URN, data: dict, props: Props) -> str:
+    # not the best place to handle this, instead properties should be tagged such that a difference isn't generated
+    if 'show_initial_rows' in data:
+        data.pop('show_initial_rows')
+    return update__default(urn, data, props)
+
+def update_table(urn: URN, data: dict, props: Props) -> str:
+    # not the best place to handle this, instead properties should be tagged such that a difference isn't generated
+    if 'as_' in data:
+        data.pop('as_')
+    if 'columns' in data and data['columns'] is None:
+        data.pop('columns')
+    return update__default(urn, data, props)
+
 def update__default(urn: URN, data: dict, props: Props) -> str:
+    if len(data) == 0:
+        return None # allows for stripping out proposed changes, this will be skipped over
     attr, new_value = data.popitem()
     attr = attr.lower()
+    if str(attr).endswith('_'):
+            # not sure why this isn't handled by the props alias
+            attr = str(attr)[:-1]
+    
     if new_value is None:
         return tidy_sql("ALTER", urn.resource_type, urn.fqn, "UNSET", attr)
     elif attr == "name":
         return tidy_sql("ALTER", urn.resource_type, urn.fqn, "RENAME TO", new_value)
     elif attr == "owner":
         return tidy_sql("GRANT OWNERSHIP ON", urn.resource_type, urn.fqn, "TO ROLE", new_value)
+    elif attr in ['when','as'] and urn.resource_type == ResourceType.TASK:
+        # knowing whether to SET or MODIFY could be an attribute of the property.
+        # In order to change a task definition, you have to suspend the task
+        # otherwise, you get: Unable to update graph with root task <name> since that root task is not suspended
+        return [
+            tidy_sql("ALTER",urn.resource_type,urn.fqn,"SUSPEND"),
+            tidy_sql("ALTER",urn.resource_type,urn.fqn,"MODIFY",attr,new_value),
+            tidy_sql("ALTER",urn.resource_type,urn.fqn,"RESUME")
+        ]
+    elif attr in ['schedule'] and urn.resource_type == ResourceType.TASK:
+        return [
+            tidy_sql("ALTER",urn.resource_type,urn.fqn,"SUSPEND"),
+            tidy_sql("ALTER",urn.resource_type,urn.fqn,"SET",attr,"=",f"$${new_value}$$"), # more duplication here, needs a refactor
+            tidy_sql("ALTER",urn.resource_type,urn.fqn,"RESUME")
+        ]
+    elif attr == 'state' and urn.resource_type == ResourceType.TASK:
+        if new_value not in [str(TaskState.STARTED),str(TaskState.SUSPENDED)]:
+            raise ValueError(f"Invalid state '{new_value}' for task")
+        return tidy_sql("ALTER", 
+                        urn.resource_type,
+                        urn.fqn,
+                        "SUSPEND" if new_value == TaskState.SUSPENDED else "RESUME")
     else:
-        new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
+        if isinstance(new_value,list) and urn.resource_type == ResourceType.REPLICATION_GROUP:
+            # not sure if list parameters should universally be treated this way, restricting for now
+            quoted_values = [f"$${v}$$" for v in new_value]
+            new_value = f"({', '.join(quoted_values)})"
+        else:
+            # value serialization should really be driven by property type
+            new_value = f"$${new_value}$$" if isinstance(new_value, str) else new_value
+
         return tidy_sql(
             "ALTER",
             urn.resource_type,
@@ -171,7 +238,7 @@ def update_schema(urn: URN, data: dict, props: Props) -> str:
     elif attr == "name":
         return tidy_sql("ALTER SCHEMA", urn.fqn, "RENAME TO", new_value)
     elif attr == "owner":
-        raise NotImplementedError
+        raise NotImplementedError(f"Cannot change owner of schema {urn.fqn}, this is not supported yet")
     elif attr == "transient":
         raise Exception("Cannot change transient property of schema")
     elif attr == "managed_access":
