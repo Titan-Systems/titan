@@ -36,7 +36,7 @@ class _User(ResourceSpec):
     def __post_init__(self):
         super().__post_init__()
         if not self.login_name:
-            self.login_name = self.name
+            self.login_name = str(self.name).upper()
         if not self.display_name:
             self.display_name = str(self.name).lower()
 
