@@ -29,8 +29,10 @@ def role_grants_from_config(role_grants: list) -> list:
 
 
 def databases_from_config(databases: list) -> list:
+    print("Databases from config", databases)
     databases = []
     for database in databases:
+        print("Database", database)
         schemas = database.pop("schemas", [])
         db = Database(**database)
         for schema in schemas:
@@ -50,11 +52,15 @@ def collect_resources_from_config(config: dict):
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
 
+    print("Found databases", databases)
+
     databases = databases_from_config(databases)
     role_grants = role_grants_from_config(role_grants)
     roles = [Role(**role) for role in roles]
     users = [User(**user) for user in users]
     warehouses = [Warehouse(**warehouse) for warehouse in warehouses]
+
+    print("Collected resources", databases, role_grants, roles, users, warehouses)
 
     return (
         *databases,
