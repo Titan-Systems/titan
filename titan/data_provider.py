@@ -843,6 +843,8 @@ def fetch_warehouse(session, fqn: FQN):
     query_accel = data.get("enable_query_acceleration")
     if query_accel:
         query_accel = query_accel == "true"
+    else:
+        query_accel = False
 
     return {
         "name": data["name"],

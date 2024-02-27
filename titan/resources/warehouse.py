@@ -41,7 +41,7 @@ class _Warehouse(ResourceSpec):
     initially_suspended: bool = None
     resource_monitor: ResourceMonitor = None
     comment: str = None
-    enable_query_acceleration: bool = None
+    enable_query_acceleration: bool = False
     query_acceleration_max_scale_factor: int = None
     max_concurrency_level: int = 8
     statement_queued_timeout_in_seconds: int = 0
@@ -89,7 +89,7 @@ class Warehouse(Resource):
         initially_suspended: bool = None,
         resource_monitor: ResourceMonitor = None,
         comment: str = None,
-        enable_query_acceleration: bool = None,
+        enable_query_acceleration: bool = False,
         query_acceleration_max_scale_factor: int = None,
         max_concurrency_level: int = 8,
         statement_queued_timeout_in_seconds: int = 0,
