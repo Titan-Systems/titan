@@ -24,7 +24,7 @@ class FQN:
         arg_types: Optional[list] = None,
         params: dict = {},
     ) -> None:
-        self.name = name.upper()
+        self.name = name
         self.database = database
         self.schema = schema
         self.arg_types = arg_types
