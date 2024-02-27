@@ -130,7 +130,7 @@ def _plan(remote_state, manifest):
         print(ref)
 
     # Calculate a topological sort order for the URNs
-    sort_order = topological_sort(resource_set, manifest["_refs"])
+    sort_order = topological_sort(resource_set, set(manifest["_refs"]))
 
     # Once sorting is done, remove the _refs and _urns keys from the manifest
     del manifest["_refs"]
@@ -361,9 +361,6 @@ def _raise_if_missing_privs(required: list, available: dict):
 def _fetch_remote_state(session, manifest):
     state = {}
     urns = set(manifest["_urns"].copy())
-
-    # FIXME
-    session.cursor().execute("USE ROLE ACCOUNTADMIN")
 
     for urn_str, _data in manifest.items():
         if urn_str.startswith("_"):
@@ -665,7 +662,7 @@ class Blueprint:
             self._add(resource)
 
 
-def topological_sort(resource_set: set, references: list):
+def topological_sort(resource_set: set, references: set):
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
