@@ -111,30 +111,49 @@ def _split_by_scope(
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
+def _raise_if_cycles(edges):
+    """
+    Check for cycles in the graph of references
+    """
+    visited = set()
+    stack = set()
+
+    def visit(node, ancestors):
+        if node in visited:
+            return False
+        if node in ancestors:
+            return True
+        ancestors.add(node)
+        for _, child in filter(lambda edge: edge[0] == node, edges):
+            if visit(child, ancestors):
+                return True
+        ancestors.remove(node)
+        visited.add(node)
+        return False
+
+    for edge in edges:
+        if visit(edge[0], stack):
+            raise Exception("Cycle detected in the graph of references")
+
+
 def _plan(remote_state, manifest):
     manifest = manifest.copy()
 
-    # Generate a list of all URNs
-    resource_set = set(manifest["_urns"] + list(remote_state.keys()))
+    urns = manifest.pop("_urns")
+    refs = set(manifest.pop("_refs"))
 
-    for ref in manifest["_refs"]:
+    # Generate a list of all URNs
+    resource_set = set(urns + list(remote_state.keys()))
+
+    for ref in refs:
         resource_set.add(ref[0])
         resource_set.add(ref[1])
 
-    print(">>>>> RESOURCE SET")
-    for res in resource_set:
-        print(res)
-
-    print(">>>>> REFS")
-    for ref in manifest["_refs"]:
-        print(ref)
+    # Check for cycles
+    _raise_if_cycles(refs)
 
     # Calculate a topological sort order for the URNs
-    sort_order = topological_sort(resource_set, set(manifest["_refs"]))
-
-    # Once sorting is done, remove the _refs and _urns keys from the manifest
-    del manifest["_refs"]
-    del manifest["_urns"]
+    sort_order = topological_sort(resource_set, refs)
 
     changes = []
     marked_for_replacement = set()
