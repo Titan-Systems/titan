@@ -121,6 +121,10 @@ def _plan(remote_state, manifest):
         resource_set.add(ref[0])
         resource_set.add(ref[1])
 
+    print(">>>>> RESOURCE SET")
+    for res in resource_set:
+        print(res)
+
     # Calculate a topological sort order for the URNs
     sort_order = topological_sort(resource_set, manifest["_refs"])
 
