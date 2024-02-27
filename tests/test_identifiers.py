@@ -1,4 +1,4 @@
-from titan.resources import ResourceName
+from titan.resource_name import ResourceName
 
 
 def test_resource_name():

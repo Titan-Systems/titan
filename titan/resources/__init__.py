@@ -1,4 +1,4 @@
-from .resource import Resource, ResourceName
+from .resource import Resource
 from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
@@ -86,7 +86,6 @@ __all__ = [
     "ReplicationGroup",
     "Resource",
     "ResourceMonitor",
-    "ResourceName",
     "Role",
     "RoleGrant",
     "S3StorageIntegration",

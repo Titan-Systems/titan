@@ -2,7 +2,7 @@ import pytest
 
 from tests.helpers import get_json_fixtures
 
-from titan.resources import ResourceName
+from titan.resource_name import ResourceName
 
 # resources = [
 #     {
