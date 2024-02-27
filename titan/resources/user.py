@@ -38,7 +38,7 @@ class _User(ResourceSpec):
         if not self.login_name:
             self.login_name = self.name
         if not self.display_name:
-            self.display_name = str(self.name.lower())
+            self.display_name = str(self.name).lower()
 
 
 class User(Resource):
