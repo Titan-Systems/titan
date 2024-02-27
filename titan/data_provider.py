@@ -43,8 +43,12 @@ def _filter_result(result, **kwargs):
     filtered = []
     for row in result:
         for key, value in kwargs.items():
-            if row[key] != value:
-                break
+            if key == "name":
+                if ResourceName(row[key]) != ResourceName(value):
+                    break
+            else:
+                if row[key] != value:
+                    break
         else:
             filtered.append(row)
     return filtered

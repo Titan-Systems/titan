@@ -7,6 +7,7 @@ from titan.identifiers import FQN, URN
 from tests.helpers import STATIC_RESOURCES
 from titan.parse import parse_identifier
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
+from titan.resource_name import ResourceName
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -65,13 +66,13 @@ account_resources = [
     },
     {
         "resource_type": ResourceType.USER,
-        "setup_sql": "CREATE USER someuser",
-        "teardown_sql": "DROP USER IF EXISTS someuser",
+        "setup_sql": 'CREATE USER "someuser@applytitan.com"',
+        "teardown_sql": 'DROP USER "someuser@applytitan.com"',
         "data": {
-            "name": "SOMEUSER",
+            "name": "someuser@applytitan.com",
             "owner": TEST_ROLE,
-            "display_name": "SOMEUSER",
-            "login_name": "SOMEUSER",
+            "display_name": "someuser@applytitan.com",
+            "login_name": "SOMEUSER@APPLYTITAN.COM",
             "disabled": False,
             "must_change_password": False,
         },
@@ -410,7 +411,7 @@ def future_grant_resource(request, cursor, account_locator):
 def test_fetch_account_resource(account_resource, cursor, account_locator):
 
     if "name" in account_resource["data"]:
-        fqn = parse_identifier(account_resource["data"]["name"])
+        fqn = FQN(name=ResourceName(account_resource["data"]["name"]))
     else:
         fqn = parse_identifier(account_resource["fqn"])
     urn = URN(
