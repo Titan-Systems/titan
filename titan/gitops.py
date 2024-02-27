@@ -40,11 +40,12 @@ def databases_from_config(databases: list) -> list:
 
 
 def collect_resources_from_config(config: dict):
-    databases = config.get("databases", [])
-    role_grants = config.get("role_grants", [])
-    roles = config.get("roles", [])
-    users = config.get("users", [])
-    warehouses = config.get("warehouses", [])
+    config = config.copy()
+    databases = config.pop("databases", [])
+    role_grants = config.pop("role_grants", [])
+    roles = config.pop("roles", [])
+    users = config.pop("users", [])
+    warehouses = config.pop("warehouses", [])
 
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
