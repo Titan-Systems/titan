@@ -159,6 +159,9 @@ def _plan(remote_state, manifest):
         changes.append((DiffAction.REMOVE, urn_str, remote_state[urn_str]))
         changes.append((DiffAction.ADD, urn_str, manifest[urn_str]))
 
+    print(changes)
+    print(sort_order)
+
     return sorted(changes, key=lambda change: sort_order[change[1]])
 
 
