@@ -18,6 +18,7 @@ from .parse import (
     parse_identifier,
     parse_function_name,
 )
+from .resource_name import ResourceName
 
 
 __this__ = sys.modules[__name__]
@@ -50,6 +51,7 @@ def _filter_result(result, **kwargs):
 
 
 def _urn_from_grant(row, session_ctx):
+    account_scoped_resources = {"user", "role", "warehouse", "database", "task"}
     granted_on = row["granted_on"].lower()
     if granted_on == "account":
         return URN.from_session_ctx(session_ctx)
@@ -61,7 +63,11 @@ def _urn_from_grant(row, session_ctx):
             id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
             name = parse_function_name(id_parts[-1])
             fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
+        elif granted_on in account_scoped_resources:
+            # This is probably all account-scoped resources
+            fqn = FQN(name=ResourceName(row["name"]))
         else:
+            # Scoped resources
             fqn = parse_identifier(row["name"], is_db_scoped=(granted_on == "schema"))
         return URN(
             resource_type=ResourceType(granted_on),
