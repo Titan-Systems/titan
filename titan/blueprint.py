@@ -28,6 +28,53 @@ class MissingPrivilegeException(Exception):
     pass
 
 
+def print_plan(plan):
+    """
+    account:ABC123
+
+    » role.transformer will be created
+
+    + role "urn::ABC123:role/transformer" {
+        + name  = "transformer"
+        + owner = "SYSADMIN"
+        }
+
+    + warehouse "urn::ABC123:warehouse/transforming" {
+        + name           = "transforming"
+        + owner          = "SYSADMIN"
+        + warehouse_type = "STANDARD"
+        + warehouse_size = "LARGE"
+        + auto_suspend   = 60
+        }
+
+    + grant "urn::ABC123:grant/..." {
+        + priv = "USAGE"
+        + on   = warehouse "transforming"
+        + to   = role "transformer
+        }
+
+    + grant "urn::ABC123:grant/..." {
+        + priv = "OPERATE"
+        + on   = warehouse "transforming"
+        + to   = role "transformer
+        }
+    """
+    for action, urn, data in plan:
+        action_marker = ""
+        if action == DiffAction.ADD:
+            action_marker = "+"
+        elif action == DiffAction.CHANGE:
+            action_marker = "~"
+        elif action == DiffAction.REMOVE:
+            action_marker = "-"
+        # »
+        print(f"{action_marker} {urn}", "{")
+        key_length = max(len(key) for key in data.keys())
+        for key, value in data.items():
+            print(f"  + {key:<{key_length}} = {value}")
+        print("}")
+
+
 def print_diffs(diffs):
     for action, target, deltas in diffs:
         print(f"[{action}]", target)
