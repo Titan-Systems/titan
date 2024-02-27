@@ -182,10 +182,6 @@ def _plan(remote_state, manifest) -> List[ResourceChange]:
     # Calculate a topological sort order for the URNs
     sort_order = topological_sort(resource_set, refs)
 
-    # Once sorting is done, remove the _refs and _urns keys from the manifest
-    del manifest["_refs"]
-    del manifest["_urns"]
-
     changes: List[ResourceChange] = []
     marked_for_replacement = set()
     for dict_diff in diff(remote_state, manifest):
