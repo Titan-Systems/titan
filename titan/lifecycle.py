@@ -152,14 +152,32 @@ def update_table(urn: URN, data: dict, props: Props) -> str:
     # not the best place to handle this, instead properties should be tagged such that a difference isn't generated
     if 'as_' in data:
         data.pop('as_')
-    if 'columns' in data and data['columns'] is None:
+    if 'columns' in data and data['columns']['new_value'] is None:
         data.pop('columns')
+    return update__default(urn, data, props)
+
+def update_replication_group(urn: URN, data: dict, props: Props) -> str:
+    # replication groups require certain values to be added and removed rather than set
+    # currently we can't do removals because we don't have that info here
+    if 'allowed_accounts' in data:
+        allowed_accounts_change = data.pop('allowed_accounts')
+        old_value = [a.upper().strip() for a in allowed_accounts_change['old_value']]
+        new_value = [a.upper().strip() for a in allowed_accounts_change['new_value']]
+        accounts_to_remove = [account for account in old_value if account not in new_value]
+        accounts_to_add = [account for account in new_value if account not in old_value]
+        return_queries = []
+        if len(accounts_to_add) > 0:
+            return_queries.append(tidy_sql("ALTER",urn.resource_type,urn.fqn,"ADD",f"{', '.join(accounts_to_add)}","TO ALLOWED_ACCOUNTS"))
+        if len(accounts_to_remove) > 0:
+            return_queries.append(tidy_sql("ALTER",urn.resource_type,urn.fqn,"REMOVE",f"{', '.join(accounts_to_remove)}","FROM ALLOWED_ACCOUNTS"))
+        return return_queries
     return update__default(urn, data, props)
 
 def update__default(urn: URN, data: dict, props: Props) -> str:
     if len(data) == 0:
         return None # allows for stripping out proposed changes, this will be skipped over
-    attr, new_value = data.popitem()
+    attr, change_dict = data.popitem()
+    new_value = change_dict['new_value']
     attr = attr.lower()
     if str(attr).endswith('_'):
             # not sure why this isn't handled by the props alias
@@ -220,7 +238,7 @@ def update_procedure(urn: URN, data: dict, props: Props) -> str:
             urn.resource_type,
             urn.fqn,
             "EXECUTE AS",
-            data["execute_as"],
+            data["execute_as"]['new_value'],
         )
     else:
         return update__default(urn, data, props)
@@ -231,7 +249,8 @@ def update_role_grant(urn: URN, data: dict, props: Props) -> str:
 
 
 def update_schema(urn: URN, data: dict, props: Props) -> str:
-    attr, new_value = data.popitem()
+    attr, change_dict = data.popitem()
+    new_value = change_dict['new_value']
     attr = attr.lower()
     if new_value is None:
         return tidy_sql("ALTER SCHEMA", urn.fqn, "UNSET", attr)

@@ -72,7 +72,7 @@ def diff(original, new):
             delta = dict_delta(original[key], new[key])
 
             for attr, value in delta.items():
-                yield DiffAction.CHANGE, key, {attr: value}
+                yield DiffAction.CHANGE, key, {attr: {'new_value':new[key][attr],'old_value':original[key][attr]}}
 
         elif isinstance(original[key], list):
 
