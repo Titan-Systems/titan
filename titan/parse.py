@@ -691,3 +691,11 @@ def _parse_copy_into(sql: str):
         return results.as_dict()
     except pp.ParseException as err:
         raise Exception(f"Failed to parse COPY INTO statement: {err}")
+
+
+def parse_future_grant_on(on_str: str):
+    # f"{in_type}/{in_name}.<{on_type}>",
+    in_type, in_name = on_str.split("/")
+    in_name, on_type = in_name.split(".")
+    on_type = on_type.strip("<>")
+    return (in_type, in_name, on_type)

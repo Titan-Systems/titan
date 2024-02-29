@@ -430,8 +430,7 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
 def test_fetch_grant(grant_resource, cursor):
     result = data_provider.fetch_resource(cursor, grant_resource["urn"])
     assert result is not None
-    assert len(result) == 1
-    result = data_provider.remove_none_values(result[0])
+    result = data_provider.remove_none_values(result)
     assert result == grant_resource["data"]
 
 

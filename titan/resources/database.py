@@ -4,12 +4,13 @@ from .resource import Resource, ResourceContainer, ResourceSpec
 from .schema import Schema
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
+from ..resource_name import ResourceName
 from ..scope import AccountScope
 
 
 @dataclass(unsafe_hash=True)
 class _Database(ResourceSpec):
-    name: str
+    name: ResourceName
     transient: bool = False
     owner: str = "SYSADMIN"
     data_retention_time_in_days: int = 1

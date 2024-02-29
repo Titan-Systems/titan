@@ -82,8 +82,8 @@ class URN:
         return f"URN(urn:{org}:{acct}:{label}/{fqn})"
 
     @classmethod
-    def from_resource(cls, resource, **kwargs):
-        return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
+    def from_resource(cls, resource, account_locator: str = ""):
+        return cls(resource_type=resource.resource_type, fqn=resource.fqn, account_locator=account_locator)
 
     # @classmethod
     # def from_locator(cls, locator: "ResourceLocator"):

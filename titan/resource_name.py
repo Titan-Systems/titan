@@ -22,6 +22,11 @@ class ResourceName:
             except pp.ParseException:
                 self._quoted = True
 
+    def __repr__(self):
+        name = getattr(self, "_name", None)
+        quoted = getattr(self, "_quoted", None)
+        return f"ResourceName(name={name}, quoted={quoted})"
+
     def __hash__(self):
         return hash(str(self))
 

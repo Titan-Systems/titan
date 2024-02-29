@@ -10,7 +10,7 @@ from snowflake.connector.errors import ProgrammingError
 
 from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
-from .identifiers import URN, FQN, resource_label_for_type
+from .identifiers import URN, FQN, resource_type_for_label
 from .parse import (
     FullyQualifiedIdentifier,
     _parse_dynamic_table_text,
@@ -368,77 +368,94 @@ def fetch_future_grant(session, fqn: FQN):
             return None
         raise
 
-    in_type, in_name = fqn.params["in"].split("/")
+    in_type, in_name = fqn.params["on"].split("/")
 
-    grantee_name = fqn.name
+    # grantee_name = fqn.name
     grants = _filter_result(
         show_result,
         # grant_on=grant_on,
-        # name=name,
-        grantee_name=grantee_name,
+        privilege=fqn.params["priv"],
+        name=in_name,
+        grant_to="ROLE",
+        grantee_name=fqn.name,
     )
 
     if len(grants) == 0:
         return None
+    elif len(grants) > 1:
+        raise Exception(f"Found multiple future grants matching {fqn}")
 
-    grant_block = {}
+    data = grants[0]
 
-    for grant in grants:
-        grant_in_name = grant["name"].split(".<")[0]
-        if in_name != grant_in_name:
-            continue
-        on_type = grant["grant_on"].lower()
-        if on_type not in grant_block:
-            grant_block[on_type] = []
-        grant_block[on_type].append(grant["privilege"])
+    # grant_block = {}
 
-    return grant_block
+    # for grant in grants:
+    #     grant_in_name = grant["name"].split(".<")[0]
+    #     if in_name != grant_in_name:
+    #         continue
+    #     on_type = grant["grant_on"].lower()
+    #     if on_type not in grant_block:
+    #         grant_block[on_type] = []
+    #     grant_block[on_type].append(grant["privilege"])
 
-    # return {
-    #     "priv": data["privilege"],
-    #     "on_type": data["grant_on"],
-    #     "in_type": fqn.params["in_type"],
-    #     "in_name": fqn.params["in_name"],
-    #     "to": data["grantee_name"],
-    #     "grant_option": data["grant_option"] == "true",
-    #     "owner": "SECURITYADMIN",
-    # }
+    # return grant_block
+
+    return {
+        "priv": data["privilege"],
+        "on_type": data["grant_on"],
+        "in_type": fqn.params["in_type"],
+        "in_name": fqn.params["in_name"],
+        "to": data["grantee_name"],
+        "grant_option": data["grant_option"] == "true",
+    }
 
 
 def fetch_grant(session, fqn: FQN):
     try:
         show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}", cacheable=True)
+        """
+        {
+            'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
+            'privilege': 'USAGE',
+            'granted_on': 'DATABASE',
+            'name': 'STATIC_DATABASE',
+            'granted_to': 'ROLE',
+            'grantee_name': 'THATROLE',
+            'grant_option': 'false',
+            'granted_by': 'ACCOUNTADMIN'
+        }
+        """
     except ProgrammingError as err:
         if err.errno == DOEST_NOT_EXIST_ERR:
             return None
         raise
-    granted_on = fqn.params["on_type"]
-    name = fqn.params["on"]
-    grantee_name = fqn.name
+    on_type, on = fqn.params["on"].split("/")
+    on_type = str(resource_type_for_label(on_type))
     grants = _filter_result(
         show_result,
-        granted_on=granted_on,
-        name=name,
-        grantee_name=grantee_name,
+        granted_on=on_type,
+        name=on,
+        grantee_name=fqn.name,
     )
 
     if len(grants) == 0:
-        return []
+        return None
+    elif len(grants) > 1:
+        # This is likely to happen when a grant has been issued by ACCOUNTADMIN
+        # and some other role with MANAGE GRANTS or OWNERSHIP. It needs to be properly
+        # handled in the future.
+        raise Exception(f"Found multiple grants matching {fqn}")
 
-    return sorted(
-        [
-            {
-                "priv": row["privilege"],
-                "on": row["name"],
-                "on_type": row["granted_on"],
-                "to": row["grantee_name"],
-                "grant_option": row["grant_option"] == "true",
-                "owner": row["granted_by"],
-            }
-            for row in grants
-        ],
-        key=lambda g: (g["priv"], g["owner"]),
-    )
+    data = grants[0]
+
+    return {
+        "priv": data["privilege"],
+        "on": data["name"],
+        "on_type": data["granted_on"],
+        "to": data["grantee_name"],
+        "grant_option": data["grant_option"] == "true",
+        "owner": data["granted_by"],
+    }
 
 
 def fetch_grant_on_all(session, fqn: FQN):
