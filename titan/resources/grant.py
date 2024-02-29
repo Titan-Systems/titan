@@ -383,7 +383,7 @@ class FutureGrant(Resource):
 def future_grant_fqn(grant: _FutureGrant):
     in_type = resource_label_for_type(grant.in_type)
     in_name = grant.in_name
-    on_type = resource_label_for_type(grant.on_type).upper()
+    on_type = resource_label_for_type(grant.on_type)
     return FQN(
         name=grant.to.name,
         params={

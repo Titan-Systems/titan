@@ -368,16 +368,14 @@ def fetch_future_grant(session, fqn: FQN):
             return None
         raise
 
-    # "on": f"{in_type}/{in_name}.<{on_type}>",
+    in_type, in_name = fqn.params["on"].split("/")
 
-    in_type, name = fqn.params["on"].split("/")
-    in_name, _ = name.split(".")
-
+    # grantee_name = fqn.name
     grants = _filter_result(
         show_result,
         # grant_on=grant_on,
         privilege=fqn.params["priv"],
-        name=name,
+        name=in_name,
         grant_to="ROLE",
         grantee_name=fqn.name,
     )
@@ -389,11 +387,24 @@ def fetch_future_grant(session, fqn: FQN):
 
     data = grants[0]
 
+    # grant_block = {}
+
+    # for grant in grants:
+    #     grant_in_name = grant["name"].split(".<")[0]
+    #     if in_name != grant_in_name:
+    #         continue
+    #     on_type = grant["grant_on"].lower()
+    #     if on_type not in grant_block:
+    #         grant_block[on_type] = []
+    #     grant_block[on_type].append(grant["privilege"])
+
+    # return grant_block
+
     return {
         "priv": data["privilege"],
         "on_type": data["grant_on"],
-        "in_type": in_type,
-        "in_name": in_name,
+        "in_type": fqn.params["in_type"],
+        "in_name": fqn.params["in_name"],
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
     }
@@ -706,6 +717,7 @@ def fetch_storage_integration(session, fqn: FQN):
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
     }
 
+
 def fetch_stream(session, fqn: FQN):
     show_result = execute(session, "SHOW STREAMS IN ACCOUNT")
 
@@ -721,8 +733,9 @@ def fetch_stream(session, fqn: FQN):
         "name": data["name"],
         "comment": data["comment"] or None,
         "append_only": data["mode"] == "APPEND_ONLY",
-        "on_table": data["table_name"] if data['source_type']=='Table' else None
+        "on_table": data["table_name"] if data["source_type"] == "Table" else None,
     }
+
 
 def fetch_event_table(session, fqn: FQN):
     show_result = execute(session, "SHOW EVENT TABLES IN ACCOUNT")
@@ -735,11 +748,8 @@ def fetch_event_table(session, fqn: FQN):
         raise Exception(f"Found multiple tables matching {fqn}")
 
     data = tables[0]
-    return {
-        "name": data["name"],
-        "comment": data["comment"] or None,
-        "cluster_by": data["cluster_by"] or None
-    }
+    return {"name": data["name"], "comment": data["comment"] or None, "cluster_by": data["cluster_by"] or None}
+
 
 def fetch_task(session, fqn: FQN):
     tasks = execute(session, f"SHOW TASKS LIKE '{fqn.name}' in schema {fqn.database}.{fqn.schema}", cacheable=True)
@@ -762,10 +772,11 @@ def fetch_task(session, fqn: FQN):
         "as_": task_details["definition"],
     }
 
+
 def fetch_replication_group(session, fqn: FQN):
     show_result = execute(session, f"SHOW REPLICATION GROUPS LIKE '{fqn.name}'", cacheable=True)
-    
-    replication_groups = _filter_result(show_result, is_primary='true')
+
+    replication_groups = _filter_result(show_result, is_primary="true")
     if len(replication_groups) == 0:
         return None
     if len(replication_groups) > 1:
@@ -776,9 +787,11 @@ def fetch_replication_group(session, fqn: FQN):
     databases = [row["name"] for row in show_databases_result]
     return {
         "name": data["name"],
-        "object_types": data["object_types"].split(','),
-        "allowed_integration_types": None if data["allowed_integration_types"]=='' else data["allowed_integration_types"].split(','),
-        "allowed_accounts": None if data["allowed_accounts"]=='' else data["allowed_accounts"].split(','),
+        "object_types": data["object_types"].split(","),
+        "allowed_integration_types": (
+            None if data["allowed_integration_types"] == "" else data["allowed_integration_types"].split(",")
+        ),
+        "allowed_accounts": None if data["allowed_accounts"] == "" else data["allowed_accounts"].split(","),
         "allowed_databases": databases,
         "replication_schedule": data["replication_schedule"],
         "owner": data["owner"],
@@ -788,7 +801,9 @@ def fetch_replication_group(session, fqn: FQN):
 def fetch_table(session, fqn: FQN):
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
 
-    tables = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE")
+    tables = _filter_result(
+        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
+    )
 
     if len(tables) == 0:
         return None
@@ -806,7 +821,7 @@ def fetch_table(session, fqn: FQN):
         "columns": columns,
         # This is here because of CTAS type tables.
         # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
-        "as_": None
+        "as_": None,
     }
 
 

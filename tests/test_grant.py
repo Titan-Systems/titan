@@ -56,7 +56,7 @@ def test_grant_future_schemas_priv():
     assert grant.in_type == ResourceType.DATABASE
     assert grant.in_name == "SOMEDB"
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::future_grant/somerole?priv=CREATE VIEW&on=database/somedb.<SCHEMA>"
+    assert str(URN.from_resource(grant)) == "urn:::future_grant/somerole?priv=CREATE VIEW&on=database/somedb.<schema>"
 
 
 def test_role_grant_to_user_with_kwargs():
