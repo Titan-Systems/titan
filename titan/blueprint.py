@@ -1,15 +1,17 @@
-from typing import List, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 from queue import Queue
 
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute
-from .diff import diff, DiffAction
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, _EXECUTION_CACHE
+from .diff import DictDiff, diff, DiffAction
 from .enums import ResourceType
 from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
 from .parse import parse_URN
+from .lifecycle import ResourceChange
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
@@ -64,7 +66,7 @@ def _split_by_scope(
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
-def _plan(remote_state, manifest):
+def _plan(remote_state, manifest) -> List[ResourceChange]:
     manifest = manifest.copy()
 
     # Generate a list of all URNs
@@ -81,37 +83,39 @@ def _plan(remote_state, manifest):
     del manifest["_refs"]
     del manifest["_urns"]
 
-    changes = []
+    changes:List[ResourceChange] = []
     marked_for_replacement = set()
-    for action, urn_str, data in diff(remote_state, manifest):
-        urn = parse_URN(urn_str)
+    for dict_diff in diff(remote_state, manifest):
+        change = ResourceChange.from_diff(dict_diff)
+        urn_str = str(change.urn)
 
-        if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
-            for on_type, privs in data.items():
+        if change.urn.resource_type == ResourceType.FUTURE_GRANT and change.action in (DiffAction.ADD, DiffAction.CHANGE):
+            # Exclude Future Grants that are already in the remote state
+            for on_type, privs in change.new_value.items():
                 privs_to_add = privs
-                if action == DiffAction.CHANGE:
+                if change.action == DiffAction.CHANGE:
                     privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
                 for priv in privs_to_add:
-                    changes.append((DiffAction.ADD, urn_str, {on_type: [priv]}))
-        elif action == DiffAction.CHANGE:
+                    change.new_value = {on_type: [priv]}
+                    changes.append(change)
+        elif change.action == DiffAction.CHANGE:
             if urn_str in marked_for_replacement:
                 continue
 
             # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
-            attr = list(data.keys())[0]
-            resource_cls = Resource.resolve_resource_cls(urn.resource_type, remote_state[urn_str])
+            attr = list(change.new_value.keys())[0]
+            resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, remote_state[urn_str])
             attr_metadata = resource_cls.spec.get_metadata(attr)
             if attr_metadata.get("triggers_replacement", False):
                 marked_for_replacement.add(urn_str)
             else:
-                changes.append((action, urn_str, data))
+                changes.append(change)
         else:
-            changes.append((action, urn_str, data))
+            changes.append(change)
 
     for urn_str in marked_for_replacement:
-        changes.append((DiffAction.REMOVE, urn_str, remote_state[urn_str]))
-        changes.append((DiffAction.ADD, urn_str, manifest[urn_str]))
-
+        changes.append(ResourceChange(DiffAction.REMOVE, change.urn, remote_state[urn_str]))
+        changes.append(ResourceChange(DiffAction.ADD, change.urn, manifest[urn_str]))
     return sorted(changes, key=lambda change: sort_order[change[1]])
 
 
@@ -494,7 +498,9 @@ class Blueprint:
         manifest["_urns"] = urns
         return manifest
 
-    def plan(self, session):
+    def plan(self, session) -> List[ResourceChange]:
+        data_provider.fetch_session.cache_clear()
+        _EXECUTION_CACHE.clear()
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = _fetch_remote_state(session, manifest)
@@ -508,7 +514,7 @@ class Blueprint:
         # TODO: clean up urn vs urn_str madness
 
         """
-            At this point, we have a list of actions as a part of the plan. Each action is one of:
+            At this point, we have a list of resource changes as a part of the plan. Each is one of:
                 1. [ADD] action (CREATE command)
                 2. [CHANGE] action (one or many ALTER or SET PARAMETER commands)
                 3. [REMOVE] action (DROP command, REVOKE command, or a rename operation)
@@ -531,42 +537,40 @@ class Blueprint:
         # print(self._staged)
         # print(plan)
 
-        action_queue = []
+        action_queue:List[str] = []
         actions_taken = []
 
-        def _queue_action(urn, data, props):
-            if action == DiffAction.ADD:
+        for resource_change in plan:
+            if resource_change.action == DiffAction.REMOVE:
+                action_queue.append((resource_change.urn,lifecycle.drop_resource(resource_change, resource_change.old_value)))
+            elif resource_change.action == DiffAction.ADD:
+                props = Resource.props_for_resource_type(resource_change.urn.resource_type, resource_change.new_value)
                 switch_to_role = None
-                if "owner" in data:
-                    switch_to_role = data["owner"]
-                elif urn.resource_type == ResourceType.FUTURE_GRANT:
+                if "owner" in resource_change.new_value:
+                    switch_to_role = resource_change.new_value["owner"]
+                elif resource_change.urn.resource_type == ResourceType.FUTURE_GRANT:
                     switch_to_role = "SECURITYADMIN"
                 if switch_to_role and switch_to_role in usable_roles:
-                    action_queue.append(f"USE ROLE {switch_to_role}")
+                    action_queue.append((resource_change.urn,f"USE ROLE {switch_to_role}"))
                 else:
-                    raise Exception(f"Role {data['owner']} required for {urn} but isn't available")
-                action_queue.append(lifecycle.create_resource(urn, data, props))
-            elif action == DiffAction.CHANGE:
-                action_queue.append(lifecycle.update_resource(urn, data, props))
-            elif action == DiffAction.REMOVE:
-                action_queue.append(lifecycle.drop_resource(urn, data))
-
-        for action, urn_str, data in plan:
-            urn = parse_URN(urn_str)
-            props = Resource.props_for_resource_type(urn.resource_type, data)
-            _queue_action(urn, data, props)
+                    if 'owner' not in resource_change.new_value:
+                        raise Exception(f"Role change required for {resource_change.urn} but, the owner is not specified")
+                    raise Exception(f"Role {resource_change.new_value['owner']} required for {resource_change.urn} but isn't available")
+                action_queue.extend((resource_change.urn,lifecycle.create_resource(resource_change, props)))
+            elif resource_change.action == DiffAction.CHANGE:
+                action_queue.extend((resource_change.urn,lifecycle.update_resource(resource_change, props)))
 
         while action_queue:
-            sql = action_queue.pop(0)
+            urn,sql = action_queue.pop(0)
             actions_taken.append(sql)
             try:
                 if not self._dry_run:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {urn_str}, skipping...")
+                    print(f"Resource already exists: {str(urn)}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {urn_str}, skipping...")
+                    print(f"Invalid grant: {str(urn)}, skipping...")
                 else:
                     raise err
         return actions_taken

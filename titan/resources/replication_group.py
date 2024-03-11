@@ -43,6 +43,7 @@ class _ReplicationGroup(ResourceSpec):
     allowed_integration_types: list[IntegrationType] = None
     ignore_edition_check: bool = None
     replication_schedule: str = None
+    owner: str = "SYSADMIN"
 
 
 class ReplicationGroup(Resource):
@@ -81,6 +82,7 @@ class ReplicationGroup(Resource):
         allowed_integration_types: list[IntegrationType] = None,
         ignore_edition_check: bool = None,
         replication_schedule: str = None,
+        owner: str = "SYSADMIN",
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -93,5 +95,6 @@ class ReplicationGroup(Resource):
             allowed_integration_types=allowed_integration_types,
             ignore_edition_check=ignore_edition_check,
             replication_schedule=replication_schedule,
+            owner=owner,
         )
         self.requires(self._data.allowed_databases or [])

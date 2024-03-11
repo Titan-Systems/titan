@@ -16,6 +16,7 @@ from ..props import (
     SchemaProp,
     StringProp,
     TagsProp,
+    QueryProp,
 )
 
 
@@ -142,3 +143,78 @@ class Table(Resource):
     @property
     def table_stage(self):
         return self._table_stage
+
+@dataclass(unsafe_hash=True)
+class _CreateTableAsSelect(ResourceSpec):
+    name: str
+    as_: str = None
+    columns: list[Column] = None
+    cluster_by: list[str] = None
+    copy_grants: bool = False
+    row_access_policy: dict[str, list] = None
+    owner: str = "SYSADMIN"
+    comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.as_ is None:
+            raise ValueError("as can't be None")
+
+
+class CreateTableAsSelect(Resource):
+    resource_type = ResourceType.TABLE
+    props = Props(
+        columns=SchemaProp(),
+        cluster_by=IdentifierListProp("cluster by", eq=False, parens=True),
+        copy_grants=FlagProp("copy grants"),
+        as_=QueryProp("as"),
+    )
+    scope = SchemaScope()
+    spec = _CreateTableAsSelect
+
+    def __init__(
+        self,
+        name: str,
+        columns: list[Column] = None,
+        cluster_by: list[str] = None,
+        copy_grants: bool = False,
+        row_access_policy: dict[str, list] = None,
+        as_: str = None,
+        owner: str = "SYSADMIN",
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data = _CreateTableAsSelect(
+            name=name,
+            as_=as_,
+            columns=columns,
+            cluster_by=cluster_by,
+            copy_grants=copy_grants,
+            row_access_policy=row_access_policy,
+            owner=owner,
+        )
+
+    @classmethod
+    def from_sql(cls, sql):
+        """
+        CREATE [ OR REPLACE ] TABLE <table_name> [ ( <col_name> [ <col_type> ] , <col_name> [ <col_type> ] , ... ) ]
+        [ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
+        [ COPY GRANTS ]
+        AS SELECT <query>
+        [ ... ]
+
+        """
+
+        identifier, remainder = _parse_create_header(sql, cls.resource_type, cls.scope)
+        table_schema, remainder = _parse_table_schema(remainder)
+        props = _parse_props(cls.props, remainder)
+        return cls(**identifier, **table_schema, **props)
+
+
+# there's no detectable difference between a table created with CTAS and a table created with a regular CREATE TABLE
+def _resolver(data: dict):
+    if 'as_' in data:
+        return CreateTableAsSelect
+    return Table
+
+Resource.__resolvers__[ResourceType.TABLE] = _resolver

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
 from .warehouse import Warehouse
-from ..enums import ResourceType, WarehouseSize
+from ..enums import ResourceType, WarehouseSize, TaskState
 from ..props import (
     BoolProp,
     EnumProp,
@@ -15,7 +15,7 @@ from ..props import (
     StringListProp,
     StringProp,
 )
-from ..scope import AccountScope
+from ..scope import SchemaScope
 
 
 @dataclass(unsafe_hash=True)
@@ -34,6 +34,7 @@ class _Task(ResourceSpec):
     comment: str = None
     after: list[str] = None
     when: str = None
+    state: TaskState = TaskState.SUSPENDED
     as_: str = None
 
 
@@ -53,9 +54,10 @@ class Task(Resource):
         comment=StringProp("comment"),
         after=StringListProp("after", eq=False),
         when=ExpressionProp("when"),
+        state=EnumProp("state", TaskState),
         as_=QueryProp("as"),
     )
-    scope = AccountScope()
+    scope = SchemaScope()
     spec = _Task
 
     def __init__(
@@ -75,6 +77,7 @@ class Task(Resource):
         after: list[str] = None,
         when: str = None,
         as_: str = None,
+        state: TaskState = TaskState.SUSPENDED,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -94,4 +97,5 @@ class Task(Resource):
             after=after,
             when=when,
             as_=as_,
+            state=state
         )

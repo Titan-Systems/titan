@@ -26,7 +26,7 @@ from .sequence import Sequence
 # from .shared_database import SharedDatabase
 from .stage import InternalStage, ExternalStage
 from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
-from .table import Table
+from .table import Table, CreateTableAsSelect
 from .tag import Tag
 from .task import Task
 from .user import User
@@ -96,6 +96,7 @@ __all__ = [
     "StageStream",
     "Table",
     "TableStream",
+    "CreateTableAsSelect",
     "Tag",
     "Task",
     "User",
