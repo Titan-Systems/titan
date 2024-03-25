@@ -88,6 +88,9 @@ class Props:
         self.name = _name
         self.start_token = Literals(_start_token) if _start_token else None
 
+    def __repr__(self):
+        return f"Props(num:{len(self.props)})"
+
     def __getitem__(self, key: str) -> Prop:
         return self.props[key]
 

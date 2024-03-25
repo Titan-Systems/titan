@@ -268,12 +268,11 @@ future_grants = [
         "data": {
             "priv": "USAGE",
             "on_type": "SCHEMA",
-            "in_type": "DATABASE",
+            "in_type": "database",
             "in_name": "STATIC_DATABASE",
-            "to": "thatrole",
+            "to": "THATROLE",
             "grant_option": False,
         },
-        "response": {"schema": ["USAGE"]},
     },
 ]
 
@@ -438,7 +437,7 @@ def test_fetch_grant(grant_resource, cursor):
 def test_fetch_future_grant(future_grant_resource, cursor):
     result = data_provider.fetch_resource(cursor, future_grant_resource["urn"])
     assert result is not None
-    assert result == future_grant_resource["response"]
+    assert result == future_grant_resource["data"]
 
 
 @pytest.mark.requires_snowflake

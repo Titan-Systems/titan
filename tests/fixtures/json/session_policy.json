@@ -1,0 +1,6 @@
+{
+    "name": "session_policy_example",
+    "session_idle_timeout_mins": 30,
+    "session_ui_idle_timeout_mins": 15,
+    "comment": "This is a test session policy"
+}

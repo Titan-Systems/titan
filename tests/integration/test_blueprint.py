@@ -47,14 +47,29 @@ def noprivs_role(cursor, test_db, marked_for_cleanup):
 @pytest.mark.requires_snowflake
 def test_plan(cursor, user, role):
     session = cursor.connection
-    bp = Blueprint(name="test")
+    blueprint = Blueprint(name="test")
     role_grant = RoleGrant(role=role, to_user=user)
-    bp.add(role_grant)
-    changes = bp.plan(session)
+    blueprint.add(role_grant)
+    changes = blueprint.plan(session)
     assert len(changes) == 1
-    bp.apply(session, changes)
+    blueprint.apply(session, changes)
     role_grant_remote = data_provider.fetch_role_grant(session, role_grant.fqn)
     assert role_grant_remote
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_plan_no_changes(cursor, user, role):
+    session = cursor.connection
+    blueprint = Blueprint(name="test_no_changes")
+    # Assuming role_grant already exists in the setup for this test
+    role_grant = RoleGrant(role=role, to_user=user)
+    blueprint.add(role_grant)
+    # Apply the initial blueprint to ensure the state is as expected
+    initial_changes = blueprint.plan(session)
+    blueprint.apply(session, initial_changes)
+    # Plan again to verify no changes are detected
+    subsequent_changes = blueprint.plan(session)
+    assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."
 
 
 # noprivs_role is causing issues and breaking other integration tests

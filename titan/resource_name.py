@@ -24,8 +24,9 @@ class ResourceName:
 
     def __repr__(self):
         name = getattr(self, "_name", None)
-        quoted = getattr(self, "_quoted", None)
-        return f"ResourceName(name={name}, quoted={quoted})"
+        quoted = getattr(self, "_quoted", False)
+        name = f'"{name}"' if quoted else name
+        return f"Resource:{name}"
 
     def __hash__(self):
         return hash(str(self))
