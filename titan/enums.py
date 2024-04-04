@@ -249,6 +249,14 @@ class SessionParameter(ParseableEnum):
     WEEK_OF_YEAR_POLICY = "WEEK_OF_YEAR_POLICY"
     WEEK_START = "WEEK_START"
 
+class TaskState(ParseableEnum):
+    """
+    Represents the scheduling state of a task.
+    https://docs.snowflake.com/en/sql-reference/sql/show-tasks#output
+    Snowflake provides these as lowercase but we'll uppercase them.
+    """
+    STARTED = "STARTED"
+    SUSPENDED = "SUSPENDED"
 
 class WarehouseSize(ParseableEnum):
     """

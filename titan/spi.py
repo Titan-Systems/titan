@@ -188,8 +188,9 @@ def _create_or_update_resource(
         resource_cls = resources.Resource.resolve_resource_cls(resource_type)
         original = {str(urn): dp.remove_none_values(original)}
         new = {str(urn): dp.remove_none_values(resource_cls.defaults() | config)}
-        for _, _, change in diff(original, new):
-            sql.append(lifecycle.update_resource(urn, change, resource_cls.props))
+        for dict_diff in diff(original, new):
+            change = lifecycle.ResourceChange.from_diff(dict_diff)
+            sql.append(lifecycle.update_resource(change, resource_cls.props))
     else:
         sql = [lifecycle.create_resource(urn, config, if_not_exists=True)]
     if not dry_run:

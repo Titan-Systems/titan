@@ -706,11 +706,89 @@ def fetch_storage_integration(session, fqn: FQN):
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
     }
 
+def fetch_stream(session, fqn: FQN):
+    show_result = execute(session, "SHOW STREAMS IN ACCOUNT")
+
+    streams = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
+
+    if len(streams) == 0:
+        return None
+    if len(streams) > 1:
+        raise Exception(f"Found multiple streams matching {fqn}")
+
+    data = streams[0]
+    return {
+        "name": data["name"],
+        "comment": data["comment"] or None,
+        "append_only": data["mode"] == "APPEND_ONLY",
+        "on_table": data["table_name"] if data['source_type']=='Table' else None
+    }
+
+def fetch_event_table(session, fqn: FQN):
+    show_result = execute(session, "SHOW EVENT TABLES IN ACCOUNT")
+
+    tables = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
+
+    if len(tables) == 0:
+        return None
+    if len(tables) > 1:
+        raise Exception(f"Found multiple tables matching {fqn}")
+
+    data = tables[0]
+    return {
+        "name": data["name"],
+        "comment": data["comment"] or None,
+        "cluster_by": data["cluster_by"] or None
+    }
+
+def fetch_task(session, fqn: FQN):
+    tasks = execute(session, f"SHOW TASKS LIKE '{fqn.name}' in schema {fqn.database}.{fqn.schema}", cacheable=True)
+    if len(tasks) == 0:
+        return None
+    if len(tasks) > 1:
+        raise Exception(f"Found multiple tasks matching {fqn}")
+
+    data = tasks[0]
+    task_details_result = execute(session, f"DESC TASK {fqn.database}.{fqn.schema}.{fqn.name}", cacheable=True)
+    if len(task_details_result) == 0:
+        raise Exception(f"Failed to fetch task details for {fqn}")
+    task_details = task_details_result[0]
+    return {
+        "name": data["name"],
+        "warehouse": data["warehouse"],
+        "schedule": data["schedule"],
+        "state": str(data["state"]).upper(),
+        "owner": data["owner"],
+        "as_": task_details["definition"],
+    }
+
+def fetch_replication_group(session, fqn: FQN):
+    show_result = execute(session, f"SHOW REPLICATION GROUPS LIKE '{fqn.name}'", cacheable=True)
+    
+    replication_groups = _filter_result(show_result, is_primary='true')
+    if len(replication_groups) == 0:
+        return None
+    if len(replication_groups) > 1:
+        raise Exception(f"Found multiple replication groups matching {fqn}")
+
+    data = replication_groups[0]
+    show_databases_result = execute(session, f"SHOW DATABASES IN REPLICATION GROUP {fqn.name}")
+    databases = [row["name"] for row in show_databases_result]
+    return {
+        "name": data["name"],
+        "object_types": data["object_types"].split(','),
+        "allowed_integration_types": None if data["allowed_integration_types"]=='' else data["allowed_integration_types"].split(','),
+        "allowed_accounts": None if data["allowed_accounts"]=='' else data["allowed_accounts"].split(','),
+        "allowed_databases": databases,
+        "replication_schedule": data["replication_schedule"],
+        "owner": data["owner"],
+    }
+
 
 def fetch_table(session, fqn: FQN):
-    show_result = execute(session, "SHOW TABLES")
+    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
 
-    tables = _filter_result(show_result, name=fqn.name, kind="TABLE")
+    tables = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE")
 
     if len(tables) == 0:
         return None
@@ -726,6 +804,9 @@ def fetch_table(session, fqn: FQN):
         "comment": data["comment"] or None,
         "cluster_by": data["cluster_by"] or None,
         "columns": columns,
+        # This is here because of CTAS type tables.
+        # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
+        "as_": None
     }
 
 

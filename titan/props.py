@@ -150,7 +150,7 @@ class StringProp(Prop):
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
-            f"'{value}'",
+            f"$${value}$$",
         )
 
 
@@ -217,7 +217,7 @@ class StringListProp(Prop):
     def render(self, values):
         if values is None or len(values) == 0:
             return ""
-        value_list = ", ".join([f"'{v}'" for v in values])
+        value_list = ", ".join([f"$${v}$$" for v in values])
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
