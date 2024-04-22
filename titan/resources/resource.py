@@ -1,3 +1,5 @@
+import difflib
+
 from dataclasses import asdict, dataclass, fields
 from typing import Any, TypedDict, Type, Union, get_args, get_origin
 from inspect import isclass
@@ -12,6 +14,23 @@ from ..props import Props as ResourceProps
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 from ..resource_name import ResourceName
 from ..scope import ResourceScope, OrganizationScope, DatabaseScope, SchemaScope
+
+
+def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
+    suggestions = {}
+    for passed_kwarg in passed_kwargs:
+        # Find the closest match from the expected kwargs for each passed kwarg
+        closest_match = difflib.get_close_matches(passed_kwarg, expected_kwargs, n=1, cutoff=0.6)
+        if closest_match:
+            closest_match = closest_match[0]
+            # If the passed kwarg is not exactly an expected kwarg, add it to suggestions
+            if passed_kwarg != closest_match:
+                suggestions[passed_kwarg] = closest_match
+        else:
+            # If no close match is found, suggest it might be an unexpected kwarg
+            suggestions[passed_kwarg] = "Unexpected kwarg, no close match found."
+
+    return suggestions
 
 
 class Arg(TypedDict):
@@ -146,7 +165,19 @@ class Resource(metaclass=_Resource):
         if resource_type and resource_type != self.resource_type:
             raise ValueError(f"Unexpected resource_type {resource_type} for {self.resource_type}")
 
-        self._register_scope(**kwargs)
+        # Consume scope from kwargs if it exists
+        database = kwargs.pop("database", None)
+        schema = kwargs.pop("schema", None)
+        self._register_scope(database=database, schema=schema)
+
+        # If there are more kwargs, throw an error
+        if kwargs:
+            if self.spec:
+                field_names = [field.name for field in fields(self.spec)]
+                suggestions = _suggest_correct_kwargs(expected_kwargs=field_names, passed_kwargs=kwargs.keys())
+                raise ValueError(f"Unexpected kwargs {kwargs}, did you mean {suggestions}?")
+            else:
+                raise ValueError(f"Unexpected kwargs {kwargs}")
 
     @classmethod
     def from_sql(cls, sql):
