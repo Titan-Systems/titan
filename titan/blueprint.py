@@ -1,17 +1,15 @@
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 from queue import Queue
 
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, _EXECUTION_CACHE
-from .diff import DictDiff, diff, DiffAction
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute
+from .diff import diff, DiffAction
 from .enums import ResourceType
 from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
 from .parse import parse_URN
-from .lifecycle import ResourceChange
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
@@ -28,53 +26,6 @@ from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 class MissingPrivilegeException(Exception):
     pass
-
-
-def print_plan(plan):
-    """
-    account:ABC123
-
-    » role.transformer will be created
-
-    + role "urn::ABC123:role/transformer" {
-        + name  = "transformer"
-        + owner = "SYSADMIN"
-        }
-
-    + warehouse "urn::ABC123:warehouse/transforming" {
-        + name           = "transforming"
-        + owner          = "SYSADMIN"
-        + warehouse_type = "STANDARD"
-        + warehouse_size = "LARGE"
-        + auto_suspend   = 60
-        }
-
-    + grant "urn::ABC123:grant/..." {
-        + priv = "USAGE"
-        + on   = warehouse "transforming"
-        + to   = role "transformer
-        }
-
-    + grant "urn::ABC123:grant/..." {
-        + priv = "OPERATE"
-        + on   = warehouse "transforming"
-        + to   = role "transformer
-        }
-    """
-    for action, urn, data in plan:
-        action_marker = ""
-        if action == DiffAction.ADD:
-            action_marker = "+"
-        elif action == DiffAction.CHANGE:
-            action_marker = "~"
-        elif action == DiffAction.REMOVE:
-            action_marker = "-"
-        # »
-        print(f"{action_marker} {urn}", "{")
-        key_length = max(len(key) for key in data.keys())
-        for key, value in data.items():
-            print(f"  + {key:<{key_length}} = {value}")
-        print("}")
 
 
 def print_diffs(diffs):
@@ -113,116 +64,53 @@ def _split_by_scope(
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
-def _raise_if_cycles(edges):
-    """
-    Check for cycles in the graph of references
-    """
-    visited = set()
-    stack = set()
-
-    def visit(node, ancestors):
-        if node in visited:
-            return False
-        if node in ancestors:
-            return True
-        ancestors.add(node)
-        for _, child in filter(lambda edge: edge[0] == node, edges):
-            if visit(child, ancestors):
-                return True
-        ancestors.remove(node)
-        visited.add(node)
-        return False
-
-    for edge in edges:
-        if visit(edge[0], stack):
-            raise Exception("Cycle detected in the graph of references")
-
-
-def _raise_if_cycles(edges):
-    """
-    Check for cycles in the graph of references
-    """
-    visited = set()
-    stack = set()
-
-    def visit(node, ancestors):
-        if node in visited:
-            return False
-        if node in ancestors:
-            return True
-        ancestors.add(node)
-        for _, child in filter(lambda edge: edge[0] == node, edges):
-            if visit(child, ancestors):
-                return True
-        ancestors.remove(node)
-        visited.add(node)
-        return False
-
-    for edge in edges:
-        if visit(edge[0], stack):
-            raise Exception("Cycle detected in the graph of references")
-
-
-def _plan(remote_state, manifest) -> List[ResourceChange]:
+def _plan(remote_state, manifest):
     manifest = manifest.copy()
 
-    urns = manifest.pop("_urns")
-    refs = set(manifest.pop("_refs"))
-
     # Generate a list of all URNs
-    resource_set = set(urns + list(remote_state.keys()))
+    resource_set = set(manifest["_urns"] + list(remote_state.keys()))
 
-    for ref in refs:
+    for ref in manifest["_refs"]:
         resource_set.add(ref[0])
         resource_set.add(ref[1])
 
-    # Check for cycles
-    _raise_if_cycles(refs)
-
     # Calculate a topological sort order for the URNs
-    sort_order = topological_sort(resource_set, refs)
+    sort_order = topological_sort(resource_set, manifest["_refs"])
 
-    changes: List[ResourceChange] = []
+    # Once sorting is done, remove the _refs and _urns keys from the manifest
+    del manifest["_refs"]
+    del manifest["_urns"]
+
+    changes = []
     marked_for_replacement = set()
-    for dict_diff in diff(remote_state, manifest):
-        change = ResourceChange.from_diff(dict_diff)
-        urn_str = str(change.urn)
+    for action, urn_str, data in diff(remote_state, manifest):
+        urn = parse_URN(urn_str)
 
-        if change.urn.resource_type == ResourceType.FUTURE_GRANT and change.action in (
-            DiffAction.ADD,
-            DiffAction.CHANGE,
-        ):
-            # Exclude Future Grants that are already in the remote state
-            for on_type, privs in change.new_value.items():
+        if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
+            for on_type, privs in data.items():
                 privs_to_add = privs
-                if change.action == DiffAction.CHANGE:
+                if action == DiffAction.CHANGE:
                     privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
                 for priv in privs_to_add:
-                    change.new_value = {on_type: [priv]}
-                    changes.append(change)
-        elif change.action == DiffAction.CHANGE:
+                    changes.append((DiffAction.ADD, urn_str, {on_type: [priv]}))
+        elif action == DiffAction.CHANGE:
             if urn_str in marked_for_replacement:
                 continue
 
             # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
-            attr = list(change.new_value.keys())[0]
-            resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, remote_state[urn_str])
+            attr = list(data.keys())[0]
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, remote_state[urn_str])
             attr_metadata = resource_cls.spec.get_metadata(attr)
             if attr_metadata.get("triggers_replacement", False):
                 marked_for_replacement.add(urn_str)
             else:
-                changes.append(change)
+                changes.append((action, urn_str, data))
         else:
-            changes.append(change)
+            changes.append((action, urn_str, data))
 
     for urn_str in marked_for_replacement:
-        changes.append(ResourceChange(DiffAction.REMOVE, change.urn, remote_state[urn_str]))
-        changes.append(ResourceChange(DiffAction.ADD, change.urn, manifest[urn_str]))
-    # print(changes)
-    for change in changes:
-        print(change)
-    for k, v in sort_order.items():
-        print(k, v)
+        changes.append((DiffAction.REMOVE, urn_str, remote_state[urn_str]))
+        changes.append((DiffAction.ADD, urn_str, manifest[urn_str]))
 
     return sorted(changes, key=lambda change: sort_order[change[1]])
 
@@ -412,6 +300,9 @@ def _raise_if_missing_privs(required: list, available: dict):
 def _fetch_remote_state(session, manifest):
     state = {}
     urns = set(manifest["_urns"].copy())
+
+    # FIXME
+    session.cursor().execute("USE ROLE ACCOUNTADMIN")
 
     for urn_str, _data in manifest.items():
         if urn_str.startswith("_"):
@@ -603,9 +494,7 @@ class Blueprint:
         manifest["_urns"] = urns
         return manifest
 
-    def plan(self, session) -> List[ResourceChange]:
-        data_provider.fetch_session.cache_clear()
-        _EXECUTION_CACHE.clear()
+    def plan(self, session):
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = _fetch_remote_state(session, manifest)
@@ -619,7 +508,7 @@ class Blueprint:
         # TODO: clean up urn vs urn_str madness
 
         """
-            At this point, we have a list of resource changes as a part of the plan. Each is one of:
+            At this point, we have a list of actions as a part of the plan. Each action is one of:
                 1. [ADD] action (CREATE command)
                 2. [CHANGE] action (one or many ALTER or SET PARAMETER commands)
                 3. [REMOVE] action (DROP command, REVOKE command, or a rename operation)
@@ -642,46 +531,44 @@ class Blueprint:
         # print(self._staged)
         # print(plan)
 
-        action_queue: List[str] = []
+        action_queue = []
         actions_taken = []
 
-        for resource_change in plan:
-            if resource_change.action == DiffAction.REMOVE:
-                action_queue.append(
-                    (resource_change.urn, lifecycle.drop_resource(resource_change, resource_change.old_value))
-                )
-            elif resource_change.action == DiffAction.ADD:
-                props = Resource.props_for_resource_type(resource_change.urn.resource_type, resource_change.new_value)
+        def _queue_action(urn, data, props):
+            if action == DiffAction.ADD:
                 switch_to_role = None
-                if "owner" in resource_change.new_value:
-                    switch_to_role = resource_change.new_value["owner"]
-                elif resource_change.urn.resource_type == ResourceType.FUTURE_GRANT:
+                if "owner" in data:
+                    switch_to_role = data["owner"]
+                elif urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
                     switch_to_role = "SECURITYADMIN"
                 if switch_to_role and switch_to_role in usable_roles:
-                    action_queue.append((resource_change.urn, f"USE ROLE {switch_to_role}"))
+                    action_queue.append(f"USE ROLE {switch_to_role}")
                 else:
-                    if "owner" not in resource_change.new_value:
-                        raise Exception(
-                            f"Role change required for {resource_change.urn} but, the owner is not specified"
-                        )
                     raise Exception(
-                        f"Role {resource_change.new_value['owner']} required for {resource_change.urn} but isn't available"
+                        f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available"
                     )
-                action_queue.extend((resource_change.urn, lifecycle.create_resource(resource_change, props)))
-            elif resource_change.action == DiffAction.CHANGE:
-                action_queue.extend((resource_change.urn, lifecycle.update_resource(resource_change, props)))
+                action_queue.append(lifecycle.create_resource(urn, data, props))
+            elif action == DiffAction.CHANGE:
+                action_queue.append(lifecycle.update_resource(urn, data, props))
+            elif action == DiffAction.REMOVE:
+                action_queue.append(lifecycle.drop_resource(urn, data))
+
+        for action, urn_str, data in plan:
+            urn = parse_URN(urn_str)
+            props = Resource.props_for_resource_type(urn.resource_type, data)
+            _queue_action(urn, data, props)
 
         while action_queue:
-            urn, sql = action_queue.pop(0)
+            sql = action_queue.pop(0)
             actions_taken.append(sql)
             try:
                 if not self._dry_run:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {str(urn)}, skipping...")
+                    print(f"Resource already exists: {urn_str}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {str(urn)}, skipping...")
+                    print(f"Invalid grant: {urn_str}, skipping...")
                 else:
                     raise err
         return actions_taken
@@ -719,7 +606,7 @@ class Blueprint:
             self._add(resource)
 
 
-def topological_sort(resource_set: set, references: set):
+def topological_sort(resource_set: set, references: list):
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
