@@ -590,7 +590,8 @@ class Blueprint:
             if switch_to_role and switch_to_role in usable_roles:
                 action_queue.append(f"USE ROLE {switch_to_role}")
             else:
-                raise Exception(f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available")
+                # raise Exception(f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available")
+                print(f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available")
             if action == DiffAction.ADD:
                 action_queue.append(lifecycle.create_resource(urn, data, props))
             elif action == DiffAction.CHANGE:
