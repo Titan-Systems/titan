@@ -175,7 +175,9 @@ class Resource(metaclass=_Resource):
             if self.spec:
                 field_names = [field.name for field in fields(self.spec)]
                 suggestions = _suggest_correct_kwargs(expected_kwargs=field_names, passed_kwargs=kwargs.keys())
-                raise ValueError(f"Unexpected kwargs {kwargs}, did you mean {suggestions}?")
+                raise ValueError(
+                    f"Unexpected kwargs {kwargs}, did you mean {suggestions}? Valid field names: {field_names}"
+                )
             else:
                 raise ValueError(f"Unexpected kwargs {kwargs}")
 

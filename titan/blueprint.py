@@ -582,18 +582,16 @@ class Blueprint:
         actions_taken = []
 
         def _queue_action(urn, data, props):
+            switch_to_role = None
+            if "owner" in data:
+                switch_to_role = data["owner"]
+            elif urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
+                switch_to_role = "SECURITYADMIN"
+            if switch_to_role and switch_to_role in usable_roles:
+                action_queue.append(f"USE ROLE {switch_to_role}")
+            else:
+                raise Exception(f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available")
             if action == DiffAction.ADD:
-                switch_to_role = None
-                if "owner" in data:
-                    switch_to_role = data["owner"]
-                elif urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
-                    switch_to_role = "SECURITYADMIN"
-                if switch_to_role and switch_to_role in usable_roles:
-                    action_queue.append(f"USE ROLE {switch_to_role}")
-                else:
-                    raise Exception(
-                        f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available"
-                    )
                 action_queue.append(lifecycle.create_resource(urn, data, props))
             elif action == DiffAction.CHANGE:
                 action_queue.append(lifecycle.update_resource(urn, data, props))
