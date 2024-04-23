@@ -50,18 +50,17 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
 
 
 def create_future_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
-    in_type, in_name = urn.fqn.params["in"].split("/")
-    on_type, privs = list(data.items())[0]
+    on_type = data["on_type"]
     if "INTEGRATION" in on_type:
         on_type = "INTEGRATION"
     return tidy_sql(
         "GRANT",
-        privs[0],
+        data["priv"],
         "ON FUTURE",
         pluralize(on_type).upper(),
         "IN",
-        in_type,
-        in_name,
+        data["in_type"],
+        data["in_name"],
         "TO ROLE",
         urn.fqn.name,
         # props.render(data), #TODO grant option

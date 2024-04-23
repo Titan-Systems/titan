@@ -43,7 +43,8 @@ def _filter_result(result, **kwargs):
     filtered = []
     for row in result:
         for key, value in kwargs.items():
-            if key == "name":
+            # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
+            if key.endswith("name"):
                 if ResourceName(row[key]) != ResourceName(value):
                     break
             else:
@@ -368,14 +369,13 @@ def fetch_future_grant(session, fqn: FQN):
             return None
         raise
 
-    in_type, in_name = fqn.params["on"].split("/")
+    in_type, name = fqn.params["on"].split("/")
+    in_name = name.split(".")[0]
 
-    # grantee_name = fqn.name
     grants = _filter_result(
         show_result,
-        # grant_on=grant_on,
         privilege=fqn.params["priv"],
-        name=in_name,
+        name=name,
         grant_to="ROLE",
         grantee_name=fqn.name,
     )
@@ -387,24 +387,11 @@ def fetch_future_grant(session, fqn: FQN):
 
     data = grants[0]
 
-    # grant_block = {}
-
-    # for grant in grants:
-    #     grant_in_name = grant["name"].split(".<")[0]
-    #     if in_name != grant_in_name:
-    #         continue
-    #     on_type = grant["grant_on"].lower()
-    #     if on_type not in grant_block:
-    #         grant_block[on_type] = []
-    #     grant_block[on_type].append(grant["privilege"])
-
-    # return grant_block
-
     return {
         "priv": data["privilege"],
         "on_type": data["grant_on"],
-        "in_type": fqn.params["in_type"],
-        "in_name": fqn.params["in_name"],
+        "in_type": in_type,
+        "in_name": in_name,
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
     }

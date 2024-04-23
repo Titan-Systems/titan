@@ -380,14 +380,14 @@ class FutureGrant(Resource):
         return self._data.to
 
 
-def future_grant_fqn(grant: _FutureGrant):
-    in_type = resource_label_for_type(grant.in_type)
-    in_name = grant.in_name
-    on_type = resource_label_for_type(grant.on_type)
+def future_grant_fqn(data: _FutureGrant):
+    in_type = resource_label_for_type(data.in_type)
+    in_name = data.in_name
+    on_type = resource_label_for_type(data.on_type).upper()
     return FQN(
-        name=grant.to.name,
+        name=data.to.name,
         params={
-            "priv": grant.priv,
+            "priv": data.priv,
             "on": f"{in_type}/{in_name}.<{on_type}>",
         },
     )
