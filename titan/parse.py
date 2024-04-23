@@ -639,6 +639,7 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
     raise Exception(f"Failed to parse identifier: {identifier}")
 
 
+# NOTE: can't put this into identifiers.py:URN because of circular import
 def parse_URN(urn_str: str) -> URN:
     parts = urn_str.split(":")
     if len(parts) != 4:

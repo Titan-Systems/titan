@@ -30,6 +30,20 @@ class FQN:
         self.arg_types = arg_types
         self.params = params
 
+    def __eq__(self, other):
+        if not isinstance(other, FQN):
+            return False
+        return (
+            self.name == other.name
+            and self.database == other.database
+            and self.schema == other.schema
+            and self.arg_types == other.arg_types
+            and self.params == other.params
+        )
+
+    def __hash__(self):
+        return hash((self.name, self.database, self.schema, tuple(self.arg_types), tuple(self.params.items())))
+
     def __str__(self):
         db = f"{self.database}." if self.database else ""
         schema = f"{self.schema}." if self.schema else ""
@@ -70,6 +84,18 @@ class URN:
         self.fqn: FQN = fqn
         self.account_locator: str = account_locator
         self.organization: str = ""
+
+    def __eq__(self, other):
+        if not isinstance(other, URN):
+            return False
+        return (
+            self.resource_type == other.resource_type
+            and self.fqn == other.fqn
+            and self.account_locator == other.account_locator
+        )
+
+    def __hash__(self):
+        return hash((self.resource_type, self.fqn, self.account_locator))
 
     def __str__(self):
         return f"urn:{self.organization}:{self.account_locator}:{self.resource_label}/{self.fqn}"
