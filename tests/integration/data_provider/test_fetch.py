@@ -230,6 +230,18 @@ scoped_resources = [
             "columns": [{"name": "ID", "nullable": True, "data_type": "NUMBER(38,0)"}],
         },
     },
+    {
+        "resource_type": ResourceType.TASK,
+        "setup_sql": "CREATE TASK sometask SCHEDULE = '60 MINUTE' AS SELECT 1",
+        "teardown_sql": "DROP TASK IF EXISTS sometask",
+        "data": {
+            "name": "SOMETASK",
+            "owner": TEST_ROLE,
+            "schedule": "60 MINUTE",
+            "state": "SUSPENDED",
+            "as_": "SELECT 1",
+        },
+    },
 ]
 
 grants = [

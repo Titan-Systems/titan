@@ -1,0 +1,18 @@
+{
+    "name": "SOMETASK",
+    "schedule": "60 MINUTE",
+    "state": "SUSPENDED",
+    "as_": "SELECT 1",
+    "after": null,
+    "allow_overlapping_execution": null,
+    "comment": null,
+    "config": null,
+    "copy_grants": null,
+    "error_integration": null,
+    "owner": "SYSADMIN",
+    "suspend_task_after_num_failures": null,
+    "user_task_managed_initial_warehouse_size": null,
+    "user_task_timeout_ms": null,
+    "warehouse": null,
+    "when": null
+}

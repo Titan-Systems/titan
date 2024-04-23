@@ -739,13 +739,14 @@ def fetch_event_table(session, fqn: FQN):
 
 
 def fetch_task(session, fqn: FQN):
-    tasks = execute(session, f"SHOW TASKS LIKE '{fqn.name}' in schema {fqn.database}.{fqn.schema}", cacheable=True)
-    if len(tasks) == 0:
+    show_result = execute(session, f"SHOW TASKS IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True)
+
+    if len(show_result) == 0:
         return None
-    if len(tasks) > 1:
+    if len(show_result) > 1:
         raise Exception(f"Found multiple tasks matching {fqn}")
 
-    data = tasks[0]
+    data = show_result[0]
     task_details_result = execute(session, f"DESC TASK {fqn.database}.{fqn.schema}.{fqn.name}", cacheable=True)
     if len(task_details_result) == 0:
         raise Exception(f"Failed to fetch task details for {fqn}")

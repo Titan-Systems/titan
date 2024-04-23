@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec
 from .column import Column
@@ -144,11 +144,12 @@ class Table(Resource):
     def table_stage(self):
         return self._table_stage
 
+
 @dataclass(unsafe_hash=True)
 class _CreateTableAsSelect(ResourceSpec):
     name: str
-    as_: str = None
-    columns: list[Column] = None
+    as_: str = field(default_factory=None, metadata={"triggers_replacement": True})
+    columns: list[Column] = field(default_factory=None, metadata={"triggers_replacement": True})
     cluster_by: list[str] = None
     copy_grants: bool = False
     row_access_policy: dict[str, list] = None
@@ -213,8 +214,9 @@ class CreateTableAsSelect(Resource):
 
 # there's no detectable difference between a table created with CTAS and a table created with a regular CREATE TABLE
 def _resolver(data: dict):
-    if 'as_' in data:
+    if "as_" in data:
         return CreateTableAsSelect
     return Table
+
 
 Resource.__resolvers__[ResourceType.TABLE] = _resolver

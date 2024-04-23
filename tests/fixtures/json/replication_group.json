@@ -15,5 +15,6 @@
         "myorg.myaccount2"
     ],
     "ignore_edition_check": null,
-    "replication_schedule": "10 MINUTE"
+    "replication_schedule": "10 MINUTE",
+    "owner": "SYSADMIN"
 }

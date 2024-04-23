@@ -3,6 +3,7 @@ import sys
 from inflection import pluralize
 
 from .builder import tidy_sql
+from .enums import ResourceType
 from .identifiers import URN
 from .props import Props
 
@@ -95,22 +96,6 @@ def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool)
     )
 
 
-# def create_task(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
-#     raise NotImplementedError
-# # we need to track the state of the task, but it's not a creatable property
-# if 'state' in resource_change.new_value:
-#     resource_change.new_value.pop('state')
-# return create__default(resource_change, props, if_not_exists)
-
-
-# def create_schema(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
-# raise NotImplementedError
-# if "name" in resource_change.new_value and resource_change.new_value["name"] == "PUBLIC":
-#     # these updates could be superfluous, since the original plan was to create
-#     return update_schema(resource_change, props)
-# return create__default(resource_change, props, if_not_exists)
-
-
 def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     return tidy_sql(
         "GRANT",
@@ -162,9 +147,8 @@ def update__default(urn: URN, data: dict, props: Props) -> str:
 
 
 def update_event_table(urn: URN, data: dict, props: Props) -> str:
-    raise NotImplementedError
-    # resource_change.urn.resource_type = "TABLE" # when event tables are being altered, they are just tables (Unsupported feature 'EVENT')
-    # return update__default(resource_change, props)
+    new_urn = URN(ResourceType.TABLE, urn.fqn, urn.account_locator)
+    return update__default(new_urn, data, props)
 
 
 def update_procedure(urn: URN, data: dict, props: Props) -> str:
@@ -200,24 +184,6 @@ def update_schema(urn: URN, data: dict, props: Props) -> str:
     else:
         new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
         return tidy_sql("ALTER SCHEMA", urn.fqn, "SET", attr, "=", new_value)
-
-
-def update_stream(urn: URN, data: dict, props: Props) -> str:
-    raise NotImplementedError
-    # # not the best place to handle this, instead properties should be tagged such that a difference isn't generated
-    # if "show_initial_rows" in resource_change.new_value:
-    #     resource_change.new_value.pop("show_initial_rows")
-    # return update__default(resource_change, props)
-
-
-def update_table(urn: URN, data: dict, props: Props) -> str:
-    raise NotImplementedError
-    # # not the best place to handle this, instead properties should be tagged such that a difference isn't generated
-    # if 'as_' in resource_change.new_value:
-    #     resource_change.new_value.pop('as_')
-    # if 'columns' in resource_change.new_value and resource_change.new_value['columns'] is None:
-    #     resource_change.new_value.pop('columns')
-    # return update__default(resource_change, props)
 
 
 def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:
