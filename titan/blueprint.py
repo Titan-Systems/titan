@@ -33,8 +33,8 @@ class MissingPrivilegeException(Exception):
 
 
 class RunMode(ParseableEnum):
-    CREATE_OR_UPDATE = "create-or-update"
-    FULLY_MANAGED = "fully-managed"
+    CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
+    FULLY_MANAGED = "FULLY-MANAGED"
 
 
 @dataclass
