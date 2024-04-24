@@ -463,7 +463,10 @@ class Blueprint:
                     )
                 if change.action == DiffAction.CHANGE:
                     if "owner" in change.delta:
-                        exceptions.append(f"Create-or-update mode does not allow ownership changes (ref: {change.urn})")
+                        change_debug = f"{change.before['owner']} => {change.delta['owner']}"
+                        exceptions.append(
+                            f"Create-or-update mode does not allow ownership changes (resource: {change.urn}, owner: {change_debug})"
+                        )
                     elif "name" in change.delta:
                         exceptions.append(
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
