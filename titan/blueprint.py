@@ -7,7 +7,7 @@ import snowflake.connector
 from . import data_provider, lifecycle
 from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
 from .diff import diff, DiffAction
-from .enums import ResourceType
+from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
 from .parse import parse_URN
@@ -30,6 +30,11 @@ State = dict
 
 class MissingPrivilegeException(Exception):
     pass
+
+
+class RunMode(ParseableEnum):
+    CREATE_OR_UPDATE = "create-or-update"
+    FULLY_MANAGED = "fully-managed"
 
 
 @dataclass
@@ -414,19 +419,21 @@ class Blueprint:
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
         resources: List[Resource] = [],
+        run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
         allow_role_switching: bool = True,
-        enforce_requirements: bool = False,
-        resource_types: List[ResourceType] = [],
+        allowed_resources: List[ResourceType] = [],
     ) -> None:
+        # TODO: input validation
+
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
         self._account_locator: str = None
+        self._run_mode: RunMode = run_mode
         self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
-        self._enforce_requirements: bool = enforce_requirements
-        self._resource_types: List[ResourceType] = resource_types
+        self._allowed_resources: List[ResourceType] = allowed_resources
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -441,6 +448,41 @@ class Blueprint:
 
         self.add(resources or [])
         self.add([res for res in [self.account, self.database, self.schema] if res is not None])
+
+    def _raise_for_nonconforming_plan(self, plan: Plan):
+        exceptions = []
+
+        # Run Mode exceptions
+        if self._run_mode == RunMode.FULLY_MANAGED:
+            return
+        elif self._run_mode == RunMode.CREATE_OR_UPDATE:
+            for change in plan:
+                if change.action == DiffAction.REMOVE:
+                    exceptions.append(
+                        f"Create-or-update mode does not allow resources to be removed (ref: {change.urn})"
+                    )
+                if change.action == DiffAction.CHANGE:
+                    if "owner" in change.delta:
+                        exceptions.append(f"Create-or-update mode does not allow ownership changes (ref: {change.urn})")
+                    elif "name" in change.delta:
+                        exceptions.append(
+                            f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
+                        )
+        else:
+            raise Exception(f"Unsupported run mode {self._run_mode}")
+
+        # Allowed Resources exceptions
+        if self._allowed_resources:
+            for change in plan:
+                if change.urn.resource_type not in self._allowed_resources:
+                    exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
+
+        if exceptions:
+            if len(exceptions) > 5:
+                exception_block = "\n".join(exceptions[0:5]) + f"\n... and {len(exceptions) - 5} more"
+            else:
+                exception_block = "\n".join(exceptions)
+            raise Exception("Non-conforming actions found in plan:\n" + exception_block)
 
     def _finalize(self, session_context: dict):
         """
@@ -569,7 +611,9 @@ class Blueprint:
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = _fetch_remote_state(session, manifest)
-        return _plan(remote_state, manifest)
+        completed_plan = _plan(remote_state, manifest)
+        self._raise_for_nonconforming_plan(completed_plan)
+        return completed_plan
 
     def apply(self, session, plan: Plan = None):
         if plan is None:
