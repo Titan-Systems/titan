@@ -1,6 +1,6 @@
 from enum import Enum
 
-from .resource_name import ResourceName
+from .resource_name import ResourceName, attribute_is_resource_name
 
 
 class DiffAction(Enum):
@@ -10,10 +10,10 @@ class DiffAction(Enum):
 
 
 def eq(lhs, rhs, key):
-    special_cases = {"args", "name"}
-
-    if key not in special_cases:
-        return lhs == rhs
+    if attribute_is_resource_name(key):
+        if lhs is None or rhs is None:
+            return lhs == rhs
+        return ResourceName(lhs) == ResourceName(rhs)
     elif key == "args":
         # Ignore arg defaults
         def _scrub_defaults(args):
@@ -27,8 +27,8 @@ def eq(lhs, rhs, key):
         lhs_copy = _scrub_defaults(lhs)
         rhs_copy = _scrub_defaults(rhs)
         return lhs_copy == rhs_copy
-    elif key == "name":
-        return ResourceName(lhs) == ResourceName(rhs)
+    else:
+        return lhs == rhs
 
 
 def dict_delta(original, new):

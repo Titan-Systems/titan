@@ -18,7 +18,7 @@ from .parse import (
     parse_identifier,
     parse_function_name,
 )
-from .resource_name import ResourceName
+from .resource_name import ResourceName, attribute_is_resource_name
 
 
 __this__ = sys.modules[__name__]
@@ -44,7 +44,7 @@ def _filter_result(result, **kwargs):
     for row in result:
         for key, value in kwargs.items():
             # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
-            if key.endswith("name"):
+            if attribute_is_resource_name(key):
                 if ResourceName(row[key]) != ResourceName(value):
                     break
             else:

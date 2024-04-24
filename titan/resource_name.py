@@ -5,6 +5,10 @@ import pyparsing as pp
 from .parse import FullyQualifiedIdentifier
 
 
+def attribute_is_resource_name(attribute: str) -> bool:
+    return attribute == "name" or attribute.endswith("_name")
+
+
 class ResourceName:
     def __init__(self, name: Union[str, "ResourceName"]) -> None:
         if isinstance(name, ResourceName):

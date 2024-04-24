@@ -83,3 +83,20 @@ def test_blueprint_plan_no_changes(cursor, user, role):
 #     marked_for_cleanup.append(res)
 #     with pytest.raises(MissingPrivilegeException):
 #         bp.apply(cursor.connection)
+
+
+@pytest.mark.requires_snowflake
+def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
+
+    # Create user
+    user_name = f"TEST_USER_{suffix}_NAME_EQUIVALENCE".upper()
+    user = User(name=user_name, login_name="ALL_UPPERCASE", owner="ACCOUNTADMIN")
+    cursor.execute(user.create_sql())
+    marked_for_cleanup.append(user)
+
+    session = cursor.connection
+    blueprint = Blueprint(name="test_name_equivalence_drift")
+    blueprint.add(User(name=user_name, login_name="all_uppercase", owner="ACCOUNTADMIN"))
+    plan = blueprint.plan(session)
+
+    assert len(plan) == 0, "Expected no changes in the blueprint plan but found some."
