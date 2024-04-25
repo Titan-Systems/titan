@@ -132,61 +132,6 @@ def _split_by_scope(
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
-def _plan(remote_state: State, manifest: Manifest) -> Plan:
-    manifest = manifest.copy()
-    refs = manifest.pop("_refs")
-    urns = manifest.pop("_urns")
-
-    # Generate a list of all URNs
-    resource_set = set(urns + list(remote_state.keys()))
-
-    for ref in refs:
-        resource_set.add(ref[0])
-        resource_set.add(ref[1])
-
-    # Calculate a topological sort order for the URNs
-    sort_order = topological_sort(resource_set, refs)
-
-    # Once sorting is done, remove the _refs and _urns keys from the manifest
-
-    changes: Plan = []
-    marked_for_replacement = set()
-    for action, urn_str, delta in diff(remote_state, manifest):
-        urn = parse_URN(urn_str)
-        before = remote_state.get(urn_str, {})
-        after = manifest.get(urn_str, {})
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type, before)
-
-        # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
-        #     for on_type, privs in data.items():
-        #         privs_to_add = privs
-        #         if action == DiffAction.CHANGE:
-        #             privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
-        #         for priv in privs_to_add:
-        #             changes.append(ResourceChange(action=DiffAction.ADD, urn=urn_str, before={}, after={}, delta={on_type: [priv]}))
-        if action == DiffAction.CHANGE:
-            if urn in marked_for_replacement:
-                continue
-
-            # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
-            attr = list(delta.keys())[0]
-            attr_metadata = resource_cls.spec.get_metadata(attr)
-            if attr_metadata.get("triggers_replacement", False):
-                marked_for_replacement.add(urn)
-            else:
-                changes.append(ResourceChange(action, urn, before, after, delta))
-        elif action == DiffAction.ADD:
-            changes.append(ResourceChange(action=action, urn=urn, before={}, after=after, delta=delta))
-        elif action == DiffAction.REMOVE:
-            changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
-
-    for urn in marked_for_replacement:
-        changes.append(ResourceChange(action=DiffAction.REMOVE, urn=urn, before=before, after={}, delta={}))
-        changes.append(ResourceChange(action=DiffAction.ADD, urn=urn, before={}, after=after, delta=after))
-
-    return sorted(changes, key=lambda change: sort_order[str(change.urn)])
-
-
 def _walk(resource: Resource):
     yield resource
     if isinstance(resource, ResourceContainer):
@@ -422,7 +367,8 @@ class Blueprint:
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
         allow_role_switching: bool = True,
-        allowed_resources: List[ResourceType] = [],
+        ignore_ownership: bool = True,
+        valid_resource_types: List[ResourceType] = [],
     ) -> None:
         # TODO: input validation
 
@@ -433,7 +379,8 @@ class Blueprint:
         self._run_mode: RunMode = run_mode
         self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
-        self._allowed_resources: List[ResourceType] = allowed_resources
+        self._ignore_ownership: bool = ignore_ownership
+        self._valid_resource_types: List[ResourceType] = valid_resource_types
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -474,10 +421,10 @@ class Blueprint:
         else:
             raise Exception(f"Unsupported run mode {self._run_mode}")
 
-        # Allowed Resources exceptions
-        if self._allowed_resources:
+        # Valid Resource Types exceptions
+        if self._valid_resource_types:
             for change in plan:
-                if change.urn.resource_type not in self._allowed_resources:
+                if change.urn.resource_type not in self._valid_resource_types:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
         if exceptions:
@@ -486,6 +433,62 @@ class Blueprint:
             else:
                 exception_block = "\n".join(exceptions)
             raise Exception("Non-conforming actions found in plan:\n" + exception_block)
+
+    def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
+        manifest = manifest.copy()
+        refs = manifest.pop("_refs")
+        urns = manifest.pop("_urns")
+
+        # Generate a list of all URNs
+        resource_set = set(urns + list(remote_state.keys()))
+
+        for ref in refs:
+            resource_set.add(ref[0])
+            resource_set.add(ref[1])
+
+        # Calculate a topological sort order for the URNs
+        sort_order = topological_sort(resource_set, refs)
+
+        # Once sorting is done, remove the _refs and _urns keys from the manifest
+
+        changes: Plan = []
+        marked_for_replacement = set()
+        for action, urn_str, delta in diff(remote_state, manifest):
+            urn = parse_URN(urn_str)
+            before = remote_state.get(urn_str, {})
+            after = manifest.get(urn_str, {})
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, before)
+
+            # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
+            #     for on_type, privs in data.items():
+            #         privs_to_add = privs
+            #         if action == DiffAction.CHANGE:
+            #             privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
+            #         for priv in privs_to_add:
+            #             changes.append(ResourceChange(action=DiffAction.ADD, urn=urn_str, before={}, after={}, delta={on_type: [priv]}))
+            if action == DiffAction.CHANGE:
+                if urn in marked_for_replacement:
+                    continue
+
+                # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
+                attr = list(delta.keys())[0]
+                attr_metadata = resource_cls.spec.get_metadata(attr)
+                if attr_metadata.get("triggers_replacement", False):
+                    marked_for_replacement.add(urn)
+                elif attr == "owner" and self._ignore_ownership:
+                    continue
+                else:
+                    changes.append(ResourceChange(action, urn, before, after, delta))
+            elif action == DiffAction.ADD:
+                changes.append(ResourceChange(action=action, urn=urn, before={}, after=after, delta=delta))
+            elif action == DiffAction.REMOVE:
+                changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
+
+        for urn in marked_for_replacement:
+            changes.append(ResourceChange(action=DiffAction.REMOVE, urn=urn, before=before, after={}, delta={}))
+            changes.append(ResourceChange(action=DiffAction.ADD, urn=urn, before={}, after=after, delta=after))
+
+        return sorted(changes, key=lambda change: sort_order[str(change.urn)])
 
     def _finalize(self, session_context: dict):
         """
@@ -614,7 +617,7 @@ class Blueprint:
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = _fetch_remote_state(session, manifest)
-        completed_plan = _plan(remote_state, manifest)
+        completed_plan = self._plan(remote_state, manifest)
         self._raise_for_nonconforming_plan(completed_plan)
         return completed_plan
 
