@@ -96,6 +96,28 @@ def print_plan(plan: Plan):
         print("}")
 
 
+def plan_sql(plan: Plan):
+    """
+    Generate SQL commands based on the plan provided.
+
+    Args:
+    plan (Plan): The plan containing changes to be applied to the database.
+
+    Returns:
+    List[str]: A list of SQL commands to be executed.
+    """
+    sql_commands = []
+    for change in plan:
+        props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+        if change.action == DiffAction.ADD:
+            sql_commands.append(lifecycle.create_resource(change.urn, change.after, props))
+        elif change.action == DiffAction.CHANGE:
+            sql_commands.append(lifecycle.update_resource(change.urn, change.delta, props))
+        elif change.action == DiffAction.REMOVE:
+            sql_commands.append(lifecycle.drop_resource(change.urn, change.before))
+    return sql_commands
+
+
 def print_diffs(diffs):
     for action, target, deltas in diffs:
         print(f"[{action}]", target)

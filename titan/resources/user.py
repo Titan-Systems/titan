@@ -126,3 +126,7 @@ class User(Resource):
     @property
     def name(self):
         return self._data.name
+
+    @property
+    def owner(self):
+        return self._data.owner

@@ -1,7 +1,7 @@
 import pytest
 
-from titan import Blueprint, User, Role, RoleGrant, data_provider
-from titan.blueprint import MissingPrivilegeException
+from titan import Blueprint, Database, User, Role, RoleGrant, data_provider
+from titan.blueprint import plan_sql
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -100,3 +100,23 @@ def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
     plan = blueprint.plan(session)
 
     assert len(plan) == 0, "Expected no changes in the blueprint plan but found some."
+
+
+def test_blueprint_plan_sql(cursor, user):
+    session = cursor.connection
+
+    blueprint = Blueprint(name="test_add_database")
+    somedb = Database(name="somedb")
+    blueprint.add(somedb)
+    plan = blueprint.plan(session)
+
+    assert plan_sql(plan) == [
+        "CREATE DATABASE SOMEDB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+    ]
+
+    blueprint = Blueprint(name="test_modify_user")
+    modified_user = User(name=user.name, owner=user.owner, display_name="new_display_name")
+    blueprint.add(modified_user)
+    plan = blueprint.plan(session)
+
+    assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
