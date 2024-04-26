@@ -11,6 +11,7 @@ from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
 from .parse import parse_URN
+from .lifecycle import ResourceChange
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
@@ -651,7 +652,7 @@ class Blueprint:
         # TODO: clean up urn vs urn_str madness
 
         """
-            At this point, we have a list of actions as a part of the plan. Each action is one of:
+            At this point, we have a list of resource changes as a part of the plan. Each is one of:
                 1. [ADD] action (CREATE command)
                 2. [CHANGE] action (one or many ALTER or SET PARAMETER commands)
                 3. [REMOVE] action (DROP command, REVOKE command, or a rename operation)
@@ -699,7 +700,7 @@ class Blueprint:
             _queue_action(change, props)
 
         while action_queue:
-            sql = action_queue.pop(0)
+            urn,sql = action_queue.pop(0)
             actions_taken.append(sql)
             try:
                 if not self._dry_run:
