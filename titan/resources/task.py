@@ -54,7 +54,6 @@ class Task(Resource):
         comment=StringProp("comment"),
         after=StringListProp("after", eq=False),
         when=ExpressionProp("when"),
-        state=EnumProp("state", TaskState),
         as_=QueryProp("as"),
     )
     scope = SchemaScope()

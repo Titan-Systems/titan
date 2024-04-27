@@ -1,6 +1,4 @@
 from enum import Enum
-from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List
 
 from .resource_name import ResourceName, attribute_is_resource_name
 
@@ -9,20 +7,6 @@ class DiffAction(Enum):
     ADD = "add"
     REMOVE = "remove"
     CHANGE = "change"
-
-@dataclass(unsafe_hash=True)
-class DictDiff:
-    """
-    Represents a change between two dictionaries.
-    action: The type of change (add, remove, change)
-    key: The key in the dictionary that changed
-    old_value: The old value (or None if the change is an add)
-    new_value: The new value (or None if the change is a remove)
-    """
-    action: DiffAction
-    key: str
-    old_value: Any = None
-    new_value: Any = None
 
 
 def eq(lhs, rhs, key):
@@ -47,7 +31,7 @@ def eq(lhs, rhs, key):
         return lhs == rhs
 
 
-def dict_delta(original:Dict, new:Dict) -> Dict:
+def dict_delta(original, new):
     original_keys = set(original.keys())
     new_keys = set(new.keys())
 
@@ -66,17 +50,13 @@ def dict_delta(original:Dict, new:Dict) -> Dict:
     return delta
 
 
-def diff(original:Dict[str,Dict], new:Dict[str,Dict]) -> Iterable[DictDiff]:
-    """
-    Generates a list of differences between the remote state ("original") and the manifest ("new").
-    Both are dictionaries keyed on the resource URN.
-    """
+def diff(original, new):
     original_keys = set(original.keys())
     new_keys = set(new.keys())
 
     # Resources in remote state but not in the manifest should be removed
     for key in original_keys - new_keys:
-        yield DictDiff(action=DiffAction.REMOVE, key=key, old_value=original[key])
+        yield DiffAction.REMOVE, key, original[key]
 
     # Resources in the manifest but not in remote state should be added
     for key in new_keys - original_keys:
@@ -84,9 +64,9 @@ def diff(original:Dict[str,Dict], new:Dict[str,Dict]) -> Iterable[DictDiff]:
             raise Exception(f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {key}")
         elif isinstance(new[key], list):
             for item in new[key]:
-                yield DictDiff(action=DiffAction.ADD, key=key, new_value=item)
+                yield DiffAction.ADD, key, item
         else:
-            yield DictDiff(action=DiffAction.ADD, key=key, new_value=new[key])
+            yield DiffAction.ADD, key, new[key]
 
     # Resources in both should be compared
     for key in original_keys & new_keys:
@@ -98,15 +78,14 @@ def diff(original:Dict[str,Dict], new:Dict[str,Dict]) -> Iterable[DictDiff]:
             delta = dict_delta(original[key], new[key])
 
             for attr, value in delta.items():
-                yield DictDiff(action=DiffAction.CHANGE, key=key, old_value=original[key][attr], new_value=new[key][attr])
+                yield DiffAction.CHANGE, key, {attr: value}
 
         elif isinstance(original[key], list):
 
             for item in original[key]:
                 if item not in new[key]:
-                    yield DictDiff(action=DiffAction.REMOVE, key=key, old_value=item)
+                    yield DiffAction.REMOVE, key, item
 
             for item in new[key]:
                 if item not in original[key]:
-                    yield DictDiff(action=DiffAction.ADD, key=key, new_value=item)
-
+                    yield DiffAction.ADD, key, item

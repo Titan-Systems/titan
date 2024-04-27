@@ -7,11 +7,9 @@ from itertools import chain
 
 import pyparsing as pp
 
-from titan.diff import DiffAction
-
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
-from ..lifecycle import ResourceChange, create_resource, drop_resource
+from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 from ..resource_name import ResourceName
@@ -300,7 +298,8 @@ class Resource(metaclass=_Resource):
 
     def create_sql(self, **kwargs):
         return create_resource(
-            ResourceChange(action=DiffAction.ADD, urn=self.urn, new_value=self.to_dict()),
+            self.urn,
+            self.to_dict(),
             self.props,
             **kwargs,
         )
