@@ -7,6 +7,7 @@ from titan.identifiers import FQN, URN
 from tests.helpers import STATIC_RESOURCES
 from titan.parse import parse_identifier
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
+from titan.resource_name import ResourceName
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -65,13 +66,13 @@ account_resources = [
     },
     {
         "resource_type": ResourceType.USER,
-        "setup_sql": "CREATE USER someuser",
-        "teardown_sql": "DROP USER IF EXISTS someuser",
+        "setup_sql": 'CREATE USER "someuser@applytitan.com"',
+        "teardown_sql": 'DROP USER "someuser@applytitan.com"',
         "data": {
-            "name": "SOMEUSER",
+            "name": "someuser@applytitan.com",
             "owner": TEST_ROLE,
-            "display_name": "SOMEUSER",
-            "login_name": "SOMEUSER",
+            "display_name": "someuser@applytitan.com",
+            "login_name": "SOMEUSER@APPLYTITAN.COM",
             "disabled": False,
             "must_change_password": False,
         },
@@ -229,6 +230,18 @@ scoped_resources = [
             "columns": [{"name": "ID", "nullable": True, "data_type": "NUMBER(38,0)"}],
         },
     },
+    {
+        "resource_type": ResourceType.TASK,
+        "setup_sql": "CREATE TASK sometask SCHEDULE = '60 MINUTE' AS SELECT 1",
+        "teardown_sql": "DROP TASK IF EXISTS sometask",
+        "data": {
+            "name": "SOMETASK",
+            "owner": TEST_ROLE,
+            "schedule": "60 MINUTE",
+            "state": "SUSPENDED",
+            "as_": "SELECT 1",
+        },
+    },
 ]
 
 grants = [
@@ -267,12 +280,11 @@ future_grants = [
         "data": {
             "priv": "USAGE",
             "on_type": "SCHEMA",
-            "in_type": "DATABASE",
+            "in_type": "database",
             "in_name": "STATIC_DATABASE",
-            "to": "thatrole",
+            "to": "THATROLE",
             "grant_option": False,
         },
-        "response": {"schema": ["USAGE"]},
     },
 ]
 
@@ -410,7 +422,7 @@ def future_grant_resource(request, cursor, account_locator):
 def test_fetch_account_resource(account_resource, cursor, account_locator):
 
     if "name" in account_resource["data"]:
-        fqn = parse_identifier(account_resource["data"]["name"])
+        fqn = FQN(name=ResourceName(account_resource["data"]["name"]))
     else:
         fqn = parse_identifier(account_resource["fqn"])
     urn = URN(
@@ -429,8 +441,7 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
 def test_fetch_grant(grant_resource, cursor):
     result = data_provider.fetch_resource(cursor, grant_resource["urn"])
     assert result is not None
-    assert len(result) == 1
-    result = data_provider.remove_none_values(result[0])
+    result = data_provider.remove_none_values(result)
     assert result == grant_resource["data"]
 
 
@@ -438,7 +449,7 @@ def test_fetch_grant(grant_resource, cursor):
 def test_fetch_future_grant(future_grant_resource, cursor):
     result = data_provider.fetch_resource(cursor, future_grant_resource["urn"])
     assert result is not None
-    assert result == future_grant_resource["response"]
+    assert result == future_grant_resource["data"]
 
 
 @pytest.mark.requires_snowflake

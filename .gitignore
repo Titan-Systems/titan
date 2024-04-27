@@ -164,3 +164,4 @@ cython_debug/
 .vscode/
 .packages/
 .build/
+SCRATCH.md

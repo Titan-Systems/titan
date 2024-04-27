@@ -11,6 +11,10 @@ def resource_label_for_type(resource_type: ResourceType) -> str:
     return str(resource_type).replace(" ", "_").lower()
 
 
+def resource_type_for_label(resource_label: str) -> ResourceType:
+    return ResourceType(resource_label.upper().replace("_", " "))
+
+
 class FQN:
     def __init__(
         self,
@@ -20,11 +24,25 @@ class FQN:
         arg_types: Optional[list] = None,
         params: dict = {},
     ) -> None:
-        self.name = name.upper()
+        self.name = name
         self.database = database
         self.schema = schema
         self.arg_types = arg_types
         self.params = params
+
+    def __eq__(self, other):
+        if not isinstance(other, FQN):
+            return False
+        return (
+            self.name == other.name
+            and self.database == other.database
+            and self.schema == other.schema
+            and self.arg_types == other.arg_types
+            and self.params == other.params
+        )
+
+    def __hash__(self):
+        return hash((self.name, self.database, self.schema, tuple(self.arg_types), tuple(self.params.items())))
 
     def __str__(self):
         db = f"{self.database}." if self.database else ""
@@ -67,6 +85,18 @@ class URN:
         self.account_locator: str = account_locator
         self.organization: str = ""
 
+    def __eq__(self, other):
+        if not isinstance(other, URN):
+            return False
+        return (
+            self.resource_type == other.resource_type
+            and self.fqn == other.fqn
+            and self.account_locator == other.account_locator
+        )
+
+    def __hash__(self):
+        return hash((self.resource_type, self.fqn, self.account_locator))
+
     def __str__(self):
         return f"urn:{self.organization}:{self.account_locator}:{self.resource_label}/{self.fqn}"
 
@@ -78,8 +108,8 @@ class URN:
         return f"URN(urn:{org}:{acct}:{label}/{fqn})"
 
     @classmethod
-    def from_resource(cls, resource, **kwargs):
-        return cls(resource_type=resource.resource_type, fqn=resource.fqn, **kwargs)
+    def from_resource(cls, resource, account_locator: str = ""):
+        return cls(resource_type=resource.resource_type, fqn=resource.fqn, account_locator=account_locator)
 
     # @classmethod
     # def from_locator(cls, locator: "ResourceLocator"):

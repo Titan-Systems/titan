@@ -1,9 +1,16 @@
-from .resources import Database, Warehouse, Role, User, RoleGrant
+from .resources import (
+    Database,
+    Role,
+    RoleGrant,
+    Schema,
+    User,
+    Warehouse,
+)
 
 
-def role_grants_from_config(role_grants: list) -> list:
+def role_grants_from_config(role_grants_config: list) -> list:
     role_grants = []
-    for role_grant in role_grants:
+    for role_grant in role_grants_config:
         for user in role_grant.get("users", []):
             role_grants.append(
                 RoleGrant(
@@ -21,17 +28,32 @@ def role_grants_from_config(role_grants: list) -> list:
     return role_grants
 
 
-def collect_resources_from_config(config: dict):
-    databases = config.get("databases", [])
-    role_grants = config.get("role_grants", [])
-    roles = config.get("roles", [])
-    users = config.get("users", [])
-    warehouses = config.get("warehouses", [])
+def databases_from_config(databases_config: list) -> list:
+    databases = []
+    for database in databases_config:
+        schemas = database.pop("schemas", [])
+        db = Database(**database)
+        for schema in schemas:
+            db.add(Schema(**schema))
+        databases.append(db)
+    return databases
 
-    databases = [Database(**database) for database in databases]
-    users = [User(**user) for user in users]
-    roles = [Role(**role) for role in roles]
+
+def collect_resources_from_config(config: dict):
+    config = config.copy()
+    databases = config.pop("databases", [])
+    role_grants = config.pop("role_grants", [])
+    roles = config.pop("roles", [])
+    users = config.pop("users", [])
+    warehouses = config.pop("warehouses", [])
+
+    if config:
+        raise ValueError(f"Unknown keys in config: {config.keys()}")
+
+    databases = databases_from_config(databases)
     role_grants = role_grants_from_config(role_grants)
+    roles = [Role(**role) for role in roles]
+    users = [User(**user) for user in users]
     warehouses = [Warehouse(**warehouse) for warehouse in warehouses]
 
     return (

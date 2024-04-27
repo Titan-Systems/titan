@@ -1,17 +1,16 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 from queue import Queue
 
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, _EXECUTION_CACHE
-from .diff import DictDiff, diff, DiffAction
-from .enums import ResourceType
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
+from .diff import diff, DiffAction
+from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
 from .parse import parse_URN
-from .lifecycle import ResourceChange
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
@@ -25,9 +24,98 @@ from .resources import Account, Database, Schema
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
+Manifest = dict
+State = dict
+
 
 class MissingPrivilegeException(Exception):
     pass
+
+
+class RunMode(ParseableEnum):
+    CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
+    FULLY_MANAGED = "FULLY-MANAGED"
+
+
+@dataclass
+class ResourceChange:
+    action: DiffAction
+    urn: URN
+    before: dict
+    after: dict
+    delta: dict
+
+
+Plan = list[ResourceChange]
+
+
+def print_plan(plan: Plan):
+    """
+    account:ABC123
+
+    » role.transformer will be created
+
+    + role "urn::ABC123:role/transformer" {
+        + name  = "transformer"
+        + owner = "SYSADMIN"
+        }
+
+    + warehouse "urn::ABC123:warehouse/transforming" {
+        + name           = "transforming"
+        + owner          = "SYSADMIN"
+        + warehouse_type = "STANDARD"
+        + warehouse_size = "LARGE"
+        + auto_suspend   = 60
+        }
+
+    + grant "urn::ABC123:grant/..." {
+        + priv = "USAGE"
+        + on   = warehouse "transforming"
+        + to   = role "transformer
+        }
+
+    + grant "urn::ABC123:grant/..." {
+        + priv = "OPERATE"
+        + on   = warehouse "transforming"
+        + to   = role "transformer
+        }
+    """
+    for change in plan:
+        action_marker = ""
+        if change.action == DiffAction.ADD:
+            action_marker = "+"
+        elif change.action == DiffAction.CHANGE:
+            action_marker = "~"
+        elif change.action == DiffAction.REMOVE:
+            action_marker = "-"
+        # »
+        print(f"{action_marker} {change.urn}", "{")
+        key_length = max(len(key) for key in change.delta.keys())
+        for key, value in change.delta.items():
+            print(f"  + {key:<{key_length}} = {value}")
+        print("}")
+
+
+def plan_sql(plan: Plan):
+    """
+    Generate SQL commands based on the plan provided.
+
+    Args:
+    plan (Plan): The plan containing changes to be applied to the database.
+
+    Returns:
+    List[str]: A list of SQL commands to be executed.
+    """
+    sql_commands = []
+    for change in plan:
+        props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+        if change.action == DiffAction.ADD:
+            sql_commands.append(lifecycle.create_resource(change.urn, change.after, props))
+        elif change.action == DiffAction.CHANGE:
+            sql_commands.append(lifecycle.update_resource(change.urn, change.delta, props))
+        elif change.action == DiffAction.REMOVE:
+            sql_commands.append(lifecycle.drop_resource(change.urn, change.before))
+    return sql_commands
 
 
 def print_diffs(diffs):
@@ -66,59 +154,6 @@ def _split_by_scope(
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
-def _plan(remote_state, manifest) -> List[ResourceChange]:
-    manifest = manifest.copy()
-
-    # Generate a list of all URNs
-    resource_set = set(manifest["_urns"] + list(remote_state.keys()))
-
-    for ref in manifest["_refs"]:
-        resource_set.add(ref[0])
-        resource_set.add(ref[1])
-
-    # Calculate a topological sort order for the URNs
-    sort_order = topological_sort(resource_set, manifest["_refs"])
-
-    # Once sorting is done, remove the _refs and _urns keys from the manifest
-    del manifest["_refs"]
-    del manifest["_urns"]
-
-    changes:List[ResourceChange] = []
-    marked_for_replacement = set()
-    for dict_diff in diff(remote_state, manifest):
-        change = ResourceChange.from_diff(dict_diff)
-        urn_str = str(change.urn)
-
-        if change.urn.resource_type == ResourceType.FUTURE_GRANT and change.action in (DiffAction.ADD, DiffAction.CHANGE):
-            # Exclude Future Grants that are already in the remote state
-            for on_type, privs in change.new_value.items():
-                privs_to_add = privs
-                if change.action == DiffAction.CHANGE:
-                    privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
-                for priv in privs_to_add:
-                    change.new_value = {on_type: [priv]}
-                    changes.append(change)
-        elif change.action == DiffAction.CHANGE:
-            if urn_str in marked_for_replacement:
-                continue
-
-            # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
-            attr = list(change.new_value.keys())[0]
-            resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, remote_state[urn_str])
-            attr_metadata = resource_cls.spec.get_metadata(attr)
-            if attr_metadata.get("triggers_replacement", False):
-                marked_for_replacement.add(urn_str)
-            else:
-                changes.append(change)
-        else:
-            changes.append(change)
-
-    for urn_str in marked_for_replacement:
-        changes.append(ResourceChange(DiffAction.REMOVE, change.urn, remote_state[urn_str]))
-        changes.append(ResourceChange(DiffAction.ADD, change.urn, manifest[urn_str]))
-    return sorted(changes, key=lambda change: sort_order[change[1]])
-
-
 def _walk(resource: Resource):
     yield resource
     if isinstance(resource, ResourceContainer):
@@ -126,7 +161,7 @@ def _walk(resource: Resource):
             yield from _walk(item)
 
 
-def _collect_required_privs(session_ctx, plan) -> list:
+def _collect_required_privs(session_ctx: dict, plan: Plan) -> list:
     """
     For each action in the plan, generate a
     """
@@ -134,20 +169,20 @@ def _collect_required_privs(session_ctx, plan) -> list:
 
     account_urn = URN.from_session_ctx(session_ctx)
 
-    for action, urn_str, data in plan:
-        urn = parse_URN(urn_str)
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+    for change in plan:
+        # urn = parse_URN(urn_str)
+        resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
         # privs = []
         privs = And()
-        if action == DiffAction.ADD:
+        if change.action == DiffAction.ADD:
             # Special cases
 
             # GRANT ROLE
             # For example, to create a RoleGrant you need OWNERSHIP on the role.
-            if urn.resource_type == ResourceType.ROLE_GRANT:
+            if change.urn.resource_type == ResourceType.ROLE_GRANT:
                 role_urn = URN(
                     resource_type=ResourceType.ROLE,
-                    fqn=FQN(urn.fqn.name),
+                    fqn=FQN(change.urn.fqn.name),
                     account_locator=session_ctx["account_locator"],
                 )
                 privs = privs & (
@@ -156,27 +191,30 @@ def _collect_required_privs(session_ctx, plan) -> list:
 
             if isinstance(resource_cls.scope, DatabaseScope):
                 privs = privs & (
-                    LogicalGrant(urn.database(), DatabasePriv.USAGE)
-                    | LogicalGrant(urn.database(), DatabasePriv.OWNERSHIP)
+                    LogicalGrant(change.urn.database(), DatabasePriv.USAGE)
+                    | LogicalGrant(change.urn.database(), DatabasePriv.OWNERSHIP)
                 )
             elif isinstance(resource_cls.scope, SchemaScope):
                 privs = (
                     privs
                     & (
-                        LogicalGrant(urn.database(), DatabasePriv.USAGE)
-                        | LogicalGrant(urn.database(), DatabasePriv.OWNERSHIP)
+                        LogicalGrant(change.urn.database(), DatabasePriv.USAGE)
+                        | LogicalGrant(change.urn.database(), DatabasePriv.OWNERSHIP)
                     )
-                    & (LogicalGrant(urn.schema(), SchemaPriv.USAGE) | LogicalGrant(urn.schema(), SchemaPriv.OWNERSHIP))
+                    & (
+                        LogicalGrant(change.urn.schema(), SchemaPriv.USAGE)
+                        | LogicalGrant(change.urn.schema(), SchemaPriv.OWNERSHIP)
+                    )
                 )
 
-            create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(urn.resource_type)
+            create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(change.urn.resource_type)
             if create_priv:
                 if isinstance(create_priv, GlobalPriv):
                     principal = account_urn
                 elif isinstance(create_priv, DatabasePriv):
-                    principal = urn.database()
+                    principal = change.urn.database()
                 elif isinstance(create_priv, SchemaPriv):
-                    principal = urn.schema()
+                    principal = change.urn.schema()
                 else:
                     raise Exception(f"Unsupported privilege type {type(create_priv)}")
                 privs = privs & LogicalGrant(principal, create_priv)
@@ -186,7 +224,7 @@ def _collect_required_privs(session_ctx, plan) -> list:
     return required_priv_list
 
 
-def _collect_available_privs(session_ctx, session, plan, usable_roles):
+def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_roles: list[str]) -> dict:
     """
     The `priv_map` dictionary structure:
     {
@@ -238,38 +276,38 @@ def _collect_available_privs(session_ctx, session, plan, usable_roles):
                         pass
 
         # Implied privilege grants in the context of our plan
-        for action, urn_str, data in plan:
-            urn = parse_URN(urn_str)
+        for change in plan:
+            # urn = parse_URN(urn_str)
 
             # If we plan to add a new resource and we have the privs to create it, we can assume
             # that we have the OWNERSHIP priv on that resource
-            if action == DiffAction.ADD:
-                resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
-                create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(urn.resource_type)
+            if change.action == DiffAction.ADD:
+                resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
+                create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(change.urn.resource_type)
                 if create_priv is None:
                     continue
 
                 if isinstance(resource_cls.scope, AccountScope):
                     parent_urn = account_urn
                 elif isinstance(resource_cls.scope, DatabaseScope):
-                    parent_urn = urn.database()
+                    parent_urn = change.urn.database()
                 elif isinstance(resource_cls.scope, SchemaScope):
-                    parent_urn = urn.schema()
+                    parent_urn = change.urn.schema()
                 else:
                     raise Exception(f"Unsupported resource type {type(resource_cls)}")
                 if _contains(role, str(parent_urn), create_priv):
-                    ownership_priv = priv_for_principal(urn, "OWNERSHIP")
-                    _add(role, urn_str, ownership_priv)
-                    if urn.resource_type == ResourceType.DATABASE and urn.fqn.name != "SNOWFLAKE":
+                    ownership_priv = priv_for_principal(change.urn, "OWNERSHIP")
+                    _add(role, str(parent_urn), ownership_priv)
+                    if change.urn.resource_type == ResourceType.DATABASE and change.urn.fqn.name != "SNOWFLAKE":
                         public_schema = URN(
                             account_locator=account_urn.account_locator,
                             resource_type=ResourceType.SCHEMA,
-                            fqn=FQN(name="PUBLIC", database=urn.fqn.name),
+                            fqn=FQN(name="PUBLIC", database=change.urn.fqn.name),
                         )
                         information_schema = URN(
                             account_locator=account_urn.account_locator,
                             resource_type=ResourceType.SCHEMA,
-                            fqn=FQN(name="PUBLIC", database=urn.fqn.name),
+                            fqn=FQN(name="PUBLIC", database=change.urn.fqn.name),
                         )
                         _add(role, str(public_schema), priv_for_principal(public_schema, "OWNERSHIP"))
                         _add(role, str(information_schema), priv_for_principal(information_schema, "OWNERSHIP"))
@@ -301,8 +339,8 @@ def _raise_if_missing_privs(required: list, available: dict):
     #         raise MissingPrivilegeException(f"Missing privileges for {principal}: {required_privs}")
 
 
-def _fetch_remote_state(session, manifest):
-    state = {}
+def _fetch_remote_state(session, manifest: Manifest) -> State:
+    state: State = {}
     urns = set(manifest["_urns"].copy())
 
     # FIXME
@@ -348,19 +386,23 @@ class Blueprint:
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
         resources: List[Resource] = [],
+        run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
         allow_role_switching: bool = True,
-        enforce_requirements: bool = False,
-        resource_types: List[ResourceType] = [],
+        ignore_ownership: bool = True,
+        valid_resource_types: List[ResourceType] = [],
     ) -> None:
+        # TODO: input validation
+
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
         self._account_locator: str = None
+        self._run_mode: RunMode = run_mode
         self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
-        self._enforce_requirements: bool = enforce_requirements
-        self._resource_types: List[ResourceType] = resource_types
+        self._ignore_ownership: bool = ignore_ownership
+        self._valid_resource_types: List[ResourceType] = valid_resource_types
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -375,6 +417,100 @@ class Blueprint:
 
         self.add(resources or [])
         self.add([res for res in [self.account, self.database, self.schema] if res is not None])
+
+    def _raise_for_nonconforming_plan(self, plan: Plan):
+        exceptions = []
+
+        # Run Mode exceptions
+        if self._run_mode == RunMode.FULLY_MANAGED:
+            return
+        elif self._run_mode == RunMode.CREATE_OR_UPDATE:
+            for change in plan:
+                if change.action == DiffAction.REMOVE:
+                    exceptions.append(
+                        f"Create-or-update mode does not allow resources to be removed (ref: {change.urn})"
+                    )
+                if change.action == DiffAction.CHANGE:
+                    if "owner" in change.delta:
+                        change_debug = f"{change.before['owner']} => {change.delta['owner']}"
+                        exceptions.append(
+                            f"Create-or-update mode does not allow ownership changes (resource: {change.urn}, owner: {change_debug})"
+                        )
+                    elif "name" in change.delta:
+                        exceptions.append(
+                            f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
+                        )
+        else:
+            raise Exception(f"Unsupported run mode {self._run_mode}")
+
+        # Valid Resource Types exceptions
+        if self._valid_resource_types:
+            for change in plan:
+                if change.urn.resource_type not in self._valid_resource_types:
+                    exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
+
+        if exceptions:
+            if len(exceptions) > 5:
+                exception_block = "\n".join(exceptions[0:5]) + f"\n... and {len(exceptions) - 5} more"
+            else:
+                exception_block = "\n".join(exceptions)
+            raise Exception("Non-conforming actions found in plan:\n" + exception_block)
+
+    def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
+        manifest = manifest.copy()
+        refs = manifest.pop("_refs")
+        urns = manifest.pop("_urns")
+
+        # Generate a list of all URNs
+        resource_set = set(urns + list(remote_state.keys()))
+
+        for ref in refs:
+            resource_set.add(ref[0])
+            resource_set.add(ref[1])
+
+        # Calculate a topological sort order for the URNs
+        sort_order = topological_sort(resource_set, refs)
+
+        # Once sorting is done, remove the _refs and _urns keys from the manifest
+
+        changes: Plan = []
+        marked_for_replacement = set()
+        for action, urn_str, delta in diff(remote_state, manifest):
+            urn = parse_URN(urn_str)
+            before = remote_state.get(urn_str, {})
+            after = manifest.get(urn_str, {})
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, before)
+
+            # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
+            #     for on_type, privs in data.items():
+            #         privs_to_add = privs
+            #         if action == DiffAction.CHANGE:
+            #             privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
+            #         for priv in privs_to_add:
+            #             changes.append(ResourceChange(action=DiffAction.ADD, urn=urn_str, before={}, after={}, delta={on_type: [priv]}))
+            if action == DiffAction.CHANGE:
+                if urn in marked_for_replacement:
+                    continue
+
+                # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
+                attr = list(delta.keys())[0]
+                attr_metadata = resource_cls.spec.get_metadata(attr)
+                if attr_metadata.get("triggers_replacement", False):
+                    marked_for_replacement.add(urn)
+                elif attr == "owner" and self._ignore_ownership:
+                    continue
+                else:
+                    changes.append(ResourceChange(action, urn, before, after, delta))
+            elif action == DiffAction.ADD:
+                changes.append(ResourceChange(action=action, urn=urn, before={}, after=after, delta=delta))
+            elif action == DiffAction.REMOVE:
+                changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
+
+        for urn in marked_for_replacement:
+            changes.append(ResourceChange(action=DiffAction.REMOVE, urn=urn, before=before, after={}, delta={}))
+            changes.append(ResourceChange(action=DiffAction.ADD, urn=urn, before={}, after=after, delta=after))
+
+        return sorted(changes, key=lambda change: sort_order[str(change.urn)])
 
     def _finalize(self, session_context: dict):
         """
@@ -439,8 +575,8 @@ class Blueprint:
                 if not found:
                     raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
 
-    def generate_manifest(self, session_context: dict = {}):
-        manifest = {}
+    def generate_manifest(self, session_context: dict = {}) -> Manifest:
+        manifest: Manifest = {}
         refs = []
         urns = []
 
@@ -498,15 +634,16 @@ class Blueprint:
         manifest["_urns"] = urns
         return manifest
 
-    def plan(self, session) -> List[ResourceChange]:
-        data_provider.fetch_session.cache_clear()
-        _EXECUTION_CACHE.clear()
+    def plan(self, session) -> Plan:
+        reset_cache()
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = _fetch_remote_state(session, manifest)
-        return _plan(remote_state, manifest)
+        completed_plan = self._plan(remote_state, manifest)
+        self._raise_for_nonconforming_plan(completed_plan)
+        return completed_plan
 
-    def apply(self, session, plan=None):
+    def apply(self, session, plan: Plan = None):
         if plan is None:
             plan = self.plan(session)
 
@@ -514,7 +651,7 @@ class Blueprint:
         # TODO: clean up urn vs urn_str madness
 
         """
-            At this point, we have a list of resource changes as a part of the plan. Each is one of:
+            At this point, we have a list of actions as a part of the plan. Each action is one of:
                 1. [ADD] action (CREATE command)
                 2. [CHANGE] action (one or many ALTER or SET PARAMETER commands)
                 3. [REMOVE] action (DROP command, REVOKE command, or a rename operation)
@@ -534,43 +671,44 @@ class Blueprint:
 
         _raise_if_missing_privs(required_privs, available_privs)
 
-        # print(self._staged)
-        # print(plan)
-
-        action_queue:List[str] = []
+        action_queue = []
         actions_taken = []
 
-        for resource_change in plan:
-            if resource_change.action == DiffAction.REMOVE:
-                action_queue.append((resource_change.urn,lifecycle.drop_resource(resource_change, resource_change.old_value)))
-            elif resource_change.action == DiffAction.ADD:
-                props = Resource.props_for_resource_type(resource_change.urn.resource_type, resource_change.new_value)
-                switch_to_role = None
-                if "owner" in resource_change.new_value:
-                    switch_to_role = resource_change.new_value["owner"]
-                elif resource_change.urn.resource_type == ResourceType.FUTURE_GRANT:
-                    switch_to_role = "SECURITYADMIN"
-                if switch_to_role and switch_to_role in usable_roles:
-                    action_queue.append((resource_change.urn,f"USE ROLE {switch_to_role}"))
-                else:
-                    if 'owner' not in resource_change.new_value:
-                        raise Exception(f"Role change required for {resource_change.urn} but, the owner is not specified")
-                    raise Exception(f"Role {resource_change.new_value['owner']} required for {resource_change.urn} but isn't available")
-                action_queue.extend((resource_change.urn,lifecycle.create_resource(resource_change, props)))
-            elif resource_change.action == DiffAction.CHANGE:
-                action_queue.extend((resource_change.urn,lifecycle.update_resource(resource_change, props)))
+        def _queue_action(change: ResourceChange, props):
+            switch_to_role = None
+            if "owner" in change.before:
+                switch_to_role = change.before["owner"]
+            elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
+                switch_to_role = "SECURITYADMIN"
+            if switch_to_role and switch_to_role in usable_roles:
+                action_queue.append(f"USE ROLE {switch_to_role}")
+            else:
+                # raise Exception(f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available")
+                print(
+                    f"Role {change.before.get('owner', '[OWNER MISSING]')} required for {change.urn} but isn't available"
+                )
+            if change.action == DiffAction.ADD:
+                action_queue.append(lifecycle.create_resource(change.urn, change.after, props))
+            elif change.action == DiffAction.CHANGE:
+                action_queue.append(lifecycle.update_resource(change.urn, change.delta, props))
+            elif change.action == DiffAction.REMOVE:
+                action_queue.append(lifecycle.drop_resource(change.urn, change.before))
+
+        for change in plan:
+            props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+            _queue_action(change, props)
 
         while action_queue:
-            urn,sql = action_queue.pop(0)
+            sql = action_queue.pop(0)
             actions_taken.append(sql)
             try:
                 if not self._dry_run:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {str(urn)}, skipping...")
+                    print(f"Resource already exists: {change.urn}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {str(urn)}, skipping...")
+                    print(f"Invalid grant: {change.urn}, skipping...")
                 else:
                     raise err
         return actions_taken

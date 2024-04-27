@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Resource, ResourcePointer, ResourceSpec
 from .table import Table
@@ -27,7 +27,7 @@ class _TableStream(ResourceSpec):
     at: dict[str, str] = None
     before: dict[str, str] = None
     append_only: bool = None
-    show_initial_rows: bool = None
+    show_initial_rows: bool = field(default_factory=None, metadata={"triggers_replacement": True})
     comment: str = None
 
     def __post_init__(self):

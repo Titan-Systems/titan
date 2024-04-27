@@ -88,6 +88,9 @@ class Props:
         self.name = _name
         self.start_token = Literals(_start_token) if _start_token else None
 
+    def __repr__(self):
+        return f"Props(num:{len(self.props)})"
+
     def __getitem__(self, key: str) -> Prop:
         return self.props[key]
 
@@ -193,7 +196,7 @@ class IdentifierListProp(Prop):
     def render(self, values):
         if values is None:
             return ""
-        value_list = ", ".join(values)
+        value_list = ", ".join(map(str, values))
         if self.parens:
             value_list = f"({value_list})"
         return tidy_sql(

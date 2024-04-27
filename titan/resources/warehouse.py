@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from .resource import Resource, ResourceSpec
 from .resource_monitor import ResourceMonitor
 from ..enums import ParseableEnum, ResourceType, WarehouseSize
+from ..resource_name import ResourceName
 from ..scope import AccountScope
 
 from ..props import (
@@ -28,9 +29,9 @@ class WarehouseScalingPolicy(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _Warehouse(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: str = "SYSADMIN"
-    warehouse_type: WarehouseType = "STANDARD"
+    warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
     max_cluster_count: int = None
     min_cluster_count: int = None
@@ -40,7 +41,7 @@ class _Warehouse(ResourceSpec):
     initially_suspended: bool = None
     resource_monitor: ResourceMonitor = None
     comment: str = None
-    enable_query_acceleration: bool = None
+    enable_query_acceleration: bool = False
     query_acceleration_max_scale_factor: int = None
     max_concurrency_level: int = 8
     statement_queued_timeout_in_seconds: int = 0
@@ -88,7 +89,7 @@ class Warehouse(Resource):
         initially_suspended: bool = None,
         resource_monitor: ResourceMonitor = None,
         comment: str = None,
-        enable_query_acceleration: bool = None,
+        enable_query_acceleration: bool = False,
         query_acceleration_max_scale_factor: int = None,
         max_concurrency_level: int = 8,
         statement_queued_timeout_in_seconds: int = 0,

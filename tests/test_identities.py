@@ -2,6 +2,7 @@ import pytest
 
 from tests.helpers import get_json_fixtures
 
+from titan.resource_name import ResourceName
 
 # resources = [
 #     {
@@ -249,4 +250,9 @@ def test_sql_identity(resource):
     instance = resource_cls(**data)
     sql = instance.create_sql()
     new = resource_cls.from_sql(sql)
-    assert new.to_dict() == instance.to_dict()
+    new_dict = new.to_dict()
+    instance_dict = instance.to_dict()
+    if "name" in new_dict:
+        assert ResourceName(new_dict.pop("name")) == ResourceName(instance_dict.pop("name"))
+
+    assert new_dict == instance_dict

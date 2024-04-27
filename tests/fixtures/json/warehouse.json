@@ -11,7 +11,7 @@
     "initially_suspended": true,
     "resource_monitor": null,
     "comment": "My XSMALL warehouse",
-    "enable_query_acceleration": null,
+    "enable_query_acceleration": false,
     "query_acceleration_max_scale_factor": null,
     "max_concurrency_level": 8,
     "statement_queued_timeout_in_seconds": 0,

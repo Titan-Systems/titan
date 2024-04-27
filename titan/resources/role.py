@@ -4,12 +4,13 @@ from .resource import Resource, ResourceSpec
 from ..enums import ResourceType
 from ..parse import parse_identifier
 from ..props import Props, StringProp, TagsProp
+from ..resource_name import ResourceName
 from ..scope import AccountScope, DatabaseScope
 
 
 @dataclass(unsafe_hash=True)
 class _Role(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: str = "USERADMIN"
     tags: dict[str, str] = None
     comment: str = None

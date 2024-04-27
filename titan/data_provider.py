@@ -10,7 +10,7 @@ from snowflake.connector.errors import ProgrammingError
 
 from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
-from .identifiers import URN, FQN, resource_label_for_type
+from .identifiers import URN, FQN, resource_type_for_label
 from .parse import (
     FullyQualifiedIdentifier,
     _parse_dynamic_table_text,
@@ -18,6 +18,7 @@ from .parse import (
     parse_identifier,
     parse_function_name,
 )
+from .resource_name import ResourceName, attribute_is_resource_name
 
 
 __this__ = sys.modules[__name__]
@@ -42,14 +43,20 @@ def _filter_result(result, **kwargs):
     filtered = []
     for row in result:
         for key, value in kwargs.items():
-            if row[key] != value:
-                break
+            # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
+            if attribute_is_resource_name(key):
+                if ResourceName(row[key]) != ResourceName(value):
+                    break
+            else:
+                if row[key] != value:
+                    break
         else:
             filtered.append(row)
     return filtered
 
 
 def _urn_from_grant(row, session_ctx):
+    account_scoped_resources = {"user", "role", "warehouse", "database", "task"}
     granted_on = row["granted_on"].lower()
     if granted_on == "account":
         return URN.from_session_ctx(session_ctx)
@@ -61,7 +68,11 @@ def _urn_from_grant(row, session_ctx):
             id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
             name = parse_function_name(id_parts[-1])
             fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
+        elif granted_on in account_scoped_resources:
+            # This is probably all account-scoped resources
+            fqn = FQN(name=ResourceName(row["name"]))
         else:
+            # Scoped resources
             fqn = parse_identifier(row["name"], is_db_scoped=(granted_on == "schema"))
         return URN(
             resource_type=ResourceType(granted_on),
@@ -358,77 +369,80 @@ def fetch_future_grant(session, fqn: FQN):
             return None
         raise
 
-    in_type, in_name = fqn.params["in"].split("/")
+    in_type, name = fqn.params["on"].split("/")
+    in_name = name.split(".")[0]
 
-    grantee_name = fqn.name
     grants = _filter_result(
         show_result,
-        # grant_on=grant_on,
-        # name=name,
-        grantee_name=grantee_name,
+        privilege=fqn.params["priv"],
+        name=name,
+        grant_to="ROLE",
+        grantee_name=fqn.name,
     )
 
     if len(grants) == 0:
         return None
+    elif len(grants) > 1:
+        raise Exception(f"Found multiple future grants matching {fqn}")
 
-    grant_block = {}
+    data = grants[0]
 
-    for grant in grants:
-        grant_in_name = grant["name"].split(".<")[0]
-        if in_name != grant_in_name:
-            continue
-        on_type = grant["grant_on"].lower()
-        if on_type not in grant_block:
-            grant_block[on_type] = []
-        grant_block[on_type].append(grant["privilege"])
-
-    return grant_block
-
-    # return {
-    #     "priv": data["privilege"],
-    #     "on_type": data["grant_on"],
-    #     "in_type": fqn.params["in_type"],
-    #     "in_name": fqn.params["in_name"],
-    #     "to": data["grantee_name"],
-    #     "grant_option": data["grant_option"] == "true",
-    #     "owner": "SECURITYADMIN",
-    # }
+    return {
+        "priv": data["privilege"],
+        "on_type": data["grant_on"],
+        "in_type": in_type,
+        "in_name": in_name,
+        "to": data["grantee_name"],
+        "grant_option": data["grant_option"] == "true",
+    }
 
 
 def fetch_grant(session, fqn: FQN):
     try:
         show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}", cacheable=True)
+        """
+        {
+            'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
+            'privilege': 'USAGE',
+            'granted_on': 'DATABASE',
+            'name': 'STATIC_DATABASE',
+            'granted_to': 'ROLE',
+            'grantee_name': 'THATROLE',
+            'grant_option': 'false',
+            'granted_by': 'ACCOUNTADMIN'
+        }
+        """
     except ProgrammingError as err:
         if err.errno == DOEST_NOT_EXIST_ERR:
             return None
         raise
-    granted_on = fqn.params["on_type"]
-    name = fqn.params["on"]
-    grantee_name = fqn.name
+    on_type, on = fqn.params["on"].split("/")
+    on_type = str(resource_type_for_label(on_type))
     grants = _filter_result(
         show_result,
-        granted_on=granted_on,
-        name=name,
-        grantee_name=grantee_name,
+        granted_on=on_type,
+        name=on,
+        grantee_name=fqn.name,
     )
 
     if len(grants) == 0:
-        return []
+        return None
+    elif len(grants) > 1:
+        # This is likely to happen when a grant has been issued by ACCOUNTADMIN
+        # and some other role with MANAGE GRANTS or OWNERSHIP. It needs to be properly
+        # handled in the future.
+        raise Exception(f"Found multiple grants matching {fqn}")
 
-    return sorted(
-        [
-            {
-                "priv": row["privilege"],
-                "on": row["name"],
-                "on_type": row["granted_on"],
-                "to": row["grantee_name"],
-                "grant_option": row["grant_option"] == "true",
-                "owner": row["granted_by"],
-            }
-            for row in grants
-        ],
-        key=lambda g: (g["priv"], g["owner"]),
-    )
+    data = grants[0]
+
+    return {
+        "priv": data["privilege"],
+        "on": data["name"],
+        "on_type": data["granted_on"],
+        "to": data["grantee_name"],
+        "grant_option": data["grant_option"] == "true",
+        "owner": data["granted_by"],
+    }
 
 
 def fetch_grant_on_all(session, fqn: FQN):
@@ -690,6 +704,7 @@ def fetch_storage_integration(session, fqn: FQN):
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
     }
 
+
 def fetch_stream(session, fqn: FQN):
     show_result = execute(session, "SHOW STREAMS IN ACCOUNT")
 
@@ -705,8 +720,9 @@ def fetch_stream(session, fqn: FQN):
         "name": data["name"],
         "comment": data["comment"] or None,
         "append_only": data["mode"] == "APPEND_ONLY",
-        "on_table": data["table_name"] if data['source_type']=='Table' else None
+        "on_table": data["table_name"] if data["source_type"] == "Table" else None,
     }
+
 
 def fetch_event_table(session, fqn: FQN):
     show_result = execute(session, "SHOW EVENT TABLES IN ACCOUNT")
@@ -719,20 +735,18 @@ def fetch_event_table(session, fqn: FQN):
         raise Exception(f"Found multiple tables matching {fqn}")
 
     data = tables[0]
-    return {
-        "name": data["name"],
-        "comment": data["comment"] or None,
-        "cluster_by": data["cluster_by"] or None
-    }
+    return {"name": data["name"], "comment": data["comment"] or None, "cluster_by": data["cluster_by"] or None}
+
 
 def fetch_task(session, fqn: FQN):
-    tasks = execute(session, f"SHOW TASKS LIKE '{fqn.name}' in schema {fqn.database}.{fqn.schema}", cacheable=True)
-    if len(tasks) == 0:
+    show_result = execute(session, f"SHOW TASKS IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True)
+
+    if len(show_result) == 0:
         return None
-    if len(tasks) > 1:
+    if len(show_result) > 1:
         raise Exception(f"Found multiple tasks matching {fqn}")
 
-    data = tasks[0]
+    data = show_result[0]
     task_details_result = execute(session, f"DESC TASK {fqn.database}.{fqn.schema}.{fqn.name}", cacheable=True)
     if len(task_details_result) == 0:
         raise Exception(f"Failed to fetch task details for {fqn}")
@@ -746,10 +760,11 @@ def fetch_task(session, fqn: FQN):
         "as_": task_details["definition"],
     }
 
+
 def fetch_replication_group(session, fqn: FQN):
     show_result = execute(session, f"SHOW REPLICATION GROUPS LIKE '{fqn.name}'", cacheable=True)
-    
-    replication_groups = _filter_result(show_result, is_primary='true')
+
+    replication_groups = _filter_result(show_result, is_primary="true")
     if len(replication_groups) == 0:
         return None
     if len(replication_groups) > 1:
@@ -760,9 +775,11 @@ def fetch_replication_group(session, fqn: FQN):
     databases = [row["name"] for row in show_databases_result]
     return {
         "name": data["name"],
-        "object_types": data["object_types"].split(','),
-        "allowed_integration_types": None if data["allowed_integration_types"]=='' else data["allowed_integration_types"].split(','),
-        "allowed_accounts": None if data["allowed_accounts"]=='' else data["allowed_accounts"].split(','),
+        "object_types": data["object_types"].split(","),
+        "allowed_integration_types": (
+            None if data["allowed_integration_types"] == "" else data["allowed_integration_types"].split(",")
+        ),
+        "allowed_accounts": None if data["allowed_accounts"] == "" else data["allowed_accounts"].split(","),
         "allowed_databases": databases,
         "replication_schedule": data["replication_schedule"],
         "owner": data["owner"],
@@ -772,7 +789,9 @@ def fetch_replication_group(session, fqn: FQN):
 def fetch_table(session, fqn: FQN):
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
 
-    tables = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE")
+    tables = _filter_result(
+        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
+    )
 
     if len(tables) == 0:
         return None
@@ -790,7 +809,7 @@ def fetch_table(session, fqn: FQN):
         "columns": columns,
         # This is here because of CTAS type tables.
         # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
-        "as_": None
+        "as_": None,
     }
 
 
@@ -924,6 +943,8 @@ def fetch_warehouse(session, fqn: FQN):
     query_accel = data.get("enable_query_acceleration")
     if query_accel:
         query_accel = query_accel == "true"
+    else:
+        query_accel = False
 
     return {
         "name": data["name"],

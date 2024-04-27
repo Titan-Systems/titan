@@ -1,3 +1,5 @@
+import difflib
+
 from dataclasses import asdict, dataclass, fields
 from typing import Any, TypedDict, Type, Union, get_args, get_origin
 from inspect import isclass
@@ -5,14 +7,30 @@ from itertools import chain
 
 import pyparsing as pp
 
-from titan.diff import DiffAction
-
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
-from ..lifecycle import ResourceChange, create_resource, drop_resource
+from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..resource_name import ResourceName
 from ..scope import ResourceScope, OrganizationScope, DatabaseScope, SchemaScope
+
+
+def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
+    suggestions = {}
+    for passed_kwarg in passed_kwargs:
+        # Find the closest match from the expected kwargs for each passed kwarg
+        closest_match = difflib.get_close_matches(passed_kwarg, expected_kwargs, n=1, cutoff=0.6)
+        if closest_match:
+            closest_match = closest_match[0]
+            # If the passed kwarg is not exactly an expected kwarg, add it to suggestions
+            if passed_kwarg != closest_match:
+                suggestions[passed_kwarg] = closest_match
+        else:
+            # If no close match is found, suggest it might be an unexpected kwarg
+            suggestions[passed_kwarg] = "Unexpected kwarg, no close match found."
+
+    return suggestions
 
 
 class Arg(TypedDict):
@@ -85,6 +103,9 @@ class ResourceSpec:
             # Coerce resources
             elif issubclass(field_type, Resource):
                 return convert_to_resource(field_type, field_value)
+
+            elif field_type == ResourceName:
+                return ResourceName(field_value)
             else:
                 return field_value
 
@@ -144,7 +165,21 @@ class Resource(metaclass=_Resource):
         if resource_type and resource_type != self.resource_type:
             raise ValueError(f"Unexpected resource_type {resource_type} for {self.resource_type}")
 
-        self._register_scope(**kwargs)
+        # Consume scope from kwargs if it exists
+        database = kwargs.pop("database", None)
+        schema = kwargs.pop("schema", None)
+        self._register_scope(database=database, schema=schema)
+
+        # If there are more kwargs, throw an error
+        if kwargs:
+            if self.spec:
+                field_names = [field.name for field in fields(self.spec)]
+                suggestions = _suggest_correct_kwargs(expected_kwargs=field_names, passed_kwargs=kwargs.keys())
+                raise ValueError(
+                    f"Unexpected kwargs {kwargs}, did you mean {suggestions}? Valid field names: {field_names}"
+                )
+            else:
+                raise ValueError(f"Unexpected kwargs {kwargs}")
 
     @classmethod
     def from_sql(cls, sql):
@@ -246,6 +281,8 @@ class Resource(metaclass=_Resource):
                 return [_serialize(v) for v in value]
             elif isinstance(value, dict):
                 return {k: _serialize(v) for k, v in value.items()}
+            elif isinstance(value, ResourceName):
+                return str(value)
             else:
                 return value
 
@@ -261,7 +298,8 @@ class Resource(metaclass=_Resource):
 
     def create_sql(self, **kwargs):
         return create_resource(
-            ResourceChange(action=DiffAction.ADD, urn=self.urn, new_value=self.to_dict()),
+            self.urn,
+            self.to_dict(),
             self.props,
             **kwargs,
         )
@@ -302,7 +340,7 @@ class Resource(metaclass=_Resource):
 
     @property
     def fqn(self):
-        name = getattr(self._data, "name")
+        name = str(getattr(self._data, "name"))
         return self.scope.fully_qualified_name(self.container, name)
 
     @property
@@ -346,7 +384,7 @@ class ResourceContainer:
 
 class ResourcePointer(Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-        self._name: str = name.upper()
+        self._name: ResourceName = ResourceName(name)
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
         super().__init__()

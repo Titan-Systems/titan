@@ -5,7 +5,7 @@ from typing import List, Dict, Callable, Union
 import pyparsing as pp
 
 from .enums import ResourceType, Scope
-from .identifiers import FQN, URN
+from .identifiers import FQN, URN, resource_type_for_label
 from .scope import DatabaseScope, SchemaScope
 
 Keyword = pp.CaselessKeyword
@@ -639,6 +639,7 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
     raise Exception(f"Failed to parse identifier: {identifier}")
 
 
+# NOTE: can't put this into identifiers.py:URN because of circular import
 def parse_URN(urn_str: str) -> URN:
     parts = urn_str.split(":")
     if len(parts) != 4:
@@ -646,7 +647,7 @@ def parse_URN(urn_str: str) -> URN:
     if parts[0] != "urn":
         raise Exception(f"Invalid URN string: {urn_str}")
     resource_label, fqn_str = parts[3].split("/", 1)
-    resource_type = ResourceType(resource_label.replace("_", " ").upper())
+    resource_type = resource_type_for_label(resource_label)
     fqn = parse_identifier(fqn_str, is_db_scoped=(resource_label == "schema"))
     return URN(
         account_locator=parts[2],
@@ -691,3 +692,11 @@ def _parse_copy_into(sql: str):
         return results.as_dict()
     except pp.ParseException as err:
         raise Exception(f"Failed to parse COPY INTO statement: {err}")
+
+
+def parse_future_grant_on(on_str: str):
+    # f"{in_type}/{in_name}.<{on_type}>",
+    in_type, in_name = on_str.split("/")
+    in_name, on_type = in_name.split(".")
+    on_type = on_type.strip("<>")
+    return (in_type, in_name, on_type)

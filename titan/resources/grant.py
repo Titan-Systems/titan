@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Union
 
 from inflection import singularize
 
@@ -7,17 +7,18 @@ from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
 from ..enums import ResourceType
-from ..identifiers import FQN, resource_label_for_type
+from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant, _parse_props
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
 from ..props import Props, FlagProp, IdentifierProp
+from ..resource_name import ResourceName
 from ..scope import AccountScope
 
 
 @dataclass(unsafe_hash=True)
 class _Grant(ResourceSpec):
     priv: str
-    on: str
+    on: ResourceName
     on_type: ResourceType
     to: Role
     grant_option: bool = False
@@ -127,7 +128,7 @@ class Grant(Resource):
         -----
 
         Global Privs:
-        >>> Grant(priv="ALL", on="ACCOUNT", to="somerole")
+        >>> Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
 
         Warehouse Privs:
         >>> Grant(priv="OPERATE", on=Warehouse(name="foo"), to="somerole")
@@ -157,31 +158,26 @@ class Grant(Resource):
             for keyword, arg in on_kwargs.items():
                 if on is not None:
                     raise ValueError("You can only specify one 'on' parameter, multiple found")
-
-                # Ex: on_future_schemas_in_database -> on_future_schemas_in, database
-                is_scoped_grant = "_in_" in keyword or keyword.endswith("_in")
-
-                if is_scoped_grant:
-
-                    if keyword.startswith("on_all"):
-                        raise ValueError("You must use GrantOnAll for all grants")
-                    elif keyword.startswith("on_future"):
-                        raise ValueError("You must use FutureGrant for future grants")
-                    else:
-                        raise Exception(f"Invalid grant type: {keyword}")
+                elif keyword.startswith("on_all"):
+                    raise ValueError("You must use GrantOnAll for all grants")
+                elif keyword.startswith("on_future"):
+                    raise ValueError("You must use FutureGrant for future grants")
                 else:
                     # Grant targeting a specific resource
                     # on_{resource} kwargs
                     # on_schema="foo" -> on=Schema(name="foo")
                     on = arg
-                    on_type = ResourceType(keyword[3:].replace("_", " ").upper())
+                    on_type = resource_type_for_label(keyword[3:])
         # Handle on= kwarg
         else:
             if on is None:
                 raise ValueError("You must specify an 'on' parameter")
-            if isinstance(on, Resource):
+            elif isinstance(on, Resource):
                 on_type = on.resource_type
                 on = on._data.name
+            elif isinstance(on, str) and on.upper() == "ACCOUNT":
+                on = "ACCOUNT"
+                on_type = ResourceType.ACCOUNT
 
         if owner is None:
             if on == "ACCOUNT" and isinstance(priv, GlobalPriv):
@@ -197,7 +193,7 @@ class Grant(Resource):
         super().__init__(**kwargs)
         self._data: _Grant = _Grant(
             priv=priv,
-            on=on.upper(),
+            on=on,
             on_type=on_type,
             to=to,
             grant_option=grant_option,
@@ -226,13 +222,6 @@ class Grant(Resource):
         return grant_fqn(self._data)
 
     @property
-    def name(self):
-        priv = self.priv if isinstance(self.priv, str) else self.priv.value
-        if " " in priv:
-            priv = f'"{priv}"'
-        return priv
-
-    @property
     def on(self) -> str:
         return self._data.on
 
@@ -250,7 +239,16 @@ class Grant(Resource):
 
 
 def grant_fqn(grant: _Grant):
-    return FQN(name=grant.to.name, params={"on": grant.on, "on_type": str(grant.on_type)})
+    on = f"{resource_label_for_type(grant.on_type)}/{grant.on}"
+    if grant.on_type == ResourceType.ACCOUNT:
+        on = "ACCOUNT"
+    return FQN(
+        name=grant.to.name,
+        params={
+            "priv": grant.priv,
+            "on": on,
+        },
+    )
 
 
 @dataclass(unsafe_hash=True)
@@ -258,10 +256,9 @@ class _FutureGrant(ResourceSpec):
     priv: str
     on_type: ResourceType
     in_type: ResourceType
-    in_name: str
+    in_name: ResourceName
     to: Role
     grant_option: bool = False
-    owner: str = "SECURITYADMIN"
 
 
 class FutureGrant(Resource):
@@ -335,20 +332,20 @@ class FutureGrant(Resource):
                         in_type = ResourceType(in_stmt)
                         in_name = arg
 
-        if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
-            owner = "ACCOUNTADMIN"
-        else:
-            owner = "SECURITYADMIN"
+        # TODO: Migrate this to blueprint
+        # if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
+        #     owner = "ACCOUNTADMIN"
+        # else:
+        #     owner = "SECURITYADMIN"
 
         super().__init__(**kwargs)
         self._data: _FutureGrant = _FutureGrant(
             priv=priv,
             on_type=on_type,
             in_type=in_type,
-            in_name=in_name.upper(),
+            in_name=in_name,
             to=to,
             grant_option=grant_option,
-            owner=owner,
         )
         granted_in = ResourcePointer(name=in_name, resource_type=in_type)
         self.requires(granted_in, self._data.to)
@@ -362,11 +359,37 @@ class FutureGrant(Resource):
     def fqn(self):
         return future_grant_fqn(self._data)
 
+    @property
+    def priv(self) -> str:
+        return self._data.priv
 
-def future_grant_fqn(grant: _FutureGrant):
+    @property
+    def on_type(self) -> ResourceType:
+        return self._data.on_type
+
+    @property
+    def in_type(self) -> ResourceType:
+        return self._data.in_type
+
+    @property
+    def in_name(self) -> str:
+        return self._data.in_name
+
+    @property
+    def to(self):
+        return self._data.to
+
+
+def future_grant_fqn(data: _FutureGrant):
+    in_type = resource_label_for_type(data.in_type)
+    in_name = data.in_name
+    on_type = resource_label_for_type(data.on_type).upper()
     return FQN(
-        name=grant.to.name,
-        params={"in": f"{resource_label_for_type(grant.in_type)}/{grant.in_name}"},
+        name=data.to.name,
+        params={
+            "priv": data.priv,
+            "on": f"{in_type}/{in_name}.<{on_type}>",
+        },
     )
 
 
@@ -502,7 +525,7 @@ class _RoleGrant(ResourceSpec):
     role: Role
     to_role: Role = None
     to_user: User = None
-    owner: str = "SECURITYADMIN"
+    # owner: str = "SECURITYADMIN"
 
     def __post_init__(self):
         super().__post_init__()
@@ -534,6 +557,30 @@ class RoleGrant(Resource):
         # owner: str = None,  # = "SECURITYADMIN"
         **kwargs,
     ):
+        """
+        Usage
+        -----
+
+        Grant to Role:
+        >>> RoleGrant(role="somerole", to_role="someotherrole")
+        >>> RoleGrant(role="somerole", to=Role(name="someuser"))
+
+        Grant to User:
+        >>> RoleGrant(role="somerole", to_user="someuser")
+        >>> RoleGrant(role="somerole", to=User(name="someuser"))
+        """
+
+        to = kwargs.pop("to", None)
+        if to:
+            if to_role or to_user:
+                raise ValueError("You can only grant to a role or a user, not both")
+            if isinstance(to, Role):
+                to_role = to
+            elif isinstance(to, User):
+                to_user = to
+            else:
+                raise ValueError("You can only grant to a role or a user")
+
         super().__init__(**kwargs)
         self._data: _RoleGrant = _RoleGrant(
             role=role,
@@ -563,4 +610,15 @@ class RoleGrant(Resource):
     def fqn(self):
         subject = "user" if self._data.to_user else "role"
         name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
-        return FQN(name=self._data.role.name, params={subject: name})
+        return FQN(
+            name=self._data.role.name,
+            params={subject: name},
+        )
+
+    @property
+    def role(self) -> Role:
+        return self._data.role
+
+    @property
+    def to(self) -> Union[Role, User]:
+        return self._data.to_role or self._data.to_user

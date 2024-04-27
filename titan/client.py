@@ -31,6 +31,11 @@ def get_session():
 _EXECUTION_CACHE = {}
 
 
+def reset_cache():
+    global _EXECUTION_CACHE
+    _EXECUTION_CACHE = {}
+
+
 def execute(
     conn_or_cursor: Union[SnowflakeConnection, SnowflakeCursor],
     sql: str,

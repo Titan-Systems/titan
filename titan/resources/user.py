@@ -3,12 +3,13 @@ from dataclasses import dataclass
 from .resource import Resource, ResourceSpec
 from ..enums import ResourceType
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
+from ..resource_name import ResourceName
 from ..scope import AccountScope
 
 
 @dataclass(unsafe_hash=True)
 class _User(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: str = "USERADMIN"
     password: str = None
     login_name: str = None
@@ -35,9 +36,9 @@ class _User(ResourceSpec):
     def __post_init__(self):
         super().__post_init__()
         if not self.login_name:
-            self.login_name = self.name
+            self.login_name = str(self.name).upper()
         if not self.display_name:
-            self.display_name = self.name
+            self.display_name = str(self.name).lower()
 
 
 class User(Resource):
@@ -96,7 +97,6 @@ class User(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        name = name.upper()
         self._data: _User = _User(
             name=name,
             owner=owner,
@@ -126,3 +126,7 @@ class User(Resource):
     @property
     def name(self):
         return self._data.name
+
+    @property
+    def owner(self):
+        return self._data.owner
