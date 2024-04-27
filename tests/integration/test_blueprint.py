@@ -102,6 +102,7 @@ def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
     assert len(plan) == 0, "Expected no changes in the blueprint plan but found some."
 
 
+@pytest.mark.requires_snowflake
 def test_blueprint_plan_sql(cursor, user):
     session = cursor.connection
 
