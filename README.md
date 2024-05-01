@@ -122,7 +122,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | **Account Resources**         |           |
 | API Integration               | ✅         |
 | Catalog Integration           | ❌         |
-| Compute Pool                  | ❌         |
+| Compute Pool                  | ✅         |
 | Connection                    | ❌         |
 | Database                      | ✅         |
 | External Access Integration   | ✅         |
@@ -140,7 +140,12 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Replication Group             | ✅         |
 | Resource Monitor              | ✅         |
 | Role                          | ✅         |
-| Security Integration          | ❌         |
+| Security Integration          | WIP        |
+| ↳ External API                | ❌         |
+| ↳ External OAuth              | ❌         |
+| ↳ Snowflake OAuth             | ✅         |
+| ↳ SAML2                       | ❌         |
+| ↳ SCIM                        | ❌         |
 | Share                         | ❌         |
 | Storage Integration           | WIP        |
 | ↳ AWS                         | ✅         |
@@ -169,7 +174,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ ORC                         | ❌         |
 | ↳ Parquet                     | ❌         |
 | Iceberg Table                 | ❌         |
-| Image Repository              | ❌         |
+| Image Repository              | ✅         |
 | Internal Stage                | ✅         |
 | Masking Policy                | ❌         |
 | Materialized View             | ❌         |
@@ -182,12 +187,6 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Role Grant                    | ✅         |
 | Row Access Policy             | ❌         |
 | Secret                        | ✅         |
-| Security Integration          | WIP        |
-| ↳ External API                | ❌         |
-| ↳ External OAuth              | ❌         |
-| ↳ Snowflake OAuth             | ✅         |
-| ↳ SAML2                       | ❌         |
-| ↳ SCIM                        | ❌         |
 | Sequence                      | ✅         |
 | Service                       | ❌         |
 | Session Policy                | ❌         |
