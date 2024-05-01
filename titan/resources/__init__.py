@@ -3,6 +3,7 @@ from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
 from .column import Column
+from .compute_pool import ComputePool
 from .database import Database
 from .dynamic_table import DynamicTable
 from .event_table import EventTable
@@ -58,6 +59,7 @@ __all__ = [
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
     "Column",
+    "ComputePool",
     # "CSVFileFormat",
     "Database",
     "DatabaseRole",
