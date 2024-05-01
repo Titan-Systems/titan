@@ -22,6 +22,7 @@ from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
 from .secret import Secret
+from .security_integration import SecurityIntegration
 from .sequence import Sequence
 
 # from .shared_database import SharedDatabase
@@ -93,6 +94,7 @@ __all__ = [
     "S3StorageIntegration",
     "Schema",
     "Secret",
+    "SecurityIntegration",
     "Sequence",
     # "SharedDatabase",
     "StageStream",
