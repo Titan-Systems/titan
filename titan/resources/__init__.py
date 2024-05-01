@@ -24,6 +24,7 @@ from .role import Role, DatabaseRole
 from .schema import Schema
 from .secret import Secret
 from .sequence import Sequence
+from .service import Service
 from .stage import InternalStage, ExternalStage
 from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
 from .table import Table, CreateTableAsSelect
@@ -99,6 +100,7 @@ __all__ = [
     "Secret",
     "SnowflakeOAuthSecurityIntegration",
     "Sequence",
+    "Service",
     # "SharedDatabase",
     "StageStream",
     "Table",
