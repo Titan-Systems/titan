@@ -1,6 +1,6 @@
 {
     "name": "some_sec_int",
-    "integration_type": "oauth",
+    "integration_type": "OAUTH",
     "enabled": true,
     "oauth_client": "TABLEAU_DESKTOP",
     "oauth_client_secret": null,

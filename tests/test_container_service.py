@@ -1,7 +1,14 @@
 import pytest
 
 from titan.blueprint import Blueprint
-from titan.resources import ComputePool, Database, Schema, Role, Warehouse
+from titan.resources import (
+    ComputePool,
+    Database,
+    Role,
+    Schema,
+    SnowflakeOAuthSecurityIntegration,
+    Warehouse,
+)
 
 
 def test_container_service():
@@ -20,12 +27,14 @@ def test_container_service():
         name="titan_app_compute_pool_test", min_nodes=1, max_nodes=1, instance_family="CPU_X64_XS"
     )
 
-    security_integration = SecurityIntegration(
+    security_integration = SnowflakeOAuthSecurityIntegration(
         name="Application Authentication Test",
         integration_type="oauth",
         oauth_client="snowservices_ingress",
         enabled=True,
     )
+
+    image_repository = ImageRepository(name="container_test_image_repo")
 
     bp.add(compute_pool, security_integration)
 

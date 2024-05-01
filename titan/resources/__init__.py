@@ -12,6 +12,7 @@ from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
 from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
+from .image_repository import ImageRepository
 from .network_rule import NetworkRule
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
@@ -22,10 +23,7 @@ from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
 from .secret import Secret
-from .security_integration import SecurityIntegration
 from .sequence import Sequence
-
-# from .shared_database import SharedDatabase
 from .stage import InternalStage, ExternalStage
 from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
 from .table import Table, CreateTableAsSelect
@@ -42,6 +40,10 @@ from .notification_integration import (
     AzureOutboundNotificationIntegration,
     GCPInboundNotificationIntegration,
     AzureInboundNotificationIntegration,
+)
+
+from .security_integration import (
+    SnowflakeOAuthSecurityIntegration,
 )
 
 from .storage_integration import (
@@ -78,6 +80,7 @@ __all__ = [
     "GCSStorageIntegration",
     "Grant",
     "GrantOnAll",
+    "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
     "NetworkRule",
@@ -94,7 +97,7 @@ __all__ = [
     "S3StorageIntegration",
     "Schema",
     "Secret",
-    "SecurityIntegration",
+    "SnowflakeOAuthSecurityIntegration",
     "Sequence",
     # "SharedDatabase",
     "StageStream",

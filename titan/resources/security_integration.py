@@ -14,6 +14,14 @@ from ..props import (
 )
 
 
+class SecurityIntegrationType(ParseableEnum):
+    API_AUTHENTICATION = "API_AUTHENTICATION"
+    EXTERNAL_OAUTH = "EXTERNAL_OAUTH"
+    OAUTH = "OAUTH"
+    SAML2 = "SAML"
+    SCIM = "SCIM"
+
+
 class OAuthClient(ParseableEnum):
     CUSTOM = "CUSTOM"
     LOOKER = "LOOKER"
@@ -23,9 +31,9 @@ class OAuthClient(ParseableEnum):
 
 
 @dataclass(unsafe_hash=True)
-class _SecurityIntegration(ResourceSpec):
+class _SnowflakeOAuthSecurityIntegration(ResourceSpec):
     name: ResourceName
-    integration_type: str = "OAUTH"
+    integration_type: SecurityIntegrationType = SecurityIntegrationType.OAUTH
     enabled: bool = True
     oauth_client: OAuthClient = None
     oauth_client_secret: str = None
@@ -35,12 +43,12 @@ class _SecurityIntegration(ResourceSpec):
     comment: str = None
 
 
-class SecurityIntegration(Resource):
+class SnowflakeOAuthSecurityIntegration(Resource):
     """A security integration in Snowflake to manage external authentication mechanisms."""
 
     resource_type = ResourceType.SECURITY_INTEGRATION
     props = Props(
-        integration_type=StringProp("integration_type"),
+        integration_type=EnumProp("integration_type", [SecurityIntegrationType.OAUTH]),
         enabled=BoolProp("enabled"),
         oauth_client=EnumProp("oauth_client", OAuthClient),
         oauth_client_secret=StringProp("oauth_client_secret"),
@@ -50,12 +58,11 @@ class SecurityIntegration(Resource):
         comment=StringProp("comment"),
     )
     scope = AccountScope()
-    spec = _SecurityIntegration
+    spec = _SnowflakeOAuthSecurityIntegration
 
     def __init__(
         self,
         name: str,
-        integration_type: str = "OAUTH",
         enabled: bool = True,
         oauth_client: OAuthClient = None,
         oauth_client_secret: str = None,
@@ -65,10 +72,10 @@ class SecurityIntegration(Resource):
         comment: str = None,
         **kwargs,
     ):
+        kwargs.pop("integration_type", None)
         super().__init__(**kwargs)
-        self._data = _SecurityIntegration(
+        self._data = _SnowflakeOAuthSecurityIntegration(
             name=name,
-            integration_type=integration_type,
             enabled=enabled,
             oauth_client=oauth_client,
             oauth_client_secret=oauth_client_secret,
@@ -77,3 +84,19 @@ class SecurityIntegration(Resource):
             oauth_refresh_token_validity=oauth_refresh_token_validity,
             comment=comment,
         )
+
+
+SecurityIntegrationMap = {
+    # SecurityIntegrationType.API_AUTHENTICATION: SecurityIntegration,
+    # SecurityIntegrationType.EXTERNAL_OAUTH: SecurityIntegration,
+    SecurityIntegrationType.OAUTH: SnowflakeOAuthSecurityIntegration,
+    # SecurityIntegrationType.SAML2: SecurityIntegration,
+    # SecurityIntegrationType.SCIM: SecurityIntegration,
+}
+
+
+def _resolver(data: dict):
+    return SecurityIntegrationMap[SecurityIntegrationType(data["integration_type"])]
+
+
+Resource.__resolvers__[ResourceType.STORAGE_INTEGRATION] = _resolver

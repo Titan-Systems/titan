@@ -182,6 +182,12 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Role Grant                    | ✅         |
 | Row Access Policy             | ❌         |
 | Secret                        | ✅         |
+| Security Integration          | WIP        |
+| ↳ External API                | ❌         |
+| ↳ External OAuth              | ❌         |
+| ↳ Snowflake OAuth             | ✅         |
+| ↳ SAML2                       | ❌         |
+| ↳ SCIM                        | ❌         |
 | Sequence                      | ✅         |
 | Service                       | ❌         |
 | Session Policy                | ❌         |
