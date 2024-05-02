@@ -284,7 +284,6 @@ def fetch_compute_pool(session, fqn: FQN):
         "max_nodes": data["max_nodes"],
         "instance_family": data["instance_family"],
         "auto_resume": data["auto_resume"],
-        "initially_suspended": data["initially_suspended"],
         "auto_suspend_secs": data["auto_suspend_secs"],
         "comment": data["comment"] or None,
     }

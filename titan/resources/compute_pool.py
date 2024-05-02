@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec
 from ..enums import AccountEdition, ParseableEnum, ResourceType
@@ -31,7 +31,7 @@ class _ComputePool(ResourceSpec):
     max_nodes: int = None
     instance_family: InstanceFamily = None
     auto_resume: bool = None
-    initially_suspended: bool = None
+    initially_suspended: bool = field(default_factory=None, metadata={"fetchable": False})
     auto_suspend_secs: int = None
     comment: str = None
 

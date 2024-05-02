@@ -497,6 +497,10 @@ class Blueprint:
                 attr_metadata = resource_cls.spec.get_metadata(attr)
                 if attr_metadata.get("triggers_replacement", False):
                     marked_for_replacement.add(urn)
+                elif attr_metadata.get("fetchable", True) is False:
+                    # drift on fields that aren't fetchable should be ignored
+                    # TODO: throw a warning, or have a blueprint runmode that fails on this
+                    continue
                 elif attr == "owner" and self._ignore_ownership:
                     continue
                 else:
