@@ -269,7 +269,7 @@ def fetch_columns(session, resource_type: str, fqn: FQN):
 
 
 def fetch_compute_pool(session, fqn: FQN):
-    show_result = execute(session, "SHOW COMPUTE POOLS LIKE '{fqn.name}'", cacheable=True)
+    show_result = execute(session, f"SHOW COMPUTE POOLS LIKE '{fqn.name}'", cacheable=True)
 
     if len(show_result) == 0:
         return None
