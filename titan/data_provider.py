@@ -268,6 +268,28 @@ def fetch_columns(session, resource_type: str, fqn: FQN):
     return columns
 
 
+def fetch_compute_pool(session, fqn: FQN):
+    show_result = execute(session, "SHOW COMPUTE POOLS LIKE '{fqn.name}'", cacheable=True)
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple databases matching {fqn}")
+
+    data = show_result[0]
+
+    return {
+        "name": data["name"],
+        "min_nodes": data["min_nodes"],
+        "max_nodes": data["max_nodes"],
+        "instance_family": data["instance_family"],
+        "auto_resume": data["auto_resume"],
+        "initially_suspended": data["initially_suspended"],
+        "auto_suspend_secs": data["auto_suspend_secs"],
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_database(session, fqn: FQN):
     show_result = execute(session, f"SHOW DATABASES LIKE '{fqn.name}'", cacheable=True)
 
