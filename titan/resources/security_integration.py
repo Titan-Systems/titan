@@ -33,7 +33,7 @@ class OAuthClient(ParseableEnum):
 @dataclass(unsafe_hash=True)
 class _SnowflakeOAuthSecurityIntegration(ResourceSpec):
     name: ResourceName
-    integration_type: SecurityIntegrationType = SecurityIntegrationType.OAUTH
+    type: SecurityIntegrationType = SecurityIntegrationType.OAUTH
     enabled: bool = True
     oauth_client: OAuthClient = None
     oauth_client_secret: str = None
@@ -48,7 +48,7 @@ class SnowflakeOAuthSecurityIntegration(Resource):
 
     resource_type = ResourceType.SECURITY_INTEGRATION
     props = Props(
-        integration_type=EnumProp("integration_type", [SecurityIntegrationType.OAUTH]),
+        type=EnumProp("type", [SecurityIntegrationType.OAUTH]),
         enabled=BoolProp("enabled"),
         oauth_client=EnumProp("oauth_client", OAuthClient),
         oauth_client_secret=StringProp("oauth_client_secret"),
@@ -72,7 +72,7 @@ class SnowflakeOAuthSecurityIntegration(Resource):
         comment: str = None,
         **kwargs,
     ):
-        kwargs.pop("integration_type", None)
+        kwargs.pop("type", None)
         super().__init__(**kwargs)
         self._data = _SnowflakeOAuthSecurityIntegration(
             name=name,

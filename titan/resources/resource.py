@@ -130,7 +130,7 @@ RESOURCE_SCOPES = {
 
 
 class _Resource(type):
-    __types__ = {}
+    __types__: dict[ResourceType, list[Type["Resource"]]] = {}
     __resolvers__ = {}
 
     def __new__(cls, name, bases, attrs):

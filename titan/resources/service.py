@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from .resource import Resource, ResourceSpec
 from .compute_pool import ComputePool
 from .warehouse import Warehouse
-from ..enums import ResourceType
+from ..enums import AccountEdition, ResourceType
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
 from ..props import (
@@ -53,12 +53,13 @@ class Service(Resource):
       [ COMMENT = '{string_literal}']
     """
 
+    edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.SERVICE
     props = Props(
-        compute_pool=IdentifierProp("in compute pool"),
+        compute_pool=IdentifierProp("in compute pool", eq=False),
         # stage=StringProp("stage"),
         specification_file=StringProp("specification_file"),
-        specification_text=StringProp("from specification"),
+        specification_text=StringProp("from specification", eq=False),
         external_access_integrations=IdentifierListProp("external_access_integrations", parens=True),
         auto_resume=BoolProp("auto_resume"),
         min_instances=IntProp("min_instances"),

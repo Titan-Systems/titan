@@ -4,7 +4,6 @@ from tests.helpers import get_json_fixtures
 
 from titan.resource_name import ResourceName
 
-
 JSON_FIXTURES = list(get_json_fixtures())
 
 

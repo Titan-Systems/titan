@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
-from ..enums import ResourceType
+from ..enums import AccountEdition, ResourceType
 from ..props import Props
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
@@ -19,6 +19,7 @@ class ImageRepository(Resource):
     CREATE [ OR REPLACE ] IMAGE REPOSITORY [ IF NOT EXISTS ] <name>
     """
 
+    edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.IMAGE_REPOSITORY
     props = Props()
     scope = SchemaScope()

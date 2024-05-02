@@ -4,6 +4,7 @@ from titan.blueprint import Blueprint
 from titan.resources import (
     ComputePool,
     Database,
+    ImageRepository,
     Role,
     Schema,
     SnowflakeOAuthSecurityIntegration,
@@ -29,14 +30,14 @@ def test_container_service():
 
     security_integration = SnowflakeOAuthSecurityIntegration(
         name="Application Authentication Test",
-        integration_type="oauth",
+        type="oauth",
         oauth_client="snowservices_ingress",
         enabled=True,
     )
 
     image_repository = ImageRepository(name="container_test_image_repo")
 
-    bp.add(compute_pool, security_integration)
+    bp.add(compute_pool, security_integration, image_repository)
 
     # # Grant permissions
     # bp.grant_all_on_database("titan_db_test", "container_test_admin_role")

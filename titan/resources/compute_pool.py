@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
-from ..enums import ParseableEnum, ResourceType
+from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
     IntProp,
     StringProp,
@@ -49,6 +49,7 @@ class ComputePool(Resource):
       [ COMMENT = '<string_literal>' ]
     """
 
+    edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.COMPUTE_POOL
     props = Props(
         min_nodes=IntProp("min_nodes"),
