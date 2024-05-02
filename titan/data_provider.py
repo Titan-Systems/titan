@@ -471,6 +471,21 @@ def fetch_grant_on_all(session, fqn: FQN):
     return None
 
 
+def fetch_image_repository(session, fqn: FQN):
+    show_result = execute(
+        session, f"SHOW IMAGE REPOSITORIES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True
+    )
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple image repositories matching {fqn}")
+
+    data = show_result[0]
+
+    return {"name": fqn.name, "owner": data["owner"]}
+
+
 def fetch_password_policy(session, fqn: FQN):
     show_result = execute(session, f"SHOW PASSWORD POLICIES IN SCHEMA {fqn.database}.{fqn.schema}")
     policies = _filter_result(show_result, name=fqn.name)
@@ -669,6 +684,34 @@ def fetch_sequence(session, fqn: FQN):
         "start": data["next_value"],
         "increment": data["interval"],
         "comment": data["comment"] or None,
+    }
+
+
+def fetch_service(session, fqn: FQN):
+    show_result = execute(
+        session, f"SHOW SERVICES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True
+    )
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple services matching {fqn}")
+
+    data = show_result[0]
+
+    tags = fetch_resource_tags(session, ResourceType.SERVICE, fqn)
+
+    return {
+        "name": fqn.name,
+        "compute_pool": data["compute_pool"],
+        "external_access_integrations": None,
+        "auto_resume": data["auto_resume"] == "true",
+        "min_instances": data["min_instances"],
+        "max_instances": data["max_instances"],
+        "query_warehouse": data["query_warehouse"],
+        "tags": tags,
+        "comment": data["comment"] or None,
+        "owner": data["owner"],
     }
 
 

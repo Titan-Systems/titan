@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec
 from .compute_pool import ComputePool
@@ -21,9 +21,9 @@ from ..props import (
 class _ServiceSpec(ResourceSpec):
     name: ResourceName
     compute_pool: ComputePool
-    stage: str = None
-    yaml_file_stage_path: str = None
-    specification_text: str = None
+    stage: str = field(default_factory=None, metadata={"fetchable": False})
+    yaml_file_stage_path: str = field(default_factory=None, metadata={"fetchable": False})
+    specification_text: str = field(default_factory=None, metadata={"fetchable": False})
     external_access_integrations: list[str] = None
     auto_resume: bool = True
     min_instances: int = None
