@@ -7,7 +7,7 @@ from titan.resources import (
     ImageRepository,
     Role,
     Schema,
-    SnowflakeOAuthSecurityIntegration,
+    SnowflakePartnerOAuthSecurityIntegration,
     Warehouse,
 )
 
@@ -28,7 +28,7 @@ def test_container_service():
         name="titan_app_compute_pool_test", min_nodes=1, max_nodes=1, instance_family="CPU_X64_XS"
     )
 
-    security_integration = SnowflakeOAuthSecurityIntegration(
+    security_integration = SnowflakePartnerOAuthSecurityIntegration(
         name="Application Authentication Test",
         type="oauth",
         oauth_client="snowservices_ingress",

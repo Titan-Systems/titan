@@ -31,7 +31,7 @@ class OAuthClient(ParseableEnum):
 
 
 @dataclass(unsafe_hash=True)
-class _SnowflakeOAuthSecurityIntegration(ResourceSpec):
+class _SnowflakePartnerOAuthSecurityIntegration(ResourceSpec):
     name: ResourceName
     type: SecurityIntegrationType = SecurityIntegrationType.OAUTH
     enabled: bool = True
@@ -42,15 +42,22 @@ class _SnowflakeOAuthSecurityIntegration(ResourceSpec):
     oauth_refresh_token_validity: int = 7776000
     comment: str = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.oauth_client not in [OAuthClient.LOOKER, OAuthClient.TABLEAU_DESKTOP, OAuthClient.TABLEAU_SERVER]:
+            raise ValueError(f"Invalid OAuth client: {self.oauth_client}")
 
-class SnowflakeOAuthSecurityIntegration(Resource):
+
+class SnowflakePartnerOAuthSecurityIntegration(Resource):
     """A security integration in Snowflake to manage external authentication mechanisms."""
 
     resource_type = ResourceType.SECURITY_INTEGRATION
     props = Props(
         type=EnumProp("type", [SecurityIntegrationType.OAUTH]),
         enabled=BoolProp("enabled"),
-        oauth_client=EnumProp("oauth_client", OAuthClient),
+        oauth_client=EnumProp(
+            "oauth_client", [OAuthClient.LOOKER, OAuthClient.TABLEAU_DESKTOP, OAuthClient.TABLEAU_SERVER]
+        ),
         oauth_client_secret=StringProp("oauth_client_secret"),
         oauth_redirect_uri=StringProp("oauth_redirect_uri"),
         oauth_issue_refresh_tokens=BoolProp("oauth_issue_refresh_tokens"),
@@ -58,7 +65,7 @@ class SnowflakeOAuthSecurityIntegration(Resource):
         comment=StringProp("comment"),
     )
     scope = AccountScope()
-    spec = _SnowflakeOAuthSecurityIntegration
+    spec = _SnowflakePartnerOAuthSecurityIntegration
 
     def __init__(
         self,
@@ -74,7 +81,7 @@ class SnowflakeOAuthSecurityIntegration(Resource):
     ):
         kwargs.pop("type", None)
         super().__init__(**kwargs)
-        self._data = _SnowflakeOAuthSecurityIntegration(
+        self._data = _SnowflakePartnerOAuthSecurityIntegration(
             name=name,
             enabled=enabled,
             oauth_client=oauth_client,
@@ -86,17 +93,61 @@ class SnowflakeOAuthSecurityIntegration(Resource):
         )
 
 
-SecurityIntegrationMap = {
-    # SecurityIntegrationType.API_AUTHENTICATION: SecurityIntegration,
-    # SecurityIntegrationType.EXTERNAL_OAUTH: SecurityIntegration,
-    SecurityIntegrationType.OAUTH: SnowflakeOAuthSecurityIntegration,
-    # SecurityIntegrationType.SAML2: SecurityIntegration,
-    # SecurityIntegrationType.SCIM: SecurityIntegration,
-}
+@dataclass(unsafe_hash=True)
+class _SnowservicesOAuthSecurityIntegration(ResourceSpec):
+    name: ResourceName
+    type: SecurityIntegrationType = SecurityIntegrationType.OAUTH
+    oauth_client: OAuthClient = OAuthClient.SNOWSERVICES_INGRESS
+    enabled: bool = True
+    comment: str = None
+
+
+class SnowservicesOAuthSecurityIntegration(Resource):
+    """A security integration in Snowflake to manage external authentication mechanisms."""
+
+    resource_type = ResourceType.SECURITY_INTEGRATION
+    props = Props(
+        type=EnumProp("type", [SecurityIntegrationType.OAUTH]),
+        oauth_client=EnumProp("oauth_client", [OAuthClient.SNOWSERVICES_INGRESS]),
+        enabled=BoolProp("enabled"),
+        comment=StringProp("comment"),
+    )
+    scope = AccountScope()
+    spec = _SnowservicesOAuthSecurityIntegration
+
+    def __init__(
+        self,
+        name: str,
+        enabled: bool = True,
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        kwargs.pop("oauth_client", None)
+        super().__init__(**kwargs)
+        self._data = _SnowservicesOAuthSecurityIntegration(
+            name=name,
+            enabled=enabled,
+            comment=comment,
+        )
 
 
 def _resolver(data: dict):
-    return SecurityIntegrationMap[SecurityIntegrationType(data["integration_type"])]
+    security_integration_type = SecurityIntegrationType(data["type"])
+    if security_integration_type == SecurityIntegrationType.OAUTH:
+        oauth_client = OAuthClient(data["oauth_client"])
+        if oauth_client in [
+            OAuthClient.LOOKER,
+            OAuthClient.TABLEAU_DESKTOP,
+            OAuthClient.TABLEAU_SERVER,
+        ]:
+            return SnowflakePartnerOAuthSecurityIntegration
+        elif oauth_client == OAuthClient.CUSTOM:
+            # return SnowflakeCustomOAuthSecurityIntegration
+            return None
+        elif oauth_client == OAuthClient.SNOWSERVICES_INGRESS:
+            return SnowservicesOAuthSecurityIntegration
+    return None
 
 
-Resource.__resolvers__[ResourceType.STORAGE_INTEGRATION] = _resolver
+Resource.__resolvers__[ResourceType.SECURITY_INTEGRATION] = _resolver

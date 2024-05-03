@@ -44,7 +44,7 @@ from .notification_integration import (
 )
 
 from .security_integration import (
-    SnowflakeOAuthSecurityIntegration,
+    SnowflakePartnerOAuthSecurityIntegration,
 )
 
 from .storage_integration import (
@@ -98,7 +98,7 @@ __all__ = [
     "S3StorageIntegration",
     "Schema",
     "Secret",
-    "SnowflakeOAuthSecurityIntegration",
+    "SnowflakePartnerOAuthSecurityIntegration",
     "Sequence",
     "Service",
     # "SharedDatabase",

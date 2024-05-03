@@ -684,17 +684,28 @@ def fetch_security_integration(session, fqn: FQN):
     desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
     properties = _desc_type2_result_to_dict(desc_result)
 
-    return {
-        "name": data["name"],
-        "type": type_,
-        "enabled": data["enabled"] == "true",
-        "oauth_client": oauth_client,
-        # "oauth_client_secret": None,
-        # "oauth_redirect_uri": None,
-        "oauth_issue_refresh_tokens": properties["oauth_issue_refresh_tokens"] == "true",
-        "oauth_refresh_token_validity": properties["oauth_refresh_token_validity"],
-        "comment": data["comment"] or None,
-    }
+    if type_ == "OAUTH":
+        if oauth_client == "SNOWSERVICES_INGRESS":
+            return {
+                "name": data["name"],
+                "type": type_,
+                oauth_client: oauth_client,
+                "enabled": data["enabled"] == "true",
+                "oauth_client": oauth_client,
+            }
+    raise Exception(f"Unsupported security integration type {type_}")
+
+    # return {
+    #     "name": data["name"],
+    #     "type": type_,
+    #     "enabled": data["enabled"] == "true",
+    #     "oauth_client": oauth_client,
+    #     # "oauth_client_secret": None,
+    #     # "oauth_redirect_uri": None,
+    #     "oauth_issue_refresh_tokens": properties["oauth_issue_refresh_tokens"] == "true",
+    #     "oauth_refresh_token_validity": properties["oauth_refresh_token_validity"],
+    #     "comment": data["comment"] or None,
+    # }
 
 
 def fetch_sequence(session, fqn: FQN):
