@@ -479,7 +479,6 @@ class Blueprint:
             urn = parse_URN(urn_str)
             before = remote_state.get(urn_str, {})
             after = manifest.get(urn_str, {})
-            resource_cls = Resource.resolve_resource_cls(urn.resource_type, before)
 
             # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
             #     for on_type, privs in data.items():
@@ -491,6 +490,8 @@ class Blueprint:
             if action == DiffAction.CHANGE:
                 if urn in marked_for_replacement:
                     continue
+
+                resource_cls = Resource.resolve_resource_cls(urn.resource_type, before)
 
                 # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
                 attr = list(delta.keys())[0]
