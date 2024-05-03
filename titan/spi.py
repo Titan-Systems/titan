@@ -8,8 +8,8 @@ from snowflake.snowpark.exceptions import SnowparkSQLException
 
 from . import data_provider as dp
 from . import lifecycle, resources, __version__
-from .blueprint import Blueprint
-from .diff import Action, diff
+from .blueprint import Action, Blueprint
+from .diff import diff
 from .enums import DataType, ResourceType
 from .identifiers import FQN, URN
 from .parse import parse_identifier

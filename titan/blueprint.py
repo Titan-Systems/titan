@@ -510,6 +510,7 @@ class Blueprint:
                     marked_for_replacement.add(urn)
                 elif attr_metadata.get("forces_add", False):
                     changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=delta))
+                    continue
                 elif attr_metadata.get("fetchable", True) is False:
                     # drift on fields that aren't fetchable should be ignored
                     # TODO: throw a warning, or have a blueprint runmode that fails on this

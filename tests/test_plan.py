@@ -1,7 +1,6 @@
 import pytest
 
-from titan.blueprint import Blueprint, ResourceChange
-from titan.diff import Action
+from titan.blueprint import Action, Blueprint, ResourceChange
 from titan.parse import parse_URN
 
 
