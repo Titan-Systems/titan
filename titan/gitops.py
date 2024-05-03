@@ -57,22 +57,20 @@ def collect_resources_from_config(config: dict):
     config = config.copy()
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
+    grants = config.pop("grants", [])
 
-    other_resources = []
+    resources = []
     for resource_type in Resource.__types__.keys():
         resource_label = pluralize(resource_label_for_type(resource_type))
         for resource in config.pop(resource_label, []):
             resource_cls = Resource.resolve_resource_cls(resource_type, resource)
-            other_resources.append(resource_cls(**resource))
+            resources.append(resource_cls(**resource))
 
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
 
-    database_resources = resources_from_database_config(database_config)
-    role_grants = resources_from_role_grants_config(role_grants)
+    resources.extend(resources_from_database_config(database_config))
+    resources.extend(resources_from_role_grants_config(role_grants))
+    resources.extend(resources_from_grants_config(grants))
 
-    return (
-        *database_resources,
-        *role_grants,
-        *other_resources,
-    )
+    return resources
