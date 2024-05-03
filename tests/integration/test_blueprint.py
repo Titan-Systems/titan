@@ -1,7 +1,6 @@
 import pytest
 
-from titan import Blueprint, Database, Grant, User, Role, RoleGrant, data_provider
-from titan.diff import DiffAction
+from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, data_provider
 from titan.blueprint import MissingResourceException, plan_sql
 from tests.helpers import get_json_fixtures
 
@@ -131,3 +130,20 @@ def test_blueprint_missing_resource_pointer(cursor):
     blueprint = Blueprint(name="blueprint", resources=[grant])
     with pytest.raises(MissingResourceException):
         blueprint.plan(session)
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_missing_database(cursor):
+    session = cursor.connection
+    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", schema="public")
+    blueprint = Blueprint(name="blueprint", resources=[func])
+    with pytest.raises(Exception):
+        blueprint.plan(session)
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_implied_container_tree(cursor, test_db):
+    session = cursor.connection
+    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database=test_db, schema="public")
+    blueprint = Blueprint(name="blueprint", resources=[func])
+    assert len(blueprint.plan(session)) == 1

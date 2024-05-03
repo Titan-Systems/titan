@@ -631,7 +631,7 @@ def fetch_role_grant(session, fqn: FQN):
 
 def fetch_schema(session, fqn: FQN):
     if fqn.database is None:
-        raise Exception(f"Schema fqn must have a database {fqn}")
+        raise Exception(f"Schema {fqn} is missing a database name")
     try:
         show_result = execute(session, f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
     except ProgrammingError:
