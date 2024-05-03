@@ -701,6 +701,7 @@ class Blueprint:
             switch_to_role = None
             if "owner" in change.before:
                 switch_to_role = change.before["owner"]
+                action_queue.append(f"USE ROLE {switch_to_role}")
             elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
                 switch_to_role = "SECURITYADMIN"
             if switch_to_role and switch_to_role in usable_roles:
