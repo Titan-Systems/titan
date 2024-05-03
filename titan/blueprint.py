@@ -32,6 +32,10 @@ class MissingPrivilegeException(Exception):
     pass
 
 
+class MissingResourceException(Exception):
+    pass
+
+
 class RunMode(ParseableEnum):
     CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
     FULLY_MANAGED = "FULLY-MANAGED"
@@ -375,6 +379,14 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
                 normalized = resource_cls.defaults() | data
             state[urn_str] = normalized
 
+    # check for existence of resource references
+    for parent, reference in manifest["_refs"]:
+        urn = parse_URN(reference)
+        resource_cls = Resource.resolve_resource_cls(urn.resource_type)
+        data = data_provider.fetch_resource(session, urn)
+        if data is None:
+            raise MissingResourceException(f"Resource {urn} required by {parent} not found")
+
     return state
 
 
@@ -470,8 +482,6 @@ class Blueprint:
 
         # Calculate a topological sort order for the URNs
         sort_order = topological_sort(resource_set, refs)
-
-        # Once sorting is done, remove the _refs and _urns keys from the manifest
 
         changes: Plan = []
         marked_for_replacement = set()

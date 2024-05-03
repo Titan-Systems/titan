@@ -1,7 +1,0 @@
-{
-    "name": "some_sec_int",
-    "type": "OAUTH",
-    "enabled": true,
-    "oauth_client": "SNOWSERVICES_INGRESS",
-    "comment": null
-}

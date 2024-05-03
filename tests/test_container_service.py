@@ -28,16 +28,9 @@ def test_container_service():
         name="titan_app_compute_pool_test", min_nodes=1, max_nodes=1, instance_family="CPU_X64_XS"
     )
 
-    security_integration = SnowflakePartnerOAuthSecurityIntegration(
-        name="Application Authentication Test",
-        type="oauth",
-        oauth_client="snowservices_ingress",
-        enabled=True,
-    )
-
     image_repository = ImageRepository(name="container_test_image_repo")
 
-    bp.add(compute_pool, security_integration, image_repository)
+    bp.add(compute_pool, image_repository)
 
     # # Grant permissions
     # bp.grant_all_on_database("titan_db_test", "container_test_admin_role")
