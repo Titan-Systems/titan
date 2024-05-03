@@ -8,7 +8,7 @@ from .role import Role
 from .user import User
 from ..enums import ResourceType
 from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
-from ..parse import _parse_grant, _parse_props
+from ..parse import _parse_grant
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
 from ..props import Props, FlagProp, IdentifierProp
 from ..resource_name import ResourceName
@@ -180,7 +180,7 @@ class Grant(Resource):
                 on_type = ResourceType.ACCOUNT
 
         if owner is None:
-            if on == "ACCOUNT" and isinstance(priv, GlobalPriv):
+            if on_type == ResourceType.ACCOUNT and isinstance(priv, GlobalPriv):
                 owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
             # Hacky fix
             elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):

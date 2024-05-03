@@ -72,6 +72,8 @@ def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     on_type = data["on_type"]
     if "INTEGRATION" in on_type:
         on_type = "INTEGRATION"
+    elif on_type == "ACCOUNT":
+        on_type = ""
     return tidy_sql(
         "GRANT",
         data["priv"],

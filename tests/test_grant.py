@@ -9,6 +9,7 @@ def test_grant_global_priv():
     assert grant.on == "ACCOUNT"
     assert grant.to.name == "somerole"
     assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=CREATE WAREHOUSE&on=ACCOUNT"
+    assert grant.create_sql() == "GRANT CREATE WAREHOUSE ON ACCOUNT TO somerole"
 
 
 def test_grant_account_obj_priv_with_resource():
