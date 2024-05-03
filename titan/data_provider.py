@@ -689,9 +689,8 @@ def fetch_security_integration(session, fqn: FQN):
             return {
                 "name": data["name"],
                 "type": type_,
-                oauth_client: oauth_client,
-                "enabled": data["enabled"] == "true",
                 "oauth_client": oauth_client,
+                "enabled": data["enabled"] == "true",
             }
     raise Exception(f"Unsupported security integration type {type_}")
 

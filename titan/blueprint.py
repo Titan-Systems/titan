@@ -643,7 +643,15 @@ class Blueprint:
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = _fetch_remote_state(session, manifest)
-        completed_plan = self._plan(remote_state, manifest)
+        try:
+            completed_plan = self._plan(remote_state, manifest)
+        except Exception as e:
+            print("~" * 80, "REMOTE STATE")
+            print(remote_state)
+            print("~" * 80, "MANIFEST")
+            print(manifest)
+
+            raise e
         self._raise_for_nonconforming_plan(completed_plan)
         return completed_plan
 
