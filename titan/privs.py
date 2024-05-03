@@ -113,11 +113,11 @@ class DatabasePriv(ParseableEnum):
     APPLYBUDGET = "APPLYBUDGET"
     CREATE_DATABASE_ROLE = "CREATE DATABASE ROLE"
     CREATE_SCHEMA = "CREATE SCHEMA"
-    IMPORTED_PRIVILEGES = "IMPORTED PRIVILEGES"
+    # IMPORTED_PRIVILEGES = "IMPORTED PRIVILEGES" # only granted on shared database
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
     OWNERSHIP = "OWNERSHIP"
-    REFERENCE_USAGE = "REFERENCE_USAGE"
+    # REFERENCE_USAGE = "REFERENCE_USAGE" # Only granted to shares
     USAGE = "USAGE"
 
 
@@ -386,3 +386,11 @@ CREATE_PRIV_FOR_RESOURCE_TYPE = {
 
 def is_ownership_priv(priv):
     return str(priv) == "OWNERSHIP"
+
+
+def _all_privs_for_resource_type(resource_type):
+    all_privs = []
+    for priv in PRIVS_FOR_RESOURCE_TYPE[resource_type]:
+        if priv != "ALL" and priv != "OWNERSHIP":
+            all_privs.append(str(priv))
+    return all_privs

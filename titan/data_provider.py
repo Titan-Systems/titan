@@ -435,6 +435,7 @@ def fetch_grant(session, fqn: FQN):
         if err.errno == DOEST_NOT_EXIST_ERR:
             return None
         raise
+    priv = fqn.params["priv"]
     on_type, on = fqn.params["on"].split("/")
     on_type = str(resource_type_for_label(on_type))
     grants = _filter_result(
@@ -446,21 +447,23 @@ def fetch_grant(session, fqn: FQN):
 
     if len(grants) == 0:
         return None
-    elif len(grants) > 1:
+    elif len(grants) > 1 and priv != "ALL":
         # This is likely to happen when a grant has been issued by ACCOUNTADMIN
         # and some other role with MANAGE GRANTS or OWNERSHIP. It needs to be properly
         # handled in the future.
         raise Exception(f"Found multiple grants matching {fqn}")
 
     data = grants[0]
+    privs = sorted([g["privilege"] for g in grants])
 
     return {
-        "priv": data["privilege"],
+        "priv": priv,
         "on": data["name"],
         "on_type": data["granted_on"],
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
         "owner": data["granted_by"],
+        "_privs": privs,
     }
 
 

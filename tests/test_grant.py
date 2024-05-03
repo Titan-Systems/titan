@@ -1,4 +1,5 @@
 from titan.enums import ResourceType
+from titan.privs import _all_privs_for_resource_type
 from titan.identifiers import URN
 from titan.resources import FutureGrant, Grant, Role, RoleGrant, Schema, User, Warehouse
 
@@ -48,6 +49,16 @@ def test_grant_schema_priv_with_kwarg():
     assert grant.on_type == ResourceType.SCHEMA
     assert grant.to.name == "SOMEROLE"
     assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=CREATE VIEW&on=schema/someschema"
+
+
+def test_grant_all():
+    grant = Grant(priv="ALL", on_warehouse="somewh", to="somerole")
+    assert grant.priv == "ALL"
+    assert grant.on == "SOMEWH"
+    assert grant.on_type == ResourceType.WAREHOUSE
+    assert grant.to.name == "SOMEROLE"
+    assert grant._data._privs == _all_privs_for_resource_type(ResourceType.WAREHOUSE)
+    assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=ALL&on=warehouse/somewh"
 
 
 def test_grant_future_schemas_priv():

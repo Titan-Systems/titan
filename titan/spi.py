@@ -9,7 +9,7 @@ from snowflake.snowpark.exceptions import SnowparkSQLException
 from . import data_provider as dp
 from . import lifecycle, resources, __version__
 from .blueprint import Blueprint
-from .diff import DiffAction, diff
+from .diff import Action, diff
 from .enums import DataType, ResourceType
 from .identifiers import FQN, URN
 from .parse import parse_identifier
@@ -138,7 +138,7 @@ def _to_object(obj):
         return {_to_object(k): _to_object(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [_to_object(v) for v in obj]
-    if isinstance(obj, (DiffAction, URN)):
+    if isinstance(obj, (Action, URN)):
         return str(obj)
     if obj is None:
         return obj

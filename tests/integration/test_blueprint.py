@@ -2,6 +2,7 @@ import pytest
 
 from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, data_provider
 from titan.blueprint import MissingResourceException, plan_sql
+from titan.diff import Action
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -147,3 +148,13 @@ def test_blueprint_implied_container_tree(cursor, test_db):
     func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database=test_db, schema="public")
     blueprint = Blueprint(name="blueprint", resources=[func])
     assert len(blueprint.plan(session)) == 1
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_forces_add(cursor, test_db, role):
+    session = cursor.connection
+    all_grant = Grant(priv="ALL", on=test_db, to=role)
+    blueprint = Blueprint(name="blueprint", resources=[all_grant])
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD

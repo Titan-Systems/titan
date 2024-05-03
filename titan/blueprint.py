@@ -6,7 +6,7 @@ import snowflake.connector
 
 from . import data_provider, lifecycle
 from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
-from .diff import diff, DiffAction
+from .diff import diff, Action
 from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN
@@ -43,7 +43,7 @@ class RunMode(ParseableEnum):
 
 @dataclass
 class ResourceChange:
-    action: DiffAction
+    action: Action
     urn: URN
     before: dict
     after: dict
@@ -86,11 +86,11 @@ def print_plan(plan: Plan):
     """
     for change in plan:
         action_marker = ""
-        if change.action == DiffAction.ADD:
+        if change.action == Action.ADD:
             action_marker = "+"
-        elif change.action == DiffAction.CHANGE:
+        elif change.action == Action.CHANGE:
             action_marker = "~"
-        elif change.action == DiffAction.REMOVE:
+        elif change.action == Action.REMOVE:
             action_marker = "-"
         # »
         print(f"{action_marker} {change.urn}", "{")
@@ -113,11 +113,11 @@ def plan_sql(plan: Plan):
     sql_commands = []
     for change in plan:
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-        if change.action == DiffAction.ADD:
+        if change.action == Action.ADD:
             sql_commands.append(lifecycle.create_resource(change.urn, change.after, props))
-        elif change.action == DiffAction.CHANGE:
+        elif change.action == Action.CHANGE:
             sql_commands.append(lifecycle.update_resource(change.urn, change.delta, props))
-        elif change.action == DiffAction.REMOVE:
+        elif change.action == Action.REMOVE:
             sql_commands.append(lifecycle.drop_resource(change.urn, change.before))
     return sql_commands
 
@@ -178,7 +178,7 @@ def _collect_required_privs(session_ctx: dict, plan: Plan) -> list:
         resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
         # privs = []
         privs = And()
-        if change.action == DiffAction.ADD:
+        if change.action == Action.ADD:
             # Special cases
 
             # GRANT ROLE
@@ -285,7 +285,7 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
 
             # If we plan to add a new resource and we have the privs to create it, we can assume
             # that we have the OWNERSHIP priv on that resource
-            if change.action == DiffAction.ADD:
+            if change.action == Action.ADD:
                 resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
                 create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(change.urn.resource_type)
                 if create_priv is None:
@@ -438,11 +438,11 @@ class Blueprint:
             return
         elif self._run_mode == RunMode.CREATE_OR_UPDATE:
             for change in plan:
-                if change.action == DiffAction.REMOVE:
+                if change.action == Action.REMOVE:
                     exceptions.append(
                         f"Create-or-update mode does not allow resources to be removed (ref: {change.urn})"
                     )
-                if change.action == DiffAction.CHANGE:
+                if change.action == Action.CHANGE:
                     if "owner" in change.delta:
                         change_debug = f"{change.before['owner']} => {change.delta['owner']}"
                         exceptions.append(
@@ -490,14 +490,14 @@ class Blueprint:
             before = remote_state.get(urn_str, {})
             after = manifest.get(urn_str, {})
 
-            # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (DiffAction.ADD, DiffAction.CHANGE):
+            # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (Action.ADD, Action.CHANGE):
             #     for on_type, privs in data.items():
             #         privs_to_add = privs
-            #         if action == DiffAction.CHANGE:
+            #         if action == Action.CHANGE:
             #             privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
             #         for priv in privs_to_add:
-            #             changes.append(ResourceChange(action=DiffAction.ADD, urn=urn_str, before={}, after={}, delta={on_type: [priv]}))
-            if action == DiffAction.CHANGE:
+            #             changes.append(ResourceChange(action=Action.ADD, urn=urn_str, before={}, after={}, delta={on_type: [priv]}))
+            if action == Action.CHANGE:
                 if urn in marked_for_replacement:
                     continue
 
@@ -508,6 +508,8 @@ class Blueprint:
                 attr_metadata = resource_cls.spec.get_metadata(attr)
                 if attr_metadata.get("triggers_replacement", False):
                     marked_for_replacement.add(urn)
+                elif attr_metadata.get("forces_add", False):
+                    changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=delta))
                 elif attr_metadata.get("fetchable", True) is False:
                     # drift on fields that aren't fetchable should be ignored
                     # TODO: throw a warning, or have a blueprint runmode that fails on this
@@ -516,14 +518,14 @@ class Blueprint:
                     continue
                 else:
                     changes.append(ResourceChange(action, urn, before, after, delta))
-            elif action == DiffAction.ADD:
+            elif action == Action.ADD:
                 changes.append(ResourceChange(action=action, urn=urn, before={}, after=after, delta=delta))
-            elif action == DiffAction.REMOVE:
+            elif action == Action.REMOVE:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
 
         for urn in marked_for_replacement:
-            changes.append(ResourceChange(action=DiffAction.REMOVE, urn=urn, before=before, after={}, delta={}))
-            changes.append(ResourceChange(action=DiffAction.ADD, urn=urn, before={}, after=after, delta=after))
+            changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
+            changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
 
         return sorted(changes, key=lambda change: sort_order[str(change.urn)])
 
@@ -706,11 +708,11 @@ class Blueprint:
                 print(
                     f"Role {change.before.get('owner', '[OWNER MISSING]')} required for {change.urn} but isn't available"
                 )
-            if change.action == DiffAction.ADD:
+            if change.action == Action.ADD:
                 action_queue.append(lifecycle.create_resource(change.urn, change.after, props))
-            elif change.action == DiffAction.CHANGE:
+            elif change.action == Action.CHANGE:
                 action_queue.append(lifecycle.update_resource(change.urn, change.delta, props))
-            elif change.action == DiffAction.REMOVE:
+            elif change.action == Action.REMOVE:
                 action_queue.append(lifecycle.drop_resource(change.urn, change.before))
 
         for change in plan:

@@ -262,6 +262,27 @@ grants = [
             "to": "THATROLE",
             "owner": TEST_ROLE,
             "grant_option": False,
+            "_privs": ["USAGE"],
+        },
+    },
+    {
+        "setup_sql": [
+            "CREATE ROLE IF NOT EXISTS thatrole",
+            "GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE thatrole",
+        ],
+        "teardown_sql": [
+            "DROP ROLE IF EXISTS thatrole",
+        ],
+        "test_name": "test_all_grant",
+        "resource_type": ResourceType.GRANT,
+        "data": {
+            "priv": "ALL",
+            "on_type": "WAREHOUSE",
+            "on": "STATIC_WAREHOUSE",
+            "to": "THATROLE",
+            "owner": TEST_ROLE,
+            "grant_option": False,
+            "_privs": ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"],
         },
     },
 ]
@@ -363,6 +384,9 @@ def grant_resource(request, cursor, account_locator):
 
     static_db = STATIC_RESOURCES[ResourceType.DATABASE]
     cursor.execute(static_db.create_sql(if_not_exists=True))
+
+    static_wh = STATIC_RESOURCES[ResourceType.WAREHOUSE]
+    cursor.execute(static_wh.create_sql(if_not_exists=True))
 
     setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
     teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]

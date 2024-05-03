@@ -3,7 +3,7 @@ from enum import Enum
 from .resource_name import ResourceName, attribute_is_resource_name
 
 
-class DiffAction(Enum):
+class Action(Enum):
     ADD = "add"
     REMOVE = "remove"
     CHANGE = "change"
@@ -56,7 +56,7 @@ def diff(original, new):
 
     # Resources in remote state but not in the manifest should be removed
     for key in original_keys - new_keys:
-        yield DiffAction.REMOVE, key, original[key]
+        yield Action.REMOVE, key, original[key]
 
     # Resources in the manifest but not in remote state should be added
     for key in new_keys - original_keys:
@@ -64,9 +64,9 @@ def diff(original, new):
             raise Exception(f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {key}")
         elif isinstance(new[key], list):
             for item in new[key]:
-                yield DiffAction.ADD, key, item
+                yield Action.ADD, key, item
         else:
-            yield DiffAction.ADD, key, new[key]
+            yield Action.ADD, key, new[key]
 
     # Resources in both should be compared
     for key in original_keys & new_keys:
@@ -78,14 +78,14 @@ def diff(original, new):
             delta = dict_delta(original[key], new[key])
 
             for attr, value in delta.items():
-                yield DiffAction.CHANGE, key, {attr: value}
+                yield Action.CHANGE, key, {attr: value}
 
         elif isinstance(original[key], list):
 
             for item in original[key]:
                 if item not in new[key]:
-                    yield DiffAction.REMOVE, key, item
+                    yield Action.REMOVE, key, item
 
             for item in new[key]:
                 if item not in original[key]:
-                    yield DiffAction.ADD, key, item
+                    yield Action.ADD, key, item

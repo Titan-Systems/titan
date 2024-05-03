@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Union
 
 from inflection import singularize
@@ -9,7 +9,7 @@ from .user import User
 from ..enums import ResourceType
 from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant
-from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
+from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS, _all_privs_for_resource_type
 from ..props import Props, FlagProp, IdentifierProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
@@ -23,6 +23,15 @@ class _Grant(ResourceSpec):
     to: Role
     grant_option: bool = False
     owner: str = None
+    _privs: list[str] = field(default_factory=list, metadata={"forces_add": True})
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not self._privs:
+            if self.priv == "ALL":
+                self._privs = sorted(_all_privs_for_resource_type(self.on_type))
+            else:
+                self._privs = [self.priv]
 
 
 class Grant(Resource):
