@@ -240,8 +240,8 @@ class Grant(Resource):
 
 def grant_fqn(grant: _Grant):
     on = f"{resource_label_for_type(grant.on_type)}/{grant.on}"
-    if grant.on_type == ResourceType.ACCOUNT:
-        on = "ACCOUNT"
+    # if grant.on_type == ResourceType.ACCOUNT:
+    #     on = "ACCOUNT"
     return FQN(
         name=grant.to.name,
         params={
