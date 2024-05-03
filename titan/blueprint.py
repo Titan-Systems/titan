@@ -605,11 +605,7 @@ class Blueprint:
             manifest_key = str(urn)
 
             #### Special Cases
-            if resource.resource_type == ResourceType.GRANT:
-                if manifest_key not in manifest:
-                    manifest[manifest_key] = []
-                manifest[manifest_key].append(data)
-            elif resource.resource_type == ResourceType.FUTURE_GRANT:
+            if resource.resource_type == ResourceType.FUTURE_GRANT:
                 # Role up FUTURE GRANTS on the same role/target to a single entry
                 # TODO: support grant option, use a single character prefix on the priv
                 if manifest_key not in manifest:

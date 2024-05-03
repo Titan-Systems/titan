@@ -1,6 +1,7 @@
 import pytest
 
-from titan import Blueprint, Database, User, Role, RoleGrant, data_provider
+from titan import Blueprint, Database, Grant, User, Role, RoleGrant, data_provider
+from titan.diff import DiffAction
 from titan.blueprint import plan_sql
 from tests.helpers import get_json_fixtures
 
@@ -121,3 +122,21 @@ def test_blueprint_plan_sql(cursor, user):
     plan = blueprint.plan(session)
 
     assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_with_string_grants(cursor):
+    session = cursor.connection
+    blueprint = Blueprint()
+    blueprint.add(
+        Grant.from_sql("GRANT ALL ON DATABASE titan_db_test TO ROLE titan_app_admin_role_test"),
+        Grant.from_sql("GRANT ALL ON SCHEMA titan_db_test.titan_app_test TO ROLE titan_app_admin_role_test"),
+        Grant.from_sql("GRANT ALL ON WAREHOUSE titan_app_warehouse_test TO ROLE titan_app_admin_role_test"),
+        Grant.from_sql("GRANT USAGE ON COMPUTE POOL titan_app_compute_pool_test TO ROLE titan_app_admin_role_test"),
+        Grant.from_sql("GRANT MONITOR ON COMPUTE POOL titan_app_compute_pool_test TO ROLE titan_app_admin_role_test"),
+        Grant.from_sql("GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE titan_app_admin_role_test"),
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 6
+    assert all(change.action == DiffAction.ADD for change in plan)
+    assert all("on_type" in change.after for change in plan)

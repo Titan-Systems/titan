@@ -3,6 +3,7 @@ import unittest
 from titan import (
     Blueprint,
     Database,
+    Grant,
     PythonUDF,
     Schema,
     Table,
