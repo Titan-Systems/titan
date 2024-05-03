@@ -669,6 +669,34 @@ def fetch_schema(session, fqn: FQN):
     }
 
 
+def fetch_security_integration(session, fqn: FQN):
+    show_result = execute(session, f"SHOW SECURITY INTEGRATIONS LIKE '{fqn.name}'")
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple security integrations matching {fqn}")
+
+    data = show_result[0]
+
+    type_, oauth_client = data["type"].split(" - ")
+
+    desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
+    properties = _desc_type2_result_to_dict(desc_result)
+
+    return {
+        "name": data["name"],
+        "type": type_,
+        "enabled": data["enabled"] == "true",
+        "oauth_client": oauth_client,
+        # "oauth_client_secret": None,
+        # "oauth_redirect_uri": None,
+        "oauth_issue_refresh_tokens": properties["oauth_issue_refresh_tokens"] == "true",
+        "oauth_refresh_token_validity": properties["oauth_refresh_token_validity"],
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_sequence(session, fqn: FQN):
     show_result = execute(session, f"SHOW SEQUENCES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
     if len(show_result) == 0:

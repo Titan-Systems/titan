@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec
 from ..enums import ParseableEnum, ResourceType
@@ -36,10 +36,10 @@ class _SnowflakeOAuthSecurityIntegration(ResourceSpec):
     type: SecurityIntegrationType = SecurityIntegrationType.OAUTH
     enabled: bool = True
     oauth_client: OAuthClient = None
-    oauth_client_secret: str = None
-    oauth_redirect_uri: str = None
+    oauth_client_secret: str = field(default_factory=None, metadata={"fetchable": False})
+    oauth_redirect_uri: str = field(default_factory=None, metadata={"fetchable": False})
     oauth_issue_refresh_tokens: bool = True
-    oauth_refresh_token_validity: int = None
+    oauth_refresh_token_validity: int = 7776000
     comment: str = None
 
 

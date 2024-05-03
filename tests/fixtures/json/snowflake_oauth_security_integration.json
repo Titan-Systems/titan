@@ -6,6 +6,6 @@
     "oauth_client_secret": null,
     "oauth_redirect_uri": null,
     "oauth_issue_refresh_tokens": true,
-    "oauth_refresh_token_validity": null,
+    "oauth_refresh_token_validity": 7776000,
     "comment": null
 }
