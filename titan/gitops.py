@@ -3,11 +3,9 @@ from inflection import pluralize
 from .identifiers import resource_label_for_type
 from .resources import (
     Database,
-    Role,
+    Grant,
     RoleGrant,
     Schema,
-    User,
-    Warehouse,
     Resource,
 )
 
@@ -42,6 +40,16 @@ def resources_from_database_config(databases_config: list) -> list:
             sch = Schema(**schema)
             db.add(sch)
             resources.append(sch)
+    return resources
+
+
+def resources_from_grants_config(grants_config: list) -> list:
+    resources = []
+    for grant in grants_config:
+        if isinstance(grant, dict):
+            resources.append(Grant(**grant))
+        elif isinstance(grant, str):
+            resources.append(Grant.from_sql(grant))
     return resources
 
 
