@@ -54,6 +54,8 @@ def resources_from_grants_config(grants_config: list) -> list:
 
 
 def collect_resources_from_config(config: dict):
+    # TODO: ResourcePointers should get resolved to top-level resource configs when possible
+
     config = config.copy()
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
