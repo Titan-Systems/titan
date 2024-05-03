@@ -23,7 +23,7 @@ class _ServiceSpec(ResourceSpec):
     compute_pool: ComputePool
     stage: str = field(default_factory=None, metadata={"fetchable": False})
     yaml_file_stage_path: str = field(default_factory=None, metadata={"fetchable": False})
-    specification_text: str = field(default_factory=None, metadata={"fetchable": False})
+    specification: str = field(default_factory=None, metadata={"fetchable": False})
     external_access_integrations: list[str] = None
     auto_resume: bool = True
     min_instances: int = None
@@ -59,7 +59,7 @@ class Service(Resource):
         compute_pool=IdentifierProp("in compute pool", eq=False),
         # stage=StringProp("stage"),
         specification_file=StringProp("specification_file"),
-        specification_text=StringProp("from specification", eq=False),
+        specification=StringProp("from specification", eq=False),
         external_access_integrations=IdentifierListProp("external_access_integrations", parens=True),
         auto_resume=BoolProp("auto_resume"),
         min_instances=IntProp("min_instances"),
@@ -77,7 +77,7 @@ class Service(Resource):
         compute_pool: ComputePool,
         stage: str = None,
         yaml_file_stage_path: str = None,
-        specification_text: str = None,
+        specification: str = None,
         external_access_integrations: list[str] = None,
         auto_resume: bool = True,
         min_instances: int = None,
@@ -93,7 +93,7 @@ class Service(Resource):
             compute_pool=compute_pool,
             stage=stage,
             yaml_file_stage_path=yaml_file_stage_path,
-            specification_text=specification_text,
+            specification=specification,
             external_access_integrations=external_access_integrations,
             auto_resume=auto_resume,
             min_instances=min_instances,
