@@ -417,11 +417,13 @@ def fetch_grant(session, fqn: FQN):
             return None
         raise
     on_type, on = fqn.params["on"].split("/")
+    priv = fqn.params["priv"]
     on_type = str(resource_type_for_label(on_type))
     grants = _filter_result(
         show_result,
         granted_on=on_type,
         name=on,
+        privilege=priv,
         grantee_name=fqn.name,
     )
 
@@ -431,6 +433,9 @@ def fetch_grant(session, fqn: FQN):
         # This is likely to happen when a grant has been issued by ACCOUNTADMIN
         # and some other role with MANAGE GRANTS or OWNERSHIP. It needs to be properly
         # handled in the future.
+        print(on_type)
+        print(on)
+        print(priv)
         raise Exception(f"Found multiple grants matching {fqn}")
 
     data = grants[0]
@@ -618,7 +623,7 @@ def fetch_schema(session, fqn: FQN):
     options = options_result_to_list(data["options"])
     show_params_result = execute(session, f"SHOW PARAMETERS IN SCHEMA {fqn}")
     params = params_result_to_dict(show_params_result)
-    tags = fetch_resource_tags(session, ResourceType.SCHEMA, fqn)
+    #tags = fetch_resource_tags(session, ResourceType.SCHEMA, fqn)
 
     return {
         "name": data["name"],
@@ -629,7 +634,7 @@ def fetch_schema(session, fqn: FQN):
         "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
         "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
-        "tags": tags,
+        "tags": None,
     }
 
 

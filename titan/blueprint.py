@@ -344,7 +344,7 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
     urns = set(manifest["_urns"].copy())
 
     # FIXME
-    session.cursor().execute("USE ROLE ACCOUNTADMIN")
+    session.cursor().execute("USE ROLE SECURITYADMIN")
 
     for urn_str, _data in manifest.items():
         if urn_str.startswith("_"):
@@ -600,11 +600,7 @@ class Blueprint:
             manifest_key = str(urn)
 
             #### Special Cases
-            if resource.resource_type == ResourceType.GRANT:
-                if manifest_key not in manifest:
-                    manifest[manifest_key] = []
-                manifest[manifest_key].append(data)
-            elif resource.resource_type == ResourceType.FUTURE_GRANT:
+            if resource.resource_type == ResourceType.FUTURE_GRANT:
                 # Role up FUTURE GRANTS on the same role/target to a single entry
                 # TODO: support grant option, use a single character prefix on the priv
                 if manifest_key not in manifest:
@@ -692,7 +688,8 @@ class Blueprint:
             elif change.action == DiffAction.CHANGE:
                 action_queue.append(lifecycle.update_resource(change.urn, change.delta, props))
             elif change.action == DiffAction.REMOVE:
-                action_queue.append(lifecycle.drop_resource(change.urn, change.before))
+                raise Exception("Titan is trying to remove a resource!")
+            #    action_queue.append(lifecycle.drop_resource(change.urn, change.before))
 
         for change in plan:
             props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
