@@ -80,8 +80,8 @@ def collect_resources_from_config(config: dict):
 
     resource_cache = {}
     for resource in resources:
-        if "name" in resource._data:
-            resource_cache[(resource.resource_type, resource._data.name)] = resource
+        if hasattr(resource, "name"):
+            resource_cache[(resource.resource_type, resource.name)] = resource
     for resource in resources:
         for ref in resource._refs:
             cache_pointer = (ref.resource_type, ref.name)
