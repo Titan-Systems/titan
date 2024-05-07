@@ -81,11 +81,13 @@ def collect_resources_from_config(config: dict):
     resource_cache = {}
     for resource in resources:
         if hasattr(resource, "name"):
+            print("~~caching", resource.resource_type, resource.name)
             resource_cache[(resource.resource_type, resource.name)] = resource
     for resource in resources:
         for ref in resource.refs:
             cache_pointer = (ref.resource_type, ref.name)
             if isinstance(ref, ResourcePointer) and cache_pointer in resource_cache:
+                print("~~resolving", ref.resource_type, ref.name, "to", resource_cache[cache_pointer]._container)
                 ref._container = resource_cache[cache_pointer]._container
 
     return resources
