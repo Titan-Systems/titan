@@ -83,7 +83,7 @@ def collect_resources_from_config(config: dict):
         if hasattr(resource, "name"):
             resource_cache[(resource.resource_type, resource.name)] = resource
     for resource in resources:
-        for ref in resource._refs:
+        for ref in resource.refs:
             cache_pointer = (ref.resource_type, ref.name)
             if isinstance(ref, ResourcePointer) and cache_pointer in resource_cache:
                 ref._container = resource_cache[cache_pointer]._container
