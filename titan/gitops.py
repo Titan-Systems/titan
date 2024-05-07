@@ -1,6 +1,7 @@
 from inflection import pluralize
 
 from .identifiers import resource_label_for_type
+from .resources.resource import ResourcePointer
 from .resources import (
     Database,
     Grant,
@@ -57,11 +58,13 @@ def collect_resources_from_config(config: dict):
     # TODO: ResourcePointers should get resolved to top-level resource configs when possible
 
     config = config.copy()
+
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
     grants = config.pop("grants", [])
 
     resources = []
+
     for resource_type in Resource.__types__.keys():
         resource_label = pluralize(resource_label_for_type(resource_type))
         for resource in config.pop(resource_label, []):
@@ -74,5 +77,15 @@ def collect_resources_from_config(config: dict):
     resources.extend(resources_from_database_config(database_config))
     resources.extend(resources_from_role_grants_config(role_grants))
     resources.extend(resources_from_grants_config(grants))
+
+    resource_cache = {}
+    for resource in resources:
+        if "name" in resource._data:
+            resource_cache[(resource.resource_type, resource._data.name)] = resource
+    for resource in resources:
+        for ref in resource._refs:
+            cache_pointer = (ref.resource_type, ref.name)
+            if isinstance(ref, ResourcePointer) and cache_pointer in resource_cache:
+                ref._container = resource_cache[cache_pointer]._container
 
     return resources
