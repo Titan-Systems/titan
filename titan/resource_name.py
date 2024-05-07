@@ -36,7 +36,7 @@ class ResourceName:
         return hash(str(self))
 
     def __str__(self):
-        return f'"{self._name}"' if self._quoted else self._name
+        return f'"{self._name}"' if self._quoted else self._name.upper()
 
     def __eq__(self, other: Union[str, "ResourceName"]):
         if not isinstance(other, (ResourceName, str)):
