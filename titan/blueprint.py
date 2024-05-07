@@ -264,7 +264,7 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
     for role in usable_roles:
         priv_map[role] = {}
 
-        if role.startswith("SNOWFLAKE.LOCAL"):
+        if role.startswith("SNOWFLAKE.LOCAL") or role.endswith(".ALL_ENDPOINTS_USAGE"):
             continue
 
         # Existing privilege grants

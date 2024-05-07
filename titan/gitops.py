@@ -82,16 +82,20 @@ def collect_resources_from_config(config: dict):
     resource_cache = {}
     for resource in resources:
         if hasattr(resource._data, "name"):
-            print("~~caching", resource.resource_type, resource._data.name, resource._container)
+            # print("~~caching", resource.resource_type, resource._data.name, resource._container)
             resource_cache[(resource.resource_type, ResourceName(resource._data.name))] = resource
     for resource in resources:
-        print(">> checking refs for", resource)
+        # print(">> checking refs for", resource)
         for ref in resource.refs:
             cache_pointer = (ref.resource_type, ResourceName(ref.name))
-            if isinstance(ref, ResourcePointer) and cache_pointer in resource_cache:
-                print("~~resolving", ref.resource_type, ref.name, "to", resource_cache[cache_pointer]._container)
+            if (
+                isinstance(ref, ResourcePointer)
+                and cache_pointer in resource_cache
+                and resource_cache[cache_pointer]._container is not None
+            ):
+                # print("~~resolving", ref.resource_type, ref.name, "to", resource_cache[cache_pointer]._container)
                 ref._container = resource_cache[cache_pointer]._container
-            else:
-                print("~~skipping", ref.resource_type, ref.name)
+            # else:
+            #     print("~~skipping", ref.resource_type, ref.name)
 
     return resources
