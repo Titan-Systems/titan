@@ -1,5 +1,6 @@
 from inflection import pluralize
 
+from .enums import ResourceType
 from .identifiers import resource_label_for_type
 from .resource_name import ResourceName
 from .resources.resource import ResourcePointer
@@ -82,10 +83,15 @@ def collect_resources_from_config(config: dict):
     resource_cache = {}
     for resource in resources:
         if hasattr(resource._data, "name"):
-            # print("~~caching", resource.resource_type, resource._data.name, resource._container)
             resource_cache[(resource.resource_type, ResourceName(resource._data.name))] = resource
+
     for resource in resources:
         # print(">> checking refs for", resource)
+        if resource.resource_type == ResourceType.GRANT:
+            cache_pointer = (resource.on_type, ResourceName(resource.on))
+            if cache_pointer in resource_cache:
+                resource._data.on = ResourceName(str(resource_cache[cache_pointer].fqn))
+
         for ref in resource.refs:
             cache_pointer = (ref.resource_type, ResourceName(ref.name))
             if (

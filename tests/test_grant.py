@@ -1,7 +1,8 @@
 from titan.enums import ResourceType
 from titan.privs import _all_privs_for_resource_type
 from titan.identifiers import URN
-from titan.resources import FutureGrant, Grant, Role, RoleGrant, Schema, User, Warehouse
+from titan.resource_name import ResourceName
+from titan.resources import FutureGrant, Grant, ImageRepository, Role, RoleGrant, Schema, User, Warehouse
 from titan.resources.resource import ResourcePointer
 
 
@@ -114,5 +115,12 @@ def test_role_grant_to_role_with_resource():
 
 def test_grant_refs():
     grant = Grant.from_sql("GRANT READ ON IMAGE REPOSITORY some_repo TO ROLE titan_app_admin")
+    repo = ImageRepository(
+        name="titan_app_image_repo",
+        owner="titan_app_admin",
+        database="titan_app_db",
+        schema="titan_app",
+    )
+    assert ResourceName(str(repo.fqn)) == ResourceName("titan_app_db.titan_app.titan_app_image_repo")
     assert grant.priv == "READ"
     assert ResourcePointer("some_repo", ResourceType.IMAGE_REPOSITORY) in grant.refs
