@@ -6,7 +6,7 @@ from .parse import FullyQualifiedIdentifier
 
 
 def attribute_is_resource_name(attribute: str) -> bool:
-    return attribute == "name" or attribute.endswith("_name")
+    return attribute == "name" or attribute == "on" or attribute.endswith("_name")
 
 
 class ResourceName:
@@ -36,7 +36,7 @@ class ResourceName:
         return hash(str(self))
 
     def __str__(self):
-        return f'"{self._name}"' if self._quoted else self._name
+        return f'"{self._name}"' if self._quoted else self._name.upper()
 
     def __eq__(self, other: Union[str, "ResourceName"]):
         if not isinstance(other, (ResourceName, str)):

@@ -53,7 +53,7 @@ def get_json_fixture(resource_name):
 
 def get_json_fixtures():
     files = os.listdir(os.path.join(FIXTURES_DIR, "json"))
-    for f in files:
+    for f in sorted(files):
         if f.endswith(".json"):
             resource_name = f.split(".")[0]
             try:
@@ -69,7 +69,7 @@ def get_json_fixtures():
 
 def get_sql_fixtures():
     files = os.listdir(os.path.join(FIXTURES_DIR, "sql"))
-    for f in files:
+    for f in sorted(files):
         if f.endswith(".sql"):
             resource_name = f.split(".")[0]
             try:

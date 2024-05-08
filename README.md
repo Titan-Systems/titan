@@ -122,13 +122,13 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | **Account Resources**         |           |
 | API Integration               | ✅         |
 | Catalog Integration           | ❌         |
-| Compute Pool                  | ❌         |
+| Compute Pool                  | ✅         |
 | Connection                    | ❌         |
 | Database                      | ✅         |
 | External Access Integration   | ✅         |
 | External Volume               | ❌         |
 | Grant                         | ✅         |
-| ↳ Future Grant                | WIP        |
+| ↳ Future Grant                | ✅         |
 | ↳ Privilege Grant             | ✅         |
 | ↳ Role Grant                  | ✅         |
 | Network Policy                | ✅         |
@@ -140,7 +140,13 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Replication Group             | ✅         |
 | Resource Monitor              | ✅         |
 | Role                          | ✅         |
-| Security Integration          | ❌         |
+| Role Grant                    | ✅         |
+| Security Integration          | WIP        |
+| ↳ External API                | ❌         |
+| ↳ External OAuth              | ❌         |
+| ↳ Snowflake OAuth             | ✅         |
+| ↳ SAML2                       | ❌         |
+| ↳ SCIM                        | ❌         |
 | Share                         | ❌         |
 | Storage Integration           | WIP        |
 | ↳ AWS                         | ✅         |
@@ -168,8 +174,9 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ AVRO                        | ❌         |
 | ↳ ORC                         | ❌         |
 | ↳ Parquet                     | ❌         |
+| Hybrid Table                  | WIP        |
 | Iceberg Table                 | ❌         |
-| Image Repository              | ❌         |
+| Image Repository              | ✅         |
 | Internal Stage                | ✅         |
 | Masking Policy                | ❌         |
 | Materialized View             | ❌         |
@@ -179,12 +186,11 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Password Policy               | ✅         |
 | Pipe                          | ✅         |
 | Projection Policy             | ❌         |
-| Role Grant                    | ✅         |
 | Row Access Policy             | ❌         |
 | Secret                        | ✅         |
 | Sequence                      | ✅         |
-| Service                       | ❌         |
-| Session Policy                | ❌         |
+| Service                       | ✅         |
+| Session Policy                | ✅         |
 | Stage                         | ✅         |
 | ↳ External                    | ✅         |
 | ↳ Internal                    | ✅         |

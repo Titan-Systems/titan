@@ -1,7 +1,7 @@
 import pytest
 
-from titan import Blueprint, Database, User, Role, RoleGrant, data_provider
-from titan.blueprint import plan_sql
+from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, data_provider
+from titan.blueprint import Action, MissingResourceException, plan_sql
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -121,3 +121,40 @@ def test_blueprint_plan_sql(cursor, user):
     plan = blueprint.plan(session)
 
     assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_missing_resource_pointer(cursor):
+    session = cursor.connection
+    grant = Grant.from_sql("GRANT ALL ON WAREHOUSE missing_wh TO ROLE SOMEROLE")
+    blueprint = Blueprint(name="blueprint", resources=[grant])
+    with pytest.raises(MissingResourceException):
+        blueprint.plan(session)
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_missing_database(cursor):
+    session = cursor.connection
+    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", schema="public")
+    blueprint = Blueprint(name="blueprint", resources=[func])
+    with pytest.raises(Exception):
+        blueprint.plan(session)
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_implied_container_tree(cursor, test_db):
+    session = cursor.connection
+    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database=test_db, schema="public")
+    blueprint = Blueprint(name="blueprint", resources=[func])
+    assert len(blueprint.plan(session)) == 1
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_forces_add(cursor, test_db, role):
+    cursor.execute(f"GRANT USAGE ON DATABASE {test_db} TO ROLE {role.name}")
+    session = cursor.connection
+    all_grant = Grant(priv="ALL", on_database=test_db, to=role)
+    blueprint = Blueprint(name="blueprint", resources=[all_grant])
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD

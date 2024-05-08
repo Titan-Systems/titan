@@ -48,5 +48,9 @@ def resource(request, test_db, cursor, marked_for_cleanup):
 def test_create_drop(resource, test_db, cursor):
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute("USE WAREHOUSE CI")
-    cursor.execute(resource.create_sql())
+    try:
+        create_sql = resource.create_sql()
+        cursor.execute(create_sql)
+    except Exception as e:
+        pytest.fail(f"Failed to create resource with sql {create_sql}")
     cursor.execute(resource.drop_sql())

@@ -1,0 +1,10 @@
+{
+    "name": "SOME_COMPUTE_POOL",
+    "min_nodes": 1,
+    "max_nodes": 1,
+    "instance_family": "CPU_X64_XS",
+    "auto_resume": true,
+    "auto_suspend_secs": 3600,
+    "comment": null,
+    "initially_suspended": null
+}

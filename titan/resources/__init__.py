@@ -3,6 +3,7 @@ from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
 from .column import Column
+from .compute_pool import ComputePool
 from .database import Database
 from .dynamic_table import DynamicTable
 from .event_table import EventTable
@@ -11,6 +12,7 @@ from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .function import JavascriptUDF, PythonUDF
 from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
+from .image_repository import ImageRepository
 from .network_rule import NetworkRule
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
@@ -22,8 +24,7 @@ from .role import Role, DatabaseRole
 from .schema import Schema
 from .secret import Secret
 from .sequence import Sequence
-
-# from .shared_database import SharedDatabase
+from .service import Service
 from .stage import InternalStage, ExternalStage
 from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
 from .table import Table, CreateTableAsSelect
@@ -42,6 +43,10 @@ from .notification_integration import (
     AzureInboundNotificationIntegration,
 )
 
+from .security_integration import (
+    SnowflakePartnerOAuthSecurityIntegration,
+)
+
 from .storage_integration import (
     S3StorageIntegration,
     GCSStorageIntegration,
@@ -58,6 +63,7 @@ __all__ = [
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
     "Column",
+    "ComputePool",
     # "CSVFileFormat",
     "Database",
     "DatabaseRole",
@@ -75,6 +81,7 @@ __all__ = [
     "GCSStorageIntegration",
     "Grant",
     "GrantOnAll",
+    "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
     "NetworkRule",
@@ -91,7 +98,9 @@ __all__ = [
     "S3StorageIntegration",
     "Schema",
     "Secret",
+    "SnowflakePartnerOAuthSecurityIntegration",
     "Sequence",
+    "Service",
     # "SharedDatabase",
     "StageStream",
     "Table",

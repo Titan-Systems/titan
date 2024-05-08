@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Union
 
 from inflection import singularize
@@ -8,8 +8,8 @@ from .role import Role
 from .user import User
 from ..enums import ResourceType
 from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
-from ..parse import _parse_grant, _parse_props
-from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS
+from ..parse import _parse_grant
+from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS, _all_privs_for_resource_type
 from ..props import Props, FlagProp, IdentifierProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
@@ -23,6 +23,15 @@ class _Grant(ResourceSpec):
     to: Role
     grant_option: bool = False
     owner: str = None
+    _privs: list[str] = field(default_factory=list, metadata={"forces_add": True})
+
+    def __post_init__(self):
+        super().__post_init__()
+        if not self._privs:
+            if self.priv == "ALL":
+                self._privs = sorted(_all_privs_for_resource_type(self.on_type))
+            else:
+                self._privs = [self.priv]
 
 
 class Grant(Resource):
@@ -142,6 +151,9 @@ class Grant(Resource):
         >>> Grant(priv="SELECT", on_table="sometable", to="somerole")
 
         """
+
+        kwargs.pop("_privs", None)
+
         # Handle instantiation from data dict
         on_type = kwargs.pop("on_type", None)
         if on_type:
@@ -180,7 +192,7 @@ class Grant(Resource):
                 on_type = ResourceType.ACCOUNT
 
         if owner is None:
-            if on == "ACCOUNT" and isinstance(priv, GlobalPriv):
+            if on_type == ResourceType.ACCOUNT and isinstance(priv, GlobalPriv):
                 owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
             # Hacky fix
             elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
@@ -240,8 +252,8 @@ class Grant(Resource):
 
 def grant_fqn(grant: _Grant):
     on = f"{resource_label_for_type(grant.on_type)}/{grant.on}"
-    if grant.on_type == ResourceType.ACCOUNT:
-        on = "ACCOUNT"
+    # if grant.on_type == ResourceType.ACCOUNT:
+    #     on = "ACCOUNT"
     return FQN(
         name=grant.to.name,
         params={

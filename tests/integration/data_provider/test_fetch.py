@@ -2,10 +2,11 @@ import os
 import pytest
 
 from titan import data_provider
+from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from tests.helpers import STATIC_RESOURCES
-from titan.parse import parse_identifier
+from titan.parse import parse_identifier, parse_URN
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
 from titan.resource_name import ResourceName
 
@@ -262,6 +263,7 @@ grants = [
             "to": "THATROLE",
             "owner": TEST_ROLE,
             "grant_option": False,
+            "_privs": ["USAGE"],
         },
     },
 ]
@@ -289,8 +291,14 @@ future_grants = [
 ]
 
 
+def safe_fetch(cursor, urn):
+    reset_cache()
+    return data_provider.fetch_resource(cursor, urn)
+
+
 @pytest.fixture(scope="session")
 def account_locator(cursor):
+    reset_cache()
     return data_provider.fetch_account_locator(cursor)
 
 
@@ -328,7 +336,7 @@ def test_fetch_scoped_resource(scoped_resource, cursor, account_locator, test_db
         account_locator=account_locator,
     )
     cursor.execute("USE WAREHOUSE CI")
-    result = data_provider.fetch_resource(cursor, urn)
+    result = safe_fetch(cursor, urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == scoped_resource["data"]
@@ -363,6 +371,9 @@ def grant_resource(request, cursor, account_locator):
 
     static_db = STATIC_RESOURCES[ResourceType.DATABASE]
     cursor.execute(static_db.create_sql(if_not_exists=True))
+
+    static_wh = STATIC_RESOURCES[ResourceType.WAREHOUSE]
+    cursor.execute(static_wh.create_sql(if_not_exists=True))
 
     setup_sqls = config["setup_sql"] if isinstance(config["setup_sql"], list) else [config["setup_sql"]]
     teardown_sqls = config["teardown_sql"] if isinstance(config["teardown_sql"], list) else [config["teardown_sql"]]
@@ -431,7 +442,7 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
         account_locator=account_locator,
     )
 
-    result = data_provider.fetch_resource(cursor, urn)
+    result = safe_fetch(cursor, urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == account_resource["data"]
@@ -439,7 +450,7 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
 
 @pytest.mark.requires_snowflake
 def test_fetch_grant(grant_resource, cursor):
-    result = data_provider.fetch_resource(cursor, grant_resource["urn"])
+    result = safe_fetch(cursor, grant_resource["urn"])
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == grant_resource["data"]
@@ -447,7 +458,7 @@ def test_fetch_grant(grant_resource, cursor):
 
 @pytest.mark.requires_snowflake
 def test_fetch_future_grant(future_grant_resource, cursor):
-    result = data_provider.fetch_resource(cursor, future_grant_resource["urn"])
+    result = safe_fetch(cursor, future_grant_resource["urn"])
     assert result is not None
     assert result == future_grant_resource["data"]
 
@@ -471,7 +482,7 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         """
     )
 
-    result = data_provider.fetch_resource(cursor, urn)
+    result = safe_fetch(cursor, urn)
     assert result == {
         "name": "ENTERPRISE_TEST_SCHEMA",
         "transient": False,
@@ -483,3 +494,66 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "owner": TEST_ROLE,
         "comment": None,
     }
+
+
+@pytest.fixture(scope="session")
+def account_grant(cursor, marked_for_cleanup):
+    static_role = STATIC_RESOURCES[ResourceType.ROLE]
+    cursor.execute(static_role.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(static_role)
+    cursor.execute(f"GRANT AUDIT ON ACCOUNT TO ROLE {static_role.name}")
+    cursor.execute(f"GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE {static_role.name}")
+    yield
+    cursor.execute(f"REVOKE AUDIT ON ACCOUNT FROM ROLE {static_role.name}")
+    cursor.execute(f"REVOKE BIND SERVICE ENDPOINT ON ACCOUNT FROM ROLE {static_role.name}")
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_grant_on_account(cursor, account_grant):
+    static_role = STATIC_RESOURCES[ResourceType.ROLE]
+    bind_service_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
+    bind_service_grant = safe_fetch(cursor, bind_service_urn)
+    assert bind_service_grant is not None
+    assert bind_service_grant["priv"] == "BIND SERVICE ENDPOINT"
+    assert bind_service_grant["on"] == "ACCOUNT"
+    assert bind_service_grant["on_type"] == "ACCOUNT"
+    assert bind_service_grant["to"] == static_role.name
+    audit_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=AUDIT&on=account/ACCOUNT")
+    audit_grant = safe_fetch(cursor, audit_urn)
+    assert audit_grant is not None
+    assert audit_grant["priv"] == "AUDIT"
+    assert audit_grant["on"] == "ACCOUNT"
+    assert audit_grant["on_type"] == "ACCOUNT"
+    assert audit_grant["to"] == static_role.name
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
+    # Setup
+    static_role = STATIC_RESOURCES[ResourceType.ROLE]
+    static_wh = STATIC_RESOURCES[ResourceType.WAREHOUSE]
+    cursor.execute("DROP ROLE IF EXISTS STATIC_ROLE")
+    cursor.execute(static_role.create_sql(if_not_exists=True))
+    cursor.execute(static_wh.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(static_role)
+    marked_for_cleanup.append(static_wh)
+    cursor.execute(f"GRANT ALL ON WAREHOUSE {static_wh.name} TO ROLE {static_role.name}")
+
+    # Test
+    grant_all_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=ALL&on=warehouse/{static_wh.name}")
+
+    grant = safe_fetch(cursor, grant_all_urn)
+    assert grant is not None
+    assert grant["priv"] == "ALL"
+    assert grant["on_type"] == "WAREHOUSE"
+    assert grant["on"] == static_wh.name
+    assert grant["to"] == static_role.name
+    assert grant["owner"] == TEST_ROLE
+    assert grant["grant_option"] is False
+    assert grant["_privs"] == ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"]
+
+    cursor.execute(f"REVOKE MODIFY ON WAREHOUSE {static_wh.name} FROM ROLE {static_role.name}")
+
+    grant = safe_fetch(cursor, grant_all_urn)
+    assert grant is not None
+    assert "MODIFY" not in grant["_privs"]

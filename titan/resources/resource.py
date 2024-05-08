@@ -130,7 +130,7 @@ RESOURCE_SCOPES = {
 
 
 class _Resource(type):
-    __types__ = {}
+    __types__: dict[ResourceType, list[Type["Resource"]]] = {}
     __resolvers__ = {}
 
     def __new__(cls, name, bases, attrs):
@@ -323,6 +323,8 @@ class Resource(metaclass=_Resource):
 
         if isinstance(schema, str):
             schema: ResourceContainer = ResourcePointer(name=schema, resource_type=ResourceType.SCHEMA)
+            if database is not None:
+                database.add(schema)
 
         if isinstance(self.scope, DatabaseScope):
             if schema is not None:

@@ -4,5 +4,8 @@
     "on": "STATIC_DATABASE",
     "to": "STATIC_ROLE",
     "owner": "SYSADMIN",
-    "grant_option": false
+    "grant_option": false,
+    "_privs": [
+        "USAGE"
+    ]
 }

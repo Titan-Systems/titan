@@ -42,6 +42,7 @@ class ResourceType(ParseableEnum):
     ALERT = "ALERT"
     API_INTEGRATION = "API INTEGRATION"
     COLUMN = "COLUMN"
+    COMPUTE_POOL = "COMPUTE POOL"
     DATABASE = "DATABASE"
     DATABASE_ROLE = "DATABASE ROLE"
     DYNAMIC_TABLE = "DYNAMIC TABLE"
@@ -54,6 +55,8 @@ class ResourceType(ParseableEnum):
     FUTURE_GRANT = "FUTURE GRANT"
     GRANT = "GRANT"
     GRANT_ON_ALL = "GRANT ON ALL"
+    HYBRID_TABLE = "HYBRID TABLE"
+    IMAGE_REPOSITORY = "IMAGE REPOSITORY"
     NETWORK_RULE = "NETWORK RULE"
     NOTIFICATION_INTEGRATION = "NOTIFICATION INTEGRATION"
     PACKAGES_POLICY = "PACKAGES POLICY"
@@ -66,7 +69,9 @@ class ResourceType(ParseableEnum):
     ROLE_GRANT = "ROLE GRANT"
     SCHEMA = "SCHEMA"
     SECRET = "SECRET"
+    SECURITY_INTEGRATION = "SECURITY INTEGRATION"
     SEQUENCE = "SEQUENCE"
+    SERVICE = "SERVICE"
     STAGE = "STAGE"
     STORAGE_INTEGRATION = "STORAGE INTEGRATION"
     STREAM = "STREAM"
@@ -249,14 +254,17 @@ class SessionParameter(ParseableEnum):
     WEEK_OF_YEAR_POLICY = "WEEK_OF_YEAR_POLICY"
     WEEK_START = "WEEK_START"
 
+
 class TaskState(ParseableEnum):
     """
     Represents the scheduling state of a task.
     https://docs.snowflake.com/en/sql-reference/sql/show-tasks#output
     Snowflake provides these as lowercase but we'll uppercase them.
     """
+
     STARTED = "STARTED"
     SUSPENDED = "SUSPENDED"
+
 
 class WarehouseSize(ParseableEnum):
     """

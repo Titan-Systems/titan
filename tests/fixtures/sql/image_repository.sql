@@ -1,0 +1,1 @@
+CREATE OR REPLACE IMAGE REPOSITORY tutorial_repository;

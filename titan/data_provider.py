@@ -3,6 +3,7 @@ import sys
 
 from collections import defaultdict
 from functools import cache
+from typing import Optional
 
 from inflection import pluralize
 
@@ -162,7 +163,7 @@ def remove_none_values(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
-def fetch_resource(session, urn: URN):
+def fetch_resource(session, urn: URN) -> Optional[dict]:
     return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
 
@@ -191,8 +192,7 @@ def fetch_session(session):
             CURRENT_DATABASE() as database,
             CURRENT_SCHEMAS() as schemas,
             CURRENT_WAREHOUSE() as warehouse,
-            CURRENT_VERSION() as version,
-            SYSTEM$BEHAVIOR_CHANGE_BUNDLE_STATUS('2024_01') as release_bundle_2024_01
+            CURRENT_VERSION() as version
         """,
     )[0]
 
@@ -212,7 +212,6 @@ def fetch_session(session):
         "account": session_obj["ACCOUNT"],
         "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
         "database": session_obj["DATABASE"],
-        "release_bundle_2024_01": session_obj["RELEASE_BUNDLE_2024_01"],
         "role": session_obj["ROLE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
         "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
@@ -266,6 +265,27 @@ def fetch_columns(session, resource_type: str, fqn: FQN):
             )
         )
     return columns
+
+
+def fetch_compute_pool(session, fqn: FQN):
+    show_result = execute(session, f"SHOW COMPUTE POOLS LIKE '{fqn.name}'", cacheable=True)
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple databases matching {fqn}")
+
+    data = show_result[0]
+
+    return {
+        "name": data["name"],
+        "min_nodes": data["min_nodes"],
+        "max_nodes": data["max_nodes"],
+        "instance_family": data["instance_family"],
+        "auto_resume": data["auto_resume"] == "true",
+        "auto_suspend_secs": data["auto_suspend_secs"],
+        "comment": data["comment"] or None,
+    }
 
 
 def fetch_database(session, fqn: FQN):
@@ -416,38 +436,65 @@ def fetch_grant(session, fqn: FQN):
         if err.errno == DOEST_NOT_EXIST_ERR:
             return None
         raise
+    priv = fqn.params["priv"]
     on_type, on = fqn.params["on"].split("/")
-    on_type = str(resource_type_for_label(on_type))
-    grants = _filter_result(
-        show_result,
-        granted_on=on_type,
-        name=on,
-        grantee_name=fqn.name,
-    )
+    # on_type = str(resource_type_for_label(on_type)).replace(" ", "_")
+    on_type = on_type.upper()
+
+    filters = {
+        "granted_on": on_type,
+    }
+
+    if on_type != "ACCOUNT":
+        filters["name"] = on
+
+    if priv != "ALL":
+        filters["privilege"] = priv
+
+    print("fetch_grant", fqn, "filters=", filters)
+
+    grants = _filter_result(show_result, **filters)
 
     if len(grants) == 0:
         return None
-    elif len(grants) > 1:
+    elif len(grants) > 1 and priv != "ALL":
         # This is likely to happen when a grant has been issued by ACCOUNTADMIN
         # and some other role with MANAGE GRANTS or OWNERSHIP. It needs to be properly
         # handled in the future.
         raise Exception(f"Found multiple grants matching {fqn}")
 
     data = grants[0]
+    privs = sorted([g["privilege"] for g in grants])
 
     return {
-        "priv": data["privilege"],
-        "on": data["name"],
-        "on_type": data["granted_on"],
+        "priv": priv,
+        "on": "ACCOUNT" if on_type == "ACCOUNT" else data["name"],
+        "on_type": data["granted_on"].replace("_", " "),
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
         "owner": data["granted_by"],
+        "_privs": privs,
     }
 
 
 def fetch_grant_on_all(session, fqn: FQN):
     # All grants are expensive to fetch, so we will assume they are always out of date
     return None
+
+
+def fetch_image_repository(session, fqn: FQN):
+    show_result = execute(
+        session, f"SHOW IMAGE REPOSITORIES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True
+    )
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple image repositories matching {fqn}")
+
+    data = show_result[0]
+
+    return {"name": fqn.name, "owner": data["owner"]}
 
 
 def fetch_password_policy(session, fqn: FQN):
@@ -490,13 +537,8 @@ def fetch_procedure(session, fqn: FQN):
         raise Exception(f"Found multiple stored procedures matching {fqn}")
 
     data = sprocs[0]
-    # inputs, output = data["arguments"].split(" RETURN ")
-    session_ctx = fetch_session(session)
 
-    if session_ctx["release_bundle_2024_01"] == "ENABLED":
-        identifier, returns = _parse_function_arguments(data["arguments"])
-    else:
-        identifier, returns = _parse_function_arguments_2023_compat(data["arguments"])
+    identifier, returns = _parse_function_arguments(data["arguments"])
     desc_result = execute(session, f"DESC PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
 
@@ -602,7 +644,7 @@ def fetch_role_grant(session, fqn: FQN):
 
 def fetch_schema(session, fqn: FQN):
     if fqn.database is None:
-        raise Exception(f"Schema fqn must have a database {fqn}")
+        raise Exception(f"Schema {fqn} is missing a database name")
     try:
         show_result = execute(session, f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
     except ProgrammingError:
@@ -633,6 +675,44 @@ def fetch_schema(session, fqn: FQN):
     }
 
 
+def fetch_security_integration(session, fqn: FQN):
+    show_result = execute(session, f"SHOW SECURITY INTEGRATIONS LIKE '{fqn.name}'")
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple security integrations matching {fqn}")
+
+    data = show_result[0]
+
+    type_, oauth_client = data["type"].split(" - ")
+
+    desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
+    properties = _desc_type2_result_to_dict(desc_result)
+
+    if type_ == "OAUTH":
+        if oauth_client == "SNOWSERVICES_INGRESS":
+            return {
+                "name": data["name"],
+                "type": type_,
+                "oauth_client": oauth_client,
+                "enabled": data["enabled"] == "true",
+            }
+    raise Exception(f"Unsupported security integration type {type_}")
+
+    # return {
+    #     "name": data["name"],
+    #     "type": type_,
+    #     "enabled": data["enabled"] == "true",
+    #     "oauth_client": oauth_client,
+    #     # "oauth_client_secret": None,
+    #     # "oauth_redirect_uri": None,
+    #     "oauth_issue_refresh_tokens": properties["oauth_issue_refresh_tokens"] == "true",
+    #     "oauth_refresh_token_validity": properties["oauth_refresh_token_validity"],
+    #     "comment": data["comment"] or None,
+    # }
+
+
 def fetch_sequence(session, fqn: FQN):
     show_result = execute(session, f"SHOW SEQUENCES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
     if len(show_result) == 0:
@@ -648,6 +728,34 @@ def fetch_sequence(session, fqn: FQN):
         "start": data["next_value"],
         "increment": data["interval"],
         "comment": data["comment"] or None,
+    }
+
+
+def fetch_service(session, fqn: FQN):
+    show_result = execute(
+        session, f"SHOW SERVICES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True
+    )
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple services matching {fqn}")
+
+    data = show_result[0]
+
+    tags = fetch_resource_tags(session, ResourceType.SERVICE, fqn)
+
+    return {
+        "name": fqn.name,
+        "compute_pool": data["compute_pool"],
+        "external_access_integrations": None,
+        "auto_resume": data["auto_resume"] == "true",
+        "min_instances": data["min_instances"],
+        "max_instances": data["max_instances"],
+        "query_warehouse": data["query_warehouse"],
+        "tags": tags,
+        "comment": data["comment"] or None,
+        "owner": data["owner"],
     }
 
 
@@ -857,7 +965,7 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
     return tag_map
 
 
-def fetch_user(session, fqn: FQN):
+def fetch_user(session, fqn: FQN) -> Optional[dict]:
     # SHOW USERS requires the MANAGE GRANTS privilege
     # Other roles can see the list of users but don't get access to other metadata such as login_name.
     # This causes incorrect drift
