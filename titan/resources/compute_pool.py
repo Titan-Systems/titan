@@ -30,9 +30,9 @@ class _ComputePool(ResourceSpec):
     min_nodes: int = None
     max_nodes: int = None
     instance_family: InstanceFamily = None
-    auto_resume: bool = None
+    auto_resume: bool = True
     initially_suspended: bool = field(default_factory=None, metadata={"fetchable": False})
-    auto_suspend_secs: int = None
+    auto_suspend_secs: int = 3600
     comment: str = None
 
 
@@ -69,9 +69,9 @@ class ComputePool(Resource):
         min_nodes: int = None,
         max_nodes: int = None,
         instance_family: InstanceFamily = None,
-        auto_resume: bool = None,
+        auto_resume: bool = True,
         initially_suspended: bool = None,
-        auto_suspend_secs: int = None,
+        auto_suspend_secs: int = 3600,
         comment: str = None,
         **kwargs,
     ):

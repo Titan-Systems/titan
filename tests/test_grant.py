@@ -60,7 +60,7 @@ def test_grant_all():
     assert grant.on_type == ResourceType.WAREHOUSE
     assert grant.to.name == "SOMEROLE"
     assert grant._data._privs == _all_privs_for_resource_type(ResourceType.WAREHOUSE)
-    assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=ALL&on=warehouse/somewh"
+    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=ALL&on=warehouse/SOMEWH"
 
 
 def test_grant_future_schemas_priv():

@@ -353,9 +353,11 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
     for urn_str, _data in manifest.items():
         if urn_str.startswith("_"):
             continue
+
         urns.remove(urn_str)
         urn = parse_URN(urn_str)
         data = data_provider.fetch_resource(session, urn)
+        print("~~fetching_1", urn_str, data)
         if urn_str in manifest and data is not None:
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
             if urn.resource_type == ResourceType.FUTURE_GRANT:
@@ -370,6 +372,7 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
         urn = parse_URN(urn_str)
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
+        print("~~fetching_2", urn_str, data)
         if data is not None:
             if urn.resource_type == ResourceType.FUTURE_GRANT:
                 normalized = data
@@ -384,6 +387,7 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
         urn = parse_URN(reference)
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
+        print("~~fetching_3", urn_str, data)
         # BUG: need to check if it's in the manifest!!!!
         # if data is None:
         #     raise MissingResourceException(f"Resource {urn} required by {parent} not found")
