@@ -3,6 +3,7 @@ import sys
 
 from collections import defaultdict
 from functools import cache
+from typing import Optional
 
 from inflection import pluralize
 
@@ -162,7 +163,7 @@ def remove_none_values(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
-def fetch_resource(session, urn: URN):
+def fetch_resource(session, urn: URN) -> Optional[dict]:
     return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
 
@@ -964,7 +965,7 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
     return tag_map
 
 
-def fetch_user(session, fqn: FQN):
+def fetch_user(session, fqn: FQN) -> Optional[dict]:
     # SHOW USERS requires the MANAGE GRANTS privilege
     # Other roles can see the list of users but don't get access to other metadata such as login_name.
     # This causes incorrect drift
