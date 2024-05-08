@@ -357,7 +357,7 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
         urns.remove(urn_str)
         urn = parse_URN(urn_str)
         data = data_provider.fetch_resource(session, urn)
-        print("~~fetching_1", urn_str, data)
+        # print("~~fetching_1", urn_str, data)
         if urn_str in manifest and data is not None:
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
             if urn.resource_type == ResourceType.FUTURE_GRANT:
@@ -372,7 +372,7 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
         urn = parse_URN(urn_str)
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
-        print("~~fetching_2", urn_str, data)
+        # print("~~fetching_2", urn_str, data)
         if data is not None:
             if urn.resource_type == ResourceType.FUTURE_GRANT:
                 normalized = data
@@ -385,12 +385,13 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
     # check for existence of resource references
     for parent, reference in manifest["_refs"]:
         urn = parse_URN(reference)
+        if urn in manifest:
+            continue
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
-        print("~~fetching_3", str(urn), data)
-        # BUG: need to check if it's in the manifest!!!!
-        # if data is None:
-        #     raise MissingResourceException(f"Resource {urn} required by {parent} not found")
+        # print("~~fetching_3", str(urn), data)
+        if data is None:
+            raise MissingResourceException(f"Resource {urn} required by {parent} not found")
 
     return state
 
