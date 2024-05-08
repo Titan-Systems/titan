@@ -2,9 +2,16 @@ import pytest
 
 from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, data_provider
 from titan.blueprint import Action, MissingResourceException, plan_sql
+from titan.client import reset_cache
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    reset_cache()
+    yield
 
 
 @pytest.fixture(
