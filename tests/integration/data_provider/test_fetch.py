@@ -2,6 +2,7 @@ import os
 import pytest
 
 from titan import data_provider
+from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from tests.helpers import STATIC_RESOURCES
@@ -265,26 +266,6 @@ grants = [
             "_privs": ["USAGE"],
         },
     },
-    {
-        "setup_sql": [
-            "CREATE ROLE IF NOT EXISTS thatrole",
-            "GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE thatrole",
-        ],
-        "teardown_sql": [
-            "DROP ROLE IF EXISTS thatrole",
-        ],
-        "test_name": "test_all_grant",
-        "resource_type": ResourceType.GRANT,
-        "data": {
-            "priv": "ALL",
-            "on_type": "WAREHOUSE",
-            "on": "STATIC_WAREHOUSE",
-            "to": "THATROLE",
-            "owner": TEST_ROLE,
-            "grant_option": False,
-            "_privs": ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"],
-        },
-    },
 ]
 
 future_grants = [
@@ -538,3 +519,35 @@ def test_fetch_grant_on_account(cursor, account_grant):
     assert audit_grant["on"] == "ACCOUNT"
     assert audit_grant["on_type"] == "ACCOUNT"
     assert audit_grant["to"] == static_role.name
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
+    # Setup
+    static_role = STATIC_RESOURCES[ResourceType.ROLE]
+    static_wh = STATIC_RESOURCES[ResourceType.WAREHOUSE]
+    cursor.execute(static_role.create_sql(if_not_exists=True))
+    cursor.execute(static_wh.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(static_role)
+    marked_for_cleanup.append(static_wh)
+    cursor.execute(f"GRANT ALL ON WAREHOUSE {static_wh.name} TO ROLE {static_role.name}")
+
+    # Test
+    grant_all_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=ALL&on=warehouse/{static_wh.name}")
+
+    grant = data_provider.fetch_resource(cursor, grant_all_urn)
+    assert grant is not None
+    assert grant["priv"] == "ALL"
+    assert grant["on_type"] == "WAREHOUSE"
+    assert grant["on"] == static_wh.name
+    assert grant["to"] == static_role.name
+    assert grant["owner"] == TEST_ROLE
+    assert grant["grant_option"] is False
+    assert grant["_privs"] == ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"]
+
+    cursor.execute(f"REVOKE MODIFY ON WAREHOUSE {static_wh.name} FROM ROLE {static_role.name}")
+
+    reset_cache()
+    grant = data_provider.fetch_resource(cursor, grant_all_urn)
+    assert grant is not None
+    assert "MODIFY" not in grant["_privs"]

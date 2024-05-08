@@ -3,7 +3,7 @@ from titan.resource_name import ResourceName
 
 def test_resource_name():
     rn = ResourceName("test")
-    assert str(rn) == "test"
+    assert str(rn) == "TEST"
 
     rn = ResourceName('"test"')
     assert str(rn) == '"test"'

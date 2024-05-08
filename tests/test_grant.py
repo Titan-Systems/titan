@@ -11,8 +11,8 @@ def test_grant_global_priv():
     assert grant.priv == "CREATE WAREHOUSE"
     assert grant.on == "ACCOUNT"
     assert grant.to.name == "somerole"
-    assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=CREATE WAREHOUSE&on=account/ACCOUNT"
-    assert grant.create_sql() == "GRANT CREATE WAREHOUSE ON ACCOUNT TO somerole"
+    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=CREATE WAREHOUSE&on=account/ACCOUNT"
+    assert grant.create_sql() == "GRANT CREATE WAREHOUSE ON ACCOUNT TO SOMEROLE"
 
 
 def test_grant_account_obj_priv_with_resource():
@@ -22,7 +22,7 @@ def test_grant_account_obj_priv_with_resource():
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=MODIFY&on=warehouse/somewh"
+    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=MODIFY&on=warehouse/SOMEWH"
 
 
 def test_grant_account_obj_priv_with_kwarg():
@@ -31,7 +31,7 @@ def test_grant_account_obj_priv_with_kwarg():
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=MODIFY&on=warehouse/somewh"
+    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=MODIFY&on=warehouse/SOMEWH"
 
 
 def test_grant_schema_priv_with_resource():
@@ -41,7 +41,7 @@ def test_grant_schema_priv_with_resource():
     assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=CREATE VIEW&on=schema/someschema"
+    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=CREATE VIEW&on=schema/SOMESCHEMA"
 
 
 def test_grant_schema_priv_with_kwarg():
@@ -50,7 +50,7 @@ def test_grant_schema_priv_with_kwarg():
     assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/somerole?priv=CREATE VIEW&on=schema/someschema"
+    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=CREATE VIEW&on=schema/SOMESCHEMA"
 
 
 def test_grant_all():
@@ -70,7 +70,7 @@ def test_grant_future_schemas_priv():
     assert grant.in_type == ResourceType.DATABASE
     assert grant.in_name == "SOMEDB"
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::future_grant/somerole?priv=CREATE VIEW&on=database/somedb.<SCHEMA>"
+    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=CREATE VIEW&on=database/SOMEDB.<SCHEMA>"
 
 
 def test_role_grant_to_user_with_kwargs():
@@ -78,7 +78,7 @@ def test_role_grant_to_user_with_kwargs():
     assert grant.role.name == "somerole"
     assert grant._data.to_user is not None
     assert grant.to.name == "someuser"
-    assert str(URN.from_resource(grant)) == "urn:::role_grant/somerole?user=someuser"
+    assert str(URN.from_resource(grant)) == "urn:::role_grant/SOMEROLE?user=SOMEUSER"
 
 
 def test_role_grant_to_user_with_resource():
@@ -86,7 +86,7 @@ def test_role_grant_to_user_with_resource():
     assert grant.role.name == "somerole"
     assert grant._data.to_user is not None
     assert grant.to.name == "someuser"
-    assert str(URN.from_resource(grant)) == "urn:::role_grant/somerole?user=someuser"
+    assert str(URN.from_resource(grant)) == "urn:::role_grant/SOMEROLE?user=SOMEUSER"
 
 
 def test_role_grant_to_role_with_kwargs():
@@ -94,7 +94,7 @@ def test_role_grant_to_role_with_kwargs():
     assert grant.role.name == "somerole"
     assert grant._data.to_role is not None
     assert grant.to.name == "someotherrole"
-    assert str(URN.from_resource(grant)) == "urn:::role_grant/somerole?role=someotherrole"
+    assert str(URN.from_resource(grant)) == "urn:::role_grant/SOMEROLE?role=SOMEOTHERROLE"
 
 
 def test_role_grant_to_role_with_resource():
@@ -102,7 +102,7 @@ def test_role_grant_to_role_with_resource():
     assert grant.role.name == "somerole"
     assert grant._data.to_role is not None
     assert grant.to.name == "someotherrole"
-    assert str(URN.from_resource(grant)) == "urn:::role_grant/somerole?role=someotherrole"
+    assert str(URN.from_resource(grant)) == "urn:::role_grant/SOMEROLE?role=SOMEOTHERROLE"
 
 
 # def test_grant_all_schemas_priv():

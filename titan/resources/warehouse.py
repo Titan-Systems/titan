@@ -118,3 +118,7 @@ class Warehouse(Resource):
             statement_timeout_in_seconds=statement_timeout_in_seconds,
             tags=tags,
         )
+
+    @property
+    def name(self):
+        return self._data.name

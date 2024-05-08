@@ -1,5 +1,5 @@
 {
-    "name": "some_compute_pool",
+    "name": "SOME_COMPUTE_POOL",
     "min_nodes": 1,
     "max_nodes": 1,
     "instance_family": "CPU_X64_XS",
