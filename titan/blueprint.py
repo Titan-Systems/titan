@@ -387,7 +387,7 @@ def _fetch_remote_state(session, manifest: Manifest) -> State:
         urn = parse_URN(reference)
         resource_cls = Resource.resolve_resource_cls(urn.resource_type)
         data = data_provider.fetch_resource(session, urn)
-        print("~~fetching_3", urn_str, data)
+        print("~~fetching_3", str(urn), data)
         # BUG: need to check if it's in the manifest!!!!
         # if data is None:
         #     raise MissingResourceException(f"Resource {urn} required by {parent} not found")

@@ -5,7 +5,7 @@ from titan import data_provider
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from tests.helpers import STATIC_RESOURCES
-from titan.parse import parse_identifier
+from titan.parse import parse_identifier, parse_URN
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
 from titan.resource_name import ResourceName
 
@@ -507,3 +507,19 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "owner": TEST_ROLE,
         "comment": None,
     }
+
+
+@pytest.fixture(scope="session")
+def account_grant(cursor, marked_for_cleanup):
+    static_role = STATIC_RESOURCES[ResourceType.ROLE]
+    cursor.execute(static_role.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(static_role)
+    cursor.execute(f"GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE {static_role.name}")
+    yield f"urn:::grant/{static_role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT"
+    cursor.execute(f"REVOKE BIND SERVICE ENDPOINT ON ACCOUNT FROM ROLE {static_role.name}")
+
+
+@pytest.mark.requires_snowflake
+def test_fetch_account_grant(cursor, account_grant):
+    grant = data_provider.fetch_resource(cursor, parse_URN(account_grant))
+    assert grant is not None
