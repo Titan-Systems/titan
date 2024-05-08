@@ -133,6 +133,16 @@ def test_blueprint_missing_resource_pointer(cursor):
 
 
 @pytest.mark.requires_snowflake
+def test_blueprint_present_resource_pointer(cursor):
+    session = cursor.connection
+    grant = Grant.from_sql("GRANT AUDIT ON ACCOUNT TO ROLE SOMEROLE")
+    role = Role(name="SOMEROLE")
+    blueprint = Blueprint(name="blueprint", resources=[grant, role])
+    plan = blueprint.plan(session)
+    assert len(plan) == 2
+
+
+@pytest.mark.requires_snowflake
 def test_blueprint_missing_database(cursor):
     session = cursor.connection
     func = JavascriptUDF(name="func", returns="INT", as_="return 1;", schema="public")
