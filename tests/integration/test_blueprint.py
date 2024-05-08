@@ -142,8 +142,8 @@ def test_blueprint_missing_resource_pointer(cursor):
 @pytest.mark.requires_snowflake
 def test_blueprint_present_resource_pointer(cursor):
     session = cursor.connection
-    grant = Grant.from_sql("GRANT AUDIT ON ACCOUNT TO ROLE SOMEROLE")
-    role = Role(name="SOMEROLE")
+    grant = Grant.from_sql("GRANT AUDIT ON ACCOUNT TO ROLE THISROLEDOESNTEXIST")
+    role = Role(name="THISROLEDOESNTEXIST")
     blueprint = Blueprint(name="blueprint", resources=[grant, role])
     plan = blueprint.plan(session)
     assert len(plan) == 2
