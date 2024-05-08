@@ -2,9 +2,16 @@ import pytest
 
 from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, data_provider
 from titan.blueprint import Action, MissingResourceException, plan_sql
+from titan.client import reset_cache
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
+
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    reset_cache()
+    yield
 
 
 @pytest.fixture(
@@ -130,6 +137,16 @@ def test_blueprint_missing_resource_pointer(cursor):
     blueprint = Blueprint(name="blueprint", resources=[grant])
     with pytest.raises(MissingResourceException):
         blueprint.plan(session)
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_present_resource_pointer(cursor):
+    session = cursor.connection
+    grant = Grant.from_sql("GRANT AUDIT ON ACCOUNT TO ROLE THISROLEDOESNTEXIST")
+    role = Role(name="THISROLEDOESNTEXIST")
+    blueprint = Blueprint(name="blueprint", resources=[grant, role])
+    plan = blueprint.plan(session)
+    assert len(plan) == 2
 
 
 @pytest.mark.requires_snowflake
