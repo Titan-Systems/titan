@@ -437,7 +437,7 @@ def fetch_grant(session, fqn: FQN):
         raise
     priv = fqn.params["priv"]
     on_type, on = fqn.params["on"].split("/")
-    on_type = str(resource_type_for_label(on_type))
+    on_type = str(resource_type_for_label(on_type)).replace(" ", "_")
 
     filters = {
         "granted_on": on_type,
