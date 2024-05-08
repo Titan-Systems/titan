@@ -527,6 +527,14 @@ def test_fetch_grant_on_account(cursor, account_grant):
     bind_service_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
     bind_service_grant = data_provider.fetch_resource(cursor, bind_service_urn)
     assert bind_service_grant is not None
+    assert bind_service_grant["priv"] == "BIND SERVICE ENDPOINT"
+    assert bind_service_grant["on"] == "ACCOUNT"
+    assert bind_service_grant["on_type"] == "ACCOUNT"
+    assert bind_service_grant["to"] == static_role.name
     audit_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=AUDIT&on=account/ACCOUNT")
     audit_grant = data_provider.fetch_resource(cursor, audit_urn)
     assert audit_grant is not None
+    assert audit_grant["priv"] == "AUDIT"
+    assert audit_grant["on"] == "ACCOUNT"
+    assert audit_grant["on_type"] == "ACCOUNT"
+    assert audit_grant["to"] == static_role.name

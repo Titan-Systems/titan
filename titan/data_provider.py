@@ -464,7 +464,7 @@ def fetch_grant(session, fqn: FQN):
 
     return {
         "priv": priv,
-        "on": data["name"],
+        "on": "ACCOUNT" if on_type == "ACCOUNT" else data["name"],
         "on_type": data["granted_on"],
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
