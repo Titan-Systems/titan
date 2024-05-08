@@ -281,7 +281,7 @@ def fetch_compute_pool(session, fqn: FQN):
         "min_nodes": data["min_nodes"],
         "max_nodes": data["max_nodes"],
         "instance_family": data["instance_family"],
-        "auto_resume": data["auto_resume"],
+        "auto_resume": data["auto_resume"] == "true",
         "auto_suspend_secs": data["auto_suspend_secs"],
         "comment": data["comment"] or None,
     }
@@ -448,6 +448,8 @@ def fetch_grant(session, fqn: FQN):
 
     if priv != "ALL":
         filters["privilege"] = priv
+
+    print("fetch_grant", fqn, "filters=", filters)
 
     grants = _filter_result(show_result, **filters)
 
