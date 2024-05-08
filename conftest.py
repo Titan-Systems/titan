@@ -67,10 +67,6 @@ def cursor(suffix, test_db, marked_for_cleanup):
                 cur.execute(res.drop_sql(if_exists=True))
         finally:
             cur.execute(f"DROP DATABASE {test_db}")
-            try:
-                cur.execute("ALTER WAREHOUSE CI SUSPEND")
-            except snowflake.connector.errors.ProgrammingError:
-                pass
 
 
 @pytest.fixture(scope="session")
