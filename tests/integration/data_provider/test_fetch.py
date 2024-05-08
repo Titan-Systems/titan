@@ -514,12 +514,19 @@ def account_grant(cursor, marked_for_cleanup):
     static_role = STATIC_RESOURCES[ResourceType.ROLE]
     cursor.execute(static_role.create_sql(if_not_exists=True))
     marked_for_cleanup.append(static_role)
+    cursor.execute(f"GRANT AUDIT ON ACCOUNT TO ROLE {static_role.name}")
     cursor.execute(f"GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE {static_role.name}")
-    yield f"urn:::grant/{static_role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT"
+    yield
+    cursor.execute(f"REVOKE AUDIT ON ACCOUNT FROM ROLE {static_role.name}")
     cursor.execute(f"REVOKE BIND SERVICE ENDPOINT ON ACCOUNT FROM ROLE {static_role.name}")
 
 
 @pytest.mark.requires_snowflake
-def test_fetch_account_grant(cursor, account_grant):
-    grant = data_provider.fetch_resource(cursor, parse_URN(account_grant))
-    assert grant is not None
+def test_fetch_grant_on_account(cursor, account_grant):
+    static_role = STATIC_RESOURCES[ResourceType.ROLE]
+    bind_service_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
+    bind_service_grant = data_provider.fetch_resource(cursor, bind_service_urn)
+    assert bind_service_grant is not None
+    audit_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=AUDIT&on=account/ACCOUNT")
+    audit_grant = data_provider.fetch_resource(cursor, audit_urn)
+    assert audit_grant is not None

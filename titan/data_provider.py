@@ -439,21 +439,17 @@ def fetch_grant(session, fqn: FQN):
     on_type, on = fqn.params["on"].split("/")
     on_type = str(resource_type_for_label(on_type))
 
-    if on_type == "ACCOUNT":
-        # This is a special case where the grant is on the account itself
-        # and not on a specific resource
-        grants = _filter_result(
-            show_result,
-            granted_on=on_type,
-            grantee_name=fqn.name,
-        )
-    else:
-        grants = _filter_result(
-            show_result,
-            granted_on=on_type,
-            name=on,
-            grantee_name=fqn.name,
-        )
+    filters = {
+        "granted_on": on_type,
+    }
+
+    if on_type != "ACCOUNT":
+        filters["name"] = on
+
+    if priv != "ALL":
+        filters["privilege"] = priv
+
+    grants = _filter_result(show_result, **filters)
 
     if len(grants) == 0:
         return None
