@@ -151,6 +151,9 @@ class Grant(Resource):
         >>> Grant(priv="SELECT", on_table="sometable", to="somerole")
 
         """
+
+        kwargs.pop("_privs", None)
+
         # Handle instantiation from data dict
         on_type = kwargs.pop("on_type", None)
         if on_type:
