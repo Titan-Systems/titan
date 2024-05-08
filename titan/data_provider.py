@@ -437,7 +437,8 @@ def fetch_grant(session, fqn: FQN):
         raise
     priv = fqn.params["priv"]
     on_type, on = fqn.params["on"].split("/")
-    on_type = str(resource_type_for_label(on_type)).replace(" ", "_")
+    # on_type = str(resource_type_for_label(on_type)).replace(" ", "_")
+    on_type = on_type.upper()
 
     filters = {
         "granted_on": on_type,
@@ -467,7 +468,7 @@ def fetch_grant(session, fqn: FQN):
     return {
         "priv": priv,
         "on": "ACCOUNT" if on_type == "ACCOUNT" else data["name"],
-        "on_type": data["granted_on"],
+        "on_type": data["granted_on"].replace("_", " "),
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
         "owner": data["granted_by"],
