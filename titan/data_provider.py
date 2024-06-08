@@ -247,6 +247,27 @@ def fetch_alert(session, fqn: FQN):
     }
 
 
+def fetch_catalog_integration(session, fqn: FQN):
+    show_result = execute(session, f"SHOW CATALOG INTEGRATIONS LIKE '{fqn.name}'", cacheable=True)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple catalog integrations matching {fqn}")
+
+    data = show_result[0]
+    desc_result = execute(session, f"DESC CATALOG INTEGRATION {fqn.name}")
+    properties = _desc_result_to_dict(desc_result)
+
+    return {
+        "name": data["name"],
+        "catalog_source": properties["catalog_source"],
+        "table_format": properties["table_format"],
+        "enabled": properties["enabled"],
+        "owner": data["owner"],
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_columns(session, resource_type: str, fqn: FQN):
     desc_result = execute(session, f"DESC {resource_type} {fqn}")
     columns = []

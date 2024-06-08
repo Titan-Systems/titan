@@ -2,6 +2,7 @@ from .resource import Resource
 from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
+from .catalog_integration import CatalogIntegration
 from .column import Column
 from .compute_pool import ComputePool
 from .database import Database
@@ -62,6 +63,7 @@ __all__ = [
     "AzureInboundNotificationIntegration",
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
+    "CatalogIntegration",
     "Column",
     "ComputePool",
     # "CSVFileFormat",

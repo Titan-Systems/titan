@@ -1,0 +1,6 @@
+{
+    "name": "myCatalogInt",
+    "catalog_source": "OBJECT_STORE",
+    "table_format": "ICEBERG",
+    "enabled": true
+}
