@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
-
 from ..enums import ParseableEnum, ResourceType
-from ..scope import AccountScope
-
-
 from ..props import Props, EnumProp, StringProp, BoolProp
+from ..resource_name import ResourceName
+from ..scope import AccountScope
 
 
 class CatalogSource(ParseableEnum):
@@ -20,14 +18,14 @@ class CatalogTableFormat(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _GlueCatalogIntegration(ResourceSpec):
-    name: str
-    catalog_source: CatalogSource = CatalogSource.GLUE
-    table_format: CatalogTableFormat = CatalogTableFormat.ICEBERG
+    name: ResourceName
     glue_aws_role_arn: str
     glue_catalog_id: str
     catalog_namespace: str
-    glue_region: str = None
     enabled: bool
+    catalog_source: CatalogSource = CatalogSource.GLUE
+    table_format: CatalogTableFormat = CatalogTableFormat.ICEBERG
+    glue_region: str = None
     owner: str = "ACCOUNTADMIN"
     comment: str = None
 
@@ -98,16 +96,32 @@ class GlueCatalogIntegration(Resource):
 @dataclass(unsafe_hash=True)
 class _ObjectStoreCatalogIntegration(ResourceSpec):
     name: ResourceName
+    catalog_source: CatalogSource = CatalogSource.OBJECT_STORE
     table_format: CatalogTableFormat = CatalogTableFormat.ICEBERG
     enabled: bool = True
     comment: str = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.catalog_source not in [CatalogSource.OBJECT_STORE]:
+            raise ValueError(f"Invalid catalog source: {self.catalog_source}")
+        if self.table_format not in [CatalogTableFormat.ICEBERG]:
+            raise ValueError(f"Invalid table format: {self.table_format}")
+
 
 class ObjectStoreCatalogIntegration(Resource):
-    """A catalog integration for object stores with a default table format of ICEBERG and enabled by default."""
+    """
+    CREATE [ OR REPLACE ] CATALOG INTEGRATION [IF NOT EXISTS]
+        <name>
+        CATALOG_SOURCE = { OBJECT_STORE }
+        TABLE_FORMAT = { ICEBERG }
+        ENABLED = { TRUE | FALSE }
+        [ COMMENT = '{string_literal}' ]
+    """
 
     resource_type = ResourceType.CATALOG_INTEGRATION
     props = Props(
+        catalog_source=EnumProp("catalog_source", CatalogSource),
         table_format=EnumProp("table_format", CatalogTableFormat),
         enabled=BoolProp("enabled"),
         comment=StringProp("comment"),
@@ -118,14 +132,16 @@ class ObjectStoreCatalogIntegration(Resource):
     def __init__(
         self,
         name: str,
+        table_format: CatalogTableFormat,
         enabled: bool = True,
         comment: str = None,
         **kwargs,
     ):
-        kwargs.pop("table_format", None)
+        kwargs.pop("catalog_source", None)
         super().__init__(**kwargs)
         self._data = _ObjectStoreCatalogIntegration(
             name=name,
+            table_format=table_format,
             enabled=enabled,
             comment=comment,
         )

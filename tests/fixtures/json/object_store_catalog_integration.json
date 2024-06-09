@@ -1,0 +1,7 @@
+{
+    "name": "MYCATALOGINT",
+    "catalog_source": "OBJECT_STORE",
+    "table_format": "ICEBERG",
+    "enabled": true,
+    "comment": "This is a test catalog integration"
+}

@@ -2,7 +2,7 @@ from .resource import Resource
 from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
-from .catalog_integration import CatalogIntegration
+from .catalog_integration import GlueCatalogIntegration, ObjectStoreCatalogIntegration
 from .column import Column
 from .compute_pool import ComputePool
 from .database import Database
@@ -63,10 +63,9 @@ __all__ = [
     "AzureInboundNotificationIntegration",
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
-    "CatalogIntegration",
     "Column",
     "ComputePool",
-    # "CSVFileFormat",
+    "CreateTableAsSelect",
     "Database",
     "DatabaseRole",
     "DynamicTable",
@@ -75,23 +74,24 @@ __all__ = [
     "ExternalAccessIntegration",
     "ExternalFunction",
     "ExternalStage",
-    # "ExternalTableStream",
     "FailoverGroup",
     "FutureGrant",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
+    "GlueCatalogIntegration",
     "Grant",
     "GrantOnAll",
     "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
     "NetworkRule",
+    "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
     "PasswordPolicy",
     "Pipe",
-    "PythonUDF",
     "PythonStoredProcedure",
+    "PythonUDF",
     "ReplicationGroup",
     "Resource",
     "ResourceMonitor",
@@ -100,14 +100,12 @@ __all__ = [
     "S3StorageIntegration",
     "Schema",
     "Secret",
-    "SnowflakePartnerOAuthSecurityIntegration",
     "Sequence",
     "Service",
-    # "SharedDatabase",
+    "SnowflakePartnerOAuthSecurityIntegration",
     "StageStream",
     "Table",
     "TableStream",
-    "CreateTableAsSelect",
     "Tag",
     "Task",
     "User",

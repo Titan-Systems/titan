@@ -78,6 +78,19 @@ account_resources = [
             "must_change_password": False,
         },
     },
+    {
+        "resource_type": ResourceType.CATALOG_INTEGRATION,
+        "setup_sql": "CREATE CATALOG INTEGRATION objectStoreCatalogInt CATALOG_SOURCE=OBJECT_STORE TABLE_FORMAT=ICEBERG ENABLED=TRUE COMMENT='This is a test catalog integration';",
+        "teardown_sql": "DROP CATALOG INTEGRATION objectStoreCatalogInt",
+        "data": {
+            "name": "OBJECTSTORECATALOGINT",
+            "catalog_source": "OBJECT_STORE",
+            "table_format": "ICEBERG",
+            "enabled": True,
+            "owner": "ACCOUNTADMIN",
+            "comment": "This is a test catalog integration",
+        },
+    },
 ]
 
 scoped_resources = [

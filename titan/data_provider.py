@@ -29,8 +29,13 @@ def _desc_result_to_dict(desc_result):
     return dict([(row["property"], row["value"]) for row in desc_result])
 
 
-def _desc_type2_result_to_dict(desc_result):
-    return dict([(row["property"], row["property_value"]) for row in desc_result])
+def _desc_type2_result_to_dict(desc_result, lower_properties=False):
+    return dict(
+        [
+            (row["property"].lower() if lower_properties else row["property"], row["property_value"])
+            for row in desc_result
+        ]
+    )
 
 
 def _fail_if_not_granted(result, *args):
@@ -163,6 +168,14 @@ def remove_none_values(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
+def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
+    show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn.name}")
+    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    if len(ownership_grant) == 0:
+        return None
+    return ownership_grant[0]["grantee_name"]
+
+
 def fetch_resource(session, urn: URN) -> Optional[dict]:
     return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
@@ -256,16 +269,33 @@ def fetch_catalog_integration(session, fqn: FQN):
 
     data = show_result[0]
     desc_result = execute(session, f"DESC CATALOG INTEGRATION {fqn.name}")
-    properties = _desc_result_to_dict(desc_result)
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
 
-    return {
-        "name": data["name"],
-        "catalog_source": properties["catalog_source"],
-        "table_format": properties["table_format"],
-        "enabled": properties["enabled"],
-        "owner": data["owner"],
-        "comment": data["comment"] or None,
-    }
+    if properties["catalog_source"] == "GLUE":
+        return {
+            "name": data["name"],
+            "catalog_source": properties["catalog_source"],
+            "catalog_namespace": properties["catalog_namespace"],
+            "table_format": properties["table_format"],
+            "glue_aws_role_arn": properties["glue_aws_role_arn"],
+            "glue_catalog_id": properties["glue_catalog_id"],
+            "glue_region": properties["glue_region"],
+            "enabled": properties["enabled"] == "true",
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["catalog_source"] == "OBJECT_STORE":
+        return {
+            "name": data["name"],
+            "catalog_source": properties["catalog_source"],
+            "table_format": properties["table_format"],
+            "enabled": properties["enabled"] == "true",
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    else:
+        raise Exception(f"Unsupported catalog integration: {properties['catalog_source']}")
 
 
 def fetch_columns(session, resource_type: str, fqn: FQN):
@@ -815,7 +845,7 @@ def fetch_storage_integration(session, fqn: FQN):
     data = integrations[0]
 
     desc_result = execute(session, f"DESC INTEGRATION {fqn.name}")
-    properties = _desc_type2_result_to_dict(desc_result)
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
 
     show_grants = execute(session, f"SHOW GRANTS ON INTEGRATION {fqn.name}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
@@ -825,11 +855,11 @@ def fetch_storage_integration(session, fqn: FQN):
         "type": data["type"],
         "enabled": data["enabled"] == "true",
         "comment": data["comment"] or None,
-        "storage_provider": properties["STORAGE_PROVIDER"],
-        "storage_aws_role_arn": properties.get("STORAGE_AWS_ROLE_ARN"),
-        "storage_allowed_locations": _parse_comma_separated_values(properties.get("STORAGE_ALLOWED_LOCATIONS")),
-        "storage_blocked_locations": _parse_comma_separated_values(properties.get("STORAGE_BLOCKED_LOCATIONS")),
-        "storage_aws_object_acl": properties.get("STORAGE_AWS_OBJECT_ACL"),
+        "storage_provider": properties["storage_provider"],
+        "storage_aws_role_arn": properties.get("storage_aws_role_arn"),
+        "storage_allowed_locations": _parse_comma_separated_values(properties.get("storage_allowed_locations")),
+        "storage_blocked_locations": _parse_comma_separated_values(properties.get("storage_blocked_locations")),
+        "storage_aws_object_acl": properties.get("storage_aws_object_acl"),
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
     }
 
