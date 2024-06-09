@@ -145,3 +145,16 @@ class ObjectStoreCatalogIntegration(Resource):
             enabled=enabled,
             comment=comment,
         )
+
+
+CatalogIntegrationMap = {
+    CatalogSource.GLUE: GlueCatalogIntegration,
+    CatalogSource.OBJECT_STORE: ObjectStoreCatalogIntegration,
+}
+
+
+def _resolver(data: dict):
+    return CatalogIntegrationMap[CatalogSource(data["catalog_source"])]
+
+
+Resource.__resolvers__[ResourceType.CATALOG_INTEGRATION] = _resolver

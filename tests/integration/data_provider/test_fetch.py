@@ -91,6 +91,16 @@ account_resources = [
             "comment": "This is a test catalog integration",
         },
     },
+    {
+        "resource_type": ResourceType.SHARE,
+        "setup_sql": "CREATE SHARE SOME_SHARE COMMENT = 'A share for testing'",
+        "teardown_sql": "DROP SHARE IF EXISTS SOME_SHARE",
+        "data": {
+            "name": "SOME_SHARE",
+            "owner": "ACCOUNTADMIN",
+            "comment": "A share for testing",
+        },
+    },
 ]
 
 scoped_resources = [

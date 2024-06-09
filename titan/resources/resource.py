@@ -1,3 +1,6 @@
+import sys
+import types
+
 import difflib
 
 from dataclasses import asdict, dataclass, fields
@@ -171,15 +174,26 @@ class Resource(metaclass=_Resource):
         self._register_scope(database=database, schema=schema)
 
         # If there are more kwargs, throw an error
+        # Based on https://stackoverflow.com/questions/1603940/how-can-i-modify-a-python-traceback-object-when-raising-an-exception
         if kwargs:
-            if self.spec:
-                field_names = [field.name for field in fields(self.spec)]
-                suggestions = _suggest_correct_kwargs(expected_kwargs=field_names, passed_kwargs=kwargs.keys())
-                raise ValueError(
-                    f"Unexpected kwargs {kwargs}, did you mean {suggestions}? Valid field names: {field_names}"
-                )
-            else:
-                raise ValueError(f"Unexpected kwargs {kwargs}")
+            try:
+                if self.spec:
+                    field_names = [field.name for field in fields(self.spec)]
+                    field_names = ", ".join(field_names)
+                    raise ValueError(
+                        f"Unexpected keyword arguments for {self.__class__.__name__} {kwargs}. Valid field names: {field_names}"
+                    )
+                else:
+                    raise ValueError(f"Unexpected keyword arguments for {self.__class__.__name__} {kwargs}")
+            except ValueError as err:
+                traceback = sys.exc_info()[2]
+                back_frame = traceback.tb_frame.f_back
+                msg = str(err)
+
+            back_tb = types.TracebackType(
+                tb_next=None, tb_frame=back_frame, tb_lasti=back_frame.f_lasti, tb_lineno=back_frame.f_lineno
+            )
+            raise ValueError(msg).with_traceback(back_tb)
 
     @classmethod
     def from_sql(cls, sql):

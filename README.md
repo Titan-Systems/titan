@@ -121,7 +121,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 |-------------------------------|-----------|
 | **Account Resources**         |           |
 | API Integration               | ✅         |
-| Catalog Integration           | ❌         |
+| Catalog Integration           | ✅         |
 | Compute Pool                  | ✅         |
 | Connection                    | ❌         |
 | Database                      | ✅         |
@@ -148,7 +148,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ SAML2                       | ❌         |
 | ↳ SCIM                        | ❌         |
 | Share                         | ❌         |
-| Storage Integration           | WIP        |
+| Storage Integration           | ✅         |
 | ↳ AWS                         | ✅         |
 | ↳ Azure                       | ✅         |
 | ↳ GCP                         | ✅         |

@@ -10,6 +10,7 @@ from .resources import (
     RoleGrant,
     Schema,
     Resource,
+    User,
 )
 
 
@@ -50,9 +51,28 @@ def resources_from_grants_config(grants_config: list) -> list:
     resources = []
     for grant in grants_config:
         if isinstance(grant, dict):
-            resources.append(Grant(**grant))
+            titan_grant = Grant(**grant)
         elif isinstance(grant, str):
-            resources.append(Grant.from_sql(grant))
+            titan_grant = Grant.from_sql(grant)
+        resources.append(titan_grant)
+    return resources
+
+
+def resources_from_users_config(users_config: list) -> list:
+    resources = []
+    for user in users_config:
+        if isinstance(user, dict):
+            titan_user = User(**user)
+            resources.append(titan_user)
+            for role in user.get("roles", []):
+                resources.append(
+                    RoleGrant(
+                        role=role,
+                        to_user=titan_user,
+                    )
+                )
+        elif isinstance(user, str):
+            resources.append(User.from_sql(user))
     return resources
 
 
@@ -64,6 +84,7 @@ def collect_resources_from_config(config: dict):
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
     grants = config.pop("grants", [])
+    users = config.pop("users", [])
 
     resources = []
 
@@ -79,6 +100,7 @@ def collect_resources_from_config(config: dict):
     resources.extend(resources_from_database_config(database_config))
     resources.extend(resources_from_role_grants_config(role_grants))
     resources.extend(resources_from_grants_config(grants))
+    resources.extend(resources_from_users_config(users))
 
     resource_cache = {}
     for resource in resources:

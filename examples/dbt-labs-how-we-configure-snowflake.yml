@@ -1,0 +1,77 @@
+roles:
+  - name: public
+    comment: "Default set of user permissions. Every user starts with public and adds roles as their position requires."
+  - name: loader
+    comment: "Owns the tables in your raw database, and connects to the loading warehouse."
+  - name: transformer
+    comment: "Has query permissions on tables in raw database and owns tables in the analytics database. This is for dbt developers and scheduled jobs."
+  - name: reporter
+    comment: "Has permissions on the analytics database only. This role is for data consumers, such as analysts and BI tools. These users will not have permissions to read data from the raw database."
+
+databases:
+  - name: raw
+    comment: "This database contains your raw data. This is the landing pad for everything extracted and loaded, as well as containing external stages for data living in S3. Access to this database is strictly permissioned."
+  - name: analytics
+    comment: "This database contains tables and views accessible to analysts and reporting. Everything in analytics is created and owned by dbt."
+
+warehouses:
+  - name: loading
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
+    comment: "Tools like Fivetran and Stitch will use this warehouse to perform their regular loads of new data. We separate this workload from the other workloads because, at scale, loading can put significant strain on your warehouse and we don't want to cause slowness for your BI users."
+  - name: transforming
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
+    comment: "This is the warehouse that dbt will use to perform all data transformations. It will only be in use (and charging you credits) when regular jobs are being run."
+  - name: reporting
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
+    comment: "Mode and any other BI tools will connect to this warehouse to run analytical queries and report the results to end users. This warehouse will be spun up only when a user is actively running a query against it."
+
+grants:
+  - to_role: loader
+    priv: usage
+    on_warehouse: loading
+  - to_role: loader
+    priv: ownership
+    on_database: raw
+  - to_role: transformer
+    priv: usage
+    on_warehouse: transforming
+  - to_role: transformer
+    priv: ownership
+    on_database: analytics
+  - to_role: reporter
+    priv: usage
+    on_warehouse: reporting
+  - to_role: reporter
+    priv: select
+    on_database: analytics
+
+users:
+  - name: admin
+    roles:
+      - sysadmin
+      - accountadmin
+      - securityadmin
+    comment: "Primary account login. Use only to set up or administer databases, warehouses, roles, and users. Never use this login to perform any real analysis!"
+  - name: etl_user
+    roles:
+      - loader
+    comment: "Your data loader(s) like Stitch, Fivetran, Alooma."
+  - name: dbt_cloud_user
+    roles:
+      - transformer
+    comment: "Your transformation scheduler(s) like Airflow, Luigi, dbt Cloud."
+  - name: bi_user
+    roles:
+      - reporter
+    comment: "Your BI tool(s) like Mode, Looker, Periscope."
+  - name: analyst
+    roles:
+      - transformer
+    comment: "Analysts writing queries in a SQL client, notebook, via dbt, etc. Users that are building dbt models should be assigned the transformer role so that they can access raw tables."
+

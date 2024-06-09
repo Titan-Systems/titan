@@ -810,6 +810,23 @@ def fetch_service(session, fqn: FQN):
     }
 
 
+def fetch_share(session, fqn: FQN):
+    show_result = execute(session, f"SHOW SHARES LIKE '{fqn.name}'")
+    shares = _filter_result(show_result, kind="OUTBOUND")
+
+    if len(shares) == 0:
+        return None
+    if len(shares) > 1:
+        raise Exception(f"Found multiple shares matching {fqn}")
+
+    data = shares[0]
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_shared_database(session, fqn: FQN):
     show_result = execute(session, "SELECT SYSTEM$SHOW_IMPORTED_DATABASES()", cacheable=True)
     show_result = json.loads(show_result[0]["SYSTEM$SHOW_IMPORTED_DATABASES()"])

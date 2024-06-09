@@ -202,6 +202,9 @@ class Grant(Resource):
             else:
                 owner = "SYSADMIN"
 
+        if to is None and kwargs.get("to_role"):
+            to = kwargs.pop("to_role")
+
         super().__init__(**kwargs)
         self._data: _Grant = _Grant(
             priv=priv,
