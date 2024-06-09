@@ -1,10 +1,10 @@
 CREATE CATALOG INTEGRATION glueCatalogInt
   CATALOG_SOURCE=GLUE
-  CATALOG_NAMESPACE='<catalog-namespace>'
+  CATALOG_NAMESPACE='some-namespace'
   TABLE_FORMAT=ICEBERG
-  GLUE_AWS_ROLE_ARN='<arn-for-aws-role-to-assume>'
-  GLUE_CATALOG_ID='<catalog-id>'
-  GLUE_REGION='<optional-aws-region-of-the-glue-catalog>'
+  GLUE_AWS_ROLE_ARN='arn:aws:iam::123456789012:role/my-role'
+  GLUE_CATALOG_ID='123456789012'
+  GLUE_REGION='us-east-1'
   ENABLED=TRUE
   COMMENT='This is a test catalog integration';
 
