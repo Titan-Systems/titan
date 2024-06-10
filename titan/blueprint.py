@@ -726,7 +726,7 @@ class Blueprint:
 
         default_role = session_ctx["role"]
 
-        def _role_for_change(change: ResourceChange):
+        def _role_for_change(change: ResourceChange, usable_roles: list[str]):
             """
             In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
 
@@ -754,23 +754,26 @@ class Blueprint:
 
             # If it supports ownership, use the owner from the resource
             if "owner" in change.after:
-                return change.after["owner"]
+                role = change.after["owner"]
             elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
-                return "SECURITYADMIN"
-            # elif change.urn.resource_type in (ResourceType.USER,):
-            #     return "USERADMIN"
+                role = "SECURITYADMIN"
             else:
                 # If we don't have a concrete owner for this resource, use the role that was active at the start of the session
-                return default_role
+                role = default_role
+
+            if role not in usable_roles:
+                raise Exception(f"Role {role} not found in usable roles: {usable_roles}")
+
+            return role
 
         def _queue_change(change: ResourceChange, props):
 
-            role = _role_for_change(change)
+            role = _role_for_change(change, usable_roles)
             if role:
                 action_queue.append(f"USE ROLE {role}")
 
-            print(change)
-            print('.')
+            # print(change)
+            # print('.')
 
             if change.action == Action.ADD:
                 action_queue.append(lifecycle.create_resource(change.urn, change.after, props))

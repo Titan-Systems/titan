@@ -229,3 +229,20 @@ def test_blueprint_fully_managed(cursor, test_db):
     assert len(plan) == 1
     assert plan[0].action == Action.REMOVE
     assert plan[0].urn.fqn.name == "PRESENT"
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_quoted_references(cursor):
+    session = cursor.connection
+
+    cursor.execute(f"CREATE ROLE IF NOT EXISTS STATIC_ROLE")
+    cursor.execute(f'CREATE USER IF NOT EXISTS "info@applytitan.com"')
+    cursor.execute(f'GRANT ROLE STATIC_ROLE TO USER "info@applytitan.com"')
+
+    blueprint = Blueprint(
+        name="test_quoted_references",
+        resources=[RoleGrant(role="STATIC_ROLE", to_user="info@applytitan.com")],
+    )
+    plan = blueprint.plan(session)
+
+    assert len(plan) == 0

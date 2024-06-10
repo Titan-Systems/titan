@@ -663,6 +663,8 @@ def fetch_role(session, fqn: FQN):
 
 def fetch_role_grant(session, fqn: FQN):
     subject, name = fqn.params.copy().popitem()
+    subject = ResourceName(subject)
+    name = ResourceName(name)
     try:
         show_result = execute(session, f"SHOW GRANTS OF ROLE {fqn.name}", cacheable=True)
     except ProgrammingError as err:
@@ -674,7 +676,7 @@ def fetch_role_grant(session, fqn: FQN):
         return None
 
     for data in show_result:
-        if data["granted_to"] == subject.upper() and data["grantee_name"] == name:
+        if ResourceName(data["granted_to"]) == subject and ResourceName(data["grantee_name"]) == name:
             if data["granted_to"] == "ROLE":
                 return {
                     "role": fqn.name,

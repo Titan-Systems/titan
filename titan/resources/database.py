@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceContainer, ResourceSpec
+from .role import Role
 from .schema import Schema
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
@@ -12,7 +13,7 @@ from ..scope import AccountScope
 class _Database(ResourceSpec):
     name: ResourceName
     transient: bool = False
-    owner: str = "SYSADMIN"
+    owner: Role = Role("SYSADMIN")
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
