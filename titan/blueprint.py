@@ -94,9 +94,10 @@ def print_plan(plan: Plan):
             action_marker = "-"
         # »
         print(f"{action_marker} {change.urn}", "{")
-        key_length = max(len(key) for key in change.delta.keys())
+        key_lengths = [len(key) for key in change.delta.keys()]
+        max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
         for key, value in change.delta.items():
-            print(f"  + {key:<{key_length}} = {value}")
+            print(f"  + {key:<{max_key_length}} = {value}")
         print("}")
 
 
@@ -370,7 +371,7 @@ class Blueprint:
         self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
         self._ignore_ownership: bool = ignore_ownership
-        self._valid_resource_types: List[ResourceType] = [ResourceType(v) for v in valid_resource_types] or []
+        self._valid_resource_types: List[ResourceType] = [ResourceType(v) for v in valid_resource_types or []]
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -511,8 +512,8 @@ class Blueprint:
                 raise Exception("Fully managed mode with all resources is not supported yet")
             
             for resource_type in self._valid_resource_types:
-                if resource_type not in (ResourceType.USER, ResourceType.ROLE, ResourceType.SCHEMA,):
-                    raise Exception("Fully managed mode with all resources is not supported yet")
+                # if resource_type not in (ResourceType.USER, ResourceType.ROLE, ResourceType.SCHEMA,):
+                #     raise Exception("Fully managed mode with all resources is not supported yet")
                 for name in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     urn = URN(resource_type=resource_type, fqn=parse_identifier(name, is_db_scoped=resource_type in (ResourceType.SCHEMA, ResourceType.ROLE)), account_locator=self._account_locator)
                     data = data_provider.fetch_resource(session, urn)
@@ -591,7 +592,9 @@ class Blueprint:
                     raise Exception(f"Database [{resource.container}] for resource {resource} not found")
             else:
                 for db in databases:
-                    if db.name == resource.container.name:
+                    if db == resource.container:
+                        break
+                    elif db.name == resource.container.name:
                         db.add(resource)
                         break
 
@@ -749,8 +752,9 @@ class Blueprint:
             if change.action != Action.ADD:
                 return default_role
 
-            if "owner" in change.before:
-                return change.before["owner"]
+            # If it supports ownership, use the owner from the resource
+            if "owner" in change.after:
+                return change.after["owner"]
             elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
                 return "SECURITYADMIN"
             # elif change.urn.resource_type in (ResourceType.USER,):
@@ -764,6 +768,9 @@ class Blueprint:
             role = _role_for_change(change)
             if role:
                 action_queue.append(f"USE ROLE {role}")
+
+            print(change)
+            print('.')
 
             if change.action == Action.ADD:
                 action_queue.append(lifecycle.create_resource(change.urn, change.after, props))

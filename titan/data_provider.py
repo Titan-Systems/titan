@@ -1149,7 +1149,7 @@ def list_resource(session, resource_label: str) -> Optional[dict]:
 
 def list_databases(session):
     show_result = execute(session, "SHOW DATABASES")
-    return [row["name"] for row in show_result]
+    return [row["name"] for row in show_result if row["name"] != "SNOWFLAKE"]
 
 
 def list_schemas(session, database=None):

@@ -1,7 +1,8 @@
 import os
 
+
 import snowflake.connector
-from titan.blueprint import Blueprint
+from titan.blueprint import Blueprint, print_plan
 
 
 connection_params = {
@@ -14,8 +15,10 @@ connection_params = {
 
 def main():
     conn = snowflake.connector.connect(**connection_params)
-    bp = Blueprint(name="reset-test-account", run_mode="FULLY-MANAGED")
-    bp.apply(conn)
+    bp = Blueprint(name="reset-test-account", run_mode="FULLY-MANAGED", valid_resource_types=["database"])
+    plan = bp.plan(conn)
+    print_plan(plan)
+    bp.apply(conn, plan)
 
 
 if __name__ == "__main__":

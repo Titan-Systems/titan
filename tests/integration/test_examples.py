@@ -14,7 +14,7 @@ EXAMPLES_YML = list(get_examples_yml())
     ids=[example_name for example_name, _ in EXAMPLES_YML],
     scope="function",
 )
-def example(request, test_db, cursor, marked_for_cleanup):
+def example(request):
     _, example_content = request.param
     yield yaml.safe_load(example_content)
 

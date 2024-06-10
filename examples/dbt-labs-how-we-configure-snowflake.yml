@@ -8,8 +8,10 @@ roles:
 
 databases:
   - name: raw
+    owner: loader
     comment: "This database contains your raw data. This is the landing pad for everything extracted and loaded, as well as containing external stages for data living in S3. Access to this database is strictly permissioned."
   - name: analytics
+    owner: transformer
     comment: "This database contains tables and views accessible to analysts and reporting. Everything in analytics is created and owned by dbt."
 
 warehouses:
@@ -33,20 +35,14 @@ grants:
   - to_role: loader
     priv: usage
     on_warehouse: loading
-  - to_role: loader
-    priv: ownership
-    on_database: raw
   - to_role: transformer
     priv: usage
     on_warehouse: transforming
-  - to_role: transformer
-    priv: ownership
-    on_database: analytics
   - to_role: reporter
     priv: usage
     on_warehouse: reporting
   - to_role: reporter
-    priv: select
+    priv: usage
     on_database: analytics
 
 users:
