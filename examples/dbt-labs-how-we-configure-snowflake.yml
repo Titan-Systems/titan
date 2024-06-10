@@ -1,6 +1,4 @@
 roles:
-  - name: public
-    comment: "Default set of user permissions. Every user starts with public and adds roles as their position requires."
   - name: loader
     comment: "Owns the tables in your raw database, and connects to the loading warehouse."
   - name: transformer

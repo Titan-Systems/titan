@@ -62,9 +62,10 @@ def resources_from_users_config(users_config: list) -> list:
     resources = []
     for user in users_config:
         if isinstance(user, dict):
+            roles = user.pop("roles", [])
             titan_user = User(**user)
             resources.append(titan_user)
-            for role in user.get("roles", []):
+            for role in roles:
                 resources.append(
                     RoleGrant(
                         role=role,

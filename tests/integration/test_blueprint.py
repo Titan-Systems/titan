@@ -1,8 +1,9 @@
 import pytest
 
-from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, data_provider
+from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, Schema, data_provider
 from titan.blueprint import Action, MissingResourceException, plan_sql
 from titan.client import reset_cache
+from titan.enums import ResourceType
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -175,3 +176,21 @@ def test_blueprint_forces_add(cursor, test_db, role):
     plan = blueprint.plan(session)
     assert len(plan) == 1
     assert plan[0].action == Action.ADD
+
+
+@pytest.mark.requires_snowflake
+def test_blueprint_fully_managed(cursor, test_db):
+    session = cursor.connection
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            # Schema(name="test", database=test_db),
+            # # Schema(name="PUBLIC", database=test_db),
+            Schema(name="INFORMATION_SCHE", database=test_db),
+        ],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 0
+    # assert plan[0].action == Action.ADD

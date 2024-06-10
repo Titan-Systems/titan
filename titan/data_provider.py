@@ -1143,8 +1143,8 @@ def fetch_warehouse(session, fqn: FQN):
 ################ List functions
 
 
-def list_resource(session, resource_key):
-    return getattr(__this__, f"list_{pluralize(resource_key)}")(session)
+def list_resource(session, resource_label: str) -> Optional[dict]:
+    return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
 def list_databases(session):
@@ -1170,3 +1170,8 @@ def list_stages(session):
         row["fqn"] = f"{row['database_name']}.{row['schema_name']}.{row['name']}"
         stages.append(row)
     return stages
+
+
+def list_users(session):
+    show_result = execute(session, "SHOW USERS")
+    return [row["name"] for row in show_result]

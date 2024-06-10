@@ -32,5 +32,5 @@ def test_example(example, cursor, marked_for_cleanup):
         allow_role_switching=True,
         ignore_ownership=False,
     )
-    plan = blueprint.plan(cursor)
-    blueprint.apply(cursor, plan)
+    plan = blueprint.plan(cursor.connection)
+    blueprint.apply(cursor.connection, plan)

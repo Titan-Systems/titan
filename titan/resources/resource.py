@@ -410,6 +410,7 @@ class ResourcePointer(Resource, ResourceContainer):
         # If this points to a database, assume it includes a PUBLIC schema
         if self._resource_type == ResourceType.DATABASE and self._name != "SNOWFLAKE":
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
+            # self.add(ResourcePointer(name="INFORMATION_SCHEMA", resource_type=ResourceType.SCHEMA))
 
     def __copy__(self):
         return ResourcePointer(self._name, self._resource_type)

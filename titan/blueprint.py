@@ -9,8 +9,8 @@ from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
 from .diff import diff, Action
 from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
-from .identifiers import URN, FQN
-from .parse import parse_URN
+from .identifiers import URN, FQN, resource_label_for_type
+from .parse import parse_URN, parse_identifier
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
@@ -311,7 +311,7 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
                         information_schema = URN(
                             account_locator=account_urn.account_locator,
                             resource_type=ResourceType.SCHEMA,
-                            fqn=FQN(name="PUBLIC", database=change.urn.fqn.name),
+                            fqn=FQN(name="INFORMATION_SCHEMA", database=change.urn.fqn.name),
                         )
                         _add(role, str(public_schema), priv_for_principal(public_schema, "OWNERSHIP"))
                         _add(role, str(information_schema), priv_for_principal(information_schema, "OWNERSHIP"))
@@ -343,60 +343,6 @@ def _raise_if_missing_privs(required: list, available: dict):
     #         raise MissingPrivilegeException(f"Missing privileges for {principal}: {required_privs}")
 
 
-def _fetch_remote_state(session, manifest: Manifest) -> State:
-    state: State = {}
-    urns = set(manifest["_urns"].copy())
-
-    # FIXME
-    session.cursor().execute("USE ROLE ACCOUNTADMIN")
-
-    for urn_str, _data in manifest.items():
-        if urn_str.startswith("_"):
-            continue
-
-        urns.remove(urn_str)
-        urn = parse_URN(urn_str)
-        data = data_provider.fetch_resource(session, urn)
-        # print("~~fetching_1", urn_str, data)
-        if urn_str in manifest and data is not None:
-            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
-            if urn.resource_type == ResourceType.FUTURE_GRANT:
-                normalized = data
-            elif isinstance(data, list):
-                normalized = [resource_cls.defaults() | d for d in data]
-            else:
-                normalized = resource_cls.defaults() | data
-            state[urn_str] = normalized
-
-    for urn_str in urns:
-        urn = parse_URN(urn_str)
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type)
-        data = data_provider.fetch_resource(session, urn)
-        # print("~~fetching_2", urn_str, data)
-        if data is not None:
-            if urn.resource_type == ResourceType.FUTURE_GRANT:
-                normalized = data
-            elif isinstance(data, list):
-                normalized = [resource_cls.defaults() | d for d in data]
-            else:
-                normalized = resource_cls.defaults() | data
-            state[urn_str] = normalized
-
-    # check for existence of resource references
-    for parent, reference in manifest["_refs"]:
-        if reference in manifest:
-            continue
-
-        urn = parse_URN(reference)
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type)
-        data = data_provider.fetch_resource(session, urn)
-        # print("~~fetching_3", str(urn), data)
-        if data is None:
-            raise MissingResourceException(f"Resource {urn} required by {parent} not found")
-
-    return state
-
-
 class Blueprint:
     def __init__(
         self,
@@ -404,24 +350,27 @@ class Blueprint:
         account: Union[None, str, Account] = None,
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
-        resources: List[Resource] = [],
+        resources: List[Resource] = None,
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
         allow_role_switching: bool = True,
         ignore_ownership: bool = True,
-        valid_resource_types: List[ResourceType] = [],
+        valid_resource_types: List[ResourceType] = None,
     ) -> None:
         # TODO: input validation
 
+        if not allow_role_switching:
+            raise Exception("Role switching must be allowed in this version of Titan")
+        
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
         self._account_locator: str = None
-        self._run_mode: RunMode = run_mode
+        self._run_mode: RunMode = RunMode(run_mode)
         self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
         self._ignore_ownership: bool = ignore_ownership
-        self._valid_resource_types: List[ResourceType] = valid_resource_types
+        self._valid_resource_types: List[ResourceType] = [ResourceType(v) for v in valid_resource_types] or []
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -441,9 +390,7 @@ class Blueprint:
         exceptions = []
 
         # Run Mode exceptions
-        if self._run_mode == RunMode.FULLY_MANAGED:
-            return
-        elif self._run_mode == RunMode.CREATE_OR_UPDATE:
+        if self._run_mode == RunMode.CREATE_OR_UPDATE:
             for change in plan:
                 if change.action == Action.REMOVE:
                     exceptions.append(
@@ -459,8 +406,8 @@ class Blueprint:
                         exceptions.append(
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
                         )
-        else:
-            raise Exception(f"Unsupported run mode {self._run_mode}")
+        # else:
+        #     raise Exception(f"Unsupported run mode {self._run_mode}")
 
         # Valid Resource Types exceptions
         if self._valid_resource_types:
@@ -537,6 +484,69 @@ class Blueprint:
 
         return sorted(changes, key=lambda change: sort_order[str(change.urn)])
 
+    def fetch_remote_state(self, session, manifest: Manifest) -> State:
+        state: State = {}
+
+        manifest_urns : set[str] = set(manifest["_urns"].copy())
+
+        def _normalize(urn: URN, data: dict) -> dict:
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+            if urn.resource_type == ResourceType.FUTURE_GRANT:
+                normalized = data
+            elif isinstance(data, list):
+                raise Exception(f"Fetching list of {urn.resource_type} is not supported yet")
+                normalized = [resource_cls.defaults() | d for d in data]
+            else:
+                normalized = resource_cls.defaults() | data
+            return normalized
+
+        if self._run_mode == RunMode.FULLY_MANAGED:
+            """
+            In fully managed mode, the remote state is not just the resources that were added to the blueprint, 
+            but all resources that exist in Snowflake. This is limited by a few things:
+            - valid_resource_types limits the scope of what resources types are allowed in a blueprint
+            - if database or schema is set, the blueprint only looks at that database or schema
+            """
+            if len(self._valid_resource_types) == 0:
+                raise Exception("Fully managed mode with all resources is not supported yet")
+            
+            for resource_type in self._valid_resource_types:
+                if resource_type not in (ResourceType.USER, ResourceType.ROLE, ResourceType.SCHEMA,):
+                    raise Exception("Fully managed mode with all resources is not supported yet")
+                for name in data_provider.list_resource(session, resource_label_for_type(resource_type)):
+                    urn = URN(resource_type=resource_type, fqn=parse_identifier(name, is_db_scoped=resource_type in (ResourceType.SCHEMA, ResourceType.ROLE)), account_locator=self._account_locator)
+                    data = data_provider.fetch_resource(session, urn)
+                    if data is not None:
+                        normalized_data = _normalize(urn, data)
+                        state[str(urn)] = normalized_data
+
+        for urn_str in manifest.keys():
+            if urn_str.startswith("_"):
+                continue
+
+            manifest_urns.remove(urn_str)
+            urn = parse_URN(urn_str)
+            data = data_provider.fetch_resource(session, urn)
+            if data is not None:
+                normalized_data = _normalize(urn, data)
+                state[urn_str] = normalized_data
+
+        # for urn_str in manifest_urns:
+        #     raise Exception(f"Resource {urn_str} not found in manifest")
+
+        # check for existence of resource refs
+        for parent, reference in manifest["_refs"]:
+            if reference in manifest:
+                continue
+
+            urn = parse_URN(reference)
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type)
+            data = data_provider.fetch_resource(session, urn)
+            if data is None:
+                raise MissingResourceException(f"Resource {urn} required by {parent} not found")
+
+        return state
+
     def _finalize(self, session_context: dict):
         """
         Convert the staged resources into a tree of resources
@@ -572,6 +582,8 @@ class Blueprint:
 
         # Add all schemas and database roles to their respective databases
         for resource in db_scoped:
+            # When the container is present, we SHOULD be looking up the real container and attaching. In other words
+            # this resource could be an island
             if resource.container is None:
                 if len(databases) == 1:
                     databases[0].add(resource)
@@ -608,8 +620,9 @@ class Blueprint:
         self._finalize(session_context)
 
         for resource in _walk(self._root):
-            if isinstance(resource, Resource) and resource.implicit:
-                continue
+            if isinstance(resource, Resource):
+                if resource.implicit and self._run_mode != RunMode.FULLY_MANAGED:
+                    continue
 
             urn = URN(
                 resource_type=resource.resource_type,
@@ -659,7 +672,7 @@ class Blueprint:
         reset_cache()
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
-        remote_state = _fetch_remote_state(session, manifest)
+        remote_state = self.fetch_remote_state(session, manifest)
         try:
             completed_plan = self._plan(remote_state, manifest)
         except Exception as e:
@@ -703,21 +716,50 @@ class Blueprint:
         action_queue = []
         actions_taken = []
 
-        def _queue_action(change: ResourceChange, props):
-            switch_to_role = None
+        default_role = session_ctx["role"]
+
+        def _role_for_change(change: ResourceChange):
+            """
+            In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
+
+            The active role of a session is set as follows:
+            - When a session is started:
+                - If the session is configured with a role, that is the active role
+                - Otherwise, if the user of the session has a default_role set, and that role exists, that is the active role
+                - Otherwise, the PUBLIC role is activated (PUBLIC cannot be revoked)
+            - Any time the USE ROLE command is run, the active role is switched
+
+            A session may run any command thats allowed by the active role or any role downstream from it in the role hierarchy.
+            When secondary roles are active (by running the command USE SECONDARY ROLES ALL), then the session may also run any
+            command that any secondary role or a role downstream from it is allowed to run.
+
+            However, when a CREATE command is run, only the active role is considered. This is because the role that
+            creates a new resource owns that resource by default. There are some exceptions with GRANTS.
+
+            For those reasons, we generally don't have to worry about the current role as long as we have activated secondary roles.
+            The exception is when creating new resources
+            """
+
+            # We only care about the active role when creating new resources
+            if change.action != Action.ADD:
+                return default_role
+
             if "owner" in change.before:
-                switch_to_role = change.before["owner"]
+                return change.before["owner"]
             elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
-                switch_to_role = "SECURITYADMIN"
-            else:  #  change.urn.resource_type in (ResourceType.SCHEMA,)
-                switch_to_role = "ACCOUNTADMIN"
-            if switch_to_role and switch_to_role in usable_roles:
-                action_queue.append(f"USE ROLE {switch_to_role}")
+                return "SECURITYADMIN"
+            # elif change.urn.resource_type in (ResourceType.USER,):
+            #     return "USERADMIN"
             else:
-                # raise Exception(f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available")
-                print(
-                    f"Role {change.before.get('owner', '[OWNER MISSING]')} required for {change.urn} but isn't available"
-                )
+                # If we don't have a concrete owner for this resource, use the role that was active at the start of the session
+                return default_role
+
+        def _queue_change(change: ResourceChange, props):
+
+            role = _role_for_change(change)
+            if role:
+                action_queue.append(f"USE ROLE {role}")
+
             if change.action == Action.ADD:
                 action_queue.append(lifecycle.create_resource(change.urn, change.after, props))
             elif change.action == Action.CHANGE:
@@ -725,9 +767,11 @@ class Blueprint:
             elif change.action == Action.REMOVE:
                 action_queue.append(lifecycle.drop_resource(change.urn, change.before))
 
+        if self._allow_role_switching:
+            action_queue.append("USE SECONDARY ROLES ALL")
         for change in plan:
             props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-            _queue_action(change, props)
+            _queue_change(change, props)
 
         while action_queue:
             sql = action_queue.pop(0)
