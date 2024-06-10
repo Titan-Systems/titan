@@ -66,6 +66,8 @@ class Schema(Resource, ResourceContainer):
         **kwargs,
     ):
         super().__init__(**kwargs)
+        if name == "INFORMATION_SCHEMA":
+            comment = "Views describing the contents of schemas in this database"
         self._data: _Schema = _Schema(
             name=name,
             transient=transient,

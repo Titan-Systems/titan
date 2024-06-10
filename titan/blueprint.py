@@ -589,6 +589,11 @@ class Blueprint:
                     databases[0].add(resource)
                 else:
                     raise Exception(f"Database [{resource.container}] for resource {resource} not found")
+            else:
+                for db in databases:
+                    if db.name == resource.container.name:
+                        db.add(resource)
+                        break
 
         for resource in schema_scoped:
             if resource.container is None:

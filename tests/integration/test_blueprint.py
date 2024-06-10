@@ -184,13 +184,48 @@ def test_blueprint_fully_managed(cursor, test_db):
     blueprint = Blueprint(
         name="blueprint",
         resources=[
-            # Schema(name="test", database=test_db),
-            # # Schema(name="PUBLIC", database=test_db),
-            Schema(name="INFORMATION_SCHE", database=test_db),
+            Schema(name="INFORMATION_SCHEMA", database=test_db),
         ],
         run_mode="fully-managed",
         valid_resource_types=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
     assert len(plan) == 0
-    # assert plan[0].action == Action.ADD
+
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            Schema(name="ABSENT", database=test_db),
+            Schema(name="INFORMATION_SCHEMA", database=test_db),
+        ],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn.fqn.name == "ABSENT"
+
+    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            Schema(name="PRESENT", database=test_db),
+            Schema(name="INFORMATION_SCHEMA", database=test_db),
+        ],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 0
+
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[Schema(name="INFORMATION_SCHEMA", database=test_db)],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.REMOVE
+    assert plan[0].urn.fqn.name == "PRESENT"
