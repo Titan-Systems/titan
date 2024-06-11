@@ -177,7 +177,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Hybrid Table                  | WIP        |
 | Iceberg Table                 | ❌         |
 | Image Repository              | ✅         |
-| Internal Stage                | WIP       |
+| Internal Stage                | ✅         |
 | Masking Policy                | ❌         |
 | Materialized View             | ✅         |
 | Model                         | ❌         |
