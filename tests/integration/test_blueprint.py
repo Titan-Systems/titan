@@ -19,6 +19,8 @@ from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
 
+pytestmark = pytest.mark.requires_snowflake
+
 
 @pytest.fixture(autouse=True)
 def clear_cache():
@@ -63,7 +65,6 @@ def noprivs_role(cursor, test_db, marked_for_cleanup):
     return role.name
 
 
-@pytest.mark.requires_snowflake
 def test_plan(cursor, user, role):
     session = cursor.connection
     blueprint = Blueprint(name="test")
@@ -76,7 +77,6 @@ def test_plan(cursor, user, role):
     assert role_grant_remote
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_plan_no_changes(cursor, user, role):
     session = cursor.connection
     blueprint = Blueprint(name="test_no_changes")
@@ -118,7 +118,6 @@ def test_blueprint_crossreferenced_database(cursor):
 #         bp.apply(cursor.connection)
 
 
-@pytest.mark.requires_snowflake
 def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
 
     # Create user
@@ -135,7 +134,6 @@ def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
     assert len(plan) == 0, "Expected no changes in the blueprint plan but found some."
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_plan_sql(cursor, user):
     session = cursor.connection
 
@@ -156,7 +154,6 @@ def test_blueprint_plan_sql(cursor, user):
     assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_missing_resource_pointer(cursor):
     session = cursor.connection
     grant = Grant.from_sql("GRANT ALL ON WAREHOUSE missing_wh TO ROLE SOMEROLE")
@@ -165,7 +162,6 @@ def test_blueprint_missing_resource_pointer(cursor):
         blueprint.plan(session)
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_present_resource_pointer(cursor):
     session = cursor.connection
     grant = Grant.from_sql("GRANT AUDIT ON ACCOUNT TO ROLE THISROLEDOESNTEXIST")
@@ -175,7 +171,6 @@ def test_blueprint_present_resource_pointer(cursor):
     assert len(plan) == 2
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_missing_database(cursor):
     session = cursor.connection
     func = JavascriptUDF(name="func", returns="INT", as_="return 1;", schema="public")
@@ -184,7 +179,6 @@ def test_blueprint_missing_database(cursor):
         blueprint.plan(session)
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     cursor.execute(f"GRANT USAGE ON DATABASE {test_db} TO ROLE {role.name}")
     session = cursor.connection
@@ -247,7 +241,6 @@ def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     # assert plan[0].urn.fqn.name == "PRESENT"
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_quoted_references(cursor):
     session = cursor.connection
 
