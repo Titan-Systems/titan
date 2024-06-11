@@ -105,7 +105,7 @@ The Snowflake provider for Terraform is limited to **1 role per provider**. This
 
 Titan Core streamlines this with upfront privileges checks to ensure that plans can be applied. When privileges are missing, Titan tells you exactly what to grant. This speeds up development cycles and helps eliminate the use of `ACCOUNTADMIN`.
 
-Titan also doesn’t use a state file, which provides more accurate plans and eliminates state mismatch issues.
+Titan also doesn't use a state file, which provides more accurate plans and eliminates state mismatch issues.
 
 
 ## `titan[core]` vs Schemachange
