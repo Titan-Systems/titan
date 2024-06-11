@@ -309,3 +309,31 @@ class WarehouseSize(ParseableEnum):
             "5X-LARGE": "X5LARGE",
             "6X-LARGE": "X6LARGE",
         }
+
+
+class FileType(ParseableEnum):
+    CSV = "CSV"
+    JSON = "JSON"
+    AVRO = "AVRO"
+    ORC = "ORC"
+    PARQUET = "PARQUET"
+    XML = "XML"
+
+
+class Compression(ParseableEnum):
+    AUTO = "AUTO"
+    GZIP = "GZIP"
+    BZ2 = "BZ2"
+    BROTLI = "BROTLI"
+    ZSTD = "ZSTD"
+    DEFLATE = "DEFLATE"
+    RAW_DEFLATE = "RAW_DEFLATE"
+    LZO = "LZO"
+    SNAPPY = "SNAPPY"
+    NONE = "NONE"
+
+
+class BinaryFormat(ParseableEnum):
+    HEX = "HEX"
+    BASE64 = "BASE64"
+    UTF8 = "UTF8"

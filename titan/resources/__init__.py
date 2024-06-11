@@ -11,6 +11,7 @@ from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
+from .file_format import CSVFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
 from .image_repository import ImageRepository
@@ -66,6 +67,7 @@ __all__ = [
     "Column",
     "ComputePool",
     "CreateTableAsSelect",
+    "CSVFileFormat",
     "Database",
     "DatabaseRole",
     "DynamicTable",

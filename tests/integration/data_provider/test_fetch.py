@@ -7,7 +7,7 @@ from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from titan.parse import parse_identifier, parse_URN
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
-from titan.resources import ExternalStage
+from titan.resources import ExternalStage, CSVFileFormat
 from titan.resource_name import ResourceName
 
 
@@ -618,3 +618,23 @@ def test_fetch_external_stage(cursor, test_db):
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == data_provider.remove_none_values(external_stage.to_dict())
+
+
+def test_fetch_csv_file_format(cursor, test_db):
+    csv_file_format = CSVFileFormat(
+        name="CSV_FILE_FORMAT_EXAMPLE",
+        owner=TEST_ROLE,
+        field_delimiter="|",
+        skip_header=1,
+        null_if=["NULL", "null"],
+        empty_field_as_null=True,
+        compression="GZIP",
+    )
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute(csv_file_format.create_sql(if_not_exists=True))
+
+    result = safe_fetch(cursor, csv_file_format.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(csv_file_format.to_dict())

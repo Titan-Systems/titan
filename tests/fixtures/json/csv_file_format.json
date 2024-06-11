@@ -1,0 +1,30 @@
+{
+    "type": "CSV",
+    "name": "MY_CSV_FORMAT",
+    "owner": "SYSADMIN",
+    "field_delimiter": "|",
+    "skip_header": 1,
+    "null_if": [
+        "NULL",
+        "null"
+    ],
+    "empty_field_as_null": true,
+    "compression": "GZIP",
+    "record_delimiter": null,
+    "file_extension": null,
+    "parse_header": null,
+    "skip_blank_lines": null,
+    "date_format": null,
+    "time_format": null,
+    "timestamp_format": null,
+    "binary_format": null,
+    "escape": null,
+    "escape_unenclosed_field": null,
+    "trim_space": null,
+    "field_optionally_enclosed_by": null,
+    "error_on_column_count_mismatch": null,
+    "replace_invalid_characters": null,
+    "skip_byte_order_mark": null,
+    "encoding": null,
+    "comment": null
+}
