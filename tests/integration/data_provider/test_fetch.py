@@ -13,6 +13,8 @@ from titan.resource_name import ResourceName
 
 from tests.helpers import STATIC_RESOURCES, get_json_fixture
 
+pytestmark = pytest.mark.requires_snowflake
+
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 account_resources = [
@@ -368,7 +370,6 @@ def scoped_resource(request, cursor, test_db):
             cursor.execute(teardown_sql)
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_scoped_resource(scoped_resource, cursor, account_locator, test_db):
     fqn = FQN(
         name=scoped_resource["data"]["name"],
@@ -474,7 +475,6 @@ def future_grant_resource(request, cursor, account_locator):
             cursor.execute(teardown_sql)
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_account_resource(account_resource, cursor, account_locator):
 
     if "name" in account_resource["data"]:
@@ -493,7 +493,6 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
     assert result == account_resource["data"]
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_grant(grant_resource, cursor):
     result = safe_fetch(cursor, grant_resource["urn"])
     assert result is not None
@@ -501,14 +500,12 @@ def test_fetch_grant(grant_resource, cursor):
     assert result == grant_resource["data"]
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_future_grant(future_grant_resource, cursor):
     result = safe_fetch(cursor, future_grant_resource["urn"])
     assert result is not None
     assert result == future_grant_resource["data"]
 
 
-@pytest.mark.requires_snowflake
 @pytest.mark.enterprise
 def test_fetch_enterprise_schema(cursor, account_locator, test_db):
     static_tag = STATIC_RESOURCES[ResourceType.TAG]
@@ -553,7 +550,6 @@ def account_grant(cursor, marked_for_cleanup):
     cursor.execute(f"REVOKE BIND SERVICE ENDPOINT ON ACCOUNT FROM ROLE {static_role.name}")
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_grant_on_account(cursor, account_grant):
     static_role = STATIC_RESOURCES[ResourceType.ROLE]
     bind_service_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
@@ -572,7 +568,6 @@ def test_fetch_grant_on_account(cursor, account_grant):
     assert audit_grant["to"] == static_role.name
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
     # Setup
     static_role = STATIC_RESOURCES[ResourceType.ROLE]
@@ -604,7 +599,6 @@ def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
     assert "MODIFY" not in grant["_privs"]
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_external_stage(cursor, test_db):
     external_stage = ExternalStage(
         name="EXTERNAL_STAGE_EXAMPLE",
@@ -621,7 +615,6 @@ def test_fetch_external_stage(cursor, test_db):
     assert result == data_provider.remove_none_values(external_stage.to_dict())
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_csv_file_format(cursor, test_db):
     csv_file_format = CSVFileFormat(
         name="CSV_FILE_FORMAT_EXAMPLE",
