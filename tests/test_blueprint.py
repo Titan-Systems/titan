@@ -6,6 +6,7 @@ from titan import (
     Role,
     Grant,
     PythonUDF,
+    JavascriptUDF,
     Schema,
     Table,
     View,
@@ -28,7 +29,9 @@ def session_ctx() -> dict:
 
 @pytest.fixture
 def remote_state() -> dict:
-    return {parse_URN("urn::ABCD123:account/SOMEACCT"): {}}
+    return {
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+    }
 
 
 def test_blueprint_with_resources():
@@ -166,7 +169,7 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert changes[5] == "GRANT OWNERSHIP ON DATABASE DB TO SOME_ROLE"
 
 
-def test_blueprint_duplicate_resources(session_ctx, remote_state):
+def test_blueprint_deduplicate_resources(session_ctx, remote_state):
     blueprint = Blueprint(name="blueprint", resources=[Database("DB"), Database("DB")])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
@@ -200,3 +203,27 @@ def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
     assert len(plan) == 1
     assert plan[0].action == Action.ADD
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+
+
+def test_blueprint_implied_container_tree(session_ctx, remote_state):
+    remote_state[parse_URN("urn::ABCD123:database/STATIC_DB")] = {}
+    remote_state[parse_URN("urn::ABCD123:schema/STATIC_DB.PUBLIC")] = {}
+    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database="STATIC_DB", schema="public")
+    blueprint = Blueprint(name="blueprint", resources=[func])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn.fqn.name == "func"
+
+
+def test_blueprint_chained_ownership(session_ctx, remote_state):
+    role = Role("SOME_ROLE")
+    db = Database("DB", owner=role)
+    schema = Schema("SCHEMA", database=db, owner=role)
+    blueprint = Blueprint(name="blueprint", resources=[db, schema])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    # assert len(plan) == 1
+    # assert plan[0].action == Action.ADD
+    # assert plan[0].urn.fqn.name == "func"

@@ -185,14 +185,6 @@ def test_blueprint_missing_database(cursor):
 
 
 @pytest.mark.requires_snowflake
-def test_blueprint_implied_container_tree(cursor, test_db):
-    session = cursor.connection
-    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database=test_db, schema="public")
-    blueprint = Blueprint(name="blueprint", resources=[func])
-    assert len(blueprint.plan(session)) == 1
-
-
-@pytest.mark.requires_snowflake
 def test_blueprint_forces_add(cursor, test_db, role):
     cursor.execute(f"GRANT USAGE ON DATABASE {test_db} TO ROLE {role.name}")
     session = cursor.connection

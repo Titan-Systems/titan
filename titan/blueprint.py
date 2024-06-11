@@ -610,18 +610,30 @@ class Blueprint:
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
-                # TODO: clean this up
-                found = False
-                for db in databases:
-                    for schema in db.items(resource_type=ResourceType.SCHEMA):
-                        if schema.name == resource.container.name:
-                            schema.add(resource)
-                            found = True
-                            break
-                    if found:
-                        break
-                if not found:
-                    raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
+                schema_pointer = resource.container
+                
+                # We have a schema-scoped resource (eg a view) that has a resource pointer for the schema. The job is to connect
+                # that resource into the tree
+                # 
+                # If the schema pointer has no database, assume it lives in the only database we have
+                if schema_pointer.container is None:
+                    if len(databases) == 1:
+                        databases[0].add(schema_pointer)
+                    else:
+                        raise Exception(f"No database for resource {resource} schema={resource.container}")
+                elif isinstance(schema_pointer.container, ResourcePointer):
+                    database_pointer = schema_pointer.container
+                    found = False
+                    for db in databases:
+                        if db.name == database_pointer.name:
+                            for schema in db.items(resource_type=ResourceType.SCHEMA):
+                                if schema.name == schema_pointer.name:
+                                    schema.add(resource)
+                                    found = True
+                                    break
+
+                    if not found:
+                        self._root.add(database_pointer)
                 
         for database in databases:
             merge_schemas = []
@@ -634,7 +646,7 @@ class Blueprint:
                         public_schema = schema
                     elif schema.name == "INFORMATION_SCHEMA":
                         information_schema = schema
-                else:
+                elif schema.name in ("PUBLIC", "INFORMATION_SCHEMA"):
                     merge_schemas.append(schema)
             
             for schema in merge_schemas:
