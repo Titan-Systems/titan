@@ -604,6 +604,7 @@ def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
     assert "MODIFY" not in grant["_privs"]
 
 
+@pytest.mark.requires_snowflake
 def test_fetch_external_stage(cursor, test_db):
     external_stage = ExternalStage(
         name="EXTERNAL_STAGE_EXAMPLE",
@@ -620,6 +621,7 @@ def test_fetch_external_stage(cursor, test_db):
     assert result == data_provider.remove_none_values(external_stage.to_dict())
 
 
+@pytest.mark.requires_snowflake
 def test_fetch_csv_file_format(cursor, test_db):
     csv_file_format = CSVFileFormat(
         name="CSV_FILE_FORMAT_EXAMPLE",
