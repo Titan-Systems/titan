@@ -22,6 +22,7 @@ def example(request):
 @pytest.mark.requires_snowflake
 def test_example(example, cursor, marked_for_cleanup):
     cursor.execute("USE WAREHOUSE CI")
+
     resources = collect_resources_from_config(example)
     for resource in resources:
         marked_for_cleanup.append(resource)

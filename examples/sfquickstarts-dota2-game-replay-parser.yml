@@ -28,7 +28,7 @@ materialized_views:
   - name: ALL_DAMAGE
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E:Time::TIME as time, 
       E:Attacker::string as attacker, 
       E:Target::string as target, 
@@ -46,7 +46,7 @@ materialized_views:
   - name: BUILDINGS
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E:Time::TIME as Time,
       E:AttackerTeam::String as ATTACKERTEAM,
       E:Name::STRING as Building,
@@ -58,7 +58,7 @@ materialized_views:
   - name: CREEP_KILLS
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E,
       E:Time::time::String AS T,
       E:Attacker::STRING AS ATTACKER,
@@ -71,7 +71,7 @@ materialized_views:
   - name: GOLD
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E, 
       E:Time::time::String AS T, 
       E:Time::TIME AS TIME, 
@@ -87,7 +87,7 @@ materialized_views:
   - name: HERO_DAMAGE
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E:Time::TIME as time, 
       E:Attacker::string as attacker, 
       E:Target::string as target, 
@@ -107,7 +107,7 @@ materialized_views:
   - name: HERO_DEATHS
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E:Time::TIME as Time, 
       REPLACE(E:Target::STRING,' (illusion)','') as hero,
       COUNT(E:Target) as death
@@ -119,7 +119,7 @@ materialized_views:
   - name: HERO_ITEMS
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E:Time::TIME as time,
       E:NetWorth::INT as NW,
       E:Target::String as target,
@@ -130,7 +130,7 @@ materialized_views:
   - name: HERO_KILLS
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E:Time::TIME as Time, 
       REPLACE(E:Attacker::STRING,' (illusion)','') as attacker,
       COUNT(E:Target) as kill
@@ -142,7 +142,7 @@ materialized_views:
   - name: XP
     database: DOTA
     schema: PUBLIC
-    definition: >
+    as_: >
       SELECT E, 
       E:Time::time::String AS T, 
       E:Time::TIME AS TIME, 
@@ -158,10 +158,14 @@ materialized_views:
 file_formats:
   - name: CSV
     type: CSV
+    database: DOTA
+    schema: PUBLIC
 
   - name: JSON
     type: JSON
     null_if: []
     compression: NONE
+    database: DOTA
+    schema: PUBLIC
 
 

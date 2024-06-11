@@ -6,7 +6,7 @@ from .parse_primitives import FullyQualifiedIdentifier
 
 
 def attribute_is_resource_name(attribute: str) -> bool:
-    return attribute == "name" or attribute == "on" or attribute.endswith("_name")
+    return attribute == "name" or attribute == "on" or attribute.endswith("_name") or attribute == "owner"
 
 
 class ResourceName:

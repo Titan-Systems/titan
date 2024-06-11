@@ -4,6 +4,11 @@ roles:
   - name: app_developer
     comment: "Role for users who manage the application and UDF deployment."
 
+role_grants:
+  - role: data_scientist
+    roles:
+      - SYSADMIN
+
 databases:
   - name: IND_SOL_DICOM
     owner: data_scientist

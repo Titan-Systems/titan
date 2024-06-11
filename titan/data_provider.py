@@ -404,8 +404,6 @@ def fetch_file_format(session, fqn: FQN):
         raise Exception(f"Found multiple file formats matching {fqn}")
 
     data = file_formats[0]
-    # desc_result = execute(session, f"DESC FILE FORMAT {fqn.name}", cacheable=True)
-    # properties = _desc_result_to_dict(desc_result)
     format_options = json.loads(data["format_options"])
 
     return {
@@ -592,6 +590,21 @@ def fetch_image_repository(session, fqn: FQN):
     data = show_result[0]
 
     return {"name": fqn.name, "owner": data["owner"]}
+
+
+def fetch_materialized_view(session, fqn: FQN):
+    show_result = execute(session, f"SHOW MATERIALIZED VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple materialized views matching {fqn}")
+
+    data = show_result[0]
+
+    return {
+        "name": fqn.name,
+        "owner": data["owner"],
+    }
 
 
 def fetch_password_policy(session, fqn: FQN):

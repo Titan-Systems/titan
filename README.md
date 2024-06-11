@@ -165,11 +165,11 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Dynamic Table                 | ✅         |
 | Event Table                   | ✅         |
 | External Function             | ✅         |
-| External Stage                | WIP        |
+| External Stage                | ✅         |
 | External Table                | ❌         |
 | Failover Group                | ✅         |
-| File Format                   | ❌         |
-| ↳ CSV                         | ❌         |
+| File Format                   | WIP        |
+| ↳ CSV                         | ✅         |
 | ↳ JSON                        | ❌         |
 | ↳ AVRO                        | ❌         |
 | ↳ ORC                         | ❌         |
@@ -179,7 +179,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Image Repository              | ✅         |
 | Internal Stage                | WIP       |
 | Masking Policy                | ❌         |
-| Materialized View             | ❌         |
+| Materialized View             | ✅         |
 | Model                         | ❌         |
 | Network Rule                  | ✅         |
 | Packages Policy               | ✅         |
