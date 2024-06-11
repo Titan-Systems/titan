@@ -53,8 +53,8 @@ account_resources = [
     {
         "resource_type": ResourceType.ROLE_GRANT,
         "setup_sql": [
-            "CREATE USER recipient",
-            "CREATE ROLE thatrole",
+            "CREATE USER IF NOT EXISTS recipient",
+            "CREATE ROLE IF NOT EXISTS thatrole",
             "GRANT ROLE thatrole TO USER recipient",
         ],
         "teardown_sql": [
