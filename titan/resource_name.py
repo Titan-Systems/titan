@@ -2,11 +2,11 @@ from typing import Union
 
 import pyparsing as pp
 
-from .parse import FullyQualifiedIdentifier
+from .parse_primitives import FullyQualifiedIdentifier
 
 
 def attribute_is_resource_name(attribute: str) -> bool:
-    return attribute == "name" or attribute == "on" or attribute.endswith("_name")
+    return attribute == "name" or attribute == "on" or attribute.endswith("_name") or attribute == "owner"
 
 
 class ResourceName:
@@ -52,3 +52,6 @@ class ResourceName:
 
     def upper(self):
         return self
+
+    def startswith(self, prefix: str) -> bool:
+        return self._name.startswith(prefix)

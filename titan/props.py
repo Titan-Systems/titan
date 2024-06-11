@@ -321,9 +321,10 @@ class ReturnsProp(Prop):
 
 
 class EnumProp(Prop):
-    def __init__(self, label, enum_or_list, **kwargs):
+    def __init__(self, label, enum_or_list, quoted=False, **kwargs):
         self.enum_type = type(enum_or_list[0]) if isinstance(enum_or_list, list) else enum_or_list
         self.valid_values = set(enum_or_list)
+        self.quoted = quoted
         value_expr = pp.MatchFirst([Keywords(val.value) for val in self.valid_values]) | (~Keyword("NULL") + ANY())
         super().__init__(label, value_expr, **kwargs)
 
@@ -339,7 +340,9 @@ class EnumProp(Prop):
         if value is None:
             return ""
         eq = " = " if self.eq else " "
-        return f"{self.label}{eq}{str(value)}"
+        if self.quoted:
+            value = f"'{value}'"
+        return f"{self.label}{eq}{value}"
 
 
 class EnumListProp(Prop):

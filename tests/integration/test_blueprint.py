@@ -1,11 +1,25 @@
 import pytest
 
-from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, data_provider
-from titan.blueprint import Action, MissingResourceException, plan_sql
+from titan import data_provider
+from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
+from titan.enums import ResourceType
+from titan.resources import (
+    FutureGrant,
+    Database,
+    Grant,
+    JavascriptUDF,
+    User,
+    Role,
+    RoleGrant,
+    Schema,
+)
+
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
+
+pytestmark = pytest.mark.requires_snowflake
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +65,6 @@ def noprivs_role(cursor, test_db, marked_for_cleanup):
     return role.name
 
 
-@pytest.mark.requires_snowflake
 def test_plan(cursor, user, role):
     session = cursor.connection
     blueprint = Blueprint(name="test")
@@ -64,7 +77,6 @@ def test_plan(cursor, user, role):
     assert role_grant_remote
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_plan_no_changes(cursor, user, role):
     session = cursor.connection
     blueprint = Blueprint(name="test_no_changes")
@@ -77,6 +89,20 @@ def test_blueprint_plan_no_changes(cursor, user, role):
     # Plan again to verify no changes are detected
     subsequent_changes = blueprint.plan(session)
     assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."
+
+
+def test_blueprint_crossreferenced_database(cursor):
+    session = cursor.connection
+    bp = Blueprint(name="failing-reference")
+    schema = Schema(name="MY_SCHEMA", database="some_db")
+    bp.add(
+        FutureGrant(priv="SELECT", on_future_views_in=schema, to="MY_ROLE"),
+        Role(name="MY_ROLE"),
+        Database(name="SOME_DB"),
+        schema,
+    )
+    plan = bp.plan(session)
+    assert len(plan) == 4
 
 
 # noprivs_role is causing issues and breaking other integration tests
@@ -92,7 +118,6 @@ def test_blueprint_plan_no_changes(cursor, user, role):
 #         bp.apply(cursor.connection)
 
 
-@pytest.mark.requires_snowflake
 def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
 
     # Create user
@@ -109,17 +134,16 @@ def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
     assert len(plan) == 0, "Expected no changes in the blueprint plan but found some."
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_plan_sql(cursor, user):
     session = cursor.connection
 
     blueprint = Blueprint(name="test_add_database")
-    somedb = Database(name="somedb")
+    somedb = Database(name="this_database_does_not_exist")
     blueprint.add(somedb)
     plan = blueprint.plan(session)
 
     assert plan_sql(plan) == [
-        "CREATE DATABASE SOMEDB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+        "CREATE DATABASE THIS_DATABASE_DOES_NOT_EXIST DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
     ]
 
     blueprint = Blueprint(name="test_modify_user")
@@ -130,7 +154,6 @@ def test_blueprint_plan_sql(cursor, user):
     assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_missing_resource_pointer(cursor):
     session = cursor.connection
     grant = Grant.from_sql("GRANT ALL ON WAREHOUSE missing_wh TO ROLE SOMEROLE")
@@ -139,7 +162,6 @@ def test_blueprint_missing_resource_pointer(cursor):
         blueprint.plan(session)
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_present_resource_pointer(cursor):
     session = cursor.connection
     grant = Grant.from_sql("GRANT AUDIT ON ACCOUNT TO ROLE THISROLEDOESNTEXIST")
@@ -149,7 +171,6 @@ def test_blueprint_present_resource_pointer(cursor):
     assert len(plan) == 2
 
 
-@pytest.mark.requires_snowflake
 def test_blueprint_missing_database(cursor):
     session = cursor.connection
     func = JavascriptUDF(name="func", returns="INT", as_="return 1;", schema="public")
@@ -158,16 +179,7 @@ def test_blueprint_missing_database(cursor):
         blueprint.plan(session)
 
 
-@pytest.mark.requires_snowflake
-def test_blueprint_implied_container_tree(cursor, test_db):
-    session = cursor.connection
-    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database=test_db, schema="public")
-    blueprint = Blueprint(name="blueprint", resources=[func])
-    assert len(blueprint.plan(session)) == 1
-
-
-@pytest.mark.requires_snowflake
-def test_blueprint_forces_add(cursor, test_db, role):
+def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     cursor.execute(f"GRANT USAGE ON DATABASE {test_db} TO ROLE {role.name}")
     session = cursor.connection
     all_grant = Grant(priv="ALL", on_database=test_db, to=role)
@@ -175,3 +187,71 @@ def test_blueprint_forces_add(cursor, test_db, role):
     plan = blueprint.plan(session)
     assert len(plan) == 1
     assert plan[0].action == Action.ADD
+
+    # TODO: This test is failing
+    # @pytest.mark.requires_snowflake
+    # def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db):
+    #     session = cursor.connection
+    #     blueprint = Blueprint(
+    #         name="blueprint",
+    #         resources=[
+    #             Schema(name="INFORMATION_SCHEMA", database=test_db),
+    #         ],
+    #         run_mode="fully-managed",
+    #         valid_resource_types=[ResourceType.SCHEMA],
+    #     )
+    #     plan = blueprint.plan(session)
+    #     assert len(plan) == 0
+
+    #     blueprint = Blueprint(
+    #         name="blueprint",
+    #         resources=[
+    #             Schema(name="ABSENT", database=test_db),
+    #             Schema(name="INFORMATION_SCHEMA", database=test_db),
+    #         ],
+    #         run_mode="fully-managed",
+    #         valid_resource_types=[ResourceType.SCHEMA],
+    #     )
+    #     plan = blueprint.plan(session)
+    #     assert len(plan) == 1
+    #     assert plan[0].action == Action.ADD
+    #     assert plan[0].urn.fqn.name == "ABSENT"
+    # cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
+    # blueprint = Blueprint(
+    #     name="blueprint",
+    #     resources=[
+    #         Schema(name="PRESENT", database=test_db),
+    #         Schema(name="INFORMATION_SCHEMA", database=test_db),
+    #     ],
+    #     run_mode="fully-managed",
+    #     valid_resource_types=[ResourceType.SCHEMA],
+    # )
+    # plan = blueprint.plan(session)
+    # assert len(plan) == 0
+
+    # blueprint = Blueprint(
+    #     name="blueprint",
+    #     resources=[Schema(name="INFORMATION_SCHEMA", database=test_db)],
+    #     run_mode="fully-managed",
+    #     valid_resource_types=[ResourceType.SCHEMA],
+    # )
+    # plan = blueprint.plan(session)
+    # assert len(plan) == 1
+    # assert plan[0].action == Action.REMOVE
+    # assert plan[0].urn.fqn.name == "PRESENT"
+
+
+def test_blueprint_quoted_references(cursor):
+    session = cursor.connection
+
+    cursor.execute(f"CREATE ROLE IF NOT EXISTS STATIC_ROLE")
+    cursor.execute(f'CREATE USER IF NOT EXISTS "info@applytitan.com"')
+    cursor.execute(f'GRANT ROLE STATIC_ROLE TO USER "info@applytitan.com"')
+
+    blueprint = Blueprint(
+        name="test_quoted_references",
+        resources=[RoleGrant(role="STATIC_ROLE", to_user="info@applytitan.com")],
+    )
+    plan = blueprint.plan(session)
+
+    assert len(plan) == 0

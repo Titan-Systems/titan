@@ -1,0 +1,59 @@
+roles:
+  - name: data_scientist
+    comment: "Role for users who perform image classification tasks and model training."
+  - name: app_developer
+    comment: "Role for users who manage the application and UDF deployment."
+
+role_grants:
+  - role: data_scientist
+    roles:
+      - SYSADMIN
+
+databases:
+  - name: IND_SOL_DICOM
+    owner: data_scientist
+    comment: "Database dedicated to storing DICOM images and related data for pneumonia detection."
+
+schemas:
+  - name: DICOM
+    database: IND_SOL_DICOM
+    owner: data_scientist
+    comment: "Schema for organizing tables and UDFs related to DICOM image processing."
+
+warehouses:
+  - name: snowopt_wh
+    warehouse_size: LARGE
+    auto_suspend: 120
+    auto_resume: true
+    comment: "Warehouse optimized for model training and heavy computations."
+  - name: standard_wh
+    warehouse_size: MEDIUM
+    auto_suspend: 120
+    auto_resume: true
+    comment: "General purpose warehouse for regular workloads."
+
+stages:
+  - name: dicom_images_stage
+    database: IND_SOL_DICOM
+    schema: DICOM
+    type: external
+    url: "s3://your-bucket-name"
+    credentials:
+      aws_key_id: "your-aws-key-id"
+      aws_secret_key: "your-aws-secret-key"
+    comment: "External stage for storing and accessing DICOM images from S3."
+
+grants:
+  - to_role: data_scientist
+    priv: all
+    on_warehouse: snowopt_wh
+  - to_role: data_scientist
+    priv: all
+    on_database: IND_SOL_DICOM
+  - to_role: app_developer
+    priv: usage
+    on_warehouse: standard_wh
+  - to_role: app_developer
+    priv: usage
+    on_database: IND_SOL_DICOM
+

@@ -4,19 +4,14 @@
     "owner": "SYSADMIN",
     "type": "EXTERNAL",
     "storage_integration": null,
+    "credentials": null,
     "encryption": {
         "type": "AWS_SSE_KMS",
         "kms_key_id": "alias/MyAliasName"
     },
-    "file_format": null,
     "directory": {
         "enable": true,
         "refresh_on_create": true
-    },
-    "copy_options": {
-        "on_error": "CONTINUE",
-        "size_limit": 100,
-        "purge": true
     },
     "tags": null,
     "comment": "This is an example of an external stage"

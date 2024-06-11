@@ -121,7 +121,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 |-------------------------------|-----------|
 | **Account Resources**         |           |
 | API Integration               | ✅         |
-| Catalog Integration           | ❌         |
+| Catalog Integration           | ✅         |
 | Compute Pool                  | ✅         |
 | Connection                    | ❌         |
 | Database                      | ✅         |
@@ -148,7 +148,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ SAML2                       | ❌         |
 | ↳ SCIM                        | ❌         |
 | Share                         | ❌         |
-| Storage Integration           | WIP        |
+| Storage Integration           | ✅         |
 | ↳ AWS                         | ✅         |
 | ↳ Azure                       | ✅         |
 | ↳ GCP                         | ✅         |
@@ -168,8 +168,8 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | External Stage                | ✅         |
 | External Table                | ❌         |
 | Failover Group                | ✅         |
-| File Format                   | ❌         |
-| ↳ CSV                         | ❌         |
+| File Format                   | WIP        |
+| ↳ CSV                         | ✅         |
 | ↳ JSON                        | ❌         |
 | ↳ AVRO                        | ❌         |
 | ↳ ORC                         | ❌         |
@@ -179,7 +179,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Image Repository              | ✅         |
 | Internal Stage                | ✅         |
 | Masking Policy                | ❌         |
-| Materialized View             | ❌         |
+| Materialized View             | ✅         |
 | Model                         | ❌         |
 | Network Rule                  | ✅         |
 | Packages Policy               | ✅         |

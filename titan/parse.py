@@ -6,18 +6,11 @@ import pyparsing as pp
 
 from .enums import ResourceType, Scope
 from .identifiers import FQN, URN, resource_type_for_label
+from .parse_primitives import Identifier, FullyQualifiedIdentifier
 from .scope import DatabaseScope, SchemaScope
 
 Keyword = pp.CaselessKeyword
 Literal = pp.CaselessLiteral
-
-Identifier = pp.Word(pp.alphanums + "_", pp.alphanums + "_$") | pp.dbl_quoted_string
-FullyQualifiedIdentifier = (
-    pp.delimited_list(Identifier, delim=".", min=4, max=4)
-    ^ pp.delimited_list(Identifier, delim=".", min=3, max=3)
-    ^ pp.delimited_list(Identifier, delim=".", min=2, max=2)
-    ^ Identifier
-)
 
 StringLiteral = pp.QuotedString("'", multiline=False, unquote_results=True) | pp.QuotedString(
     "$$", multiline=True, unquote_results=True

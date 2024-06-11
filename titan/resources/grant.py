@@ -6,7 +6,7 @@ from inflection import singularize
 from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
-from ..enums import ResourceType
+from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS, _all_privs_for_resource_type
@@ -154,6 +154,8 @@ class Grant(Resource):
 
         kwargs.pop("_privs", None)
 
+        priv = priv.value if isinstance(priv, ParseableEnum) else priv
+
         # Handle instantiation from data dict
         on_type = kwargs.pop("on_type", None)
         if on_type:
@@ -184,6 +186,9 @@ class Grant(Resource):
         else:
             if on is None:
                 raise ValueError("You must specify an 'on' parameter")
+            elif isinstance(on, ResourcePointer):
+                on_type = on.resource_type
+                on = on.name
             elif isinstance(on, Resource):
                 on_type = on.resource_type
                 on = on._data.name
@@ -201,6 +206,9 @@ class Grant(Resource):
                 owner = "ACCOUNTADMIN"
             else:
                 owner = "SYSADMIN"
+
+        if to is None and kwargs.get("to_role"):
+            to = kwargs.pop("to_role")
 
         super().__init__(**kwargs)
         self._data: _Grant = _Grant(
@@ -312,10 +320,12 @@ class FutureGrant(Resource):
         on_type = kwargs.pop("on_type", None)
         in_type = kwargs.pop("in_type", None)
         in_name = kwargs.pop("in_name", None)
+        granted_in_ref = None
 
         if all([on_type, in_type, in_name]):
             in_type = ResourceType(in_type)
             on_type = ResourceType(on_type)
+            granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
 
         else:
 
@@ -337,12 +347,15 @@ class FutureGrant(Resource):
                     if isinstance(arg, Resource):
                         on_type = ResourceType(singularize(keyword[10:-3]))
                         in_type = arg.resource_type
-                        in_name = str(arg.fqn)
+                        # in_name = str(arg.fqn)
+                        in_name = arg.fqn.name
+                        granted_in_ref = arg
                     else:
                         on_stmt, in_stmt = keyword.split("_in_")
                         on_type = ResourceType(singularize(on_stmt[10:]))
                         in_type = ResourceType(in_stmt)
                         in_name = arg
+                        granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
 
         # TODO: Migrate this to blueprint
         # if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
@@ -359,8 +372,9 @@ class FutureGrant(Resource):
             to=to,
             grant_option=grant_option,
         )
-        granted_in = ResourcePointer(name=in_name, resource_type=in_type)
-        self.requires(granted_in, self._data.to)
+        self.requires(self._data.to)
+        if granted_in_ref:
+            self.requires(granted_in_ref)
 
     @classmethod
     def from_sql(cls, sql):

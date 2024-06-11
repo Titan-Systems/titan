@@ -2,6 +2,8 @@ from typing import Optional
 
 from .enums import ResourceType
 
+from .resource_name import ResourceName
+
 
 def _params_to_str(params: dict) -> str:
     return "&".join([f"{k.lower()}={v}" for k, v in params.items()])
@@ -22,19 +24,19 @@ class FQN:
         database: Optional[str] = None,
         schema: Optional[str] = None,
         arg_types: Optional[list] = None,
-        params: dict = {},
+        params: Optional[dict] = None,
     ) -> None:
         self.name = name
         self.database = database
         self.schema = schema
-        self.arg_types = arg_types
-        self.params = params
+        self.arg_types = arg_types or []
+        self.params = params or {}
 
     def __eq__(self, other):
         if not isinstance(other, FQN):
             return False
         return (
-            self.name == other.name
+            ResourceName(self.name) == ResourceName(other.name)
             and self.database == other.database
             and self.schema == other.schema
             and self.arg_types == other.arg_types
@@ -42,7 +44,9 @@ class FQN:
         )
 
     def __hash__(self):
-        return hash((self.name, self.database, self.schema, tuple(self.arg_types), tuple(self.params.items())))
+        return hash(
+            (ResourceName(self.name), self.database, self.schema, tuple(self.arg_types), tuple(self.params.items()))
+        )
 
     def __str__(self):
         db = f"{self.database}." if self.database else ""

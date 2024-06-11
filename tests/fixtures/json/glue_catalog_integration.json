@@ -1,0 +1,12 @@
+{
+    "name": "GLUECATALOGINT",
+    "catalog_source": "GLUE",
+    "catalog_namespace": "some-namespace",
+    "table_format": "ICEBERG",
+    "glue_aws_role_arn": "arn:aws:iam::123456789012:role/my-role",
+    "glue_catalog_id": "123456789012",
+    "glue_region": "us-east-1",
+    "enabled": true,
+    "owner": "ACCOUNTADMIN",
+    "comment": "This is a test catalog integration"
+}

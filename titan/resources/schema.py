@@ -65,7 +65,11 @@ class Schema(Resource, ResourceContainer):
         comment: str = None,
         **kwargs,
     ):
+        # database = kwargs.pop("database", None)
+
         super().__init__(**kwargs)
+        if name == "INFORMATION_SCHEMA":
+            comment = "Views describing the contents of schemas in this database"
         self._data: _Schema = _Schema(
             name=name,
             transient=transient,
@@ -77,6 +81,7 @@ class Schema(Resource, ResourceContainer):
             owner=owner,
             comment=comment,
         )
+        # self._register_scope(database=database)
         if self._data.tags:
             for tag_name in self._data.tags.keys():
                 self.requires(ResourcePointer(name=tag_name, resource_type=ResourceType.TAG))
