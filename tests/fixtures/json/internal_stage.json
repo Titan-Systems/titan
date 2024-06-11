@@ -5,20 +5,9 @@
     "encryption": {
         "type": "SNOWFLAKE_SSE"
     },
-    "file_format": null,
     "directory": {
         "enable": true,
         "refresh_on_create": false
-    },
-    "copy_options": {
-        "on_error": "CONTINUE",
-        "size_limit": 100,
-        "purge": true,
-        "return_failed_only": false,
-        "match_by_column_name": "CASE_SENSITIVE",
-        "enforce_length": true,
-        "truncatecolumns": false,
-        "force": false
     },
     "tags": null,
     "comment": "This is an example of an internal stage."

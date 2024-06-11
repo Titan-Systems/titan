@@ -38,6 +38,32 @@ def _desc_type2_result_to_dict(desc_result, lower_properties=False):
     )
 
 
+def _desc_type3_result_to_dict(desc_result, lower_properties=False):
+    result = {}
+    for row in desc_result:
+        parent_property = row["parent_property"]
+        property = row["property"]
+        if lower_properties:
+            parent_property = parent_property.lower()
+            property = property.lower()
+        if parent_property not in result:
+            result[parent_property] = {}
+
+        value = row["property_value"]
+        if row["property_type"] == "Boolean":
+            value = value == "true"
+        elif row["property_type"] == "Long":
+            value = value or None
+        elif row["property_type"] == "Integer":
+            value = int(value)
+        elif row["property_type"] == "String":
+            value = value or None
+        elif row["property_type"] == "List":
+            value = _parse_list_property(value)
+        result[parent_property][property] = value
+    return result
+
+
 def _fail_if_not_granted(result, *args):
     if len(result) == 0:
         raise Exception("Failed to create grant")
@@ -124,12 +150,12 @@ def _parse_function_arguments(arguments_str: str) -> tuple:
     return (identifier, returns)
 
 
-def _parse_imports(imports: str) -> list:
-    if imports is None:
+def _parse_list_property(property_str: str) -> list:
+    if property_str is None:
         return []
-    imports = imports.strip("[]")
-    if imports:
-        return [imp.strip(" ") for imp in imports.split(",")]
+    property_str = property_str.strip("[]")
+    if property_str:
+        return [item.strip(" ") for item in property_str.split(",")]
     return []
 
 
@@ -661,7 +687,7 @@ def fetch_procedure(session, fqn: FQN):
         "comment": data["description"],
         "execute_as": properties["execute as"],
         "handler": properties["handler"],
-        "imports": _parse_imports(properties["imports"]),
+        "imports": _parse_list_property(properties["imports"]),
         "language": properties["language"],
         "null_handling": properties["null handling"],
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
@@ -917,6 +943,10 @@ def fetch_stage(session, fqn: FQN):
         raise Exception(f"Found multiple stages matching {fqn}")
 
     data = stages[0]
+    desc_result = execute(session, f"DESC STAGE {fqn.name}")
+    properties = _desc_type3_result_to_dict(desc_result, lower_properties=True)
+    tags = fetch_resource_tags(session, ResourceType.STAGE, fqn)
+
     if data["type"] == "EXTERNAL":
         return {
             "name": data["name"],
@@ -924,20 +954,21 @@ def fetch_stage(session, fqn: FQN):
             "owner": data["owner"],
             "type": data["type"],
             "storage_integration": data["storage_integration"],
-            # "credentials": data["credentials"],
-            # "encryption": data["encryption"],
-            # "file_format": data["file_format"],
             "directory": {"enable": data["directory_enabled"] == "Y"},
-            # "copy_options": data["copy_options"],
-            # "tags": data["tags"],
+            "tags": tags,
+            "comment": data["comment"] or None,
+        }
+    elif data["type"] == "INTERNAL":
+        return {
+            "name": data["name"],
+            "owner": data["owner"],
+            "type": data["type"],
+            "directory": {"enable": data["directory_enabled"] == "Y"},
+            "tags": tags,
             "comment": data["comment"] or None,
         }
     else:
         raise Exception(f"Unsupported stage type {data['type']}")
-        return {
-            "name": data["name"],
-            "owner": data["owner"],
-        }
 
 
 def fetch_storage_integration(session, fqn: FQN):
@@ -1094,14 +1125,13 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
 
     """
 
-    if resource_type != ResourceType.SCHEMA or not isinstance(resource_type, ResourceType):
-        raise NotImplementedError
+    database = f"{fqn.database}." if fqn.database else ""
 
     tag_refs = execute(
         session,
         f"""
             SELECT *
-            FROM table({fqn.database}.information_schema.tag_references(
+            FROM table({database}information_schema.tag_references(
                 '{fqn}', '{str(resource_type)}'
             ))""",
     )

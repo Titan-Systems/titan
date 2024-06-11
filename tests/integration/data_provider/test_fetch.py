@@ -2,12 +2,12 @@ import os
 import pytest
 
 from titan import data_provider
+from titan import resources as res
 from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from titan.parse import parse_identifier, parse_URN
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
-from titan.resources import ExternalStage, CSVFileFormat
 from titan.resource_name import ResourceName
 
 
@@ -600,7 +600,7 @@ def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
 
 
 def test_fetch_external_stage(cursor, test_db):
-    external_stage = ExternalStage(
+    external_stage = res.ExternalStage(
         name="EXTERNAL_STAGE_EXAMPLE",
         url="s3://titan-snowflake/",
         owner=TEST_ROLE,
@@ -615,8 +615,24 @@ def test_fetch_external_stage(cursor, test_db):
     assert result == data_provider.remove_none_values(external_stage.to_dict())
 
 
+def test_fetch_internal_stage(cursor, test_db):
+    internal_stage = res.InternalStage(
+        name="INTERNAL_STAGE_EXAMPLE",
+        directory={"enable": True},
+        owner=TEST_ROLE,
+    )
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute(internal_stage.create_sql(if_not_exists=True))
+
+    result = safe_fetch(cursor, internal_stage.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(internal_stage.to_dict())
+
+
 def test_fetch_csv_file_format(cursor, test_db):
-    csv_file_format = CSVFileFormat(
+    csv_file_format = res.CSVFileFormat(
         name="CSV_FILE_FORMAT_EXAMPLE",
         owner=TEST_ROLE,
         field_delimiter="|",

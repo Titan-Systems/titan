@@ -32,6 +32,17 @@ class Alert(Resource):
         owner (str, optional): The owner of the alert. Defaults to "SYSADMIN".
         comment (str, optional): A comment for the alert. Defaults to None.
         tags (dict[str, str], optional): Tags for the alert. Defaults to None.
+
+    CREATE [ OR REPLACE ] ALERT [ IF NOT EXISTS ] <name>
+        [ WAREHOUSE = <warehouse_name> ]
+        SCHEDULE = '{ <num> MINUTE | USING CRON <expr> <time_zone> }'
+        COMMENT = '<string_literal>'
+        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+        IF( EXISTS(
+            <condition>
+        ))
+        THEN
+            <action>
     """
 
     resource_type = ResourceType.ALERT
