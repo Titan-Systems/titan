@@ -423,7 +423,7 @@ class ResourcePointer(Resource, ResourceContainer):
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
         name = getattr(self, "name", None)
-        return f"[{resource_type}:{name}]"
+        return f"<→{resource_type}:{name}>"
 
     def __eq__(self, other):
         if not isinstance(other, ResourcePointer):

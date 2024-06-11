@@ -20,9 +20,17 @@ from .privs import (
     priv_for_principal,
     is_ownership_priv,
 )
-from .resources import Account, Database, Schema
+from .resources import Account, Database, Schema, Grant
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
+
+SYSTEM_ROLES = [
+    "ACCOUNTADMIN",
+    "SECURITYADMIN",
+    "SYSADMIN",
+    "PUBLIC",
+    "USERADMIN",
+]
 
 Manifest = dict[URN, dict]
 State = dict[URN, dict]
@@ -425,16 +433,6 @@ class Blueprint:
         refs = manifest.pop("_refs")
         urns = manifest.pop("_urns")
 
-        # Generate a list of all URNs
-        resource_set = set(urns + list(remote_state.keys()))
-
-        for ref in refs:
-            resource_set.add(ref[0])
-            resource_set.add(ref[1])
-
-        # Calculate a topological sort order for the URNs
-        sort_order = topological_sort(resource_set, set(refs))
-
         changes: Plan = []
         marked_for_replacement = set()
         for action, urn, delta in diff(remote_state, manifest):
@@ -469,9 +467,22 @@ class Blueprint:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
 
         for urn in marked_for_replacement:
-            changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
-            changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
+            raise NotImplementedError("Marked for replacement")
+            # changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
+            # changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
 
+        # # Handle account role ownership by creating an ownership grant
+        # for change in changes:
+        #     if change.action == Action.ADD and change.after.get("owner") in SYSTEM_ROLES:
+        #         changes.append(ResourceChange(action=Action.ADD, urn=change.urn, before={}, after=after, delta=after))
+        
+        # Generate a list of all URNs
+        resource_set = set(urns + list(remote_state.keys()))
+        for ref in refs:
+            resource_set.add(ref[0])
+            resource_set.add(ref[1])
+        # Calculate a topological sort order for the URNs
+        sort_order = topological_sort(resource_set, set(refs))
         return sorted(changes, key=lambda change: sort_order[change.urn])
 
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
@@ -541,6 +552,18 @@ class Blueprint:
         """
         if self._finalized:
             return
+        
+        # Inject ownership grants for resources with owner specified to non-system roles
+        ownership_grants = []
+        for staged_resource in self._staged:
+            if hasattr(staged_resource._data, "owner"):
+                # A shim until we move all owner attrs to a role
+                owner = staged_resource._data.owner
+                owner_str = owner if isinstance(owner, str) else str(owner.name)
+                if owner_str not in SYSTEM_ROLES:
+                    ownership_grants.append(Grant(priv=RolePriv.OWNERSHIP, on=staged_resource, to=owner_str))
+                    staged_resource._data.owner = staged_resource.defaults()["owner"]
+        self.add(ownership_grants)
         self._finalized = True
 
         org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
@@ -702,16 +725,33 @@ class Blueprint:
         """
 
         session_ctx = data_provider.fetch_session(session)
-        usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
-        required_privs = _collect_required_privs(session_ctx, plan)
-        available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
+    
+        # required_privs = _collect_required_privs(session_ctx, plan)
+        # available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
+        # _raise_if_missing_privs(required_privs, available_privs)
 
-        _raise_if_missing_privs(required_privs, available_privs)
-
-        action_queue = []
+        action_queue = self._compile_plan_to_sql(session_ctx, plan)
         actions_taken = []
 
+        while action_queue:
+            sql = action_queue.pop(0)
+            actions_taken.append(sql)
+            try:
+                if not self._dry_run:
+                    execute(session, sql)
+            except snowflake.connector.errors.ProgrammingError as err:
+                if err.errno == ALREADY_EXISTS_ERR:
+                    print(f"Resource already exists: {sql}, skipping...")
+                elif err.errno == INVALID_GRANT_ERR:
+                    print(f"Invalid grant: {sql}, skipping...")
+                else:
+                    raise err
+        return actions_taken
+    
+    def _compile_plan_to_sql(self, session_ctx, plan: Plan):
+        action_queue = []
         default_role = session_ctx["role"]
+        usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
 
         def _role_for_change(change: ResourceChange, usable_roles: list[str]):
             """
@@ -771,21 +811,7 @@ class Blueprint:
         for change in plan:
             props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
             _queue_change(change, props)
-
-        while action_queue:
-            sql = action_queue.pop(0)
-            actions_taken.append(sql)
-            try:
-                if not self._dry_run:
-                    execute(session, sql)
-            except snowflake.connector.errors.ProgrammingError as err:
-                if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {change.urn}, skipping...")
-                elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {change.urn}, skipping...")
-                else:
-                    raise err
-        return actions_taken
+        return action_queue
 
     def destroy(self, session, manifest: Manifest=None):
         session_ctx = data_provider.fetch_session(session)

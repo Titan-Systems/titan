@@ -6,7 +6,7 @@ from inflection import singularize
 from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
-from ..enums import ResourceType
+from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant
 from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS, _all_privs_for_resource_type
@@ -153,6 +153,8 @@ class Grant(Resource):
         """
 
         kwargs.pop("_privs", None)
+
+        priv = priv.value if isinstance(priv, ParseableEnum) else priv
 
         # Handle instantiation from data dict
         on_type = kwargs.pop("on_type", None)

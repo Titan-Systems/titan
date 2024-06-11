@@ -72,7 +72,7 @@ class Database(Resource, ResourceContainer):
                 Schema(name="PUBLIC", implicit=True),
                 Schema(name="INFORMATION_SCHEMA", implicit=True),
             )
-        print(self._items)
+        self.requires(self._data.owner)
 
     def schemas(self):
         return self.items(resource_type=ResourceType.SCHEMA)
