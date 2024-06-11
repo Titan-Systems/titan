@@ -2,6 +2,7 @@ from .resource import Resource
 from .account import Account
 from .alert import Alert
 from .api_integration import APIIntegration
+from .catalog_integration import GlueCatalogIntegration, ObjectStoreCatalogIntegration
 from .column import Column
 from .compute_pool import ComputePool
 from .database import Database
@@ -10,9 +11,11 @@ from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
+from .file_format import CSVFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
 from .image_repository import ImageRepository
+from .materialized_view import MaterializedView
 from .network_rule import NetworkRule
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
@@ -64,7 +67,8 @@ __all__ = [
     "AzureStorageIntegration",
     "Column",
     "ComputePool",
-    # "CSVFileFormat",
+    "CreateTableAsSelect",
+    "CSVFileFormat",
     "Database",
     "DatabaseRole",
     "DynamicTable",
@@ -73,23 +77,25 @@ __all__ = [
     "ExternalAccessIntegration",
     "ExternalFunction",
     "ExternalStage",
-    # "ExternalTableStream",
     "FailoverGroup",
     "FutureGrant",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
+    "GlueCatalogIntegration",
     "Grant",
     "GrantOnAll",
     "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
+    "MaterializedView",
     "NetworkRule",
+    "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
     "PasswordPolicy",
     "Pipe",
-    "PythonUDF",
     "PythonStoredProcedure",
+    "PythonUDF",
     "ReplicationGroup",
     "Resource",
     "ResourceMonitor",
@@ -98,14 +104,12 @@ __all__ = [
     "S3StorageIntegration",
     "Schema",
     "Secret",
-    "SnowflakePartnerOAuthSecurityIntegration",
     "Sequence",
     "Service",
-    # "SharedDatabase",
+    "SnowflakePartnerOAuthSecurityIntegration",
     "StageStream",
     "Table",
     "TableStream",
-    "CreateTableAsSelect",
     "Tag",
     "Task",
     "User",

@@ -3,17 +3,40 @@ import pytest
 from titan import (
     Blueprint,
     Database,
+    Role,
     Grant,
     PythonUDF,
+    JavascriptUDF,
     Schema,
     Table,
     View,
 )
+from titan.blueprint import Action
+from titan.enums import ResourceType
+from titan.identifiers import URN, FQN
+from titan.parse import parse_URN
+
+
+@pytest.fixture
+def session_ctx() -> dict:
+    return {
+        "account": "SOMEACCT",
+        "account_locator": "ABCD123",
+        "role": "SYSADMIN",
+        "available_roles": ["SYSADMIN", "USERADMIN"],
+    }
+
+
+@pytest.fixture
+def remote_state() -> dict:
+    return {
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+    }
 
 
 def test_blueprint_with_resources():
+    session_ctx = {"account": "SOMEACCT", "account_locator": "ABCD123"}
     db = Database(name="DB")
-    # FIXME: database=db is not setting a ref from schema to db, causing schema to not get added to the manifest
     schema = Schema(name="SCHEMA", database=db)
     table = Table(name="TABLE", columns=[{"name": "ID", "data_type": "INT"}])
     schema.add(table)
@@ -27,10 +50,11 @@ def test_blueprint_with_resources():
         comment="This is a UDF comment",
     )
     blueprint = Blueprint(name="blueprint", resources=[db, table, schema, view, udf])
-    manifest = blueprint.generate_manifest({"account": "SOMEACCT", "account_locator": "ABCD123"})
+    manifest = blueprint.generate_manifest(session_ctx)
 
-    assert "urn::ABCD123:database/DB" in manifest
-    assert manifest["urn::ABCD123:database/DB"] == {
+    db_urn = parse_URN("urn::ABCD123:database/DB")
+    assert db_urn in manifest
+    assert manifest[db_urn] == {
         "name": "DB",
         "owner": "SYSADMIN",
         "comment": None,
@@ -41,8 +65,9 @@ def test_blueprint_with_resources():
         "transient": False,
     }
 
-    assert "urn::ABCD123:schema/DB.SCHEMA" in manifest
-    assert manifest["urn::ABCD123:schema/DB.SCHEMA"] == {
+    schema_urn = parse_URN("urn::ABCD123:schema/DB.SCHEMA")
+    assert schema_urn in manifest
+    assert manifest[schema_urn] == {
         "comment": None,
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
@@ -53,9 +78,9 @@ def test_blueprint_with_resources():
         "tags": None,
         "transient": False,
     }
-
-    assert "urn::ABCD123:view/DB.SCHEMA.VIEW" in manifest
-    assert manifest["urn::ABCD123:view/DB.SCHEMA.VIEW"] == {
+    view_urn = parse_URN("urn::ABCD123:view/DB.SCHEMA.VIEW")
+    assert view_urn in manifest
+    assert manifest[view_urn] == {
         "as_": "SELECT 1",
         "change_tracking": None,
         "columns": None,
@@ -68,9 +93,9 @@ def test_blueprint_with_resources():
         "tags": None,
         "volatile": None,
     }
-    assert "urn::ABCD123:table/DB.SCHEMA.TABLE" in manifest
-
-    assert manifest["urn::ABCD123:table/DB.SCHEMA.TABLE"] == {
+    table_urn = parse_URN("urn::ABCD123:table/DB.SCHEMA.TABLE")
+    assert table_urn in manifest
+    assert manifest[table_urn] == {
         "name": "TABLE",
         "owner": "SYSADMIN",
         "columns": [{"name": "ID", "data_type": "INT"}],
@@ -88,9 +113,19 @@ def test_blueprint_with_resources():
         "tags": None,
         "comment": None,
     }
-    assert "urn::ABCD123:function/DB.PUBLIC.SOMEUDF()" in manifest
-
-    assert manifest["urn::ABCD123:function/DB.PUBLIC.SOMEUDF()"] == {
+    # parse URN is incorrectly stripping the parens. Not sure what the correct behavior should be
+    # udf_urn = parse_URN("urn::ABCD123:function/DB.PUBLIC.SOMEUDF()")
+    udf_urn = URN(
+        resource_type=ResourceType.FUNCTION,
+        fqn=FQN(
+            database="DB",
+            schema="PUBLIC",
+            name="SOMEUDF()",
+        ),
+        account_locator="ABCD123",
+    )
+    assert udf_urn in manifest
+    assert manifest[udf_urn] == {
         "name": "SOMEUDF",
         "owner": "SYSADMIN",
         "returns": "VARCHAR",
@@ -109,3 +144,86 @@ def test_blueprint_with_resources():
         "secure": None,
         "volatility": None,
     }
+
+
+def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
+    role = Role("SOME_ROLE")
+    db = Database("DB", owner=role)
+    blueprint = Blueprint(name="blueprint", resources=[db, role])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+
+    assert len(plan) == 2
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
+    assert plan[1].action == Action.ADD
+    assert plan[1].urn == parse_URN("urn::ABCD123:database/DB")
+
+    changes = blueprint._compile_plan_to_sql(session_ctx, plan)
+    assert len(changes) == 6
+    assert changes[0] == "USE SECONDARY ROLES ALL"
+    assert changes[1] == "USE ROLE USERADMIN"
+    assert changes[2] == "CREATE ROLE SOME_ROLE"
+    assert changes[3] == "USE ROLE SYSADMIN"
+    assert changes[4] == "CREATE DATABASE DB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+    assert changes[5] == "GRANT OWNERSHIP ON DATABASE DB TO SOME_ROLE"
+
+
+def test_blueprint_deduplicate_resources(session_ctx, remote_state):
+    blueprint = Blueprint(name="blueprint", resources=[Database("DB"), Database("DB")])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
+            Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
+        ],
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:grant/SOME_ROLE?priv=OWNERSHIP&on=database/DB")
+
+
+def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
+    db = Database("DB")
+    public = Schema(name="PUBLIC", database=db, comment="this is ignored")
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[db, public],
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+
+
+def test_blueprint_implied_container_tree(session_ctx, remote_state):
+    remote_state[parse_URN("urn::ABCD123:database/STATIC_DB")] = {}
+    remote_state[parse_URN("urn::ABCD123:schema/STATIC_DB.PUBLIC")] = {}
+    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database="STATIC_DB", schema="public")
+    blueprint = Blueprint(name="blueprint", resources=[func])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn.fqn.name == "func"
+
+
+def test_blueprint_chained_ownership(session_ctx, remote_state):
+    role = Role("SOME_ROLE")
+    db = Database("DB", owner=role)
+    schema = Schema("SCHEMA", database=db, owner=role)
+    blueprint = Blueprint(name="blueprint", resources=[db, schema])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    # assert len(plan) == 1
+    # assert plan[0].action == Action.ADD
+    # assert plan[0].urn.fqn.name == "func"

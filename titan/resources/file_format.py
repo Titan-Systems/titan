@@ -1,55 +1,134 @@
-# from abc import ABC
-# from typing import List, Union
+from dataclasses import dataclass
 
-# import pyparsing as pp
-
-# from .base import Resource, SchemaScoped, _fix_class_documentation
-# from ..enums import ParseableEnum
-# from ..parse import (
-#     _resolve_resource_class,
-#     _in_parens,
-#     _parse_props,
-#     FullyQualifiedIdentifier,
-#     StringLiteral,
-# )
-# from ..props import (
-#     Props,
-#     BoolProp,
-#     EnumProp,
-#     StringProp,
-#     IdentifierProp,
-#     IntProp,
-#     StringListProp,
-#     Prop,
-# )
+from .resource import Resource, ResourceSpec
+from ..enums import BinaryFormat, Compression, FileType, ResourceType
+from ..props import (
+    BoolProp,
+    EnumProp,
+    IntProp,
+    Props,
+    StringListProp,
+    StringProp,
+)
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
 
 
-# class FileType(ParseableEnum):
-#     CSV = "CSV"
-#     JSON = "JSON"
-#     AVRO = "AVRO"
-#     ORC = "ORC"
-#     PARQUET = "PARQUET"
-#     XML = "XML"
+@dataclass(unsafe_hash=True)
+class _CSVFileFormat(ResourceSpec):
+    name: ResourceName
+    owner: str = "SYSADMIN"
+    type: FileType = FileType.CSV
+    compression: Compression = None
+    record_delimiter: str = "\n"
+    field_delimiter: str = None
+    file_extension: str = None
+    parse_header: bool = False
+    skip_header: int = None
+    skip_blank_lines: bool = False
+    date_format: str = "AUTO"
+    time_format: str = "AUTO"
+    timestamp_format: str = "AUTO"
+    binary_format: BinaryFormat = BinaryFormat.HEX
+    escape: str = None
+    escape_unenclosed_field: str = "\\"
+    trim_space: bool = False
+    field_optionally_enclosed_by: str = None
+    null_if: list[str] = None
+    error_on_column_count_mismatch: bool = True
+    replace_invalid_characters: bool = False
+    empty_field_as_null: bool = None
+    skip_byte_order_mark: bool = True
+    encoding: str = "UTF8"
+    comment: str = None
 
 
-# class Compression(ParseableEnum):
-#     AUTO = "AUTO"
-#     GZIP = "GZIP"
-#     BZ2 = "BZ2"
-#     BROTLI = "BROTLI"
-#     ZSTD = "ZSTD"
-#     DEFLATE = "DEFLATE"
-#     RAW_DEFLATE = "RAW_DEFLATE"
-#     LZO = "LZO"
-#     SNAPPY = "SNAPPY"
-#     NONE = "NONE"
+class CSVFileFormat(Resource):
+    resource_type = ResourceType.FILE_FORMAT
+    props = Props(
+        type=EnumProp("type", [FileType.CSV]),
+        compression=EnumProp("compression", Compression),
+        record_delimiter=StringProp("record_delimiter", alt_tokens=["NONE"]),
+        field_delimiter=StringProp("field_delimiter", alt_tokens=["NONE"]),
+        file_extension=StringProp("file_extension"),
+        parse_header=BoolProp("parse_header"),
+        skip_header=IntProp("skip_header"),
+        skip_blank_lines=BoolProp("skip_blank_lines"),
+        date_format=StringProp("date_format", alt_tokens=["AUTO"]),
+        time_format=StringProp("time_format", alt_tokens=["AUTO"]),
+        timestamp_format=StringProp("timestamp_format", alt_tokens=["AUTO"]),
+        binary_format=EnumProp("binary_format", BinaryFormat),
+        escape=StringProp("escape", alt_tokens=["NONE"]),
+        escape_unenclosed_field=StringProp("escape_unenclosed_field", alt_tokens=["NONE"]),
+        trim_space=BoolProp("trim_space"),
+        field_optionally_enclosed_by=StringProp("field_optionally_enclosed_by", alt_tokens=["NONE"]),
+        null_if=StringListProp("null_if", parens=True),
+        error_on_column_count_mismatch=BoolProp("error_on_column_count_mismatch"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        empty_field_as_null=BoolProp("empty_field_as_null"),
+        skip_byte_order_mark=BoolProp("skip_byte_order_mark"),
+        encoding=StringProp("encoding", alt_tokens=["UTF8"]),
+        comment=StringProp("comment"),
+    )
+    scope = SchemaScope()
+    spec = _CSVFileFormat
 
-
-# class BinaryFormat(ParseableEnum):
-#     HEX = "HEX"
-#     BASE64 = "BASE64"
-#     UTF8 = "UTF8"
+    def __init__(
+        self,
+        name: ResourceName,
+        owner: str = "SYSADMIN",
+        compression: Compression = None,
+        record_delimiter: str = "\n",
+        field_delimiter: str = None,
+        file_extension: str = None,
+        parse_header: bool = False,
+        skip_header: int = None,
+        skip_blank_lines: bool = False,
+        date_format: str = "AUTO",
+        time_format: str = "AUTO",
+        timestamp_format: str = "AUTO",
+        binary_format: BinaryFormat = BinaryFormat.HEX,
+        escape: str = None,
+        escape_unenclosed_field: str = "\\",
+        trim_space: bool = False,
+        field_optionally_enclosed_by: str = None,
+        null_if: list[str] = None,
+        error_on_column_count_mismatch: bool = True,
+        replace_invalid_characters: bool = False,
+        empty_field_as_null: bool = None,
+        skip_byte_order_mark: bool = True,
+        encoding: str = "UTF8",
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        super().__init__(**kwargs)
+        self._data = _CSVFileFormat(
+            name=name,
+            owner=owner,
+            compression=compression,
+            record_delimiter=record_delimiter,
+            field_delimiter=field_delimiter,
+            file_extension=file_extension,
+            parse_header=parse_header,
+            skip_header=skip_header,
+            skip_blank_lines=skip_blank_lines,
+            date_format=date_format,
+            time_format=time_format,
+            timestamp_format=timestamp_format,
+            binary_format=binary_format,
+            escape=escape,
+            escape_unenclosed_field=escape_unenclosed_field,
+            trim_space=trim_space,
+            field_optionally_enclosed_by=field_optionally_enclosed_by,
+            null_if=null_if,
+            error_on_column_count_mismatch=error_on_column_count_mismatch,
+            replace_invalid_characters=replace_invalid_characters,
+            empty_field_as_null=empty_field_as_null,
+            skip_byte_order_mark=skip_byte_order_mark,
+            encoding=encoding,
+            comment=comment,
+        )
 
 
 # @_fix_class_documentation
@@ -86,31 +165,31 @@
 #     """
 
 #     resource_type = "FILE FORMAT"
-#     props = Props(
-#         type=EnumProp("type", [FileType.CSV]),
-#         compression=EnumProp("compression", Compression),
-#         record_delimiter=StringProp("record_delimiter", alt_tokens=["NONE"]),
-#         field_delimiter=StringProp("field_delimiter", alt_tokens=["NONE"]),
-#         file_extension=StringProp("file_extension"),
-#         parse_header=BoolProp("parse_header"),
-#         skip_header=IntProp("skip_header"),
-#         skip_blank_lines=BoolProp("skip_blank_lines"),
-#         date_format=StringProp("date_format", alt_tokens=["AUTO"]),
-#         time_format=StringProp("time_format", alt_tokens=["AUTO"]),
-#         timestamp_format=StringProp("timestamp_format", alt_tokens=["AUTO"]),
-#         binary_format=EnumProp("binary_format", BinaryFormat),
-#         escape=StringProp("escape", alt_tokens=["NONE"]),
-#         escape_unenclosed_field=StringProp("escape_unenclosed_field", alt_tokens=["NONE"]),
-#         trim_space=BoolProp("trim_space"),
-#         field_optionally_enclosed_by=StringProp("field_optionally_enclosed_by", alt_tokens=["NONE"]),
-#         null_if=StringListProp("null_if", parens=True),
-#         error_on_column_count_mismatch=BoolProp("error_on_column_count_mismatch"),
-#         replace_invalid_characters=BoolProp("replace_invalid_characters"),
-#         empty_field_as_null=BoolProp("empty_field_as_null"),
-#         skip_byte_order_mark=BoolProp("skip_byte_order_mark"),
-#         encoding=StringProp("encoding", alt_tokens=["UTF8"]),
-#         comment=StringProp("comment"),
-#     )
+# props = Props(
+#     type=EnumProp("type", [FileType.CSV]),
+#     compression=EnumProp("compression", Compression),
+#     record_delimiter=StringProp("record_delimiter", alt_tokens=["NONE"]),
+#     field_delimiter=StringProp("field_delimiter", alt_tokens=["NONE"]),
+#     file_extension=StringProp("file_extension"),
+#     parse_header=BoolProp("parse_header"),
+#     skip_header=IntProp("skip_header"),
+#     skip_blank_lines=BoolProp("skip_blank_lines"),
+#     date_format=StringProp("date_format", alt_tokens=["AUTO"]),
+#     time_format=StringProp("time_format", alt_tokens=["AUTO"]),
+#     timestamp_format=StringProp("timestamp_format", alt_tokens=["AUTO"]),
+#     binary_format=EnumProp("binary_format", BinaryFormat),
+#     escape=StringProp("escape", alt_tokens=["NONE"]),
+#     escape_unenclosed_field=StringProp("escape_unenclosed_field", alt_tokens=["NONE"]),
+#     trim_space=BoolProp("trim_space"),
+#     field_optionally_enclosed_by=StringProp("field_optionally_enclosed_by", alt_tokens=["NONE"]),
+#     null_if=StringListProp("null_if", parens=True),
+#     error_on_column_count_mismatch=BoolProp("error_on_column_count_mismatch"),
+#     replace_invalid_characters=BoolProp("replace_invalid_characters"),
+#     empty_field_as_null=BoolProp("empty_field_as_null"),
+#     skip_byte_order_mark=BoolProp("skip_byte_order_mark"),
+#     encoding=StringProp("encoding", alt_tokens=["UTF8"]),
+#     comment=StringProp("comment"),
+# )
 
 #     name: str
 #     owner: str = "SYSADMIN"
@@ -433,3 +512,19 @@
 #     def from_sql(cls, sql):
 #         resource_cls = Resource.classes[_resolve_resource_class(sql)]
 #         return resource_cls.from_sql(sql)
+
+FileFormatMap = {
+    FileType.CSV: CSVFileFormat,
+    # FileType.JSON: JSONFileFormat,
+    # FileType.AVRO: AvroFileFormat,
+    # FileType.ORC: OrcFileFormat,
+    # FileType.PARQUET: ParquetFileFormat,
+    # FileType.XML: XMLFileFormat,
+}
+
+
+def _resolver(data: dict):
+    return FileFormatMap[FileType(data["type"])]
+
+
+Resource.__resolvers__[ResourceType.FILE_FORMAT] = _resolver

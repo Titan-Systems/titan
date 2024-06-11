@@ -5,10 +5,15 @@ from titan import data_provider
 from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
-from tests.helpers import STATIC_RESOURCES
 from titan.parse import parse_identifier, parse_URN
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
+from titan.resources import ExternalStage, CSVFileFormat
 from titan.resource_name import ResourceName
+
+
+from tests.helpers import STATIC_RESOURCES, get_json_fixture
+
+pytestmark = pytest.mark.requires_snowflake
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -50,8 +55,8 @@ account_resources = [
     {
         "resource_type": ResourceType.ROLE_GRANT,
         "setup_sql": [
-            "CREATE USER recipient",
-            "CREATE ROLE thatrole",
+            "CREATE USER IF NOT EXISTS recipient",
+            "CREATE ROLE IF NOT EXISTS thatrole",
             "GRANT ROLE thatrole TO USER recipient",
         ],
         "teardown_sql": [
@@ -76,6 +81,48 @@ account_resources = [
             "login_name": "SOMEUSER@APPLYTITAN.COM",
             "disabled": False,
             "must_change_password": False,
+        },
+    },
+    {
+        "resource_type": ResourceType.CATALOG_INTEGRATION,
+        "setup_sql": "CREATE CATALOG INTEGRATION objectStoreCatalogInt CATALOG_SOURCE=OBJECT_STORE TABLE_FORMAT=ICEBERG ENABLED=TRUE COMMENT='This is a test catalog integration';",
+        "teardown_sql": "DROP CATALOG INTEGRATION objectStoreCatalogInt",
+        "data": {
+            "name": "OBJECTSTORECATALOGINT",
+            "catalog_source": "OBJECT_STORE",
+            "table_format": "ICEBERG",
+            "enabled": True,
+            "owner": "ACCOUNTADMIN",
+            "comment": "This is a test catalog integration",
+        },
+    },
+    {
+        "resource_type": ResourceType.SHARE,
+        "setup_sql": "CREATE SHARE SOME_SHARE COMMENT = 'A share for testing'",
+        "teardown_sql": "DROP SHARE IF EXISTS SOME_SHARE",
+        "data": {
+            "name": "SOME_SHARE",
+            "owner": "ACCOUNTADMIN",
+            "comment": "A share for testing",
+        },
+    },
+    {
+        "resource_type": ResourceType.STORAGE_INTEGRATION,
+        "setup_sql": """CREATE STORAGE INTEGRATION SOME_STORAGE
+            TYPE = EXTERNAL_STAGE
+            STORAGE_PROVIDER = 'S3'
+            STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::001234567890:role/myrole'
+            ENABLED = TRUE
+            STORAGE_ALLOWED_LOCATIONS = ('s3://mybucket1/path1/', 's3://mybucket2/path2/');""",
+        "teardown_sql": "DROP STORAGE INTEGRATION IF EXISTS SOME_STORAGE",
+        "data": {
+            "name": "SOME_STORAGE",
+            "type": "EXTERNAL_STAGE",
+            "storage_provider": "S3",
+            "storage_aws_role_arn": "arn:aws:iam::001234567890:role/myrole",
+            "enabled": True,
+            "owner": "ACCOUNTADMIN",
+            "storage_allowed_locations": ["s3://mybucket1/path1/", "s3://mybucket2/path2/"],
         },
     },
 ]
@@ -323,7 +370,6 @@ def scoped_resource(request, cursor, test_db):
             cursor.execute(teardown_sql)
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_scoped_resource(scoped_resource, cursor, account_locator, test_db):
     fqn = FQN(
         name=scoped_resource["data"]["name"],
@@ -429,7 +475,6 @@ def future_grant_resource(request, cursor, account_locator):
             cursor.execute(teardown_sql)
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_account_resource(account_resource, cursor, account_locator):
 
     if "name" in account_resource["data"]:
@@ -448,7 +493,6 @@ def test_fetch_account_resource(account_resource, cursor, account_locator):
     assert result == account_resource["data"]
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_grant(grant_resource, cursor):
     result = safe_fetch(cursor, grant_resource["urn"])
     assert result is not None
@@ -456,14 +500,12 @@ def test_fetch_grant(grant_resource, cursor):
     assert result == grant_resource["data"]
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_future_grant(future_grant_resource, cursor):
     result = safe_fetch(cursor, future_grant_resource["urn"])
     assert result is not None
     assert result == future_grant_resource["data"]
 
 
-@pytest.mark.requires_snowflake
 @pytest.mark.enterprise
 def test_fetch_enterprise_schema(cursor, account_locator, test_db):
     static_tag = STATIC_RESOURCES[ResourceType.TAG]
@@ -508,7 +550,6 @@ def account_grant(cursor, marked_for_cleanup):
     cursor.execute(f"REVOKE BIND SERVICE ENDPOINT ON ACCOUNT FROM ROLE {static_role.name}")
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_grant_on_account(cursor, account_grant):
     static_role = STATIC_RESOURCES[ResourceType.ROLE]
     bind_service_urn = parse_URN(f"urn:::grant/{static_role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
@@ -527,7 +568,6 @@ def test_fetch_grant_on_account(cursor, account_grant):
     assert audit_grant["to"] == static_role.name
 
 
-@pytest.mark.requires_snowflake
 def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
     # Setup
     static_role = STATIC_RESOURCES[ResourceType.ROLE]
@@ -557,3 +597,39 @@ def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
     grant = safe_fetch(cursor, grant_all_urn)
     assert grant is not None
     assert "MODIFY" not in grant["_privs"]
+
+
+def test_fetch_external_stage(cursor, test_db):
+    external_stage = ExternalStage(
+        name="EXTERNAL_STAGE_EXAMPLE",
+        url="s3://titan-snowflake/",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute(external_stage.create_sql(if_not_exists=True))
+
+    result = safe_fetch(cursor, external_stage.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(external_stage.to_dict())
+
+
+def test_fetch_csv_file_format(cursor, test_db):
+    csv_file_format = CSVFileFormat(
+        name="CSV_FILE_FORMAT_EXAMPLE",
+        owner=TEST_ROLE,
+        field_delimiter="|",
+        skip_header=1,
+        null_if=["NULL", "null"],
+        empty_field_as_null=True,
+        compression="GZIP",
+    )
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute(csv_file_format.create_sql(if_not_exists=True))
+
+    result = safe_fetch(cursor, csv_file_format.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(csv_file_format.to_dict())

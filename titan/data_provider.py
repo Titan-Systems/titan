@@ -29,8 +29,13 @@ def _desc_result_to_dict(desc_result):
     return dict([(row["property"], row["value"]) for row in desc_result])
 
 
-def _desc_type2_result_to_dict(desc_result):
-    return dict([(row["property"], row["property_value"]) for row in desc_result])
+def _desc_type2_result_to_dict(desc_result, lower_properties=False):
+    return dict(
+        [
+            (row["property"].lower() if lower_properties else row["property"], row["property_value"])
+            for row in desc_result
+        ]
+    )
 
 
 def _fail_if_not_granted(result, *args):
@@ -163,6 +168,14 @@ def remove_none_values(d):
     return {k: v for k, v in d.items() if v is not None}
 
 
+def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
+    show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn.name}")
+    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    if len(ownership_grant) == 0:
+        return None
+    return ownership_grant[0]["grantee_name"]
+
+
 def fetch_resource(session, urn: URN) -> Optional[dict]:
     return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
@@ -245,6 +258,44 @@ def fetch_alert(session, fqn: FQN):
         "then": data["action"],
         "owner": data["owner"],
     }
+
+
+def fetch_catalog_integration(session, fqn: FQN):
+    show_result = execute(session, f"SHOW CATALOG INTEGRATIONS LIKE '{fqn.name}'", cacheable=True)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple catalog integrations matching {fqn}")
+
+    data = show_result[0]
+    desc_result = execute(session, f"DESC CATALOG INTEGRATION {fqn.name}")
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
+
+    if properties["catalog_source"] == "GLUE":
+        return {
+            "name": data["name"],
+            "catalog_source": properties["catalog_source"],
+            "catalog_namespace": properties["catalog_namespace"],
+            "table_format": properties["table_format"],
+            "glue_aws_role_arn": properties["glue_aws_role_arn"],
+            "glue_catalog_id": properties["glue_catalog_id"],
+            "glue_region": properties["glue_region"],
+            "enabled": properties["enabled"] == "true",
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["catalog_source"] == "OBJECT_STORE":
+        return {
+            "name": data["name"],
+            "catalog_source": properties["catalog_source"],
+            "table_format": properties["table_format"],
+            "enabled": properties["enabled"] == "true",
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    else:
+        raise Exception(f"Unsupported catalog integration: {properties['catalog_source']}")
 
 
 def fetch_columns(session, resource_type: str, fqn: FQN):
@@ -341,6 +392,50 @@ def fetch_dynamic_table(session, fqn: FQN):
         "comment": data["comment"] or None,
         "columns": columns,
         "as_": as_,
+    }
+
+
+def fetch_file_format(session, fqn: FQN):
+    show_result = execute(session, "SHOW FILE FORMATS IN ACCOUNT", cacheable=True)
+    file_formats = _filter_result(show_result, name=fqn.name)
+    if len(file_formats) == 0:
+        return None
+    if len(file_formats) > 1:
+        raise Exception(f"Found multiple file formats matching {fqn}")
+
+    data = file_formats[0]
+    format_options = json.loads(data["format_options"])
+
+    return {
+        "type": data["type"],
+        "name": data["name"],
+        "owner": data["owner"],
+        "field_delimiter": format_options["FIELD_DELIMITER"],
+        "skip_header": format_options["SKIP_HEADER"],
+        "null_if": format_options["NULL_IF"],
+        "empty_field_as_null": format_options["EMPTY_FIELD_AS_NULL"],
+        "compression": format_options["COMPRESSION"],
+        "record_delimiter": format_options["RECORD_DELIMITER"],
+        "file_extension": format_options["FILE_EXTENSION"],
+        "parse_header": format_options["PARSE_HEADER"],
+        "skip_blank_lines": format_options["SKIP_BLANK_LINES"],
+        "date_format": format_options["DATE_FORMAT"],
+        "time_format": format_options["TIME_FORMAT"],
+        "timestamp_format": format_options["TIMESTAMP_FORMAT"],
+        "binary_format": format_options["BINARY_FORMAT"],
+        "escape": format_options["ESCAPE"] if format_options["ESCAPE"] != "NONE" else None,
+        "escape_unenclosed_field": format_options["ESCAPE_UNENCLOSED_FIELD"],
+        "trim_space": format_options["TRIM_SPACE"],
+        "field_optionally_enclosed_by": (
+            format_options["FIELD_OPTIONALLY_ENCLOSED_BY"]
+            if format_options["FIELD_OPTIONALLY_ENCLOSED_BY"] != "NONE"
+            else None
+        ),
+        "error_on_column_count_mismatch": format_options["ERROR_ON_COLUMN_COUNT_MISMATCH"],
+        "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
+        "skip_byte_order_mark": format_options["SKIP_BYTE_ORDER_MARK"],
+        "encoding": format_options["ENCODING"],
+        "comment": data["comment"] or None,
     }
 
 
@@ -497,6 +592,21 @@ def fetch_image_repository(session, fqn: FQN):
     return {"name": fqn.name, "owner": data["owner"]}
 
 
+def fetch_materialized_view(session, fqn: FQN):
+    show_result = execute(session, f"SHOW MATERIALIZED VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple materialized views matching {fqn}")
+
+    data = show_result[0]
+
+    return {
+        "name": fqn.name,
+        "owner": data["owner"],
+    }
+
+
 def fetch_password_policy(session, fqn: FQN):
     show_result = execute(session, f"SHOW PASSWORD POLICIES IN SCHEMA {fqn.database}.{fqn.schema}")
     policies = _filter_result(show_result, name=fqn.name)
@@ -612,6 +722,8 @@ def fetch_role(session, fqn: FQN):
 
 def fetch_role_grant(session, fqn: FQN):
     subject, name = fqn.params.copy().popitem()
+    subject = ResourceName(subject)
+    name = ResourceName(name)
     try:
         show_result = execute(session, f"SHOW GRANTS OF ROLE {fqn.name}", cacheable=True)
     except ProgrammingError as err:
@@ -623,7 +735,7 @@ def fetch_role_grant(session, fqn: FQN):
         return None
 
     for data in show_result:
-        if data["granted_to"] == subject.upper() and data["grantee_name"] == name:
+        if ResourceName(data["granted_to"]) == subject and ResourceName(data["grantee_name"]) == name:
             if data["granted_to"] == "ROLE":
                 return {
                     "role": fqn.name,
@@ -759,6 +871,23 @@ def fetch_service(session, fqn: FQN):
     }
 
 
+def fetch_share(session, fqn: FQN):
+    show_result = execute(session, f"SHOW SHARES LIKE '{fqn.name}'")
+    shares = _filter_result(show_result, kind="OUTBOUND")
+
+    if len(shares) == 0:
+        return None
+    if len(shares) > 1:
+        raise Exception(f"Found multiple shares matching {fqn}")
+
+    data = shares[0]
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_shared_database(session, fqn: FQN):
     show_result = execute(session, "SELECT SYSTEM$SHOW_IMPORTED_DATABASES()", cacheable=True)
     show_result = json.loads(show_result[0]["SYSTEM$SHOW_IMPORTED_DATABASES()"])
@@ -779,7 +908,36 @@ def fetch_shared_database(session, fqn: FQN):
 
 
 def fetch_stage(session, fqn: FQN):
-    raise NotImplementedError
+    show_result = execute(session, "SHOW STAGES")
+    stages = _filter_result(show_result, name=fqn.name)
+
+    if len(stages) == 0:
+        return None
+    if len(stages) > 1:
+        raise Exception(f"Found multiple stages matching {fqn}")
+
+    data = stages[0]
+    if data["type"] == "EXTERNAL":
+        return {
+            "name": data["name"],
+            "url": data["url"],
+            "owner": data["owner"],
+            "type": data["type"],
+            "storage_integration": data["storage_integration"],
+            # "credentials": data["credentials"],
+            # "encryption": data["encryption"],
+            # "file_format": data["file_format"],
+            "directory": {"enable": data["directory_enabled"] == "Y"},
+            # "copy_options": data["copy_options"],
+            # "tags": data["tags"],
+            "comment": data["comment"] or None,
+        }
+    else:
+        raise Exception(f"Unsupported stage type {data['type']}")
+        return {
+            "name": data["name"],
+            "owner": data["owner"],
+        }
 
 
 def fetch_storage_integration(session, fqn: FQN):
@@ -794,7 +952,7 @@ def fetch_storage_integration(session, fqn: FQN):
     data = integrations[0]
 
     desc_result = execute(session, f"DESC INTEGRATION {fqn.name}")
-    properties = _desc_type2_result_to_dict(desc_result)
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
 
     show_grants = execute(session, f"SHOW GRANTS ON INTEGRATION {fqn.name}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
@@ -804,11 +962,11 @@ def fetch_storage_integration(session, fqn: FQN):
         "type": data["type"],
         "enabled": data["enabled"] == "true",
         "comment": data["comment"] or None,
-        "storage_provider": properties["STORAGE_PROVIDER"],
-        "storage_aws_role_arn": properties.get("STORAGE_AWS_ROLE_ARN"),
-        "storage_allowed_locations": _parse_comma_separated_values(properties.get("STORAGE_ALLOWED_LOCATIONS")),
-        "storage_blocked_locations": _parse_comma_separated_values(properties.get("STORAGE_BLOCKED_LOCATIONS")),
-        "storage_aws_object_acl": properties.get("STORAGE_AWS_OBJECT_ACL"),
+        "storage_provider": properties["storage_provider"],
+        "storage_aws_role_arn": properties.get("storage_aws_role_arn"),
+        "storage_allowed_locations": _parse_comma_separated_values(properties.get("storage_allowed_locations")),
+        "storage_blocked_locations": _parse_comma_separated_values(properties.get("storage_blocked_locations")),
+        "storage_aws_object_acl": properties.get("storage_aws_object_acl"),
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
     }
 
@@ -1075,13 +1233,13 @@ def fetch_warehouse(session, fqn: FQN):
 ################ List functions
 
 
-def list_resource(session, resource_key):
-    return getattr(__this__, f"list_{pluralize(resource_key)}")(session)
+def list_resource(session, resource_label: str) -> Optional[dict]:
+    return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
 def list_databases(session):
     show_result = execute(session, "SHOW DATABASES")
-    return [row["name"] for row in show_result]
+    return [row["name"] for row in show_result if row["name"] != "SNOWFLAKE"]
 
 
 def list_schemas(session, database=None):
@@ -1102,3 +1260,8 @@ def list_stages(session):
         row["fqn"] = f"{row['database_name']}.{row['schema_name']}.{row['name']}"
         stages.append(row)
     return stages
+
+
+def list_users(session):
+    show_result = execute(session, "SHOW USERS")
+    return [row["name"] for row in show_result]

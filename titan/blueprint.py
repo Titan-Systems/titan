@@ -9,8 +9,8 @@ from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
 from .diff import diff, Action
 from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
-from .identifiers import URN, FQN
-from .parse import parse_URN
+from .identifiers import URN, FQN, resource_label_for_type
+from .parse import parse_URN, parse_identifier
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     GlobalPriv,
@@ -20,13 +20,20 @@ from .privs import (
     priv_for_principal,
     is_ownership_priv,
 )
-from .resources import Account, Database, Schema
+from .resources import Account, Database, Schema, Grant
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
-Manifest = dict
-State = dict
+SYSTEM_ROLES = [
+    "ACCOUNTADMIN",
+    "SECURITYADMIN",
+    "SYSADMIN",
+    "PUBLIC",
+    "USERADMIN",
+]
 
+Manifest = dict[URN, dict]
+State = dict[URN, dict]
 
 class MissingPrivilegeException(Exception):
     pass
@@ -94,9 +101,10 @@ def print_plan(plan: Plan):
             action_marker = "-"
         # »
         print(f"{action_marker} {change.urn}", "{")
-        key_length = max(len(key) for key in change.delta.keys())
+        key_lengths = [len(key) for key in change.delta.keys()]
+        max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
         for key, value in change.delta.items():
-            print(f"  + {key:<{key_length}} = {value}")
+            print(f"  + {key:<{max_key_length}} = {value}")
         print("}")
 
 
@@ -174,7 +182,6 @@ def _collect_required_privs(session_ctx: dict, plan: Plan) -> list:
     account_urn = URN.from_session_ctx(session_ctx)
 
     for change in plan:
-        # urn = parse_URN(urn_str)
         resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
         # privs = []
         privs = And()
@@ -281,7 +288,6 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
 
         # Implied privilege grants in the context of our plan
         for change in plan:
-            # urn = parse_URN(urn_str)
 
             # If we plan to add a new resource and we have the privs to create it, we can assume
             # that we have the OWNERSHIP priv on that resource
@@ -311,7 +317,7 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
                         information_schema = URN(
                             account_locator=account_urn.account_locator,
                             resource_type=ResourceType.SCHEMA,
-                            fqn=FQN(name="PUBLIC", database=change.urn.fqn.name),
+                            fqn=FQN(name="INFORMATION_SCHEMA", database=change.urn.fqn.name),
                         )
                         _add(role, str(public_schema), priv_for_principal(public_schema, "OWNERSHIP"))
                         _add(role, str(information_schema), priv_for_principal(information_schema, "OWNERSHIP"))
@@ -343,60 +349,6 @@ def _raise_if_missing_privs(required: list, available: dict):
     #         raise MissingPrivilegeException(f"Missing privileges for {principal}: {required_privs}")
 
 
-def _fetch_remote_state(session, manifest: Manifest) -> State:
-    state: State = {}
-    urns = set(manifest["_urns"].copy())
-
-    # FIXME
-    session.cursor().execute("USE ROLE ACCOUNTADMIN")
-
-    for urn_str, _data in manifest.items():
-        if urn_str.startswith("_"):
-            continue
-
-        urns.remove(urn_str)
-        urn = parse_URN(urn_str)
-        data = data_provider.fetch_resource(session, urn)
-        # print("~~fetching_1", urn_str, data)
-        if urn_str in manifest and data is not None:
-            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
-            if urn.resource_type == ResourceType.FUTURE_GRANT:
-                normalized = data
-            elif isinstance(data, list):
-                normalized = [resource_cls.defaults() | d for d in data]
-            else:
-                normalized = resource_cls.defaults() | data
-            state[urn_str] = normalized
-
-    for urn_str in urns:
-        urn = parse_URN(urn_str)
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type)
-        data = data_provider.fetch_resource(session, urn)
-        # print("~~fetching_2", urn_str, data)
-        if data is not None:
-            if urn.resource_type == ResourceType.FUTURE_GRANT:
-                normalized = data
-            elif isinstance(data, list):
-                normalized = [resource_cls.defaults() | d for d in data]
-            else:
-                normalized = resource_cls.defaults() | data
-            state[urn_str] = normalized
-
-    # check for existence of resource references
-    for parent, reference in manifest["_refs"]:
-        if reference in manifest:
-            continue
-
-        urn = parse_URN(reference)
-        resource_cls = Resource.resolve_resource_cls(urn.resource_type)
-        data = data_provider.fetch_resource(session, urn)
-        # print("~~fetching_3", str(urn), data)
-        if data is None:
-            raise MissingResourceException(f"Resource {urn} required by {parent} not found")
-
-    return state
-
-
 class Blueprint:
     def __init__(
         self,
@@ -404,24 +356,27 @@ class Blueprint:
         account: Union[None, str, Account] = None,
         database: Union[None, str, Database] = None,
         schema: Union[None, str, Schema] = None,
-        resources: List[Resource] = [],
+        resources: List[Resource] = None,
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
         allow_role_switching: bool = True,
         ignore_ownership: bool = True,
-        valid_resource_types: List[ResourceType] = [],
+        valid_resource_types: List[ResourceType] = None,
     ) -> None:
         # TODO: input validation
 
+        if not allow_role_switching:
+            raise Exception("Role switching must be allowed in this version of Titan")
+        
         self._finalized = False
         self._staged: List[Resource] = []
         self._root: Account = None
         self._account_locator: str = None
-        self._run_mode: RunMode = run_mode
+        self._run_mode: RunMode = RunMode(run_mode)
         self._dry_run: bool = dry_run
         self._allow_role_switching: bool = allow_role_switching
         self._ignore_ownership: bool = ignore_ownership
-        self._valid_resource_types: List[ResourceType] = valid_resource_types
+        self._valid_resource_types: List[ResourceType] = [ResourceType(v) for v in valid_resource_types or []]
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -441,9 +396,7 @@ class Blueprint:
         exceptions = []
 
         # Run Mode exceptions
-        if self._run_mode == RunMode.FULLY_MANAGED:
-            return
-        elif self._run_mode == RunMode.CREATE_OR_UPDATE:
+        if self._run_mode == RunMode.CREATE_OR_UPDATE:
             for change in plan:
                 if change.action == Action.REMOVE:
                     exceptions.append(
@@ -459,8 +412,8 @@ class Blueprint:
                         exceptions.append(
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
                         )
-        else:
-            raise Exception(f"Unsupported run mode {self._run_mode}")
+        # else:
+        #     raise Exception(f"Unsupported run mode {self._run_mode}")
 
         # Valid Resource Types exceptions
         if self._valid_resource_types:
@@ -480,30 +433,12 @@ class Blueprint:
         refs = manifest.pop("_refs")
         urns = manifest.pop("_urns")
 
-        # Generate a list of all URNs
-        resource_set = set(urns + list(remote_state.keys()))
-
-        for ref in refs:
-            resource_set.add(ref[0])
-            resource_set.add(ref[1])
-
-        # Calculate a topological sort order for the URNs
-        sort_order = topological_sort(resource_set, refs)
-
         changes: Plan = []
         marked_for_replacement = set()
-        for action, urn_str, delta in diff(remote_state, manifest):
-            urn = parse_URN(urn_str)
-            before = remote_state.get(urn_str, {})
-            after = manifest.get(urn_str, {})
+        for action, urn, delta in diff(remote_state, manifest):
+            before = remote_state.get(urn, {})
+            after = manifest.get(urn, {})
 
-            # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (Action.ADD, Action.CHANGE):
-            #     for on_type, privs in data.items():
-            #         privs_to_add = privs
-            #         if action == Action.CHANGE:
-            #             privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
-            #         for priv in privs_to_add:
-            #             changes.append(ResourceChange(action=Action.ADD, urn=urn_str, before={}, after={}, delta={on_type: [priv]}))
             if action == Action.CHANGE:
                 if urn in marked_for_replacement:
                     continue
@@ -532,10 +467,88 @@ class Blueprint:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
 
         for urn in marked_for_replacement:
-            changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
-            changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
+            raise NotImplementedError("Marked for replacement")
+            # changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
+            # changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
 
-        return sorted(changes, key=lambda change: sort_order[str(change.urn)])
+        # # Handle account role ownership by creating an ownership grant
+        # for change in changes:
+        #     if change.action == Action.ADD and change.after.get("owner") in SYSTEM_ROLES:
+        #         changes.append(ResourceChange(action=Action.ADD, urn=change.urn, before={}, after=after, delta=after))
+        
+        # Generate a list of all URNs
+        resource_set = set(urns + list(remote_state.keys()))
+        for ref in refs:
+            resource_set.add(ref[0])
+            resource_set.add(ref[1])
+        # Calculate a topological sort order for the URNs
+        sort_order = topological_sort(resource_set, set(refs))
+        return sorted(changes, key=lambda change: sort_order[change.urn])
+
+    def fetch_remote_state(self, session, manifest: Manifest) -> State:
+        state: State = {}
+
+        manifest_urns : set[URN] = set(manifest["_urns"].copy())
+
+        def _normalize(urn: URN, data: dict) -> dict:
+            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+            if urn.resource_type == ResourceType.FUTURE_GRANT:
+                normalized = data
+            elif isinstance(data, list):
+                raise Exception(f"Fetching list of {urn.resource_type} is not supported yet")
+                normalized = [resource_cls.defaults() | d for d in data]
+            else:
+                normalized = resource_cls.defaults() | data
+            return normalized
+
+        if self._run_mode == RunMode.FULLY_MANAGED:
+            """
+            In fully managed mode, the remote state is not just the resources that were added to the blueprint, 
+            but all resources that exist in Snowflake. This is limited by a few things:
+            - valid_resource_types limits the scope of what resources types are allowed in a blueprint
+            - if database or schema is set, the blueprint only looks at that database or schema
+            """
+            if len(self._valid_resource_types) == 0:
+                raise Exception("Fully managed mode with all resources is not supported yet")
+            
+            for resource_type in self._valid_resource_types:
+                # if resource_type not in (ResourceType.USER, ResourceType.ROLE, ResourceType.SCHEMA,):
+                #     raise Exception("Fully managed mode with all resources is not supported yet")
+                for name in data_provider.list_resource(session, resource_label_for_type(resource_type)):
+                    urn = URN(resource_type=resource_type, fqn=parse_identifier(name, is_db_scoped=resource_type in (ResourceType.SCHEMA, ResourceType.ROLE)), account_locator=self._account_locator)
+                    data = data_provider.fetch_resource(session, urn)
+                    if data is not None:
+                        normalized_data = _normalize(urn, data)
+                        state[urn] = normalized_data
+
+        for urn in manifest.keys():
+            if str(urn).startswith("_"):
+                continue
+
+            manifest_urns.remove(urn)
+            data = data_provider.fetch_resource(session, urn)
+            if data is not None:
+                normalized_data = _normalize(urn, data)
+                state[urn] = normalized_data
+
+        # for urn_str in manifest_urns:
+        #     raise Exception(f"Resource {urn_str} not found in manifest")
+
+        # check for existence of resource refs
+        for parent, reference in manifest["_refs"]:
+            if reference in manifest:
+                continue
+            
+            
+            try:
+                data = data_provider.fetch_resource(session, reference)
+            except Exception as e:
+                data = None
+            if data is None:
+                print(manifest)
+                raise MissingResourceException(f"Resource {reference} required by {parent} not found or failed to fetch")
+
+        return state
 
     def _finalize(self, session_context: dict):
         """
@@ -546,6 +559,7 @@ class Blueprint:
         self._finalized = True
 
         org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
+        self._staged = None
 
         if len(org_scoped) > 1:
             raise Exception("Only one account allowed")
@@ -572,11 +586,20 @@ class Blueprint:
 
         # Add all schemas and database roles to their respective databases
         for resource in db_scoped:
+            # When the container is present, we SHOULD be looking up the real container and attaching. In other words
+            # this resource could be an island
             if resource.container is None:
                 if len(databases) == 1:
                     databases[0].add(resource)
                 else:
                     raise Exception(f"Database [{resource.container}] for resource {resource} not found")
+            else:
+                for db in databases:
+                    if db == resource.container:
+                        break
+                    elif db.name == resource.container.name:
+                        db.add(resource)
+                        break
 
         for resource in schema_scoped:
             if resource.container is None:
@@ -587,18 +610,54 @@ class Blueprint:
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
-                # TODO: clean this up
-                found = False
-                for db in databases:
-                    for schema in db.items(resource_type=ResourceType.SCHEMA):
-                        if schema.name == resource.container.name:
-                            schema.add(resource)
-                            found = True
-                            break
-                    if found:
-                        break
-                if not found:
-                    raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
+                schema_pointer = resource.container
+                
+                # We have a schema-scoped resource (eg a view) that has a resource pointer for the schema. The job is to connect
+                # that resource into the tree
+                # 
+                # If the schema pointer has no database, assume it lives in the only database we have
+                if schema_pointer.container is None:
+                    if len(databases) == 1:
+                        databases[0].add(schema_pointer)
+                    else:
+                        raise Exception(f"No database for resource {resource} schema={resource.container}")
+                elif isinstance(schema_pointer.container, ResourcePointer):
+                    database_pointer = schema_pointer.container
+                    found = False
+                    for db in databases:
+                        if db.name == database_pointer.name:
+                            for schema in db.items(resource_type=ResourceType.SCHEMA):
+                                if schema.name == schema_pointer.name:
+                                    schema.add(resource)
+                                    found = True
+                                    break
+
+                    if not found:
+                        self._root.add(database_pointer)
+                
+        for database in databases:
+            merge_schemas = []
+            public_schema = None
+            information_schema = None
+            all_schemas = database.items(resource_type=ResourceType.SCHEMA)
+            for schema in all_schemas:
+                if schema.implicit:
+                    if schema.name == "PUBLIC":
+                        public_schema = schema
+                    elif schema.name == "INFORMATION_SCHEMA":
+                        information_schema = schema
+                elif schema.name in ("PUBLIC", "INFORMATION_SCHEMA"):
+                    merge_schemas.append(schema)
+            
+            for schema in merge_schemas:
+                database.remove(schema)
+                schema_items = schema.items()
+                for item in schema_items:
+                    schema.remove(item)
+                    if schema.name == "PUBLIC":
+                        public_schema.add(item)
+                    elif schema.name == "INFORMATION_SCHEMA":
+                        information_schema.add(item)
 
     def generate_manifest(self, session_context: dict = {}) -> Manifest:
         manifest: Manifest = {}
@@ -608,8 +667,9 @@ class Blueprint:
         self._finalize(session_context)
 
         for resource in _walk(self._root):
-            if isinstance(resource, Resource) and resource.implicit:
-                continue
+            if isinstance(resource, Resource):
+                if resource.implicit and self._run_mode != RunMode.FULLY_MANAGED:
+                    continue
 
             urn = URN(
                 resource_type=resource.resource_type,
@@ -622,35 +682,35 @@ class Blueprint:
             if isinstance(resource, ResourcePointer):
                 data["_pointer"] = True
 
-            manifest_key = str(urn)
+            # manifest_key = str(urn)
 
             #### Special Cases
             if resource.resource_type == ResourceType.FUTURE_GRANT:
                 # Role up FUTURE GRANTS on the same role/target to a single entry
                 # TODO: support grant option, use a single character prefix on the priv
-                if manifest_key not in manifest:
-                    manifest[manifest_key] = {}
+                if urn not in manifest:
+                    manifest[urn] = {}
                 on_type = data["on_type"].lower()
-                if on_type not in manifest[manifest_key]:
-                    manifest[manifest_key][on_type] = []
-                if data["priv"] in manifest[manifest_key][on_type]:
+                if on_type not in manifest[urn]:
+                    manifest[urn][on_type] = []
+                if data["priv"] in manifest[urn][on_type]:
                     # raise Exception(f"Duplicate resource {urn} with conflicting data")
                     continue
-                manifest[manifest_key][on_type].append(data["priv"])
+                manifest[urn][on_type].append(data["priv"])
 
             #### Normal Case
             else:
-                if manifest_key in manifest:
-                    if data != manifest[manifest_key]:
+                if urn in manifest:
+                    if data != manifest[urn]:
                         # raise Exception(f"Duplicate resource {urn} with conflicting data")
                         continue
-                manifest[manifest_key] = data
+                manifest[urn] = data
 
-            urns.append(manifest_key)
+            urns.append(urn)
 
             for ref in resource.refs:
                 ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
-                refs.append((str(urn), str(ref_urn)))
+                refs.append((urn, ref_urn))
         manifest["_refs"] = refs
         manifest["_urns"] = urns
         return manifest
@@ -659,7 +719,7 @@ class Blueprint:
         reset_cache()
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
-        remote_state = _fetch_remote_state(session, manifest)
+        remote_state = self.fetch_remote_state(session, manifest)
         try:
             completed_plan = self._plan(remote_state, manifest)
         except Exception as e:
@@ -694,40 +754,13 @@ class Blueprint:
         """
 
         session_ctx = data_provider.fetch_session(session)
-        usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
-        required_privs = _collect_required_privs(session_ctx, plan)
-        available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
+    
+        # required_privs = _collect_required_privs(session_ctx, plan)
+        # available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
+        # _raise_if_missing_privs(required_privs, available_privs)
 
-        _raise_if_missing_privs(required_privs, available_privs)
-
-        action_queue = []
+        action_queue = self._compile_plan_to_sql(session_ctx, plan)
         actions_taken = []
-
-        def _queue_action(change: ResourceChange, props):
-            switch_to_role = None
-            if "owner" in change.before:
-                switch_to_role = change.before["owner"]
-            elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
-                switch_to_role = "SECURITYADMIN"
-            else:  #  change.urn.resource_type in (ResourceType.SCHEMA,)
-                switch_to_role = "ACCOUNTADMIN"
-            if switch_to_role and switch_to_role in usable_roles:
-                action_queue.append(f"USE ROLE {switch_to_role}")
-            else:
-                # raise Exception(f"Role {data.get('owner', '[OWNER MISSING]')} required for {urn} but isn't available")
-                print(
-                    f"Role {change.before.get('owner', '[OWNER MISSING]')} required for {change.urn} but isn't available"
-                )
-            if change.action == Action.ADD:
-                action_queue.append(lifecycle.create_resource(change.urn, change.after, props))
-            elif change.action == Action.CHANGE:
-                action_queue.append(lifecycle.update_resource(change.urn, change.delta, props))
-            elif change.action == Action.REMOVE:
-                action_queue.append(lifecycle.drop_resource(change.urn, change.before))
-
-        for change in plan:
-            props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-            _queue_action(change, props)
 
         while action_queue:
             sql = action_queue.pop(0)
@@ -737,23 +770,86 @@ class Blueprint:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {change.urn}, skipping...")
+                    print(f"Resource already exists: {sql}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {change.urn}, skipping...")
+                    print(f"Invalid grant: {sql}, skipping...")
                 else:
                     raise err
         return actions_taken
+    
+    def _compile_plan_to_sql(self, session_ctx, plan: Plan):
+        action_queue = []
+        default_role = session_ctx["role"]
+        # usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
 
-    def destroy(self, session, manifest=None):
+        def _queue_change(change: ResourceChange, props):
+            """
+            In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
+
+            The active role of a session is set as follows:
+            - When a session is started:
+                - If the session is configured with a role, that is the active role
+                - Otherwise, if the user of the session has a default_role set, and that role exists, that is the active role
+                - Otherwise, the PUBLIC role is activated (PUBLIC cannot be revoked)
+            - Any time the USE ROLE command is run, the active role is switched
+
+            A session may run any command thats allowed by the active role or any role downstream from it in the role hierarchy.
+            When secondary roles are active (by running the command USE SECONDARY ROLES ALL), then the session may also run any
+            command that any secondary role or a role downstream from it is allowed to run.
+
+            However, when a CREATE command is run, only the active role is considered. This is because the role that
+            creates a new resource owns that resource by default. There are some exceptions with GRANTS.
+
+            For those reasons, we generally don't have to worry about the current role as long as we have activated secondary roles.
+            The exception is when creating new resources
+            """
+            
+            before_action = []
+            action = None
+            after_action = []
+
+
+            if change.action == Action.ADD:
+                # TODO: raise exception if role isn't usable. Maybe can just let this fail naturally
+
+                if "owner" in change.after:
+                    if change.after["owner"] in SYSTEM_ROLES:
+                        before_action.append(f"USE ROLE {change.after['owner']}")
+                    else:
+                        before_action.append(f"USE ROLE {default_role}")
+                        after_action.append(f"GRANT OWNERSHIP ON {change.urn.resource_type} {change.urn.fqn} TO {change.after['owner']}")
+                elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
+                    # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
+                    before_action.append(f"USE ROLE SECURITYADMIN")
+                else:
+                    before_action.append(f"USE ROLE {default_role}")
+                
+                action = lifecycle.create_resource(change.urn, change.after, props)
+            elif change.action == Action.CHANGE:
+                action = lifecycle.update_resource(change.urn, change.delta, props)
+            elif change.action == Action.REMOVE:
+                action = lifecycle.drop_resource(change.urn, change.before)
+
+            action_queue.extend(before_action)
+            action_queue.append(action)
+            action_queue.extend(after_action)
+
+        if self._allow_role_switching:
+            action_queue.append("USE SECONDARY ROLES ALL")
+        for change in plan:
+            props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+            _queue_change(change, props)
+        return action_queue
+
+    def destroy(self, session, manifest: Manifest=None):
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
-        for urn_str, data in manifest.items():
-            if urn_str.startswith("_"):
+        for urn, data in manifest.items():
+            if str(urn).startswith("_"):
                 continue
 
             if isinstance(data, dict) and data.get("_pointer"):
                 continue
-            urn = parse_URN(urn_str)
             if urn.resource_type == ResourceType.GRANT:
                 for grant in data:
                     execute(session, lifecycle.drop_resource(urn, grant))
@@ -777,7 +873,7 @@ class Blueprint:
             self._add(resource)
 
 
-def topological_sort(resource_set: set, references: list):
+def topological_sort(resource_set: set, references: set):
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
@@ -816,4 +912,6 @@ def topological_sort(resource_set: set, references: list):
         # Remove edges to empty neighbors
         outgoing_edges[node].difference_update(empty_neighbors)
     nodes.reverse()
+    if len(nodes) != len(resource_set):
+        raise Exception("Graph is not a DAG")
     return {value: index for index, value in enumerate(nodes)}

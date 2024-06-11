@@ -9,6 +9,7 @@ from titan.parse import _split_statements
 
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "../examples")
 
 STATIC_RESOURCES = {
     ResourceType.DATABASE: resources.Database(name="static_database"),
@@ -91,3 +92,10 @@ def get_sql_fixture(filename, lines=False):
             yield from f.read().splitlines()
         else:
             yield from _split_statements(f.read())
+
+
+def get_examples_yml():
+    for file_name in os.listdir(EXAMPLES_DIR):
+        if file_name.endswith(".yml"):
+            with open(os.path.join(EXAMPLES_DIR, file_name), "r") as file:
+                yield (file_name[:-4], file.read())

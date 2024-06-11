@@ -4,6 +4,7 @@
     "owner": "SYSADMIN",
     "type": "EXTERNAL",
     "storage_integration": null,
+    "credentials": null,
     "encryption": {
         "type": "AWS_SSE_KMS",
         "kms_key_id": "alias/MyAliasName"

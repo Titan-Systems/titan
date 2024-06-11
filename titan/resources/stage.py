@@ -148,6 +148,7 @@ class _ExternalStage(ResourceSpec):
     owner: str = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
     storage_integration: str = None
+    credentials: dict[str, str] = None
     encryption: dict[str, str] = None
     file_format: Union[str, dict] = None
     directory: dict[str, bool] = None
@@ -220,6 +221,15 @@ class ExternalStage(Resource):
                 kms_key_id=StringProp("kms_key_id"),
             ),
         ),
+        credentials=PropSet(
+            "credentials",
+            Props(
+                aws_key_id=StringProp("aws_key_id"),
+                aws_secret_key=StringProp("aws_secret_key"),
+                aws_token=StringProp("aws_token"),
+                aws_role=StringProp("aws_role"),
+            ),
+        ),
         directory=PropSet(
             "directory",
             Props(
@@ -242,6 +252,7 @@ class ExternalStage(Resource):
         owner: str = "SYSADMIN",
         type: StageType = StageType.EXTERNAL,
         storage_integration: str = None,
+        credentials: dict[str, str] = None,
         encryption: dict[str, EncryptionType] = None,
         file_format=None,
         directory: dict[str, bool] = None,
@@ -252,12 +263,15 @@ class ExternalStage(Resource):
     ):
         kwargs.pop("type", None)
         super().__init__(**kwargs)
+        if directory is None:
+            directory = {"enable": False}
         self._data: _ExternalStage = _ExternalStage(
             name=name,
             url=url,
             owner=owner,
             type=type,
             storage_integration=storage_integration,
+            credentials=credentials,
             encryption=encryption,
             file_format=file_format,
             directory=directory,

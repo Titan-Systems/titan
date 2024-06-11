@@ -41,6 +41,7 @@ class ResourceType(ParseableEnum):
     ACCOUNT = "ACCOUNT"
     ALERT = "ALERT"
     API_INTEGRATION = "API INTEGRATION"
+    CATALOG_INTEGRATION = "CATALOG INTEGRATION"
     COLUMN = "COLUMN"
     COMPUTE_POOL = "COMPUTE POOL"
     DATABASE = "DATABASE"
@@ -57,6 +58,7 @@ class ResourceType(ParseableEnum):
     GRANT_ON_ALL = "GRANT ON ALL"
     HYBRID_TABLE = "HYBRID TABLE"
     IMAGE_REPOSITORY = "IMAGE REPOSITORY"
+    MATERIALIZED_VIEW = "MATERIALIZED VIEW"
     NETWORK_RULE = "NETWORK RULE"
     NOTIFICATION_INTEGRATION = "NOTIFICATION INTEGRATION"
     PACKAGES_POLICY = "PACKAGES POLICY"
@@ -72,6 +74,7 @@ class ResourceType(ParseableEnum):
     SECURITY_INTEGRATION = "SECURITY INTEGRATION"
     SEQUENCE = "SEQUENCE"
     SERVICE = "SERVICE"
+    SHARE = "SHARE"
     STAGE = "STAGE"
     STORAGE_INTEGRATION = "STORAGE INTEGRATION"
     STREAM = "STREAM"
@@ -307,3 +310,31 @@ class WarehouseSize(ParseableEnum):
             "5X-LARGE": "X5LARGE",
             "6X-LARGE": "X6LARGE",
         }
+
+
+class FileType(ParseableEnum):
+    CSV = "CSV"
+    JSON = "JSON"
+    AVRO = "AVRO"
+    ORC = "ORC"
+    PARQUET = "PARQUET"
+    XML = "XML"
+
+
+class Compression(ParseableEnum):
+    AUTO = "AUTO"
+    GZIP = "GZIP"
+    BZ2 = "BZ2"
+    BROTLI = "BROTLI"
+    ZSTD = "ZSTD"
+    DEFLATE = "DEFLATE"
+    RAW_DEFLATE = "RAW_DEFLATE"
+    LZO = "LZO"
+    SNAPPY = "SNAPPY"
+    NONE = "NONE"
+
+
+class BinaryFormat(ParseableEnum):
+    HEX = "HEX"
+    BASE64 = "BASE64"
+    UTF8 = "UTF8"
