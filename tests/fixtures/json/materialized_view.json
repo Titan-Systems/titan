@@ -1,0 +1,13 @@
+{
+    "name": "SOME_MV",
+    "owner": "SYSADMIN",
+    "comment": "Test view",
+    "as_": "SELECT id FROM static_table",
+    "cluster_by": [
+        "id"
+    ],
+    "tags": null,
+    "copy_grants": false,
+    "secure": false,
+    "columns": null
+}

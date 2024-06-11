@@ -15,6 +15,7 @@ from .file_format import CSVFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
 from .image_repository import ImageRepository
+from .materialized_view import MaterializedView
 from .network_rule import NetworkRule
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
@@ -87,6 +88,7 @@ __all__ = [
     "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
+    "MaterializedView",
     "NetworkRule",
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
