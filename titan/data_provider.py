@@ -1131,7 +1131,7 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
         session,
         f"""
             SELECT *
-            FROM table({database}.information_schema.tag_references(
+            FROM table({database}information_schema.tag_references(
                 '{fqn}', '{str(resource_type)}'
             ))""",
     )
