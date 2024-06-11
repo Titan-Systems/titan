@@ -2,7 +2,7 @@ from typing import Union
 
 import pyparsing as pp
 
-from .parse import FullyQualifiedIdentifier
+from .parse_primitives import FullyQualifiedIdentifier
 
 
 def attribute_is_resource_name(attribute: str) -> bool:

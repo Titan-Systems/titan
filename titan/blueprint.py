@@ -24,9 +24,8 @@ from .resources import Account, Database, Schema
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
-Manifest = dict
-State = dict
-
+Manifest = dict[URN, dict]
+State = dict[URN, dict]
 
 class MissingPrivilegeException(Exception):
     pass
@@ -175,7 +174,6 @@ def _collect_required_privs(session_ctx: dict, plan: Plan) -> list:
     account_urn = URN.from_session_ctx(session_ctx)
 
     for change in plan:
-        # urn = parse_URN(urn_str)
         resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
         # privs = []
         privs = And()
@@ -282,7 +280,6 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
 
         # Implied privilege grants in the context of our plan
         for change in plan:
-            # urn = parse_URN(urn_str)
 
             # If we plan to add a new resource and we have the privs to create it, we can assume
             # that we have the OWNERSHIP priv on that resource
@@ -436,22 +433,14 @@ class Blueprint:
             resource_set.add(ref[1])
 
         # Calculate a topological sort order for the URNs
-        sort_order = topological_sort(resource_set, refs)
+        sort_order = topological_sort(resource_set, set(refs))
 
         changes: Plan = []
         marked_for_replacement = set()
-        for action, urn_str, delta in diff(remote_state, manifest):
-            urn = parse_URN(urn_str)
-            before = remote_state.get(urn_str, {})
-            after = manifest.get(urn_str, {})
+        for action, urn, delta in diff(remote_state, manifest):
+            before = remote_state.get(urn, {})
+            after = manifest.get(urn, {})
 
-            # if urn.resource_type == ResourceType.FUTURE_GRANT and action in (Action.ADD, Action.CHANGE):
-            #     for on_type, privs in data.items():
-            #         privs_to_add = privs
-            #         if action == Action.CHANGE:
-            #             privs_to_add = [priv for priv in privs if priv not in remote_state[urn_str].get(on_type, [])]
-            #         for priv in privs_to_add:
-            #             changes.append(ResourceChange(action=Action.ADD, urn=urn_str, before={}, after={}, delta={on_type: [priv]}))
             if action == Action.CHANGE:
                 if urn in marked_for_replacement:
                     continue
@@ -483,12 +472,12 @@ class Blueprint:
             changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
             changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
 
-        return sorted(changes, key=lambda change: sort_order[str(change.urn)])
+        return sorted(changes, key=lambda change: sort_order[change.urn])
 
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
         state: State = {}
 
-        manifest_urns : set[str] = set(manifest["_urns"].copy())
+        manifest_urns : set[URN] = set(manifest["_urns"].copy())
 
         def _normalize(urn: URN, data: dict) -> dict:
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
@@ -519,18 +508,17 @@ class Blueprint:
                     data = data_provider.fetch_resource(session, urn)
                     if data is not None:
                         normalized_data = _normalize(urn, data)
-                        state[str(urn)] = normalized_data
+                        state[urn] = normalized_data
 
-        for urn_str in manifest.keys():
-            if urn_str.startswith("_"):
+        for urn in manifest.keys():
+            if str(urn).startswith("_"):
                 continue
 
-            manifest_urns.remove(urn_str)
-            urn = parse_URN(urn_str)
+            manifest_urns.remove(urn)
             data = data_provider.fetch_resource(session, urn)
             if data is not None:
                 normalized_data = _normalize(urn, data)
-                state[urn_str] = normalized_data
+                state[urn] = normalized_data
 
         # for urn_str in manifest_urns:
         #     raise Exception(f"Resource {urn_str} not found in manifest")
@@ -539,12 +527,11 @@ class Blueprint:
         for parent, reference in manifest["_refs"]:
             if reference in manifest:
                 continue
-
-            urn = parse_URN(reference)
-            resource_cls = Resource.resolve_resource_cls(urn.resource_type)
-            data = data_provider.fetch_resource(session, urn)
+            
+            data = data_provider.fetch_resource(session, reference)
             if data is None:
-                raise MissingResourceException(f"Resource {urn} required by {parent} not found")
+                print(manifest)
+                raise MissingResourceException(f"Resource {reference} required by {parent} not found")
 
         return state
 
@@ -643,35 +630,35 @@ class Blueprint:
             if isinstance(resource, ResourcePointer):
                 data["_pointer"] = True
 
-            manifest_key = str(urn)
+            # manifest_key = str(urn)
 
             #### Special Cases
             if resource.resource_type == ResourceType.FUTURE_GRANT:
                 # Role up FUTURE GRANTS on the same role/target to a single entry
                 # TODO: support grant option, use a single character prefix on the priv
-                if manifest_key not in manifest:
-                    manifest[manifest_key] = {}
+                if urn not in manifest:
+                    manifest[urn] = {}
                 on_type = data["on_type"].lower()
-                if on_type not in manifest[manifest_key]:
-                    manifest[manifest_key][on_type] = []
-                if data["priv"] in manifest[manifest_key][on_type]:
+                if on_type not in manifest[urn]:
+                    manifest[urn][on_type] = []
+                if data["priv"] in manifest[urn][on_type]:
                     # raise Exception(f"Duplicate resource {urn} with conflicting data")
                     continue
-                manifest[manifest_key][on_type].append(data["priv"])
+                manifest[urn][on_type].append(data["priv"])
 
             #### Normal Case
             else:
-                if manifest_key in manifest:
-                    if data != manifest[manifest_key]:
+                if urn in manifest:
+                    if data != manifest[urn]:
                         # raise Exception(f"Duplicate resource {urn} with conflicting data")
                         continue
-                manifest[manifest_key] = data
+                manifest[urn] = data
 
-            urns.append(manifest_key)
+            urns.append(urn)
 
             for ref in resource.refs:
                 ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
-                refs.append((str(urn), str(ref_urn)))
+                refs.append((urn, ref_urn))
         manifest["_refs"] = refs
         manifest["_urns"] = urns
         return manifest
@@ -772,9 +759,6 @@ class Blueprint:
             if role:
                 action_queue.append(f"USE ROLE {role}")
 
-            # print(change)
-            # print('.')
-
             if change.action == Action.ADD:
                 action_queue.append(lifecycle.create_resource(change.urn, change.after, props))
             elif change.action == Action.CHANGE:
@@ -803,16 +787,15 @@ class Blueprint:
                     raise err
         return actions_taken
 
-    def destroy(self, session, manifest=None):
+    def destroy(self, session, manifest: Manifest=None):
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
-        for urn_str, data in manifest.items():
-            if urn_str.startswith("_"):
+        for urn, data in manifest.items():
+            if str(urn).startswith("_"):
                 continue
 
             if isinstance(data, dict) and data.get("_pointer"):
                 continue
-            urn = parse_URN(urn_str)
             if urn.resource_type == ResourceType.GRANT:
                 for grant in data:
                     execute(session, lifecycle.drop_resource(urn, grant))
@@ -836,7 +819,7 @@ class Blueprint:
             self._add(resource)
 
 
-def topological_sort(resource_set: set, references: list):
+def topological_sort(resource_set: set, references: set):
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
@@ -875,4 +858,6 @@ def topological_sort(resource_set: set, references: list):
         # Remove edges to empty neighbors
         outgoing_edges[node].difference_update(empty_neighbors)
     nodes.reverse()
+    if len(nodes) != len(resource_set):
+        raise Exception("Graph is not a DAG")
     return {value: index for index, value in enumerate(nodes)}

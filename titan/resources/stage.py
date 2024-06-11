@@ -148,6 +148,7 @@ class _ExternalStage(ResourceSpec):
     owner: str = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
     storage_integration: str = None
+    credentials: dict[str, str] = None
     encryption: dict[str, str] = None
     file_format: Union[str, dict] = None
     directory: dict[str, bool] = None
@@ -242,6 +243,7 @@ class ExternalStage(Resource):
         owner: str = "SYSADMIN",
         type: StageType = StageType.EXTERNAL,
         storage_integration: str = None,
+        credentials: dict[str, str] = None,
         encryption: dict[str, EncryptionType] = None,
         file_format=None,
         directory: dict[str, bool] = None,
@@ -258,6 +260,7 @@ class ExternalStage(Resource):
             owner=owner,
             type=type,
             storage_integration=storage_integration,
+            credentials=credentials,
             encryption=encryption,
             file_format=file_format,
             directory=directory,

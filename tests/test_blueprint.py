@@ -9,11 +9,13 @@ from titan import (
     Table,
     View,
 )
+from titan.enums import ResourceType
+from titan.identifiers import URN, FQN
+from titan.parse import parse_URN
 
 
 def test_blueprint_with_resources():
     db = Database(name="DB")
-    # FIXME: database=db is not setting a ref from schema to db, causing schema to not get added to the manifest
     schema = Schema(name="SCHEMA", database=db)
     table = Table(name="TABLE", columns=[{"name": "ID", "data_type": "INT"}])
     schema.add(table)
@@ -29,8 +31,9 @@ def test_blueprint_with_resources():
     blueprint = Blueprint(name="blueprint", resources=[db, table, schema, view, udf])
     manifest = blueprint.generate_manifest({"account": "SOMEACCT", "account_locator": "ABCD123"})
 
-    assert "urn::ABCD123:database/DB" in manifest
-    assert manifest["urn::ABCD123:database/DB"] == {
+    db_urn = parse_URN("urn::ABCD123:database/DB")
+    assert db_urn in manifest
+    assert manifest[db_urn] == {
         "name": "DB",
         "owner": "SYSADMIN",
         "comment": None,
@@ -41,8 +44,9 @@ def test_blueprint_with_resources():
         "transient": False,
     }
 
-    assert "urn::ABCD123:schema/DB.SCHEMA" in manifest
-    assert manifest["urn::ABCD123:schema/DB.SCHEMA"] == {
+    schema_urn = parse_URN("urn::ABCD123:schema/DB.SCHEMA")
+    assert schema_urn in manifest
+    assert manifest[schema_urn] == {
         "comment": None,
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
@@ -53,9 +57,9 @@ def test_blueprint_with_resources():
         "tags": None,
         "transient": False,
     }
-
-    assert "urn::ABCD123:view/DB.SCHEMA.VIEW" in manifest
-    assert manifest["urn::ABCD123:view/DB.SCHEMA.VIEW"] == {
+    view_urn = parse_URN("urn::ABCD123:view/DB.SCHEMA.VIEW")
+    assert view_urn in manifest
+    assert manifest[view_urn] == {
         "as_": "SELECT 1",
         "change_tracking": None,
         "columns": None,
@@ -68,9 +72,9 @@ def test_blueprint_with_resources():
         "tags": None,
         "volatile": None,
     }
-    assert "urn::ABCD123:table/DB.SCHEMA.TABLE" in manifest
-
-    assert manifest["urn::ABCD123:table/DB.SCHEMA.TABLE"] == {
+    table_urn = parse_URN("urn::ABCD123:table/DB.SCHEMA.TABLE")
+    assert table_urn in manifest
+    assert manifest[table_urn] == {
         "name": "TABLE",
         "owner": "SYSADMIN",
         "columns": [{"name": "ID", "data_type": "INT"}],
@@ -88,9 +92,19 @@ def test_blueprint_with_resources():
         "tags": None,
         "comment": None,
     }
-    assert "urn::ABCD123:function/DB.PUBLIC.SOMEUDF()" in manifest
-
-    assert manifest["urn::ABCD123:function/DB.PUBLIC.SOMEUDF()"] == {
+    # parse URN is incorrectly stripping the parens. Not sure what the correct behavior should be
+    # udf_urn = parse_URN("urn::ABCD123:function/DB.PUBLIC.SOMEUDF()")
+    udf_urn = URN(
+        resource_type=ResourceType.FUNCTION,
+        fqn=FQN(
+            database="DB",
+            schema="PUBLIC",
+            name="SOMEUDF()",
+        ),
+        account_locator="ABCD123",
+    )
+    assert udf_urn in manifest
+    assert manifest[udf_urn] == {
         "name": "SOMEUDF",
         "owner": "SYSADMIN",
         "returns": "VARCHAR",

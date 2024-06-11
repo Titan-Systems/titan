@@ -20,12 +20,12 @@ setup(
         "Framework :: Titan",
     ],
     install_requires=[
-        "click~=8.1.7",
-        "inflection~=0.5.1",
-        "pyparsing~=3.0.9",
+        "click>=8.1.7",
+        "inflection>=0.5.1",
+        "pyparsing>=3.0.9",
         "pyyaml",
-        "snowflake-connector-python~=3.7.0",
-        "snowflake-snowpark-python~=1.14.0",
+        "snowflake-connector-python>=3.7.0",
+        "snowflake-snowpark-python>=1.14.0",
         "pygithub==1.55",
     ],
     extras_require={

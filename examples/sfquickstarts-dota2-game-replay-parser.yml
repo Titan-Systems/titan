@@ -1,0 +1,167 @@
+databases:
+  - name: DOTA
+    comment: "This database is dedicated to storing and processing Dota 2 game replay data."
+
+schemas:
+  - name: PUBLIC
+    database: DOTA
+    comment: "Default public schema for Dota 2 game data."
+
+tables:
+  - name: RAW
+    database: DOTA
+    schema: PUBLIC
+    comment: "Raw data table for game replays, storing raw JSON data."
+    columns:
+      - name: RAW_DATA
+        data_type: variant
+
+  - name: GAME
+    database: DOTA
+    schema: PUBLIC
+    comment: "Parsed game data stored in a structured format."
+    columns:
+      - name: E
+        data_type: variant
+
+materialized_views:
+  - name: ALL_DAMAGE
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E:Time::TIME as time, 
+      E:Attacker::string as attacker, 
+      E:Target::string as target, 
+      E:DamageCategory::int as CATEGORY,
+      E:DmgType::int AS TYPE,
+      E:LH::int as LH,
+      E:NetWorth::int as NW,
+      E:Inflictor::string as inflictor,
+      NULLIF(E:Value::string,'')::int as value, 
+      NULLIF(E:HP::string,'')::int as HP, 
+      NULLIF(E:NHP::string,'')::int as NHP
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_DAMAGE'
+
+  - name: BUILDINGS
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E:Time::TIME as Time,
+      E:AttackerTeam::String as ATTACKERTEAM,
+      E:Name::STRING as Building,
+      E:TargetTeam::STRING AS TARGETTEAM,
+      E:Units::STRING AS UNIT
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_TEAM_BUILDING_KILL'
+
+  - name: CREEP_KILLS
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E,
+      E:Time::time::String AS T,
+      E:Attacker::STRING AS ATTACKER,
+      E:Target::STRING AS Target,
+      COUNT(*) AS UNIT
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_DEATH'
+      GROUP BY 1, 2, 3, 4
+
+  - name: GOLD
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E, 
+      E:Time::time::String AS T, 
+      E:Time::TIME AS TIME, 
+      E:Target::String as TARGET,
+      E:Reason::integer AS REASON,
+      IFF(E:Direction::STRING = '-', (E:Gold::INT) * -1, (E:Gold::INT)) as GOLD,
+      E:Direction::String AS DIRECTION,
+      E:X::Double AS X,
+      E:Y::Double AS Y
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_GOLD'
+
+  - name: HERO_DAMAGE
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E:Time::TIME as time, 
+      E:Attacker::string as attacker, 
+      E:Target::string as target, 
+      E:DamageCategory::int as CATEGORY,
+      E:DmgType::int AS TYPE,
+      E:LH::int as LH,
+      E:NetWorth::int as NW,
+      E:Inflictor::string as inflictor,
+      NULLIF(E:Value::string,'')::int as value, 
+      NULLIF(E:HP::string,'')::int as HP, 
+      NULLIF(E:NHP::string,'')::int as NHP
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_DAMAGE'
+      AND E:Target LIKE 'npc_dota_hero%'
+      AND E:Attacker LIKE 'npc_dota_hero%'
+
+  - name: HERO_DEATHS
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E:Time::TIME as Time, 
+      REPLACE(E:Target::STRING,' (illusion)','') as hero,
+      COUNT(E:Target) as death
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_DEATH'
+      AND E:Target LIKE 'npc_dota_hero%'
+      GROUP BY 1, 2
+
+  - name: HERO_ITEMS
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E:Time::TIME as time,
+      E:NetWorth::INT as NW,
+      E:Target::String as target,
+      E:Value::STRING as item
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_PURCHASE'
+
+  - name: HERO_KILLS
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E:Time::TIME as Time, 
+      REPLACE(E:Attacker::STRING,' (illusion)','') as attacker,
+      COUNT(E:Target) as kill
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_DEATH'
+      AND E:Target LIKE 'npc_dota_hero%'
+      GROUP BY 1, 2
+
+  - name: XP
+    database: DOTA
+    schema: PUBLIC
+    definition: >
+      SELECT E, 
+      E:Time::time::String AS T, 
+      E:Time::TIME AS TIME, 
+      E:Target::String as TARGET,
+      E:Reason::integer AS REASON,
+      E:XP::integer AS xp,
+      E:Direction::String AS DIRECTION,
+      E:X::Double AS X,
+      E:Y::Double AS Y
+      FROM DOTA.PUBLIC.GAME
+      WHERE E:Type = 'DOTA_COMBATLOG_XP'
+
+file_formats:
+  - name: CSV
+    type: CSV
+
+  - name: JSON
+    type: JSON
+    null_if: []
+    compression: NONE
+
+

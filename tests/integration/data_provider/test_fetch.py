@@ -101,6 +101,25 @@ account_resources = [
             "comment": "A share for testing",
         },
     },
+    {
+        "resource_type": ResourceType.STORAGE_INTEGRATION,
+        "setup_sql": """CREATE STORAGE INTEGRATION SOME_STORAGE
+            TYPE = EXTERNAL_STAGE
+            STORAGE_PROVIDER = 'S3'
+            STORAGE_AWS_ROLE_ARN = 'arn:aws:iam::001234567890:role/myrole'
+            ENABLED = TRUE
+            STORAGE_ALLOWED_LOCATIONS = ('s3://mybucket1/path1/', 's3://mybucket2/path2/');""",
+        "teardown_sql": "DROP STORAGE INTEGRATION IF EXISTS SOME_STORAGE",
+        "data": {
+            "name": "SOME_STORAGE",
+            "type": "EXTERNAL_STAGE",
+            "storage_provider": "S3",
+            "storage_aws_role_arn": "arn:aws:iam::001234567890:role/myrole",
+            "enabled": True,
+            "owner": "ACCOUNTADMIN",
+            "storage_allowed_locations": ["s3://mybucket1/path1/", "s3://mybucket2/path2/"],
+        },
+    },
 ]
 
 scoped_resources = [

@@ -849,7 +849,19 @@ def fetch_shared_database(session, fqn: FQN):
 
 
 def fetch_stage(session, fqn: FQN):
-    raise NotImplementedError
+    show_result = execute(session, "SHOW STAGES")
+    stages = _filter_result(show_result, name=fqn.name)
+
+    if len(stages) == 0:
+        return None
+    if len(stages) > 1:
+        raise Exception(f"Found multiple stages matching {fqn}")
+
+    data = stages[0]
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+    }
 
 
 def fetch_storage_integration(session, fqn: FQN):

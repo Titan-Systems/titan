@@ -1,9 +1,20 @@
 import pytest
 
-from titan import Blueprint, Database, Grant, JavascriptUDF, User, Role, RoleGrant, Schema, data_provider
-from titan.blueprint import Action, MissingResourceException, plan_sql
+from titan import data_provider
+from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
 from titan.enums import ResourceType
+from titan.resources import (
+    FutureGrant,
+    Database,
+    Grant,
+    JavascriptUDF,
+    User,
+    Role,
+    RoleGrant,
+    Schema,
+)
+
 from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -78,6 +89,20 @@ def test_blueprint_plan_no_changes(cursor, user, role):
     # Plan again to verify no changes are detected
     subsequent_changes = blueprint.plan(session)
     assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."
+
+
+def test_blueprint_crossreferenced_database(cursor):
+    session = cursor.connection
+    bp = Blueprint(name="failing-reference")
+    schema = Schema(name="MY_SCHEMA", database="some_db")
+    bp.add(
+        FutureGrant(priv="SELECT", on_future_views_in=schema, to="MY_ROLE"),
+        Role(name="MY_ROLE"),
+        Database(name="SOME_DB"),
+        schema,
+    )
+    plan = bp.plan(session)
+    assert len(plan) == 4
 
 
 # noprivs_role is causing issues and breaking other integration tests

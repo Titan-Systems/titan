@@ -315,10 +315,12 @@ class FutureGrant(Resource):
         on_type = kwargs.pop("on_type", None)
         in_type = kwargs.pop("in_type", None)
         in_name = kwargs.pop("in_name", None)
+        granted_in_ref = None
 
         if all([on_type, in_type, in_name]):
             in_type = ResourceType(in_type)
             on_type = ResourceType(on_type)
+            granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
 
         else:
 
@@ -340,12 +342,15 @@ class FutureGrant(Resource):
                     if isinstance(arg, Resource):
                         on_type = ResourceType(singularize(keyword[10:-3]))
                         in_type = arg.resource_type
-                        in_name = str(arg.fqn)
+                        # in_name = str(arg.fqn)
+                        in_name = arg.fqn.name
+                        granted_in_ref = arg
                     else:
                         on_stmt, in_stmt = keyword.split("_in_")
                         on_type = ResourceType(singularize(on_stmt[10:]))
                         in_type = ResourceType(in_stmt)
                         in_name = arg
+                        granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
 
         # TODO: Migrate this to blueprint
         # if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
@@ -362,8 +367,9 @@ class FutureGrant(Resource):
             to=to,
             grant_option=grant_option,
         )
-        granted_in = ResourcePointer(name=in_name, resource_type=in_type)
-        self.requires(granted_in, self._data.to)
+        self.requires(self._data.to)
+        if granted_in_ref:
+            self.requires(granted_in_ref)
 
     @classmethod
     def from_sql(cls, sql):
