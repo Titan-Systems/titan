@@ -1125,11 +1125,13 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
 
     """
 
+    database = f"{fqn.database}." if fqn.database else ""
+
     tag_refs = execute(
         session,
         f"""
             SELECT *
-            FROM table({fqn.database}.information_schema.tag_references(
+            FROM table({database}.information_schema.tag_references(
                 '{fqn}', '{str(resource_type)}'
             ))""",
     )
