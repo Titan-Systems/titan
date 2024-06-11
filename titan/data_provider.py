@@ -61,7 +61,6 @@ def _desc_type3_result_to_dict(desc_result, lower_properties=False):
         elif row["property_type"] == "List":
             value = _parse_list_property(value)
         result[parent_property][property] = value
-        print(parent_property, property, value)
     return result
 
 
@@ -1125,9 +1124,6 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
     +----------------------+------------+-------------+-----------+--------+----------------------+---------------+-------------+--------+-------------+
 
     """
-
-    if resource_type != ResourceType.SCHEMA or not isinstance(resource_type, ResourceType):
-        raise NotImplementedError
 
     tag_refs = execute(
         session,
