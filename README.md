@@ -165,7 +165,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Dynamic Table                 | ✅         |
 | Event Table                   | ✅         |
 | External Function             | ✅         |
-| External Stage                | ✅         |
+| External Stage                | WIP        |
 | External Table                | ❌         |
 | Failover Group                | ✅         |
 | File Format                   | ❌         |
@@ -177,7 +177,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Hybrid Table                  | WIP        |
 | Iceberg Table                 | ❌         |
 | Image Repository              | ✅         |
-| Internal Stage                | ✅         |
+| Internal Stage                | WIP       |
 | Masking Policy                | ❌         |
 | Materialized View             | ❌         |
 | Model                         | ❌         |

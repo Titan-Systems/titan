@@ -186,6 +186,9 @@ class Grant(Resource):
         else:
             if on is None:
                 raise ValueError("You must specify an 'on' parameter")
+            elif isinstance(on, ResourcePointer):
+                on_type = on.resource_type
+                on = on.name
             elif isinstance(on, Resource):
                 on_type = on.resource_type
                 on = on._data.name

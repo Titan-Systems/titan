@@ -140,12 +140,12 @@ def test_blueprint_plan_sql(cursor, user):
     session = cursor.connection
 
     blueprint = Blueprint(name="test_add_database")
-    somedb = Database(name="somedb")
+    somedb = Database(name="this_database_does_not_exist")
     blueprint.add(somedb)
     plan = blueprint.plan(session)
 
     assert plan_sql(plan) == [
-        "CREATE DATABASE SOMEDB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+        "CREATE DATABASE THIS_DATABASE_DOES_NOT_EXIST DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
     ]
 
     blueprint = Blueprint(name="test_modify_user")
@@ -204,7 +204,7 @@ def test_blueprint_forces_add(cursor, test_db, role):
 
 
 @pytest.mark.requires_snowflake
-def test_blueprint_fully_managed(cursor, test_db):
+def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db):
     session = cursor.connection
     blueprint = Blueprint(
         name="blueprint",

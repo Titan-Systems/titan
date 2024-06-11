@@ -539,10 +539,14 @@ class Blueprint:
             if reference in manifest:
                 continue
             
-            data = data_provider.fetch_resource(session, reference)
+            
+            try:
+                data = data_provider.fetch_resource(session, reference)
+            except Exception as e:
+                data = None
             if data is None:
                 print(manifest)
-                raise MissingResourceException(f"Resource {reference} required by {parent} not found")
+                raise MissingResourceException(f"Resource {reference} required by {parent} not found or failed to fetch")
 
         return state
 
@@ -552,21 +556,10 @@ class Blueprint:
         """
         if self._finalized:
             return
-        
-        # Inject ownership grants for resources with owner specified to non-system roles
-        ownership_grants = []
-        for staged_resource in self._staged:
-            if hasattr(staged_resource._data, "owner"):
-                # A shim until we move all owner attrs to a role
-                owner = staged_resource._data.owner
-                owner_str = owner if isinstance(owner, str) else str(owner.name)
-                if owner_str not in SYSTEM_ROLES:
-                    ownership_grants.append(Grant(priv=RolePriv.OWNERSHIP, on=staged_resource, to=owner_str))
-                    staged_resource._data.owner = staged_resource.defaults()["owner"]
-        self.add(ownership_grants)
         self._finalized = True
 
         org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
+        self._staged = None
 
         if len(org_scoped) > 1:
             raise Exception("Only one account allowed")
@@ -629,6 +622,30 @@ class Blueprint:
                         break
                 if not found:
                     raise Exception(f"Schema [{resource.container}] for resource {resource} not found")
+                
+        for database in databases:
+            merge_schemas = []
+            public_schema = None
+            information_schema = None
+            all_schemas = database.items(resource_type=ResourceType.SCHEMA)
+            for schema in all_schemas:
+                if schema.implicit:
+                    if schema.name == "PUBLIC":
+                        public_schema = schema
+                    elif schema.name == "INFORMATION_SCHEMA":
+                        information_schema = schema
+                else:
+                    merge_schemas.append(schema)
+            
+            for schema in merge_schemas:
+                database.remove(schema)
+                schema_items = schema.items()
+                for item in schema_items:
+                    schema.remove(item)
+                    if schema.name == "PUBLIC":
+                        public_schema.add(item)
+                    elif schema.name == "INFORMATION_SCHEMA":
+                        information_schema.add(item)
 
     def generate_manifest(self, session_context: dict = {}) -> Manifest:
         manifest: Manifest = {}
@@ -751,9 +768,9 @@ class Blueprint:
     def _compile_plan_to_sql(self, session_ctx, plan: Plan):
         action_queue = []
         default_role = session_ctx["role"]
-        usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
+        # usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
 
-        def _role_for_change(change: ResourceChange, usable_roles: list[str]):
+        def _queue_change(change: ResourceChange, props):
             """
             In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
 
@@ -774,37 +791,36 @@ class Blueprint:
             For those reasons, we generally don't have to worry about the current role as long as we have activated secondary roles.
             The exception is when creating new resources
             """
+            
+            before_action = []
+            action = None
+            after_action = []
 
-            # We only care about the active role when creating new resources
-            if change.action != Action.ADD:
-                return default_role
-
-            # If it supports ownership, use the owner from the resource
-            if "owner" in change.after:
-                role = change.after["owner"]
-            elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
-                role = "SECURITYADMIN"
-            else:
-                # If we don't have a concrete owner for this resource, use the role that was active at the start of the session
-                role = default_role
-
-            if role not in usable_roles:
-                raise Exception(f"Role {role} not found in usable roles: {usable_roles}")
-
-            return role
-
-        def _queue_change(change: ResourceChange, props):
-
-            role = _role_for_change(change, usable_roles)
-            if role:
-                action_queue.append(f"USE ROLE {role}")
 
             if change.action == Action.ADD:
-                action_queue.append(lifecycle.create_resource(change.urn, change.after, props))
+                # TODO: raise exception if role isn't usable. Maybe can just let this fail naturally
+
+                if "owner" in change.after:
+                    if change.after["owner"] in SYSTEM_ROLES:
+                        before_action.append(f"USE ROLE {change.after['owner']}")
+                    else:
+                        before_action.append(f"USE ROLE {default_role}")
+                        after_action.append(f"GRANT OWNERSHIP ON {change.urn.resource_type} {change.urn.fqn} TO {change.after['owner']}")
+                elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
+                    # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
+                    before_action.append(f"USE ROLE SECURITYADMIN")
+                else:
+                    before_action.append(f"USE ROLE {default_role}")
+                
+                action = lifecycle.create_resource(change.urn, change.after, props)
             elif change.action == Action.CHANGE:
-                action_queue.append(lifecycle.update_resource(change.urn, change.delta, props))
+                action = lifecycle.update_resource(change.urn, change.delta, props)
             elif change.action == Action.REMOVE:
-                action_queue.append(lifecycle.drop_resource(change.urn, change.before))
+                action = lifecycle.drop_resource(change.urn, change.before)
+
+            action_queue.extend(before_action)
+            action_queue.append(action)
+            action_queue.extend(after_action)
 
         if self._allow_role_switching:
             action_queue.append("USE SECONDARY ROLES ALL")

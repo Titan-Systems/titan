@@ -52,3 +52,6 @@ class ResourceName:
 
     def upper(self):
         return self
+
+    def startswith(self, prefix: str) -> bool:
+        return self._name.startswith(prefix)

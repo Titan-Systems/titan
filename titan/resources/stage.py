@@ -221,6 +221,15 @@ class ExternalStage(Resource):
                 kms_key_id=StringProp("kms_key_id"),
             ),
         ),
+        credentials=PropSet(
+            "credentials",
+            Props(
+                aws_key_id=StringProp("aws_key_id"),
+                aws_secret_key=StringProp("aws_secret_key"),
+                aws_token=StringProp("aws_token"),
+                aws_role=StringProp("aws_role"),
+            ),
+        ),
         directory=PropSet(
             "directory",
             Props(
@@ -254,6 +263,8 @@ class ExternalStage(Resource):
     ):
         kwargs.pop("type", None)
         super().__init__(**kwargs)
+        if directory is None:
+            directory = {"enable": False}
         self._data: _ExternalStage = _ExternalStage(
             name=name,
             url=url,

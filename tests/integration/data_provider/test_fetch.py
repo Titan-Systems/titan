@@ -5,10 +5,13 @@ from titan import data_provider
 from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
-from tests.helpers import STATIC_RESOURCES
 from titan.parse import parse_identifier, parse_URN
 from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
+from titan.resources import ExternalStage
 from titan.resource_name import ResourceName
+
+
+from tests.helpers import STATIC_RESOURCES, get_json_fixture
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -599,3 +602,19 @@ def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
     grant = safe_fetch(cursor, grant_all_urn)
     assert grant is not None
     assert "MODIFY" not in grant["_privs"]
+
+
+def test_fetch_external_stage(cursor, test_db):
+    external_stage = ExternalStage(
+        name="EXTERNAL_STAGE_EXAMPLE",
+        url="s3://titan-snowflake/",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute(external_stage.create_sql(if_not_exists=True))
+
+    result = safe_fetch(cursor, external_stage.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(external_stage.to_dict())

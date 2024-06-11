@@ -858,10 +858,27 @@ def fetch_stage(session, fqn: FQN):
         raise Exception(f"Found multiple stages matching {fqn}")
 
     data = stages[0]
-    return {
-        "name": data["name"],
-        "owner": data["owner"],
-    }
+    if data["type"] == "EXTERNAL":
+        return {
+            "name": data["name"],
+            "url": data["url"],
+            "owner": data["owner"],
+            "type": data["type"],
+            "storage_integration": data["storage_integration"],
+            # "credentials": data["credentials"],
+            # "encryption": data["encryption"],
+            # "file_format": data["file_format"],
+            "directory": {"enable": data["directory_enabled"] == "Y"},
+            # "copy_options": data["copy_options"],
+            # "tags": data["tags"],
+            "comment": data["comment"] or None,
+        }
+    else:
+        raise Exception(f"Unsupported stage type {data['type']}")
+        return {
+            "name": data["name"],
+            "owner": data["owner"],
+        }
 
 
 def fetch_storage_integration(session, fqn: FQN):

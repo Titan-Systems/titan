@@ -373,7 +373,7 @@ class ResourceContainer:
             items = items[0]
         for item in items:
 
-            if item.container and not isinstance(item.container, ResourcePointer):
+            if item.container is not None and not isinstance(item.container, ResourcePointer):
                 raise RuntimeError(f"{item} already belongs to a container")
             item._container = self
             item.requires(self)
@@ -392,6 +392,12 @@ class ResourceContainer:
             if resource._data.name == name:
                 return resource
         raise KeyError(f"Resource {resource_type} {name} not found")
+
+    def remove(self, resource: Resource):
+        if resource.resource_type in self._items:
+            self._items[resource.resource_type].remove(resource)
+            resource._container = None
+            resource.refs.remove(self)
 
     @property
     def name(self):
@@ -471,7 +477,7 @@ def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, 
         ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
 
         >>> convert_to_resource(Database, Database(name="my_database"))
-        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
+        Database(name="my_database")
 
         >>> convert_to_resource(Database, ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE))
         ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
