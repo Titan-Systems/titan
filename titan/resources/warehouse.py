@@ -68,7 +68,7 @@ class Warehouse(Resource):
         auto_suspend (int): The time in seconds of inactivity after which the warehouse is automatically suspended.
         auto_resume (bool): Whether the warehouse should automatically resume when queries are submitted.
         initially_suspended (bool): Whether the warehouse should start in a suspended state.
-        resource_monitor (ResourceMonitor): The resource monitor that tracks the warehouse's credit usage and other metrics.
+        resource_monitor (string or ResourceMonitor): The resource monitor that tracks the warehouse's credit usage and other metrics.
         comment (string): A comment about the warehouse.
         enable_query_acceleration (bool): Whether query acceleration is enabled to improve performance.
         query_acceleration_max_scale_factor (int): The maximum scale factor for query acceleration.

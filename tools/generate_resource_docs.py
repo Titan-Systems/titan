@@ -191,7 +191,7 @@ def main():
                 try:
                     generate_resource_doc(class_name, class_docstring)
                 except Exception as e:
-                    print(f"Error generating {class_name} doc: {e}")
+                    print(f"[{file}] » Error generating {class_name}")
 
 
 if __name__ == "__main__":

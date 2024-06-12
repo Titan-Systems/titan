@@ -38,6 +38,57 @@ class _JavascriptUDF(ResourceSpec):
 
 
 class JavascriptUDF(Resource):
+    """
+    Description:
+        A Javascript user-defined function (UDF) in Snowflake allows you to define a function using the JavaScript programming language.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-function
+
+    Fields:
+        name (string, required): The name of the function.
+        returns (string or DataType, required): The data type of the function's return value.
+        as_ (string, required): The JavaScript code to execute when the function is called.
+        args (list): The arguments that the function takes.
+        comment (string): A comment for the function.
+        copy_grants (bool): Specifies whether to retain the access privileges from the original function when a new function is created using CREATE OR REPLACE FUNCTION. Defaults to False.
+        external_access_integrations (list): External integrations accessible by the function.
+        handler (string): The entry point for the function within the JavaScript code.
+        imports (list): The list of JavaScript files to import.
+        null_handling (string or NullHandling): How the function handles NULL input.
+        owner (string or Role): The owner of the function. Defaults to "SYSADMIN".
+        packages (list): The list of npm packages that the function depends on.
+        runtime_version (string): The JavaScript runtime version to use.
+        secrets (dict of string to string): Key-value pairs of secrets available to the function.
+        secure (bool): Specifies whether the function is secure. Defaults to False.
+        volatility (string or Volatility): The volatility of the function.
+
+    Python:
+
+        ```python
+        js_udf = JavascriptUDF(
+            name="some_function",
+            returns="STRING",
+            as_="function(x) { return x.toUpperCase(); }",
+            args=[{"name": "x", "data_type": "STRING"}],
+            comment="Converts a string to uppercase",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        functions:
+          - name: some_function
+            returns: STRING
+            as_: function(x) { return x.toUpperCase(); }
+            args:
+              - name: x
+                data_type: STRING
+            comment: Converts a string to uppercase
+        ```
+    """
+
     resource_type = ResourceType.FUNCTION
 
     props = Props(
@@ -109,6 +160,86 @@ class _PythonUDF(ResourceSpec):
 
 
 class PythonUDF(Resource):
+    """
+    Description:
+        A Python user-defined function (UDF) in Snowflake allows users to define their own custom functions in Python.
+        These functions can be used to perform operations that are not available as standard SQL functions.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-function.html
+
+    Fields:
+        name (string, required): The name of the function.
+        returns (string, required): The data type of the function's return value.
+        runtime_version (string, required): The version of the Python runtime to use.
+        handler (string, required): The name of the method to call in the Python script.
+        args (list, required): A list of arguments that the function takes.
+        as_ (string): The Python code to execute when the function is called.
+        comment (string): A comment for the function.
+        copy_grants (bool): Whether to copy grants from the existing function. Defaults to False.
+        external_access_integrations (list): List of external integrations accessible by the function.
+        imports (list): List of modules to import in the function.
+        null_handling (NullHandling): Specifies how NULL values are handled by the function.
+        owner (string or Role): The owner role of the function. Defaults to "SYSADMIN".
+        packages (list): List of Python packages that the function can use.
+        secrets (dict): Secrets that can be accessed by the function.
+        secure (bool): Whether the function is secure. Defaults to False.
+        volatility (string or Volatility): The volatility of the function.
+
+    Python:
+
+        ```python
+        python_udf = PythonUDF(
+            name="some_python_udf",
+            returns="string",
+            runtime_version="3.8",
+            handler="process_data",
+            args=[{"name": "input_data", "data_type": "string"}],
+            as_="process_data_function",
+            comment="This function processes data.",
+            copy_grants=False,
+            external_access_integrations=["s3_integration"],
+            imports=["pandas", "numpy"],
+            null_handling="CALLED_ON_NULL_INPUT",
+            owner="SYSADMIN",
+            packages=["pandas", "numpy"],
+            secrets={"api_key": "secret_value"},
+            secure=False,
+            volatility="IMMUTABLE"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        python_udfs:
+          - name: some_python_udf
+            returns: string
+            runtime_version: 3.8
+            handler: process_data
+            args:
+              - name: input_data
+                type: string
+            as_: process_data_function
+            comment: This function processes data.
+            copy_grants: false
+            external_access_integrations:
+              - s3_integration
+            imports:
+              - pandas
+              - numpy
+            null_handling: CALLED_ON_NULL_INPUT
+            owner: SYSADMIN
+            packages:
+              - pandas
+              - numpy
+            secrets:
+              api_key: secret_value
+            secure: false
+            volatility: IMMUTABLE
+        ```
+    """
+
     resource_type = ResourceType.FUNCTION
     props = Props(
         secure=FlagProp("secure"),
