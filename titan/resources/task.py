@@ -15,12 +15,13 @@ from ..props import (
     StringListProp,
     StringProp,
 )
+from ..resource_name import ResourceName
 from ..scope import SchemaScope
 
 
 @dataclass(unsafe_hash=True)
 class _Task(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: str = "SYSADMIN"
     warehouse: Warehouse = None
     user_task_managed_initial_warehouse_size: WarehouseSize = None
@@ -98,3 +99,7 @@ class Task(Resource):
             as_=as_,
             state=state,
         )
+
+    @property
+    def name(self):
+        return self._data.name

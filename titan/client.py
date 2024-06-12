@@ -22,12 +22,6 @@ connection_params = {
     "password": os.environ.get("SNOWFLAKE_PASSWORD"),
 }
 
-
-def get_session():
-    # TODO: make this snowpark-compatible
-    return snowflake.connector.connect(**connection_params)
-
-
 _EXECUTION_CACHE = {}
 
 

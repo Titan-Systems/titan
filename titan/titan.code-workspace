@@ -2,12 +2,6 @@
 	"folders": [
 		{
 			"path": ".."
-		},
-		{
-			"path": "../../titan-examples"
-		},
-		{
-			"path": "../../titan-lite"
 		}
 	],
 	"settings": {

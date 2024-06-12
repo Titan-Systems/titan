@@ -1,0 +1,20 @@
+roles:
+- comment: null
+  name: CI
+  owner: SYSADMIN
+- comment: null
+  name: EMPTY
+  owner: USERADMIN
+- comment: null
+  name: SOMEADMIN
+  owner: USERADMIN
+- comment: Role for Titan administrators
+  name: TITAN_ADMIN
+  owner: SYSADMIN
+- comment: 'This role has some issues'
+  name: ~@#$%^&*()_+
+  owner: ACCOUNTADMIN
+- comment: 'This is a brand new role'
+  name: ~a-brand-new-role
+  owner: USERADMIN
+

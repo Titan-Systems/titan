@@ -2,22 +2,7 @@ from .blueprint import Blueprint
 from .resources import *
 
 __all__ = [
-    "ACL",
-    "Alert",
     "Blueprint",
-    "Database",
-    "ExternalFunction",
-    "FileFormat",
-    "Role",
-    "Schema",
-    "Sequence",
-    "SharedDatabase",
-    "Table",
-    "Tag",
-    "Task",
-    "User",
-    "View",
-    "Warehouse",
 ]
 
 __version__ = "0.4.1"

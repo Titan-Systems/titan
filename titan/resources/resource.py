@@ -296,7 +296,7 @@ class Resource(metaclass=_Resource):
             elif isinstance(value, dict):
                 return {k: _serialize(v) for k, v in value.items()}
             elif isinstance(value, ResourceName):
-                return str(value)
+                return value._name
             else:
                 return value
 
@@ -356,7 +356,9 @@ class Resource(metaclass=_Resource):
 
     @property
     def fqn(self):
-        name = str(getattr(self._data, "name"))
+        name = getattr(self._data, "name")
+        if isinstance(name, ResourceName):
+            name = name._name
         return self.scope.fully_qualified_name(self.container, name)
 
     @property
