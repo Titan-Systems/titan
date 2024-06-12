@@ -42,6 +42,42 @@ class _User(ResourceSpec):
 
 
 class User(Resource):
+    """
+    Description:
+        A user in Snowflake.
+
+    Args:
+        name (str): [required] The name of the user.
+        owner (str): The owner of the user. Defaults to "USERADMIN".
+        password (str): The password of the user.
+        login_name (str): The login name of the user. Defaults to the name in uppercase.
+        display_name (str): The display name of the user. Defaults to the name in lowercase.
+        first_name (str): The first name of the user.
+        middle_name (str): The middle name of the user.
+        last_name (str): The last name of the user.
+        email (str): The email of the user.
+
+    Python:
+
+        ```python
+        user = User(
+            name="some_user",
+            owner="USERADMIN",
+            email="some.user@example.com",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        users:
+          - name: some_user
+            owner: USERADMIN
+            email: some.user@example.com
+        ```
+
+    """
+
     resource_type = ResourceType.USER
     props = Props(
         password=StringProp("password"),
