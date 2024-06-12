@@ -1,14 +1,14 @@
 roles:
-- comment: null
+- comment: CI role, do not drop
   name: CI
   owner: SYSADMIN
-- comment: null
+- comment: This role is intentionally left empty
   name: EMPTY
   owner: USERADMIN
 - comment: null
   name: SOMEADMIN
   owner: USERADMIN
-- comment: Role for Titan administrators
+- comment: null
   name: TITAN_ADMIN
   owner: SYSADMIN
 - comment: 'This role has some issues'
