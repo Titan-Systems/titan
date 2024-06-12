@@ -6,3 +6,4 @@
 
 * [Warehouse](resources/warehouse.md)
 * [Role](resources/role.md)
+* [User](resources/user.md)
