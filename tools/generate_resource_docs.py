@@ -38,6 +38,16 @@ field_template = """\
 * `{field_name}` ({field_type}{is_required}) - {field_description}
 """
 
+summary_template = """\
+# Table of contents
+
+* [Page](README.md)
+
+## Resources
+
+{resources}
+"""
+
 
 def parse_resource_docstring(docstring):
     sections = {
@@ -155,7 +165,9 @@ def get_resource_classes_for_file(resource_file: str) -> dict[str, str]:
 
 
 def camelcase_to_snakecase(name: str) -> str:
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
+    pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+    name = pattern.sub("_", name).lower()
+    return name
 
 
 def generate_resource_doc(resource_class_name: str, resource_docstring: str):
@@ -183,15 +195,27 @@ def generate_resource_doc(resource_class_name: str, resource_docstring: str):
         )
 
 
+def generate_summary(generated_docs):
+    with open(os.path.join(DOCS_ROOT, "SUMMARY.md"), "w") as f:
+        resources = ""
+        for class_name in generated_docs:
+            resources += f"* [{class_name}](resources/{camelcase_to_snakecase(class_name)}.md)\n"
+        output = summary_template.format(resources=resources)
+        f.write(output)
+
+
 def main():
+    generated_docs = []
     for file in os.listdir(RESOURCES_ROOT):
         if file.endswith(".py"):
             classes = get_resource_classes_for_file(os.path.join(RESOURCES_ROOT, file))
             for class_name, class_docstring in classes.items():
                 try:
                     generate_resource_doc(class_name, class_docstring)
+                    generated_docs.append(class_name)
                 except Exception as e:
                     print(f"[{file}] » Error generating {class_name}")
+    generate_summary(sorted(generated_docs))
 
 
 if __name__ == "__main__":
