@@ -1,13 +1,15 @@
 ---
 description: >-
-  A user in Snowflake.
+  
 ---
 
 # User
 
 [Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-user)
 
-## Example
+A user in Snowflake.
+
+## Examples
 
 ### Python
 
@@ -53,6 +55,5 @@ users:
 * `comment` (string) - A comment for the user.
 * `network_policy` (string) - The network policy for the user.
 * `tags` (dict) - Tags for the user.
-
 
 

@@ -1,13 +1,15 @@
 ---
 description: >-
-  A virtual warehouse, often referred to simply as a "warehouse", is a cluster of compute resources in Snowflake. It provides the necessary CPU, memory, and temporary storage to execute SQL SELECT statements, perform DML operations such as INSERT, UPDATE, DELETE, and manage data loading and unloading.
+  
 ---
 
 # Warehouse
 
 [Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-warehouse.html)
 
-## Example
+A virtual warehouse, often referred to simply as a "warehouse", is a cluster of compute resources in Snowflake. It provides the necessary CPU, memory, and temporary storage to execute SQL SELECT statements, perform DML operations such as INSERT, UPDATE, DELETE, and manage data loading and unloading.
+
+## Examples
 
 ### Python
 
@@ -79,6 +81,5 @@ warehouses:
 * `statement_queued_timeout_in_seconds` (int) - The time in seconds a statement can be queued before it times out.
 * `statement_timeout_in_seconds` (int) - The time in seconds a statement can run before it times out.
 * `tags` (dict) - Tags for the warehouse.
-
 
 

@@ -9,14 +9,16 @@ RESOURCES_ROOT = os.path.join(REPO_ROOT, "titan", "resources")
 doc_template = """\
 ---
 description: >-
-  {description}
+  
 ---
 
 # {resource_title}
 
 [Snowflake Documentation]({snowflake_docs})
 
-## Example
+{description}
+
+## Examples
 
 ### Python
 
@@ -29,7 +31,6 @@ description: >-
 ## Fields
 
 {fields}
-
 
 """
 

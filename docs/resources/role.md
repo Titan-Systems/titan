@@ -1,13 +1,15 @@
 ---
 description: >-
-  A role in Snowflake defines a set of access controls and permissions.
+  
 ---
 
 # Role
 
 [Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-role)
 
-## Example
+A role in Snowflake defines a set of access controls and permissions.
+
+## Examples
 
 ### Python
 
@@ -34,6 +36,5 @@ roles:
 * `owner` (string) - The owner of the role. Defaults to "USERADMIN".
 * `tags` (dict) - Tags associated with the role.
 * `comment` (string) - A comment for the role.
-
 
 
