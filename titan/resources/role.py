@@ -95,6 +95,7 @@ class DatabaseRole(Resource):
         comment (string): A comment about the database role.
 
     Python:
+
         ```python
         database_role = DatabaseRole(
             name="some_database_role",
@@ -106,6 +107,7 @@ class DatabaseRole(Resource):
         ```
 
     Yaml:
+
         ```yaml
         database_roles:
           - name: some_database_role

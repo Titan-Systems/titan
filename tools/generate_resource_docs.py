@@ -12,7 +12,7 @@ description: >-
   
 ---
 
-# {resource_title}
+# {class_name}
 
 [Snowflake Documentation]({snowflake_docs})
 
@@ -130,7 +130,7 @@ def enrich_fields(fields):
         linked_words = []
         for word in words:
             if word[0].isupper():
-                docs_page = re.sub(r"(?<!^)(?=[A-Z])", "_", word).lower()
+                docs_page = camelcase_to_snakecase(word)
                 linked_word = f"[{word}]({docs_page}.md)"
                 linked_words.append(linked_word)
             else:
@@ -140,21 +140,27 @@ def enrich_fields(fields):
     return new_fields
 
 
-def get_resource_docstring(resource_type: str):
-    resource_file = os.path.join(RESOURCES_ROOT, f"{resource_type}.py")
+def get_resource_classes_for_file(resource_file: str) -> dict[str, str]:
     with open(resource_file, "r") as f:
         tree = ast.parse(f.read(), filename=resource_file)
 
+    resource_classes = {}
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
-            if node.name == resource_type.capitalize():
-                return ast.get_docstring(node)
+            if "Resource" in [base.id for base in node.bases]:
+                docstring = ast.get_docstring(node)
+                resource_classes[node.name] = docstring
+
+    return resource_classes
 
 
-def generate_resource_doc(resource_type: str):
+def camelcase_to_snakecase(name: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
 
-    resource_title = resource_type.replace("_", " ").title()
-    resource_docstring = get_resource_docstring(resource_type)
+
+def generate_resource_doc(resource_class_name: str, resource_docstring: str):
+
+    doc_file_name = camelcase_to_snakecase(resource_class_name)
     parsed = parse_resource_docstring(resource_docstring)
 
     fields = parsed["Fields"].split("\n")
@@ -164,10 +170,10 @@ def generate_resource_doc(resource_type: str):
     # print(fields_md)
     # return
 
-    with open(os.path.join(DOCS_ROOT, "resources", f"{resource_type}.md"), "w") as f:
+    with open(os.path.join(DOCS_ROOT, "resources", f"{doc_file_name}.md"), "w") as f:
         f.write(
             doc_template.format(
-                resource_title=resource_title,
+                class_name=resource_class_name,
                 description=parsed["Description"],
                 snowflake_docs=parsed["Snowflake Docs"],
                 fields=fields_md,
@@ -178,11 +184,14 @@ def generate_resource_doc(resource_type: str):
 
 
 def main():
-    for res in ["user", "role", "warehouse"]:
-        try:
-            generate_resource_doc(res)
-        except Exception as e:
-            print(f"Error generating {res} doc: {e}")
+    for file in os.listdir(RESOURCES_ROOT):
+        if file.endswith(".py"):
+            classes = get_resource_classes_for_file(os.path.join(RESOURCES_ROOT, file))
+            for class_name, class_docstring in classes.items():
+                try:
+                    generate_resource_doc(class_name, class_docstring)
+                except Exception as e:
+                    print(f"Error generating {class_name} doc: {e}")
 
 
 if __name__ == "__main__":
