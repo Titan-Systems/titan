@@ -4,10 +4,18 @@ from inflection import pluralize
 
 from .builder import tidy_sql
 from .enums import ResourceType
-from .identifiers import URN
+from .identifiers import URN, FQN
 from .props import Props
+from .resource_name import ResourceName
 
 __this__ = sys.modules[__name__]
+
+
+def fqn_to_sql(fqn: FQN):
+    database = f"{ResourceName(fqn.database)}." if fqn.database else ""
+    schema = f"{ResourceName(fqn.schema)}." if fqn.schema else ""
+    name = ResourceName(fqn.name)
+    return f"{database}{schema}{name}"
 
 
 def create_resource(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
@@ -19,7 +27,7 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
         "CREATE",
         urn.resource_type,
         "IF NOT EXISTS" if if_not_exists else "",
-        urn.fqn,
+        fqn_to_sql(urn.fqn),
         props.render(data),
     )
 
