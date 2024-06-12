@@ -10,7 +10,7 @@ description: >-
 
 #### Python
 
-```
+```python
 wh = Warehouse(
   name = "some_warehouse",
   owner = "SYSADMIN",
@@ -37,9 +37,11 @@ warehouses:
 
 ### Fields
 
-* `name` (required) - Identifier for the virtual warehouse; must be unique for your account.
-* `owner` (string or [Role](role.md)) - The role that owns this resource&#x20;
-* `warehouse_type` (string or [WarehouseType](warehouse.md#warehousetype))&#x20;
+
+* `name` (string, required) - Identifier for the virtual warehouse; must be unique for your account.
+* `owner` (string or [Role](role.md)) - The role that owns this resource
+* `warehouse_type` (string or [WarehouseType](warehouse.md#warehousetype))
+
 
 ### Enums
 

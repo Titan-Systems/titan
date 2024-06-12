@@ -14,6 +14,8 @@ description: >-
 
 # {resource_title}
 
+[Snowflake Documentation]({snowflake_docs})
+
 ## Example
 
 ### Python
@@ -26,26 +28,21 @@ description: >-
 
 ## Fields
 
-{args}
+{fields}
 
-* `name` (required) - Identifier for the virtual warehouse; must be unique for your account.
-* `owner` (string or [Role](role.md)) - The role that owns this resource
-* `warehouse_type` (string or [WarehouseType](warehouse.md#warehousetype)
 
-## Enums
+"""
 
-### WarehouseType
-
-* STANDARD
-* SNOWPARK-OPTIMIZED
-
+field_template = """\
+* `{field_name}` ({field_type}{is_required}) - {field_description}
 """
 
 
 def parse_resource_docstring(docstring):
     sections = {
         "Description": "",
-        "Args": "",
+        "Snowflake Docs": "",
+        "Fields": "",
         "Python": "",
         "Yaml": "",
     }
@@ -69,9 +66,12 @@ def parse_resource_docstring(docstring):
         if part.startswith("Description:"):
             current_section = "Description"
             part = part[11:].strip()
-        elif part.startswith("Args:"):
-            current_section = "Args"
-            part = part[5:].strip()
+        elif part.startswith("Snowflake Docs:"):
+            current_section = "Snowflake Docs"
+            part = part[13:].strip()
+        elif part.startswith("Fields:"):
+            current_section = "Fields"
+            part = part[6:].strip()
         elif part.startswith("Python:"):
             current_section = "Python"
             part = part[7:].strip()
@@ -82,6 +82,57 @@ def parse_resource_docstring(docstring):
         sections[current_section] += _strip_leading_spaces(part)
 
     return sections
+
+
+def parse_field_docstring(field_docstring):
+    pattern = re.compile(
+        r"""
+        ^                           # Start of the string
+        (?P<field_name>\w+)         # Capture field name: one or more word characters
+        \s+                         # One or more whitespace characters
+        \(                          # Literal opening parenthesis
+        (?P<field_type>[^,]+?)      # Capture field type: any characters except comma, non-greedy
+        (?:                         # Start of non-capturing group for optional 'required'
+            ,\s+                    # Comma followed by one or more whitespace characters
+            (?P<is_required>\w+)    # Capture requirement status: word characters (e.g., 'required')
+        )?                          # End of non-capturing group, make it optional
+        \)                          # Literal closing parenthesis
+        :\s+                        # Colon followed by one or more whitespace characters
+        (?P<field_description>.+)   # Capture field description: any characters until the end
+        $                           # End of the string
+        """,
+        re.VERBOSE,
+    )
+    match = pattern.match(field_docstring)
+    if match:
+        return match.groupdict()
+    else:
+        raise ValueError(f"Failed to parse field docstring: {field_docstring}")
+
+
+def enrich_fields(fields):
+    new_fields = []
+    for field in fields:
+
+        # Add a comma if the field is required
+        if field["is_required"]:
+            field["is_required"] = ", required"
+        else:
+            field["is_required"] = ""
+
+        # Link resources named in field_type
+        field_type = field["field_type"]
+        words = field_type.split()
+        linked_words = []
+        for word in words:
+            if word[0].isupper():
+                linked_word = f"[{word}]({word.lower()}.md)"
+                linked_words.append(linked_word)
+            else:
+                linked_words.append(word)
+        field["field_type"] = " ".join(linked_words)
+        new_fields.append(field)
+    return new_fields
 
 
 def get_resource_docstring(resource_type: str):
@@ -100,12 +151,21 @@ def generate_resource_doc(resource_type: str):
     resource_title = resource_type.replace("_", " ").title()
     resource_docstring = get_resource_docstring(resource_type)
     parsed = parse_resource_docstring(resource_docstring)
+
+    fields = parsed["Fields"].split("\n")
+    fields = [parse_field_docstring(field) for field in fields]
+    fields = enrich_fields(fields)
+    fields_md = "".join([field_template.format(**field) for field in fields])
+    # print(fields_md)
+    # return
+
     with open(os.path.join(DOCS_ROOT, "resources", f"{resource_type}.md"), "w") as f:
         f.write(
             doc_template.format(
                 resource_title=resource_title,
                 description=parsed["Description"],
-                args=parsed["Args"],
+                snowflake_docs=parsed["Snowflake Docs"],
+                fields=fields_md,
                 python_example=parsed["Python"],
                 yaml_example=parsed["Yaml"],
             )

@@ -5,6 +5,8 @@ description: >-
 
 # User
 
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-user)
+
 ## Example
 
 ### Python
@@ -28,24 +30,29 @@ users:
 
 ## Fields
 
-(str): [required] The name of the user.
-owner (str): The owner of the user. Defaults to "USERADMIN".
-password (str): The password of the user.
-login_name (str): The login name of the user. Defaults to the name in uppercase.
-display_name (str): The display name of the user. Defaults to the name in lowercase.
-first_name (str): The first name of the user.
-middle_name (str): The middle name of the user.
-last_name (str): The last name of the user.
-email (str): The email of the user.
+* `name` (string, required) - The name of the user.
+* `owner` (string or [Role](role.md)) - The owner of the user. Defaults to "USERADMIN".
+* `password` (string) - The password of the user.
+* `login_name` (string) - The login name of the user. Defaults to the name in uppercase.
+* `display_name` (string) - The display name of the user. Defaults to the name in lowercase.
+* `first_name` (string) - The first name of the user.
+* `middle_name` (string) - The middle name of the user.
+* `last_name` (string) - The last name of the user.
+* `email` (string) - The email of the user.
+* `must_change_password` (bool) - Whether the user must change their password. Defaults to False.
+* `disabled` (bool) - Whether the user is disabled. Defaults to False.
+* `days_to_expiry` (int) - The number of days until the user's password expires.
+* `mins_to_unlock` (int) - The number of minutes until the user's account is unlocked.
+* `default_warehouse` (string) - The default warehouse for the user.
+* `default_namespace` (string) - The default namespace for the user.
+* `default_role` (string) - The default role for the user.
+* `default_secondary_roles` (list) - The default secondary roles for the user.
+* `mins_to_bypass_mfa` (int) - The number of minutes until the user can bypass Multi-Factor Authentication.
+* `rsa_public_key` (string) - The RSA public key for the user.
+* `rsa_public_key_2` (string) - The RSA public key for the user.
+* `comment` (string) - A comment for the user.
+* `network_policy` (string) - The network policy for the user.
+* `tags` (dict) - Tags for the user.
 
-* `name` (required) - Identifier for the virtual warehouse; must be unique for your account.
-* `owner` (string or [Role](role.md)) - The role that owns this resource
-* `warehouse_type` (string or [WarehouseType](warehouse.md#warehousetype)
 
-## Enums
-
-### WarehouseType
-
-* STANDARD
-* SNOWPARK-OPTIMIZED
 
