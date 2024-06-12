@@ -61,7 +61,7 @@ def parse_resource_docstring(docstring):
     parts = re.split(r"\n\s*\n", docstring)
 
     # Identify sections
-
+    current_section = None
     for part in parts:
         if part.startswith("Description:"):
             current_section = "Description"
@@ -79,7 +79,10 @@ def parse_resource_docstring(docstring):
             current_section = "Yaml"
             part = part[5:].strip()
 
-        sections[current_section] += _strip_leading_spaces(part)
+        if current_section:
+            sections[current_section] += _strip_leading_spaces(part)
+        else:
+            raise ValueError(f"Unknown section: {part}")
 
     return sections
 
@@ -126,7 +129,8 @@ def enrich_fields(fields):
         linked_words = []
         for word in words:
             if word[0].isupper():
-                linked_word = f"[{word}]({word.lower()}.md)"
+                docs_page = re.sub(r"(?<!^)(?=[A-Z])", "_", word).lower()
+                linked_word = f"[{word}]({docs_page}.md)"
                 linked_words.append(linked_word)
             else:
                 linked_words.append(word)
@@ -173,7 +177,11 @@ def generate_resource_doc(resource_type: str):
 
 
 def main():
-    generate_resource_doc("user")
+    for res in ["user", "role", "warehouse"]:
+        try:
+            generate_resource_doc(res)
+        except Exception as e:
+            print(f"Error generating {res} doc: {e}")
 
 
 if __name__ == "__main__":

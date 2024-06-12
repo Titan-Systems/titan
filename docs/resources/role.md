@@ -1,36 +1,39 @@
 ---
 description: >-
-  Roles are assigned to users to allow them to perform actions required for
-  business functions in their organization.
+  A role in Snowflake defines a set of access controls and permissions.
 ---
 
 # Role
 
-### Example
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-role)
 
-#### Python
+## Example
 
-```
+### Python
+
+```python
 role = Role(
-  name = "some_role",
-  owner = "USERADMIN",
-  comment = "Some role comment",
+    name="some_role",
+    owner="USERADMIN",
+    comment="This is a sample role.",
 )
 ```
 
-#### YAML
+### YAML
 
 ```yaml
 roles:
   - name: some_role
     owner: USERADMIN
-    comment: Some role comment
+    comment: This is a sample role.
 ```
 
-### Fields
+## Fields
 
-* `name` (required) - Identifier for the role; must be unique for your account
-* `owner` (string or Role) - The role that owns this resource
-* `tags` (dict) - Tag declarations for this resource
-* `comment` (string) - A comment for this resource
+* `name` (string, required) - The name of the role.
+* `owner` (string) - The owner of the role. Defaults to "USERADMIN".
+* `tags` (dict) - Tags associated with the role.
+* `comment` (string) - A comment for the role.
+
+
 
