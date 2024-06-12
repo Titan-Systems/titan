@@ -1,3 +1,5 @@
+import json
+
 from dataclasses import dataclass
 from typing import List, Optional, Union
 from queue import Queue
@@ -5,6 +7,7 @@ from queue import Queue
 import snowflake.connector
 
 from . import data_provider, lifecycle
+from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES
 from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
 from .diff import diff, Action
 from .enums import ResourceType, ParseableEnum
@@ -24,13 +27,6 @@ from .resources import Account, Database, Schema, Grant
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
-SYSTEM_ROLES = [
-    "ACCOUNTADMIN",
-    "SECURITYADMIN",
-    "SYSADMIN",
-    "PUBLIC",
-    "USERADMIN",
-]
 
 Manifest = dict[URN, dict]
 State = dict[URN, dict]
@@ -56,56 +52,93 @@ class ResourceChange:
     after: dict
     delta: dict
 
+    def to_dict(self):
+        return {
+            "action": self.action.value,
+            "urn": str(self.urn),
+            "before": self.before,
+            "after": self.after,
+            "delta": self.delta,
+        }
+
 
 Plan = list[ResourceChange]
 
+def dump_plan(plan: Plan, format: str = "json"):
+    if format == "json":
+        return json.dumps([change.to_dict() for change in plan], indent=2)
+    elif format == "text":
+        """
+        account:ABC123
+
+        » role.transformer will be created
+
+        + role "urn::ABC123:role/transformer" {
+            + name  = "transformer"
+            + owner = "SYSADMIN"
+            }
+
+        + warehouse "urn::ABC123:warehouse/transforming" {
+            + name           = "transforming"
+            + owner          = "SYSADMIN"
+            + warehouse_type = "STANDARD"
+            + warehouse_size = "LARGE"
+            + auto_suspend   = 60
+            }
+
+        + grant "urn::ABC123:grant/..." {
+            + priv = "USAGE"
+            + on   = warehouse "transforming"
+            + to   = role "transformer
+            }
+
+        + grant "urn::ABC123:grant/..." {
+            + priv = "OPERATE"
+            + on   = warehouse "transforming"
+            + to   = role "transformer
+            }
+        """
+        output = ""
+
+        def _render_value(value):
+            if isinstance(value, str):
+                return f'"{value}"'
+            return str(value)
+        
+        # green_start = "\033[36m"
+        # color_end = "\033[0m"
+
+        add_count = len([change for change in plan if change.action == Action.ADD])
+        change_count = len([change for change in plan if change.action == Action.CHANGE])
+        remove_count = len([change for change in plan if change.action == Action.REMOVE])
+
+        output += "\n» titan[core]\n"
+        output += f"» Plan: {add_count} to add, {change_count} to change, {remove_count} to destroy.\n\n"
+
+        for change in plan:
+            action_marker = ""
+            if change.action == Action.ADD:
+                action_marker = "+"
+            elif change.action == Action.CHANGE:
+                action_marker = "~"
+            elif change.action == Action.REMOVE:
+                action_marker = "-"
+            output += f"{action_marker} {change.urn}" "{\n"
+            key_lengths = [len(key) for key in change.delta.keys()]
+            max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
+            for key, value in change.delta.items():
+                new_value = _render_value(value)
+                before_value = ""
+                if key in change.before:
+                    before_value = _render_value(change.before[key]) + " -> "
+                output += f"  {action_marker} {key:<{max_key_length}} = {before_value}{new_value}\n"
+            output += "}" + "\n\n"
+        return output
+    else:
+        raise Exception(f"Unsupported format {format}")
 
 def print_plan(plan: Plan):
-    """
-    account:ABC123
-
-    » role.transformer will be created
-
-    + role "urn::ABC123:role/transformer" {
-        + name  = "transformer"
-        + owner = "SYSADMIN"
-        }
-
-    + warehouse "urn::ABC123:warehouse/transforming" {
-        + name           = "transforming"
-        + owner          = "SYSADMIN"
-        + warehouse_type = "STANDARD"
-        + warehouse_size = "LARGE"
-        + auto_suspend   = 60
-        }
-
-    + grant "urn::ABC123:grant/..." {
-        + priv = "USAGE"
-        + on   = warehouse "transforming"
-        + to   = role "transformer
-        }
-
-    + grant "urn::ABC123:grant/..." {
-        + priv = "OPERATE"
-        + on   = warehouse "transforming"
-        + to   = role "transformer
-        }
-    """
-    for change in plan:
-        action_marker = ""
-        if change.action == Action.ADD:
-            action_marker = "+"
-        elif change.action == Action.CHANGE:
-            action_marker = "~"
-        elif change.action == Action.REMOVE:
-            action_marker = "-"
-        # »
-        print(f"{action_marker} {change.urn}", "{")
-        key_lengths = [len(key) for key in change.delta.keys()]
-        max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
-        for key, value in change.delta.items():
-            print(f"  + {key:<{max_key_length}} = {value}")
-        print("}")
+    print(dump_plan(plan, format="text"))
 
 
 def plan_sql(plan: Plan):
@@ -308,7 +341,7 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
                 if _contains(role, str(parent_urn), create_priv):
                     ownership_priv = priv_for_principal(change.urn, "OWNERSHIP")
                     _add(role, str(parent_urn), ownership_priv)
-                    if change.urn.resource_type == ResourceType.DATABASE and change.urn.fqn.name != "SNOWFLAKE":
+                    if change.urn.resource_type == ResourceType.DATABASE and change.urn.fqn.name not in SYSTEM_DATABASES:
                         public_schema = URN(
                             account_locator=account_urn.account_locator,
                             resource_type=ResourceType.SCHEMA,

@@ -91,9 +91,10 @@ def collect_resources_from_config(config: dict):
 
     for resource_type in Resource.__types__.keys():
         resource_label = pluralize(resource_label_for_type(resource_type))
-        for resource in config.pop(resource_label, []):
-            resource_cls = Resource.resolve_resource_cls(resource_type, resource)
-            resources.append(resource_cls(**resource))
+        for data in config.pop(resource_label, []):
+            resource_cls = Resource.resolve_resource_cls(resource_type, data)
+            resource = resource_cls(**data)
+            resources.append(resource)
 
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
@@ -109,7 +110,6 @@ def collect_resources_from_config(config: dict):
             resource_cache[(resource.resource_type, ResourceName(resource._data.name))] = resource
 
     for resource in resources:
-        # print(">> checking refs for", resource)
         if resource.resource_type == ResourceType.GRANT:
             cache_pointer = (resource.on_type, ResourceName(resource.on))
             if cache_pointer in resource_cache:
@@ -122,9 +122,6 @@ def collect_resources_from_config(config: dict):
                 and cache_pointer in resource_cache
                 and resource_cache[cache_pointer]._container is not None
             ):
-                # print("~~resolving", ref.resource_type, ref.name, "to", resource_cache[cache_pointer]._container)
                 ref._container = resource_cache[cache_pointer]._container
-            # else:
-            #     print("~~skipping", ref.resource_type, ref.name)
 
     return resources
