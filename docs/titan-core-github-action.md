@@ -1,4 +1,4 @@
-# `[titan core]` GitHub Action
+# `titan[core]` GitHub Action
 
 ## Installation
 
