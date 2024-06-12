@@ -9,6 +9,7 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
+from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES, SYSTEM_USERS
 from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
 from .identifiers import URN, FQN, resource_type_for_label
@@ -376,7 +377,7 @@ def fetch_database(session, fqn: FQN):
     data = show_result[0]
 
     is_standard_db = data["kind"] == "STANDARD"
-    is_snowflake_builtin = data["kind"] == "APPLICATION" and data["name"] == "SNOWFLAKE"
+    is_snowflake_builtin = data["kind"] == "APPLICATION" and data["name"] in SYSTEM_DATABASES
 
     if not (is_standard_db or is_snowflake_builtin):
         return None
@@ -572,8 +573,6 @@ def fetch_grant(session, fqn: FQN):
     if priv != "ALL":
         filters["privilege"] = priv
 
-    print("fetch_grant", fqn, "filters=", filters)
-
     grants = _filter_result(show_result, **filters)
 
     if len(grants) == 0:
@@ -730,7 +729,8 @@ def fetch_role_grants(session, role: str):
 
 
 def fetch_role(session, fqn: FQN):
-    show_result = execute(session, f"SHOW ROLES LIKE '{fqn.name}'", cacheable=True)
+    role_name = fqn.name._name if isinstance(fqn.name, ResourceName) else fqn.name
+    show_result = execute(session, f"SHOW ROLES LIKE '{role_name}'", cacheable=True)
 
     if len(show_result) == 0:
         return None
@@ -1263,16 +1263,16 @@ def fetch_warehouse(session, fqn: FQN):
 ################ List functions
 
 
-def list_resource(session, resource_label: str) -> Optional[dict]:
+def list_resource(session, resource_label: str) -> list[str]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
-def list_databases(session):
+def list_databases(session) -> list[str]:
     show_result = execute(session, "SHOW DATABASES")
-    return [row["name"] for row in show_result if row["name"] != "SNOWFLAKE"]
+    return [row["name"] for row in show_result if row["name"] not in SYSTEM_DATABASES]
 
 
-def list_schemas(session, database=None):
+def list_schemas(session, database=None) -> list[str]:
     db = f" IN DATABASE {database}" if database else ""
     try:
         show_result = execute(session, f"SHOW SCHEMAS{db}")
@@ -1283,7 +1283,7 @@ def list_schemas(session, database=None):
         raise
 
 
-def list_stages(session):
+def list_stages(session) -> list[str]:
     show_result = execute(session, "SHOW STAGES IN DATABASE")
     stages = []
     for row in show_result:
@@ -1292,6 +1292,11 @@ def list_stages(session):
     return stages
 
 
-def list_users(session):
+def list_users(session) -> list[str]:
     show_result = execute(session, "SHOW USERS")
-    return [row["name"] for row in show_result]
+    return [row["name"] for row in show_result if row["name"] not in SYSTEM_USERS]
+
+
+def list_roles(session) -> list[str]:
+    show_result = execute(session, "SHOW ROLES")
+    return [row["name"] for row in show_result if row["name"] not in SYSTEM_ROLES]

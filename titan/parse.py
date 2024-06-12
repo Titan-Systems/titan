@@ -384,7 +384,6 @@ def _first_expr(parser):
 def _best_guess_failing_parser(parser, text):
     first_token = text.split(" ")[0]
     for expr in parser.exprs:
-        print(">>>>>", first_token, _format_parser(expr))
         if first_token in _format_parser(expr):
             return expr
 
