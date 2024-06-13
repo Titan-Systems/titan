@@ -599,7 +599,7 @@ def test_fetch_grant_all_on_resource(cursor, marked_for_cleanup):
     assert "MODIFY" not in grant["_privs"]
 
 
-def test_fetch_external_stage(cursor, test_db):
+def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
     external_stage = res.ExternalStage(
         name="EXTERNAL_STAGE_EXAMPLE",
         url="s3://titan-snowflake/",
@@ -608,6 +608,7 @@ def test_fetch_external_stage(cursor, test_db):
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute("USE SCHEMA PUBLIC")
     cursor.execute(external_stage.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(external_stage)
 
     result = safe_fetch(cursor, external_stage.urn)
     assert result is not None
@@ -615,7 +616,7 @@ def test_fetch_external_stage(cursor, test_db):
     assert result == data_provider.remove_none_values(external_stage.to_dict())
 
 
-def test_fetch_internal_stage(cursor, test_db):
+def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
     internal_stage = res.InternalStage(
         name="INTERNAL_STAGE_EXAMPLE",
         directory={"enable": True},
@@ -624,6 +625,7 @@ def test_fetch_internal_stage(cursor, test_db):
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute("USE SCHEMA PUBLIC")
     cursor.execute(internal_stage.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(internal_stage)
 
     result = safe_fetch(cursor, internal_stage.urn)
     assert result is not None
@@ -631,7 +633,7 @@ def test_fetch_internal_stage(cursor, test_db):
     assert result == data_provider.remove_none_values(internal_stage.to_dict())
 
 
-def test_fetch_csv_file_format(cursor, test_db):
+def test_fetch_csv_file_format(cursor, test_db, marked_for_cleanup):
     csv_file_format = res.CSVFileFormat(
         name="CSV_FILE_FORMAT_EXAMPLE",
         owner=TEST_ROLE,
@@ -644,8 +646,24 @@ def test_fetch_csv_file_format(cursor, test_db):
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute("USE SCHEMA PUBLIC")
     cursor.execute(csv_file_format.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(csv_file_format)
 
     result = safe_fetch(cursor, csv_file_format.urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == data_provider.remove_none_values(csv_file_format.to_dict())
+
+
+def test_fetch_resource_monitor(cursor, marked_for_cleanup):
+
+    resource_monitor = res.ResourceMonitor(
+        name="RESOURCE_MONITOR_EXAMPLE",
+        start_timestamp="2049-01-01 00:00",
+    )
+    cursor.execute(resource_monitor.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(resource_monitor)
+
+    result = safe_fetch(cursor, resource_monitor.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(resource_monitor.to_dict())

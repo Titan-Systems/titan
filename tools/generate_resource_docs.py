@@ -41,7 +41,7 @@ field_template = """\
 summary_template = """\
 # Table of contents
 
-* [Page](README.md)
+* [Overview](README.md)
 
 ## Resources
 

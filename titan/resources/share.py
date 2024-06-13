@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ResourceType
 from ..resource_name import ResourceName
 from ..scope import AccountScope
@@ -14,14 +15,35 @@ from ..props import (
 @dataclass(unsafe_hash=True)
 class _Share(ResourceSpec):
     name: ResourceName
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     comment: str = None
 
 
 class Share(Resource):
     """
-    CREATE [ OR REPLACE ] SHARE [ IF NOT EXISTS ] <name>
-      [ COMMENT = '<string_literal>' ]
+    Description:
+        Represents a share resource in Snowflake, which allows sharing data across Snowflake accounts.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-share
+
+    Fields:
+        name (string, required): The name of the share.
+        owner (string or Role): The owner of the share. Defaults to "SYSADMIN".
+        comment (string): A comment about the share.
+
+    Python:
+
+        share = Share(
+            name="some_share",
+            comment="This is a snowflake share."
+        )
+
+    Yaml:
+
+        share:
+          - name: some_share
+            comment: This is a snowflake share.
     """
 
     resource_type = ResourceType.SHARE

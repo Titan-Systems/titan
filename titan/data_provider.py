@@ -1,4 +1,6 @@
+import datetime
 import json
+import pytz
 import sys
 
 from collections import defaultdict
@@ -1083,30 +1085,36 @@ def fetch_replication_group(session, fqn: FQN):
     }
 
 
-def fetch_table(session, fqn: FQN):
-    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+def convert_to_gmt(dt: datetime.datetime) -> str:
+    """
+    Converts a datetime object in any timezone to a GMT datetime string in the format YYYY-MM-DD HH:MM.
 
-    tables = _filter_result(
-        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
-    )
+    Args:
+        dt (datetime): The datetime object to convert.
 
-    if len(tables) == 0:
+    Returns:
+        str: The converted datetime string in GMT.
+    """
+    gmt = pytz.timezone("GMT")
+    dt_gmt = dt.astimezone(gmt)
+    return dt_gmt.strftime("%Y-%m-%d %H:%M")
+
+
+def fetch_resource_monitor(session, fqn: FQN):
+    show_result = execute(session, f"SHOW RESOURCE MONITORS LIKE '{fqn.name}'")
+    resource_monitors = _filter_result(show_result)
+    if len(resource_monitors) == 0:
         return None
-    if len(tables) > 1:
-        raise Exception(f"Found multiple tables matching {fqn}")
-
-    columns = fetch_columns(session, "TABLE", fqn)
-
-    data = tables[0]
+    if len(resource_monitors) > 1:
+        raise Exception(f"Found multiple resource monitors matching {fqn}")
+    data = resource_monitors[0]
     return {
         "name": data["name"],
-        "owner": data["owner"],
-        "comment": data["comment"] or None,
-        "cluster_by": data["cluster_by"] or None,
-        "columns": columns,
-        # This is here because of CTAS type tables.
-        # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
-        "as_": None,
+        "credit_quota": data["credit_quota"],
+        "frequency": data["frequency"],
+        "start_timestamp": convert_to_gmt(data["start_time"]) if data["start_time"] else None,
+        "end_timestamp": convert_to_gmt(data["end_time"]) if data["end_time"] else None,
+        "notify_users": data["notify_users"] or None,
     }
 
 
@@ -1151,6 +1159,33 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
             tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
         tag_map[tag_name] = tag_ref["TAG_VALUE"]
     return tag_map
+
+
+def fetch_table(session, fqn: FQN):
+    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+
+    tables = _filter_result(
+        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
+    )
+
+    if len(tables) == 0:
+        return None
+    if len(tables) > 1:
+        raise Exception(f"Found multiple tables matching {fqn}")
+
+    columns = fetch_columns(session, "TABLE", fqn)
+
+    data = tables[0]
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "comment": data["comment"] or None,
+        "cluster_by": data["cluster_by"] or None,
+        "columns": columns,
+        # This is here because of CTAS type tables.
+        # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
+        "as_": None,
+    }
 
 
 def fetch_user(session, fqn: FQN) -> Optional[dict]:
