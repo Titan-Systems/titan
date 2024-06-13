@@ -7,6 +7,7 @@
 * [Alert](resources/alert.md)
 * [AzureStorageIntegration](resources/azure_storage_integration.md)
 * [DatabaseRole](resources/database_role.md)
+* [DynamicTable](resources/dynamic_table.md)
 * [EmailNotificationIntegration](resources/email_notification_integration.md)
 * [ExternalAccessIntegration](resources/external_access_integration.md)
 * [GCSStorageIntegration](resources/gcs_storage_integration.md)
