@@ -50,6 +50,14 @@ summary_template = """\
 """
 
 
+class EmptyDocstringError(Exception):
+    pass
+
+
+class LegacyDocstringError(Exception):
+    pass
+
+
 def parse_resource_docstring(docstring):
     sections = {
         "Description": "",
@@ -60,7 +68,11 @@ def parse_resource_docstring(docstring):
     }
 
     if not docstring:
-        raise ValueError("Docstring is empty")
+        raise EmptyDocstringError()
+    if docstring.strip().startswith("CREATE"):
+        raise LegacyDocstringError()
+    if docstring.strip().startswith("GRANT"):
+        raise LegacyDocstringError()
 
     # Identify sections
     current_section = None
@@ -215,8 +227,14 @@ def main(resource_file: str):
                 try:
                     generate_resource_doc(class_name, class_docstring)
                     generated_docs.append(class_name)
-                except Exception as e:
-                    print(f"[{file}] » Error generating {class_name}")
+                except EmptyDocstringError:
+                    print(f"[{file}] » {class_name} has no docstring")
+                except LegacyDocstringError:
+                    print(f"[{file}] » {class_name} has a legacy docstring")
+                except ValueError as e:
+                    print(f"[{file}] » {class_name} has an invalid docstring: {e}")
+                # except Exception as e:
+                #     print(f"[{file}] » Error generating {class_name}")
     if resource_file is None:
         generate_summary(sorted(generated_docs))
 
