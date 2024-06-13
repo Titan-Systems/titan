@@ -55,7 +55,7 @@ def marked_for_cleanup() -> list:
 @pytest.fixture(scope="session")
 def cursor(suffix, test_db, marked_for_cleanup):
     session = snowflake.connector.connect(**connection_params())
-    with session.cursor() as cur:
+    with session.cursor(snowflake.connector.DictCursor) as cur:
         cur.execute(f"ALTER SESSION set query_tag='titan_package:test::{suffix}'")
         cur.execute(f"CREATE DATABASE {test_db}")
         cur.execute("CREATE WAREHOUSE IF NOT EXISTS CI WAREHOUSE_SIZE = XSMALL AUTO_SUSPEND = 60 AUTO_RESUME = TRUE")

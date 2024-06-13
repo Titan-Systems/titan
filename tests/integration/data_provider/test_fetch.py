@@ -16,6 +16,7 @@ from tests.helpers import STATIC_RESOURCES, get_json_fixture
 pytestmark = pytest.mark.requires_snowflake
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
+TEST_USER = os.environ.get("TEST_SNOWFLAKE_USER")
 
 account_resources = [
     {
@@ -349,6 +350,12 @@ def account_locator(cursor):
     return data_provider.fetch_account_locator(cursor)
 
 
+@pytest.fixture(scope="session")
+def email_address(cursor):
+    user = cursor.execute(f"SHOW TERSE USERS LIKE '{TEST_USER}'").fetchone()
+    return user["email"]
+
+
 @pytest.fixture(
     params=scoped_resources,
     ids=[f"test_fetch_{config['resource_type']}" for config in scoped_resources],
@@ -668,3 +675,20 @@ def test_fetch_resource_monitor(cursor, marked_for_cleanup):
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == data_provider.remove_none_values(resource_monitor.to_dict())
+
+
+def test_fetch_email_notification_integration(cursor, email_address, marked_for_cleanup):
+
+    email_notification_integration = res.EmailNotificationIntegration(
+        name="EMAIL_NOTIFICATION_INTEGRATION_EXAMPLE",
+        enabled=True,
+        allowed_recipients=[email_address],
+        comment="Example email notification integration",
+    )
+    cursor.execute(email_notification_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(email_notification_integration)
+
+    result = safe_fetch(cursor, email_notification_integration.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(email_notification_integration.to_dict())

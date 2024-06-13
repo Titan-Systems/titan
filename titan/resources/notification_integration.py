@@ -100,7 +100,7 @@ class EmailNotificationIntegration(Resource):
         owner: str = "ACCOUNTADMIN",
         **kwargs,
     ):
-        kwargs.pop("type", None)  # Ensure 'type' is not passed to the base class
+        kwargs.pop("type", None)
         super().__init__(**kwargs)
         self._data = _EmailNotificationIntegration(
             name=name,
@@ -427,6 +427,8 @@ class AzureInboundNotificationIntegration(Resource):
 
 
 def _notification_resolver(data: dict):
+    if NotificationType(data["type"]) == NotificationType.EMAIL:
+        return EmailNotificationIntegration
     if "direction" in data and "notification_provider" in data:
         direction = NotificationDirection(data["direction"])
         provider = NotificationProvider(data["notification_provider"])
