@@ -24,9 +24,7 @@ class _Database(ResourceSpec):
 class Database(Resource, ResourceContainer):
     """
     Description:
-        Represents a database in Snowflake, which can be either transient or permanent. This class allows for the creation,
-        modification, and management of databases with various properties such as data retention time, collation specifications,
-        and custom tags.
+        Represents a database in Snowflake.
 
     Snowflake Docs:
         https://docs.snowflake.com/en/sql-reference/sql/create-database.html
@@ -54,36 +52,30 @@ class Database(Resource, ResourceContainer):
             tags={"project": "research", "priority": "high"},
             comment="Database for research project."
         )
-        ```
 
-        A database can contain schemas. In Titan, you can add a schema to a database in several ways:
+        # A database can contain schemas. In Python, you can add a schema to a database in several ways:
 
-        For any resource, you can specify the container via kwargs.
-
-        By database name:
-        ```python
+        # By database name:
         sch = Schema(
             name = "some_schema",
             database = "my_test_db",
         )
-        ```
 
-        By database object:
-        ```python
+        # By database object:
         db = Database(name = "my_test_db")
-
         sch = Schema(
             name = "some_schema",
             database = db,
         )
-        ```
 
-        Or using the `add` method:
-        ```python
+        # Or using the `add` method:
         db = Database(name = "my_test_db")
         sch = Schema(name = "some_schema")
         db.add(sch)
         ```
+
+
+
 
 
     Yaml:
