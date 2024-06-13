@@ -42,7 +42,7 @@ class ExternalAccessIntegration(Resource):
 
     Fields:
         name (string, required): The name of the external access integration.
-        allowed_network_rules (list, required): [NetworkRule](resources/network_rule.md)s that are allowed for this integration.
+        allowed_network_rules (list, required): [NetworkRules](network_rule.md) that are allowed for this integration.
         allowed_api_authentication_integrations (list): API authentication integrations that are allowed.
         allowed_authentication_secrets (list): Authentication secrets that are allowed.
         enabled (bool): Specifies if the integration is enabled. Defaults to True.
