@@ -56,6 +56,36 @@ class Database(Resource, ResourceContainer):
         )
         ```
 
+        A database can contain schemas. In Titan, you can add a schema to a database in several ways:
+
+        For any resource, you can specify the container via kwargs.
+
+        By database name:
+        ```python
+        sch = Schema(
+            name = "some_schema",
+            database = "my_test_db",
+        )
+        ```
+
+        By database object:
+        ```python
+        db = Database(name = "my_test_db")
+
+        sch = Schema(
+            name = "some_schema",
+            database = db,
+        )
+        ```
+
+        Or using the `add` method:
+        ```python
+        db = Database(name = "my_test_db")
+        sch = Schema(name = "some_schema")
+        db.add(sch)
+        ```
+
+
     Yaml:
 
         ```yaml

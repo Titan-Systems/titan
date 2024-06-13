@@ -29,12 +29,38 @@ class _SessionPolicy(ResourceSpec):
 
 class SessionPolicy(Resource):
     """
-    A Session Policy defines session timeout settings within a Snowflake account.
+    Description:
+        Manages session policies in Snowflake, which define timeout settings for user sessions to enhance security.
 
-    CREATE [ OR REPLACE ] SESSION POLICY [IF NOT EXISTS] <name>
-      [ SESSION_IDLE_TIMEOUT_MINS = <integer> ]
-      [ SESSION_UI_IDLE_TIMEOUT_MINS = <integer> ]
-      [ COMMENT = '<string_literal>' ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-session-policy.html
+
+    Fields:
+        name (string, required): The name of the session policy.
+        session_idle_timeout_mins (int): The maximum amount of time a session can remain idle before it is automatically terminated.
+        session_ui_idle_timeout_mins (int): The maximum amount of time a user interface session can remain idle before it is automatically terminated.
+        comment (string): A description or comment about the session policy.
+
+    Python:
+
+        ```python
+        session_policy = SessionPolicy(
+            name="some_session_policy",
+            session_idle_timeout_mins=30,
+            session_ui_idle_timeout_mins=10,
+            comment="Policy for standard users."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        session_policies:
+          - name: some_session_policy
+            session_idle_timeout_mins: 30
+            session_ui_idle_timeout_mins: 10
+            comment: Policy for standard users.
+        ```
     """
 
     resource_type = ResourceType.SESSION_POLICY

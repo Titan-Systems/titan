@@ -208,6 +208,8 @@ def main():
     generated_docs = []
     for file in os.listdir(RESOURCES_ROOT):
         if file.endswith(".py"):
+            if file == "resource.py":
+                continue
             classes = get_resource_classes_for_file(os.path.join(RESOURCES_ROOT, file))
             for class_name, class_docstring in classes.items():
                 try:
