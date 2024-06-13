@@ -22,11 +22,13 @@ class _Grant(ResourceSpec):
     on_type: ResourceType
     to: Role
     grant_option: bool = False
-    owner: str = None
+    owner: Role = None
     _privs: list[str] = field(default_factory=list, metadata={"forces_add": True})
 
     def __post_init__(self):
         super().__post_init__()
+        if isinstance(self.priv, str):
+            self.priv = self.priv.upper()
         if not self._privs:
             if self.priv == "ALL":
                 self._privs = sorted(_all_privs_for_resource_type(self.on_type))
@@ -280,6 +282,11 @@ class _FutureGrant(ResourceSpec):
     to: Role
     grant_option: bool = False
 
+    def __post_init__(self):
+        super().__post_init__()
+        if isinstance(self.priv, str):
+            self.priv = self.priv.upper()
+
 
 class FutureGrant(Resource):
     """
@@ -427,10 +434,12 @@ class _GrantOnAll(ResourceSpec):
     in_name: str
     to: Role
     grant_option: bool = False
-    owner: str = "SECURITYADMIN"
+    owner: Role = "SECURITYADMIN"
 
     def __post_init__(self):
         super().__post_init__()
+        if isinstance(self.priv, str):
+            self.priv = self.priv.upper()
         if self.in_type not in [ResourceType.DATABASE, ResourceType.SCHEMA]:
             raise ValueError("in_type must be either DATABASE or SCHEMA")
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import AccountEdition, ResourceType
 from ..scope import SchemaScope
 
@@ -19,7 +20,7 @@ from ..props import (
 @dataclass(unsafe_hash=True)
 class _MaterializedView(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     secure: bool = False
     columns: list[dict] = None
     tags: dict[str, str] = None

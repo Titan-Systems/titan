@@ -11,7 +11,6 @@ def export_resources(resource_type: ResourceType) -> dict[str, list]:
     resource_label = resource_label_for_type(resource_type)
     resource_names = list_resource(session, resource_label)
     account_locator = fetch_account_locator(session)
-    print("name:", resource_names)
     resource_urns = [URN(resource_type, FQN(name), account_locator) for name in resource_names]
     resources = [fetch_resource(session, urn) for urn in resource_urns]
     return {pluralize(resource_label): resources}

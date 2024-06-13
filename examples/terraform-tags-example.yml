@@ -1,0 +1,28 @@
+databases:
+  - name: "database"
+    tags:
+      - cost_center: "finance"
+    schemas:
+      - name: "schema"
+        tags:
+          - cost_center: "finance"
+tables:
+  - name: "TABLE_NAME"
+    comment: "Titan example table"
+    columns:
+      - name: "column1"
+        data_type: "VARIANT"
+        tags:
+          - cost_center: "engineering"
+      - name: "column2"
+        data_type: "VARCHAR(16)"
+        tags:
+          - cost_center: "engineering"
+    tags:
+      - cost_center: "engineering"
+
+tags:
+  - name: cost_center
+    allowed_values: ["finance", "engineering"]
+    database: "database"
+    schema: "schema"

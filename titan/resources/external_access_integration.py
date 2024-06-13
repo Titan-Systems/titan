@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
 from .network_rule import NetworkRule
+from .role import Role
 from .secret import Secret
 from ..enums import ResourceType
 from ..scope import AccountScope
@@ -17,7 +18,7 @@ class _ExternalAccessIntegration(ResourceSpec):
     allowed_authentication_secrets: list[Secret] = None
     enabled: bool = True
     comment: str = None
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
 
     def __post_init__(self):
         super().__post_init__()

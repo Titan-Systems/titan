@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ResourceType
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
 from ..resource_name import ResourceName
@@ -10,7 +11,7 @@ from ..scope import AccountScope
 @dataclass(unsafe_hash=True)
 class _User(ResourceSpec):
     name: ResourceName
-    owner: str = "USERADMIN"
+    owner: Role = "USERADMIN"
     password: str = None
     login_name: str = None
     display_name: str = None

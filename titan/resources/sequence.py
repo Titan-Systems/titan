@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
 
@@ -10,7 +11,7 @@ from ..props import Props, IntProp, StringProp
 @dataclass(unsafe_hash=True)
 class _Sequence(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     start: int = None
     increment: int = None
     comment: str = None

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import BinaryFormat, Compression, FileType, ResourceType
 from ..props import (
     BoolProp,
@@ -17,7 +18,7 @@ from ..scope import SchemaScope
 @dataclass(unsafe_hash=True)
 class _CSVFileFormat(ResourceSpec):
     name: ResourceName
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     type: FileType = FileType.CSV
     compression: Compression = None
     record_delimiter: str = "\n"

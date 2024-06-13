@@ -18,7 +18,7 @@ class _HybridTable(ResourceSpec):
     name: str
     columns: list[Column]
     tags: dict[str, str] = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     comment: str = None
 
     def __post_init__(self):

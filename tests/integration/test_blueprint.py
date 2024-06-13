@@ -1,6 +1,7 @@
 import pytest
 
 from titan import data_provider
+from titan import resources as res
 from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
 from titan.enums import ResourceType
@@ -254,4 +255,26 @@ def test_blueprint_quoted_references(cursor):
     )
     plan = blueprint.plan(session)
 
+    assert len(plan) == 0
+
+
+def test_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cleanup):
+    session = cursor.connection
+
+    bp = Blueprint()
+    role = res.Role(name=f"TITAN_TEST_ROLE_{suffix}")
+    warehouse = res.Warehouse(
+        name=f"TITAN_TEST_WAREHOUSE_{suffix}",
+        warehouse_size="xsmall",
+        auto_suspend=60,
+    )
+    grant = res.Grant(priv="usage", to=role, on=warehouse)
+    marked_for_cleanup.append(role)
+    marked_for_cleanup.append(warehouse)
+
+    bp.add(role, warehouse, grant)
+    plan = bp.plan(session)
+    assert len(plan) == 3
+    bp.apply(session, plan)
+    plan = bp.plan(session)
     assert len(plan) == 0
