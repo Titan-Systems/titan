@@ -28,15 +28,54 @@ class _Schema(ResourceSpec):
 
 class Schema(Resource, ResourceContainer):
     """
-    CREATE [ OR REPLACE ] [ TRANSIENT ] SCHEMA [ IF NOT EXISTS ] <name>
-      [ CLONE <source_schema>
-            [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> } ) ] ]
-      [ WITH MANAGED ACCESS ]
-      [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
-      [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
-      [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ COMMENT = '<string_literal>' ]
+    Description:
+        Represents a schema in Snowflake, which is a logical grouping of database objects such as tables, views, and stored procedures. Schemas are used to organize and manage such objects within a database.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-schema.html
+
+    Fields:
+        name (string, required): The name of the schema.
+        transient (bool): Specifies if the schema is transient. Defaults to False.
+        managed_access (bool): Specifies if the schema has managed access. Defaults to False.
+        data_retention_time_in_days (int): The number of days to retain data. Defaults to 1.
+        max_data_extension_time_in_days (int): The maximum number of days to extend data retention. Defaults to 14.
+        default_ddl_collation (string): The default DDL collation setting.
+        tags (dict): Tags associated with the schema.
+        owner (string or Role): The owner of the schema. Defaults to "SYSADMIN".
+        comment (string): A comment about the schema.
+
+    Python:
+
+        ```python
+        schema = Schema(
+            name="some_schema",
+            transient=True,
+            managed_access=True,
+            data_retention_time_in_days=7,
+            max_data_extension_time_in_days=28,
+            default_ddl_collation="utf8",
+            tags={"project": "analytics"},
+            owner="SYSADMIN",
+            comment="Schema for analytics project."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        schemas:
+          - name: some_schema
+            transient: true
+            managed_access: true
+            data_retention_time_in_days: 7
+            max_data_extension_time_in_days: 28
+            default_ddl_collation: utf8
+            tags:
+              project: analytics
+            owner: SYSADMIN
+            comment: Schema for analytics project.
+        ```
     """
 
     resource_type = ResourceType.SCHEMA
@@ -65,8 +104,6 @@ class Schema(Resource, ResourceContainer):
         comment: str = None,
         **kwargs,
     ):
-        # database = kwargs.pop("database", None)
-
         super().__init__(**kwargs)
         if name == "INFORMATION_SCHEMA":
             comment = "Views describing the contents of schemas in this database"
@@ -81,7 +118,6 @@ class Schema(Resource, ResourceContainer):
             owner=owner,
             comment=comment,
         )
-        # self._register_scope(database=database)
         if self._data.tags:
             for tag_name in self._data.tags.keys():
                 self.requires(ResourcePointer(name=tag_name, resource_type=ResourceType.TAG))

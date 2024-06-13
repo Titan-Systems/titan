@@ -31,6 +31,7 @@ class _TableStream(ResourceSpec):
     comment: str = None
 
     def __post_init__(self):
+        super().__post_init__()
         if self.at:
             self.at = {k.lower(): v for k, v in self.at.items()}
         if self.before:

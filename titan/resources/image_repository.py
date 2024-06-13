@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import AccountEdition, ResourceType
 from ..props import Props
 from ..resource_name import ResourceName
@@ -10,13 +11,35 @@ from ..scope import SchemaScope
 @dataclass(unsafe_hash=True)
 class _ImageRepository(ResourceSpec):
     name: ResourceName
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
 
 
 class ImageRepository(Resource):
-    """An image repository is an OCIv2-compliant image registry service and a storage unit call repository to store images.
+    """
+    Description:
+        An image repository in Snowflake is a storage unit within a schema that allows for the management of OCIv2-compliant container images.
 
-    CREATE [ OR REPLACE ] IMAGE REPOSITORY [ IF NOT EXISTS ] <name>
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-image-repository
+
+    Fields:
+        name (string, required): The unique identifier for the image repository within the schema.
+        owner (string or Role): The owner role of the image repository. Defaults to "SYSADMIN".
+
+    Python:
+
+        ```python
+        image_repository = ImageRepository(
+            name="some_image_repository",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        image_repositories:
+          - name: some_image_repository
+        ```
     """
 
     edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}

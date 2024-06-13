@@ -1,4 +1,6 @@
+import datetime
 import json
+import pytz
 import sys
 
 from collections import defaultdict
@@ -31,12 +33,24 @@ def _desc_result_to_dict(desc_result):
 
 
 def _desc_type2_result_to_dict(desc_result, lower_properties=False):
-    return dict(
-        [
-            (row["property"].lower() if lower_properties else row["property"], row["property_value"])
-            for row in desc_result
-        ]
-    )
+    result = {}
+    for row in desc_result:
+        property = row["property"]
+        if lower_properties:
+            property = property.lower()
+        value = row["property_value"]
+        if row["property_type"] == "Boolean":
+            value = value == "true"
+        elif row["property_type"] == "Long":
+            value = value or None
+        elif row["property_type"] == "Integer":
+            value = int(value)
+        elif row["property_type"] == "String":
+            value = value or None
+        elif row["property_type"] == "List":
+            value = _parse_list_property(value)
+        result[property] = value
+    return result
 
 
 def _desc_type3_result_to_dict(desc_result, lower_properties=False):
@@ -308,7 +322,7 @@ def fetch_catalog_integration(session, fqn: FQN):
             "glue_aws_role_arn": properties["glue_aws_role_arn"],
             "glue_catalog_id": properties["glue_catalog_id"],
             "glue_region": properties["glue_region"],
-            "enabled": properties["enabled"] == "true",
+            "enabled": properties["enabled"],
             "owner": owner,
             "comment": data["comment"] or None,
         }
@@ -317,7 +331,7 @@ def fetch_catalog_integration(session, fqn: FQN):
             "name": data["name"],
             "catalog_source": properties["catalog_source"],
             "table_format": properties["table_format"],
-            "enabled": properties["enabled"] == "true",
+            "enabled": properties["enabled"],
             "owner": owner,
             "comment": data["comment"] or None,
         }
@@ -630,6 +644,33 @@ def fetch_materialized_view(session, fqn: FQN):
         "name": fqn.name,
         "owner": data["owner"],
     }
+
+
+def fetch_notification_integration(session, fqn: FQN):
+    show_result = execute(session, f"SHOW NOTIFICATION INTEGRATIONS LIKE '{fqn.name}'")
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple notification integrations matching {fqn}")
+
+    data = show_result[0]
+    desc_result = execute(session, f"DESC NOTIFICATION INTEGRATION {fqn.name}")
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
+
+    if data["type"] == "EMAIL":
+
+        return {
+            "name": data["name"],
+            "type": data["type"],
+            "enabled": data["enabled"] == "true",
+            "allowed_recipients": properties["allowed_recipients"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    else:
+        raise Exception(f"Unsupported notification integration type: {data['type']}")
 
 
 def fetch_password_policy(session, fqn: FQN):
@@ -995,8 +1036,8 @@ def fetch_storage_integration(session, fqn: FQN):
         "comment": data["comment"] or None,
         "storage_provider": properties["storage_provider"],
         "storage_aws_role_arn": properties.get("storage_aws_role_arn"),
-        "storage_allowed_locations": _parse_comma_separated_values(properties.get("storage_allowed_locations")),
-        "storage_blocked_locations": _parse_comma_separated_values(properties.get("storage_blocked_locations")),
+        "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
+        "storage_blocked_locations": properties.get("storage_blocked_locations") or None,
         "storage_aws_object_acl": properties.get("storage_aws_object_acl"),
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
     }
@@ -1083,30 +1124,37 @@ def fetch_replication_group(session, fqn: FQN):
     }
 
 
-def fetch_table(session, fqn: FQN):
-    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+def convert_to_gmt(dt: datetime.datetime) -> str:
+    """
+    Converts a datetime object in any timezone to a GMT datetime string in the format YYYY-MM-DD HH:MM.
 
-    tables = _filter_result(
-        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
-    )
+    Args:
+        dt (datetime): The datetime object to convert.
 
-    if len(tables) == 0:
+    Returns:
+        str: The converted datetime string in GMT.
+    """
+    gmt = pytz.timezone("GMT")
+    dt_gmt = dt.astimezone(gmt)
+    return dt_gmt.strftime("%Y-%m-%d %H:%M")
+
+
+def fetch_resource_monitor(session, fqn: FQN):
+    show_result = execute(session, f"SHOW RESOURCE MONITORS LIKE '{fqn.name}'")
+    resource_monitors = _filter_result(show_result)
+    if len(resource_monitors) == 0:
         return None
-    if len(tables) > 1:
-        raise Exception(f"Found multiple tables matching {fqn}")
-
-    columns = fetch_columns(session, "TABLE", fqn)
-
-    data = tables[0]
+    if len(resource_monitors) > 1:
+        raise Exception(f"Found multiple resource monitors matching {fqn}")
+    data = resource_monitors[0]
     return {
         "name": data["name"],
         "owner": data["owner"],
-        "comment": data["comment"] or None,
-        "cluster_by": data["cluster_by"] or None,
-        "columns": columns,
-        # This is here because of CTAS type tables.
-        # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
-        "as_": None,
+        "credit_quota": int(float(data["credit_quota"])) if data["credit_quota"] else None,
+        "frequency": data["frequency"],
+        "start_timestamp": convert_to_gmt(data["start_time"]) if data["start_time"] else None,
+        "end_timestamp": convert_to_gmt(data["end_time"]) if data["end_time"] else None,
+        "notify_users": data["notify_users"] or None,
     }
 
 
@@ -1151,6 +1199,33 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
             tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
         tag_map[tag_name] = tag_ref["TAG_VALUE"]
     return tag_map
+
+
+def fetch_table(session, fqn: FQN):
+    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+
+    tables = _filter_result(
+        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
+    )
+
+    if len(tables) == 0:
+        return None
+    if len(tables) > 1:
+        raise Exception(f"Found multiple tables matching {fqn}")
+
+    columns = fetch_columns(session, "TABLE", fqn)
+
+    data = tables[0]
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "comment": data["comment"] or None,
+        "cluster_by": data["cluster_by"] or None,
+        "columns": columns,
+        # This is here because of CTAS type tables.
+        # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
+        "as_": None,
+    }
 
 
 def fetch_user(session, fqn: FQN) -> Optional[dict]:

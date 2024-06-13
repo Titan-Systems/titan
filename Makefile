@@ -27,3 +27,5 @@ build:
 	mkdir -p dist
 	zip -vrX dist/titan-$(shell python setup.py -V).zip titan/
 
+docs:
+	python tools/generate_resource_docs.py

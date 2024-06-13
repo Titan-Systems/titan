@@ -1,20 +1,20 @@
 roles:
-- comment: CI role, do not drop
-  name: CI
-  owner: SYSADMIN
-- comment: This role is intentionally left empty
-  name: EMPTY
-  owner: USERADMIN
-- comment: null
-  name: SOMEADMIN
-  owner: USERADMIN
-- comment: null
-  name: TITAN_ADMIN
-  owner: SYSADMIN
-- comment: 'This role has some issues'
-  name: ~@#$%^&*()_+
-  owner: ACCOUNTADMIN
-- comment: 'This is a brand new role'
-  name: ~a-brand-new-role
-  owner: USERADMIN
+  - comment: CI role, do not drop
+    name: CI
+    owner: SYSADMIN
+  - comment: This role is intentionally left empty
+    name: EMPTY
+    owner: USERADMIN
+  - comment: null
+    name: SOMEADMIN
+    owner: USERADMIN
+  - comment: null
+    name: TITAN_ADMIN
+    owner: SYSADMIN
+  - comment: 'This role has some issues'
+    name: ~@#$%^&*()_+
+    owner: ACCOUNTADMIN
+  - comment: 'This is a brand new role'
+    name: ~a-brand-new-role
+    owner: USERADMIN
 

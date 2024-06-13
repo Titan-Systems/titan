@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
 
@@ -18,7 +19,7 @@ from ..props import (
 @dataclass(unsafe_hash=True)
 class _View(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     secure: bool = None
     volatile: bool = None
     recursive: bool = None
@@ -37,21 +38,46 @@ class _View(ResourceSpec):
 
 class View(Resource):
     """
-    CREATE
-      [ OR REPLACE ]
-      [ SECURE ]
-      [ { [ { LOCAL | GLOBAL } ] TEMP | TEMPORARY | VOLATILE } ]
-      [ RECURSIVE ]
-      VIEW [ IF NOT EXISTS ] <name>
-      [ ( <column_list> ) ]
-      [ <col1> [ WITH ] MASKING POLICY <policy_name> [ USING ( <col1> , <cond_col1> , ... ) ]
-               [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ , <col2> [ ... ] ]
-      [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ COPY GRANTS ]
-      [ COMMENT = '<string_literal>' ]
-      AS <select_statement>
+    Description:
+        Represents a view in Snowflake, which is a virtual table created by a stored query on the data.
+        Views are used to simplify complex queries, improve security, or enhance performance.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-view
+
+    Fields:
+        name (string, required): The name of the view.
+        owner (string or Role): The owner role of the view. Defaults to "SYSADMIN".
+        secure (bool): Specifies if the view is secure.
+        volatile (bool): Specifies if the view is volatile.
+        recursive (bool): Specifies if the view is recursive.
+        columns (list): A list of dictionaries specifying column details.
+        tags (dict): A dictionary of tags associated with the view.
+        change_tracking (bool): Specifies if change tracking is enabled.
+        copy_grants (bool): Specifies if grants should be copied from the base table.
+        comment (string): A comment for the view.
+        as_ (string): The SELECT statement defining the view.
+
+    Python:
+
+        ```python
+        view = View(
+            name="some_view",
+            owner="SYSADMIN",
+            secure=True,
+            as_="SELECT * FROM some_table"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        views:
+          - name: some_view
+            owner: SYSADMIN
+            secure: true
+            as_: "SELECT * FROM some_table"
+        ```
     """
 
     resource_type = ResourceType.VIEW
@@ -61,7 +87,7 @@ class View(Resource):
         volatile=FlagProp("volatile"),
         recursive=FlagProp("recursive"),
         tags=TagsProp(),
-        change_tracking=BoolProp("change_tracking"),  # Not documented
+        change_tracking=BoolProp("change_tracking"),
         copy_grants=FlagProp("copy grants"),
         comment=StringProp("comment"),
         as_=QueryProp("as"),

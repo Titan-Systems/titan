@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from .warehouse import Warehouse
 from ..enums import ResourceType
 from ..scope import SchemaScope
@@ -15,34 +16,51 @@ class _Alert(ResourceSpec):
     schedule: str
     condition: str
     then: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     comment: str = None
     tags: dict[str, str] = None
 
 
 class Alert(Resource):
-    """Alerts trigger notifications when certain conditions are met.
+    """
+    Description:
+        Alerts trigger notifications when certain conditions are met.
 
-    Args:
-        name (str): The name of the alert.
-        warehouse (str): The name of the warehouse to run the query on.
-        schedule (str): The schedule for the alert to run on.
-        condition (str): The condition for the alert to trigger on.
-        then (str): The query to run when the alert triggers.
-        owner (str, optional): The owner of the alert. Defaults to "SYSADMIN".
-        comment (str, optional): A comment for the alert. Defaults to None.
-        tags (dict[str, str], optional): Tags for the alert. Defaults to None.
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-alert
 
-    CREATE [ OR REPLACE ] ALERT [ IF NOT EXISTS ] <name>
-        [ WAREHOUSE = <warehouse_name> ]
-        SCHEDULE = '{ <num> MINUTE | USING CRON <expr> <time_zone> }'
-        COMMENT = '<string_literal>'
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-        IF( EXISTS(
-            <condition>
-        ))
-        THEN
-            <action>
+    Fields:
+        name (string, required): The name of the alert.
+        warehouse (string or Warehouse): The name of the warehouse to run the query on.
+        schedule (string): The schedule for the alert to run on.
+        condition (string): The condition for the alert to trigger on.
+        then (string): The query to run when the alert triggers.
+        owner (string or Role): The owner role of the alert. Defaults to "SYSADMIN".
+        comment (string): A comment for the alert. Defaults to None.
+        tags (dict): Tags for the alert. Defaults to None.
+
+    Python:
+
+        ```python
+        alert = Alert(
+            name="some_alert",
+            warehouse="some_warehouse",
+            schedule="USING CRON * * * * *",
+            condition="SELECT COUNT(*) FROM some_table",
+            then="CALL SYSTEM$SEND_EMAIL('example@example.com', 'Alert Triggered', 'The alert condition was met.')",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        alerts:
+          - name: some_alert
+            warehouse: some_warehouse
+            schedule: USING CRON * * * * *
+            condition: SELECT COUNT(*) FROM some_table
+            then: CALL SYSTEM$SEND_EMAIL('example@example.com', 'Alert Triggered', 'The alert condition was met.')
+        ```
     """
 
     resource_type = ResourceType.ALERT

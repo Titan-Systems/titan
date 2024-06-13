@@ -30,7 +30,7 @@ STATIC_RESOURCES = {
     ResourceType.STREAM: resources.TableStream(name="static_stream", on_table="static_table"),
     ResourceType.TABLE: resources.Table(name="static_table", columns=[{"name": "id", "data_type": "INT"}]),
     ResourceType.TAG: resources.Tag(name="static_tag"),
-    ResourceType.USER: resources.User(name="static_user"),
+    ResourceType.USER: resources.User(name="static_user", email="static.user@example.com"),
     ResourceType.VIEW: resources.View(
         name="static_view", columns=[{"name": "id", "data_type": "INT"}], as_="SELECT id FROM static_table"
     ),

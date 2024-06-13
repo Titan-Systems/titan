@@ -34,14 +34,41 @@ class _ExternalAccessIntegration(ResourceSpec):
 
 class ExternalAccessIntegration(Resource):
     """
-    External Access Integrations allow code in functions and stored procedures to use secrets and to connect with external networks.
+    Description:
+        External Access Integrations enable code within functions and stored procedures to utilize secrets and establish connections with external networks. This resource configures the rules and secrets that can be accessed by such code.
 
-    CREATE [ OR REPLACE ] EXTERNAL ACCESS INTEGRATION <name>
-      ALLOWED_NETWORK_RULES = ( <rule_name_1> [, <rule_name_2>, ... ] )
-      [ ALLOWED_API_AUTHENTICATION_INTEGRATIONS = ( <integration_name_1> [, <integration_name_2>, ... ] ) ]
-      [ ALLOWED_AUTHENTICATION_SECRETS = ( <secret_name_1> [, <secret_name_2>, ... ] ) ]
-      ENABLED = { TRUE | FALSE }
-      [ COMMENT = '<string_literal>' ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-external-access-integration.html
+
+    Fields:
+        name (string, required): The name of the external access integration.
+        allowed_network_rules (list, required): [NetworkRules](network_rule.md) that are allowed for this integration.
+        allowed_api_authentication_integrations (list): API authentication integrations that are allowed.
+        allowed_authentication_secrets (list): Authentication secrets that are allowed.
+        enabled (bool): Specifies if the integration is enabled. Defaults to True.
+        comment (string): An optional comment about the integration.
+        owner (string or Role): The owner role of the external access integration. Defaults to "ACCOUNTADMIN".
+
+    Python:
+
+        ```python
+        external_access_integration = ExternalAccessIntegration(
+            name="some_external_access_integration",
+            allowed_network_rules=["rule1", "rule2"],
+            enabled=True
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        external_access_integrations:
+          - name: some_external_access_integration
+            allowed_network_rules:
+              - rule1
+              - rule2
+            enabled: true
+        ```
     """
 
     resource_type = ResourceType.EXTERNAL_ACCESS_INTEGRATION

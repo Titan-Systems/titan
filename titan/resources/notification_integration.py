@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from inflection import camelize
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ParseableEnum, ResourceType
-from ..parse import _resolve_resource_class
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
 from ..scope import AccountScope
 
@@ -32,7 +32,7 @@ class _EmailNotificationIntegration(ResourceSpec):
     enabled: bool
     allowed_recipients: list[str]
     type: NotificationType = NotificationType.EMAIL
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
     def __post_init__(self):
@@ -43,12 +43,42 @@ class _EmailNotificationIntegration(ResourceSpec):
 
 class EmailNotificationIntegration(Resource):
     """
-    CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
-      <name>
-      TYPE = EMAIL
-      ENABLED = { TRUE | FALSE }
-      ALLOWED_RECIPIENTS = ( '<email_address_1>' [ , ... '<email_address_N>' ] )
-      [ COMMENT = '<string_literal>' ]
+    Description:
+        Manages the configuration for email-based notification integrations within Snowflake. This integration
+        allows specifying recipients who will receive notifications via email.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-notification-integration.html
+
+    Fields:
+        name (string, required): The name of the email notification integration.
+        enabled (bool, required): Specifies whether the notification integration is enabled.
+        allowed_recipients (list): A list of email addresses that are allowed to receive notifications.
+        comment (string): An optional comment about the notification integration.
+        owner (string or Role): The owner role of the notification integration. Defaults to "ACCOUNTADMIN".
+
+    Python:
+
+        ```python
+        email_notification_integration = EmailNotificationIntegration(
+            name="some_email_notification_integration",
+            enabled=True,
+            allowed_recipients=["user1@example.com", "user2@example.com"],
+            comment="Example email notification integration"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        email_notification_integrations:
+          - name: some_email_notification_integration
+            enabled: true
+            allowed_recipients:
+              - user1@example.com
+              - user2@example.com
+            comment: "Example email notification integration"
+        ```
     """
 
     resource_type = ResourceType.NOTIFICATION_INTEGRATION
@@ -397,6 +427,8 @@ class AzureInboundNotificationIntegration(Resource):
 
 
 def _notification_resolver(data: dict):
+    if NotificationType(data["type"]) == NotificationType.EMAIL:
+        return EmailNotificationIntegration
     if "direction" in data and "notification_provider" in data:
         direction = NotificationDirection(data["direction"])
         provider = NotificationProvider(data["notification_provider"])

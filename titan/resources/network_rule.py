@@ -42,14 +42,44 @@ class _NetworkRule(ResourceSpec):
 
 class NetworkRule(Resource):
     """
-    A Network Rule defines a set of network addresses (eg. IP addresses or hostnames) that can be allowed or
-    denied access from a Snowflake account.
+    Description:
+        A Network Rule in Snowflake defines a set of network addresses, such as IP addresses or hostnames,
+        that can be allowed or denied access to a Snowflake account. This helps in managing network traffic
+        and securing access based on network policies.
 
-    CREATE [ OR REPLACE ] NETWORK RULE <name>
-       TYPE = { IPV4 | AWSVPCEID | AZURELINKID | HOST_PORT }
-       VALUE_LIST = ( '<value>' [, '<value>', ... ] )
-       MODE = { INGRESS | INTERNAL_STAGE | EGRESS }
-       [ COMMENT = '<string_literal>' ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-network-policy
+
+    Fields:
+        name (string, required): The name of the network rule.
+        type (string or NetworkIdentifierType, required): The type of network identifier. Defaults to IPV4.
+        value_list (list): A list of values associated with the network rule.
+        mode (string or NetworkRuleMode): The mode of the network rule. Defaults to INGRESS.
+        comment (string): A comment about the network rule.
+        owner (string or Role): The owner role of the network rule. Defaults to "SYSADMIN".
+
+    Python:
+
+        ```python
+        network_rule = NetworkRule(
+            name="some_network_rule",
+            type="IPV4",
+            value_list=["192.168.1.1", "192.168.1.2"],
+            mode="INGRESS",
+            comment="Example network rule"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        network_rules:
+          - name: some_network_rule
+            type: IPV4
+            value_list: ["192.168.1.1", "192.168.1.2"]
+            mode: INGRESS
+            comment: "Example network rule"
+        ```
     """
 
     resource_type = ResourceType.NETWORK_RULE
