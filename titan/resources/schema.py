@@ -108,6 +108,11 @@ class Schema(Resource, ResourceContainer):
     ):
         super().__init__(**kwargs)
 
+        # TODO:
+        # This is a temporary fix to allow the creation of schemas in the format
+        # `DB.SCHEMA` without having to create the database first.
+        # The plan going forward is to put this behavior into a NamedResource trait
+        # and have all resources with names inherit from that.
         name = self._add_implied_containers(name)
 
         if name == "INFORMATION_SCHEMA":

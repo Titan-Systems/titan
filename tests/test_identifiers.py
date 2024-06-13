@@ -74,3 +74,12 @@ def test_parse_fully_qualified_schema():
     sch = res.Schema(name="DB.SCHEMA")
     assert sch.name == "SCHEMA"
     assert sch.container.name == "DB"
+
+    sch = res.Schema.from_sql("CREATE SCHEMA IF NOT EXISTS DB.SCHEMA")
+    assert sch.name == "SCHEMA"
+    assert sch.container.name == "DB"
+
+    # tbl = res.Table(name="DB.SCHEMA.TABLE", columns=[res.Column(name="ID", data_type="INT")])
+    # assert tbl.name == "TABLE"
+    # assert tbl.container.name == "SCHEMA"
+    # assert tbl.container.container.name == "DB"

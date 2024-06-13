@@ -192,6 +192,10 @@ class Table(Resource):
     def table_stage(self):
         return self._table_stage
 
+    @property
+    def name(self):
+        return self._data.name
+
 
 @dataclass(unsafe_hash=True)
 class _CreateTableAsSelect(ResourceSpec):
