@@ -4,12 +4,13 @@ from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec
 from .role import Role
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
+from ..resource_name import ResourceName
 from ..scope import DatabaseScope
 
 
 @dataclass(unsafe_hash=True)
 class _Schema(ResourceSpec):
-    name: str
+    name: ResourceName
     transient: bool = False
     managed_access: bool = False
     data_retention_time_in_days: int = 1
@@ -106,8 +107,12 @@ class Schema(Resource, ResourceContainer):
         **kwargs,
     ):
         super().__init__(**kwargs)
+
+        name = self._add_implied_containers(name)
+
         if name == "INFORMATION_SCHEMA":
             comment = "Views describing the contents of schemas in this database"
+
         self._data: _Schema = _Schema(
             name=name,
             transient=transient,

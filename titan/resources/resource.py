@@ -14,9 +14,15 @@ from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
-from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..parse import _parse_create_header, _parse_props, _resolve_resource_class, parse_identifier
 from ..resource_name import ResourceName
-from ..scope import ResourceScope, OrganizationScope, DatabaseScope, SchemaScope
+from ..scope import (
+    AccountScope,
+    DatabaseScope,
+    OrganizationScope,
+    ResourceScope,
+    SchemaScope,
+)
 
 
 def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
@@ -276,6 +282,19 @@ class Resource(metaclass=_Resource):
     def __hash__(self):
         return hash(self._data)
 
+    def _add_implied_containers(self, name):
+        implied_fqn = parse_identifier(str(name), is_db_scoped=isinstance(self.scope, DatabaseScope))
+        if implied_fqn.schema and isinstance(self.scope, SchemaScope):
+            schema = ResourcePointer(name=implied_fqn.schema, resource_type=ResourceType.SCHEMA)
+            schema.add(self)
+            if implied_fqn.database:
+                db = ResourcePointer(name=implied_fqn.database, resource_type=ResourceType.DATABASE)
+                db.add(schema)
+        elif implied_fqn.database and isinstance(self.scope, DatabaseScope):
+            db = ResourcePointer(name=implied_fqn.database, resource_type=ResourceType.DATABASE)
+            db.add(self)
+        return implied_fqn.name
+
     def to_dict(self):
         defaults = {f.name: f.default for f in fields(self.spec)}
 
@@ -410,13 +429,29 @@ class ResourceContainer:
 
 class ResourcePointer(Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-        self._name: ResourceName = ResourceName(name)
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
         super().__init__()
 
-        # Don't want to do this for all implicit resources but making an exception for PUBLIC schema
+        if isinstance(self.scope, AccountScope):
+            self._name = ResourceName(name)
+        else:
+            fqn = parse_identifier(str(name), is_db_scoped=isinstance(self.scope, DatabaseScope))
+            self._name = ResourceName(fqn.name)
+            if isinstance(self.scope, DatabaseScope) and fqn.database:
+                db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
+                db.add(self)
+            elif isinstance(self.scope, SchemaScope) and fqn.schema:
+                if fqn.database:
+                    db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
+                    schema = ResourcePointer(name=fqn.schema, resource_type=ResourceType.SCHEMA)
+                    db.add(schema)
+                    schema.add(self)
+                else:
+                    schema = ResourcePointer(name=fqn.schema, resource_type=ResourceType.SCHEMA)
+                    schema.add(self)
 
+        # Don't want to do this for all implicit resources but making an exception for PUBLIC schema
         # If this points to a database, assume it includes a PUBLIC schema
         if self._resource_type == ResourceType.DATABASE and self._name != "SNOWFLAKE":
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))

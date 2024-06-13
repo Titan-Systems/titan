@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="titan",
-    version="0.5.2",
+    version="0.5.3",
     description="Snowflake infrastructure as code",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",

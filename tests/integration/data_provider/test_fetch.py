@@ -711,3 +711,17 @@ def test_fetch_event_table(cursor, test_db, marked_for_cleanup):
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == data_provider.remove_none_values(event_table.to_dict())
+
+
+def test_fetch_grant_with_fully_qualified_ref(cursor, test_db, suffix, marked_for_cleanup):
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute(f"CREATE SCHEMA if not exists {test_db}.my_schema")
+    cursor.execute(f"CREATE ROLE test_role_grant_{suffix}")
+    cursor.execute(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE test_role_grant_{suffix}")
+    grant = res.Grant.from_sql(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE test_role_grant_{suffix}")
+    grant._data.owner = TEST_ROLE
+    result = safe_fetch(cursor, grant.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    result["on"] = ResourceName(result["on"])
+    assert result == data_provider.remove_none_values(grant.to_dict())
