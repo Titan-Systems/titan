@@ -9,6 +9,7 @@ description: >-
 
 External Access Integrations enable code within functions and stored procedures to utilize secrets and establish connections with external networks. This resource configures the rules and secrets that can be accessed by such code.
 
+
 ## Examples
 
 ### Python
@@ -21,6 +22,7 @@ external_access_integration = ExternalAccessIntegration(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -31,6 +33,7 @@ external_access_integrations:
       - rule2
     enabled: true
 ```
+
 
 ## Fields
 

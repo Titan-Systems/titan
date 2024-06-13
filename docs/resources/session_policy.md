@@ -9,6 +9,7 @@ description: >-
 
 Manages session policies in Snowflake, which define timeout settings for user sessions to enhance security.
 
+
 ## Examples
 
 ### Python
@@ -22,6 +23,7 @@ session_policy = SessionPolicy(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -31,6 +33,7 @@ session_policies:
     session_ui_idle_timeout_mins: 10
     comment: Policy for standard users.
 ```
+
 
 ## Fields
 

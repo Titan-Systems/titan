@@ -45,6 +45,62 @@ class _CSVFileFormat(ResourceSpec):
 
 
 class CSVFileFormat(Resource):
+    """
+    Description:
+        Defines the specifications for a CSV file format in Snowflake, including delimiters, encoding, and compression options.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-file-format
+
+    Fields:
+        type (FileType, required): The type of file format, which is CSV for this class. Defaults to CSV.
+        compression (Compression): The compression type used for the file format.
+        record_delimiter (string): Specifies the character that delimits records. Defaults to "\n".
+        field_delimiter (string): Specifies the character that delimits fields.
+        file_extension (string): The file extension used for files of this format.
+        parse_header (bool): Whether to parse the first line of the file as a header. Defaults to False.
+        skip_header (int): The number of header lines to skip before parsing.
+        skip_blank_lines (bool): Whether to skip over blank lines. Defaults to False.
+        date_format (string): The format used for date values. Defaults to "AUTO".
+        time_format (string): The format used for time values. Defaults to "AUTO".
+        timestamp_format (string): The format used for timestamp values. Defaults to "AUTO".
+        binary_format (BinaryFormat): The format used for binary data. Defaults to HEX.
+        escape (string): The escape character used in the file format.
+        escape_unenclosed_field (string): The escape character for unenclosed fields. Defaults to "\\".
+        trim_space (bool): Whether to trim spaces from fields. Defaults to False.
+        field_optionally_enclosed_by (string): A character that may optionally enclose fields.
+        null_if (list): A list of string values that should be interpreted as NULL.
+        error_on_column_count_mismatch (bool, required): Whether to raise an error on column count mismatch. Defaults to True.
+        replace_invalid_characters (bool): Whether to replace invalid characters. Defaults to False.
+        empty_field_as_null (bool): Whether to treat empty fields as NULL.
+        skip_byte_order_mark (bool): Whether to skip the byte order mark. Defaults to True.
+        encoding (string): The file encoding. Defaults to "UTF8".
+        comment (string): A comment regarding the file format.
+
+    Python:
+
+        ```python
+        csv_file_format = CSVFileFormat(
+            name="some_csv_file_format",
+            compression=Compression.GZIP,
+            field_delimiter=',',
+            file_extension='csv',
+            parse_header=True
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        csv_file_formats:
+          - name: some_csv_file_format
+            compression: GZIP
+            field_delimiter: ','
+            file_extension: 'csv'
+            parse_header: true
+        ```
+    """
+
     resource_type = ResourceType.FILE_FORMAT
     props = Props(
         type=EnumProp("type", [FileType.CSV]),

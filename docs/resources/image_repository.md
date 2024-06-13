@@ -9,6 +9,7 @@ description: >-
 
 An image repository in Snowflake is a storage unit within a schema that allows for the management of OCIv2-compliant container images.
 
+
 ## Examples
 
 ### Python
@@ -19,12 +20,14 @@ image_repository = ImageRepository(
 )
 ```
 
+
 ### YAML
 
 ```yaml
 image_repositories:
   - name: some_image_repository
 ```
+
 
 ## Fields
 

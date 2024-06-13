@@ -11,6 +11,7 @@ Service is a managed resource in Snowflake that allows users to run instances of
 as a collection of containers on a compute pool. Each service instance can handle incoming traffic
 with the help of a load balancer if multiple instances are run.
 
+
 ## Examples
 
 ### Python
@@ -32,6 +33,7 @@ service = Service(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -51,6 +53,7 @@ services:
       key: value
     comment: This is a sample service.
 ```
+
 
 ## Fields
 

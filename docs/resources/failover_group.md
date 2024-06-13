@@ -10,6 +10,7 @@ description: >-
 Represents a failover group in Snowflake, which is a collection of databases, shares, and other resources
 that can be failed over together to a secondary account in case of a disaster recovery scenario.
 
+
 ## Examples
 
 ### Python
@@ -27,6 +28,7 @@ failover_group = FailoverGroup(
     owner="ACCOUNTADMIN"
 )
 ```
+
 
 ### YAML
 
@@ -52,6 +54,7 @@ failover_groups:
     replication_schedule: "USING CRON 0 0 * * * UTC"
     owner: ACCOUNTADMIN
 ```
+
 
 ## Fields
 

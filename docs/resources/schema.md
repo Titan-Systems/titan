@@ -9,6 +9,7 @@ description: >-
 
 Represents a schema in Snowflake, which is a logical grouping of database objects such as tables, views, and stored procedures. Schemas are used to organize and manage such objects within a database.
 
+
 ## Examples
 
 ### Python
@@ -27,6 +28,7 @@ schema = Schema(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -42,6 +44,7 @@ schemas:
     owner: SYSADMIN
     comment: Schema for analytics project.
 ```
+
 
 ## Fields
 

@@ -9,6 +9,7 @@ description: >-
 
 Manages the integration of an object store as a catalog in Snowflake, supporting the ICEBERG table format.
 
+
 ## Examples
 
 ### Python
@@ -22,6 +23,7 @@ object_store_catalog_integration = ObjectStoreCatalogIntegration(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -31,6 +33,7 @@ catalog_integrations:
     enabled: true
     comment: Integration for object storage.
 ```
+
 
 ## Fields
 

@@ -9,6 +9,7 @@ description: >-
 
 Defines the rules and constraints for creating and managing passwords within the system, ensuring they meet specific security standards.
 
+
 ## Examples
 
 ### Python
@@ -32,6 +33,7 @@ password_policy = PasswordPolicy(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -51,6 +53,7 @@ password_policies:
     comment: Strict policy for admin accounts
     owner: SYSADMIN
 ```
+
 
 ## Fields
 

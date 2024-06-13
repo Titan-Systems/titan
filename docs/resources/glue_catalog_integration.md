@@ -9,6 +9,7 @@ description: >-
 
 Manages the integration of AWS Glue as a catalog in Snowflake, supporting the ICEBERG table format.
 
+
 ## Examples
 
 ### Python
@@ -26,6 +27,7 @@ glue_catalog_integration = GlueCatalogIntegration(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -39,6 +41,7 @@ catalog_integrations:
     glue_region: us-west-2
     comment: Integration for AWS Glue with Snowflake.
 ```
+
 
 ## Fields
 

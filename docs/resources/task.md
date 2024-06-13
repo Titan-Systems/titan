@@ -9,6 +9,7 @@ description: >-
 
 Represents a scheduled task in Snowflake that performs a specified SQL statement at a recurring interval.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ task = Task(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -34,6 +36,7 @@ tasks:
     as_: |
         SELECT 1
 ```
+
 
 ## Fields
 

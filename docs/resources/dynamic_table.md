@@ -10,6 +10,7 @@ description: >-
 Represents a dynamic table in Snowflake, which can be configured to refresh automatically,
 fully, or incrementally, and initialized on creation or on a schedule.
 
+
 ## Examples
 
 ### Python
@@ -27,6 +28,7 @@ dynamic_table = DynamicTable(
     owner="SYSADMIN"
 )
 ```
+
 
 ### YAML
 
@@ -46,6 +48,7 @@ dynamic_table:
   comment: "This is a sample dynamic table"
   owner: SYSADMIN
 ```
+
 
 ## Fields
 

@@ -10,6 +10,7 @@ description: >-
 A Materialized View in Snowflake is a database object that contains the results of a query.
 It is physically stored and automatically updated as data changes, providing faster access to data.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ materialized_view = MaterializedView(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -32,6 +34,7 @@ materialized_views:
     secure: true
     as: SELECT * FROM some_table
 ```
+
 
 ## Fields
 

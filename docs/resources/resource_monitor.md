@@ -9,6 +9,7 @@ description: >-
 
 Manages the monitoring of resource usage within an account.
 
+
 ## Examples
 
 ### Python
@@ -24,6 +25,7 @@ resource_monitor = ResourceMonitor(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -37,6 +39,7 @@ resource_monitors:
       - user1
       - user2
 ```
+
 
 ## Fields
 

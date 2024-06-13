@@ -9,6 +9,7 @@ description: >-
 
 An event table captures events, including logged messages from functions and procedures.
 
+
 ## Examples
 
 ### Python
@@ -27,6 +28,7 @@ event_table = EventTable(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -44,6 +46,7 @@ event_tables:
     tags:
       department: analytics
 ```
+
 
 ## Fields
 

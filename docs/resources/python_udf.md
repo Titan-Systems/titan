@@ -10,6 +10,7 @@ description: >-
 A Python user-defined function (UDF) in Snowflake allows users to define their own custom functions in Python.
 These functions can be used to perform operations that are not available as standard SQL functions.
 
+
 ## Examples
 
 ### Python
@@ -34,6 +35,7 @@ python_udf = PythonUDF(
     volatility="IMMUTABLE"
 )
 ```
+
 
 ### YAML
 
@@ -64,6 +66,7 @@ python_udfs:
     secure: false
     volatility: IMMUTABLE
 ```
+
 
 ## Fields
 

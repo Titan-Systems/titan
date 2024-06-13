@@ -9,6 +9,7 @@ description: >-
 
 Manages the creation and configuration of sequences in Snowflake, which are objects that generate numeric values according to a specified sequence.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ sequence = Sequence(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -33,6 +35,7 @@ sequences:
     increment: 10
     comment: This is a sample sequence.
 ```
+
 
 ## Fields
 
