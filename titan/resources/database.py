@@ -23,12 +23,54 @@ class _Database(ResourceSpec):
 
 class Database(Resource, ResourceContainer):
     """
-    CREATE [ OR REPLACE ] [ TRANSIENT ] DATABASE [ IF NOT EXISTS ] <name>
-        [ DATA_RETENTION_TIME_IN_DAYS = <integer> ]
-        [ MAX_DATA_EXTENSION_TIME_IN_DAYS = <integer> ]
-        [ DEFAULT_DDL_COLLATION = '<collation_specification>' ]
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-        [ COMMENT = '<string_literal>' ]
+    Description:
+        Represents a database in Snowflake, which can be either transient or permanent. This class allows for the creation,
+        modification, and management of databases with various properties such as data retention time, collation specifications,
+        and custom tags.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-database.html
+
+    Fields:
+        name (string, required): The name of the database.
+        transient (bool): Specifies if the database is transient. Defaults to False.
+        owner (string or Role): The owner role of the database. Defaults to "SYSADMIN".
+        data_retention_time_in_days (int): The number of days to retain data. Defaults to 1.
+        max_data_extension_time_in_days (int): The maximum number of days to extend data retention. Defaults to 14.
+        default_ddl_collation (string): The default collation for DDL statements.
+        tags (dict): A dictionary of tags associated with the database.
+        comment (string): A comment describing the database.
+
+    Python:
+
+        ```python
+        database = Database(
+            name="some_database",
+            transient=True,
+            owner="SYSADMIN",
+            data_retention_time_in_days=7,
+            max_data_extension_time_in_days=28,
+            default_ddl_collation="utf8",
+            tags={"project": "research", "priority": "high"},
+            comment="Database for research project."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        databases:
+          - name: some_database
+            transient: true
+            owner: SYSADMIN
+            data_retention_time_in_days: 7
+            max_data_extension_time_in_days: 28
+            default_ddl_collation: utf8
+            tags:
+              project: research
+              priority: high
+            comment: Database for research project.
+        ```
     """
 
     resource_type = ResourceType.DATABASE

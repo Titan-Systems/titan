@@ -90,6 +90,8 @@ def _filter_result(result, **kwargs):
     filtered = []
     for row in result:
         for key, value in kwargs.items():
+            if value is None:
+                continue
             # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
             if attribute_is_resource_name(key):
                 if ResourceName(row[key]) != ResourceName(value):
@@ -126,6 +128,19 @@ def _urn_from_grant(row, session_ctx):
             account_locator=session_ctx["account_locator"],
             fqn=fqn,
         )
+
+
+def _parse_cluster_keys(cluster_keys_str: str) -> list[str]:
+    """
+    Assume cluster key statement is in the form of:
+        LINEAR(C1, C3)
+        LINEAR(SUBSTRING(C2, 5, 15), CAST(C1 AS DATE))
+    """
+    if cluster_keys_str is None:
+        return None
+    cluster_keys_str = cluster_keys_str[len("LINEAR") :]
+    cluster_keys_str = cluster_keys_str.strip("()")
+    return [key.strip(" ") for key in cluster_keys_str.split(",")]
 
 
 def _parse_function_arguments_2023_compat(arguments_str: str) -> tuple:
@@ -1073,7 +1088,14 @@ def fetch_event_table(session, fqn: FQN):
         raise Exception(f"Found multiple tables matching {fqn}")
 
     data = tables[0]
-    return {"name": data["name"], "comment": data["comment"] or None, "cluster_by": data["cluster_by"] or None}
+    return {
+        "name": data["name"],
+        "comment": data["comment"] or None,
+        "cluster_by": _parse_cluster_keys(data["cluster_by"]),
+        "data_retention_time_in_days": int(data["retention_time"]),
+        "change_tracking": data["change_tracking"] == "ON",
+        "owner": data["owner"],
+    }
 
 
 def fetch_task(session, fqn: FQN):

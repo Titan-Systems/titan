@@ -40,16 +40,51 @@ class _GlueCatalogIntegration(ResourceSpec):
 
 class GlueCatalogIntegration(Resource):
     """
-    CREATE [ OR REPLACE ] CATALOG INTEGRATION [IF NOT EXISTS]
-      <name>
-      CATALOG_SOURCE = { GLUE }
-      TABLE_FORMAT = { ICEBERG }
-      GLUE_AWS_ROLE_ARN = '<arn-for-AWS-role-to-assume>'
-      GLUE_CATALOG_ID = '<glue-catalog-id>'
-      [ GLUE_REGION = '<AWS-region-of-the-glue-catalog>' ]
-      CATALOG_NAMESPACE = '<catalog-namespace>'
-      ENABLED = { TRUE | FALSE }
-      [ COMMENT = '{string_literal}' ]
+    Description:
+        Manages the integration of AWS Glue as a catalog in Snowflake, supporting the ICEBERG table format.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-catalog-integration
+
+    Fields:
+        name (string, required): The name of the catalog integration.
+        table_format (string or CatalogTableFormat, required): The format of the table, defaults to ICEBERG.
+        glue_aws_role_arn (string, required): The ARN for the AWS role to assume.
+        glue_catalog_id (string, required): The Glue catalog ID.
+        catalog_namespace (string, required): The namespace of the catalog.
+        enabled (bool, required): Specifies whether the catalog integration is enabled.
+        glue_region (string): The AWS region of the Glue catalog. Defaults to None.
+        owner (string or Role): The owner role of the catalog integration. Defaults to "ACCOUNTADMIN".
+        comment (string): An optional comment describing the catalog integration.
+
+    Python:
+
+        ```python
+        glue_catalog_integration = GlueCatalogIntegration(
+            name="some_catalog_integration",
+            table_format="ICEBERG",
+            glue_aws_role_arn="arn:aws:iam::123456789012:role/SnowflakeAccess",
+            glue_catalog_id="some_glue_catalog_id",
+            catalog_namespace="some_namespace",
+            enabled=True,
+            glue_region="us-west-2",
+            comment="Integration for AWS Glue with Snowflake."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        catalog_integrations:
+          - name: some_catalog_integration
+            table_format: ICEBERG
+            glue_aws_role_arn: arn:aws:iam::123456789012:role/SnowflakeAccess
+            glue_catalog_id: some_glue_catalog_id
+            catalog_namespace: some_namespace
+            enabled: true
+            glue_region: us-west-2
+            comment: Integration for AWS Glue with Snowflake.
+        ```
     """
 
     resource_type = ResourceType.CATALOG_INTEGRATION
@@ -112,12 +147,38 @@ class _ObjectStoreCatalogIntegration(ResourceSpec):
 
 class ObjectStoreCatalogIntegration(Resource):
     """
-    CREATE [ OR REPLACE ] CATALOG INTEGRATION [IF NOT EXISTS]
-        <name>
-        CATALOG_SOURCE = { OBJECT_STORE }
-        TABLE_FORMAT = { ICEBERG }
-        ENABLED = { TRUE | FALSE }
-        [ COMMENT = '{string_literal}' ]
+    Description:
+        Manages the integration of an object store as a catalog in Snowflake, supporting the ICEBERG table format.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-catalog-integration
+
+    Fields:
+        name (string, required): The name of the catalog integration.
+        table_format (string or CatalogTableFormat, required): The format of the table, defaults to ICEBERG.
+        enabled (bool): Specifies whether the catalog integration is enabled. Defaults to True.
+        comment (string): An optional comment describing the catalog integration.
+
+    Python:
+
+        ```python
+        object_store_catalog_integration = ObjectStoreCatalogIntegration(
+            name="some_catalog_integration",
+            table_format="ICEBERG",
+            enabled=True,
+            comment="Integration for object storage."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        catalog_integrations:
+          - name: some_catalog_integration
+            table_format: ICEBERG
+            enabled: true
+            comment: Integration for object storage.
+        ```
     """
 
     resource_type = ResourceType.CATALOG_INTEGRATION

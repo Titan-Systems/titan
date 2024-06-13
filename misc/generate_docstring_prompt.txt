@@ -1,0 +1,37 @@
+Generate a docs-compatible docstring for this class. Use @user.py as the reference example.
+
+It should be formatted using Google-style docstring format.
+
+It should have exactly 5 sections in this order: Description, Snowflake Docs, Fields, Python, Yaml.
+
+Description:
+- Write a description of the resource.
+
+Snowflake Docs:
+- Use internet search @Web with "snowflake create <resource>" to find the URL to provide under the Snowflake Docs section. For example, for the Warehouse class you should search "snowflake create warehouse" and find the docs link.
+- Snowflake Docs link should just be a raw link, NOT a markdown link.
+
+
+Fields:
+- All fields start with the name of the field
+- Next is the field type. If the field is required, mention that. Examples: (string) | (int) | (bool, required) | (string or WarehouseType, required)
+- For list types, just specify list. Do not specify list[str] or list[int]. Just specify list.
+- The field type never mentions "optional", optional is implied.
+- Fields should never specify "optional", since that is implied. Only specify "required"
+- For fields that take some sort of ParseableEnum (eg WarehouseType) should specify it can take string or <enum>. For example: warehouse_type (string or WarehouseType): ....,
+- Many resources will have an "owner" field. This is a Role, but can also be a string. It should be written: owner (string or Role): The owner role of ...
+- Field defaults should be specified at the end of the description as "Defaults to <default>". Example: warehouse_type (string or WarehouseType): ... Defaults to STANDARD.
+- If a field defaults to None, do not specify a default.
+
+
+All Examples:
+- For the examples, resource names should be in the form of "some_<resource>". For example, the User class example resource name is "some_user"
+
+Python:
+- When creating python examples for fields that take an enum, use a string example instead
+- There should always be a newline between the start of the Python section header and the example
+- Python examples should be wrapped in a python markdown code block, eg ```python ... ```
+
+Yaml:
+- There should always be a newline between the start of the Yaml section header and the example
+- Yaml examples should be wrapped in a yaml markdown code block, eg ```yaml ... ```

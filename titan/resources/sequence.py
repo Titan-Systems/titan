@@ -19,11 +19,41 @@ class _Sequence(ResourceSpec):
 
 class Sequence(Resource):
     """
-    CREATE [ OR REPLACE ] SEQUENCE [ IF NOT EXISTS ] <name>
-      [ WITH ]
-      [ START [ WITH ] [ = ] <initial_value> ]
-      [ INCREMENT [ BY ] [ = ] <sequence_interval> ]
-      [ COMMENT = '<string_literal>' ]
+    Description:
+        Manages the creation and configuration of sequences in Snowflake, which are objects that generate numeric values according to a specified sequence.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-sequence
+
+    Fields:
+        name (string, required): The name of the sequence.
+        owner (string or Role): The owner role of the sequence. Defaults to "SYSADMIN".
+        start (int): The starting value of the sequence.
+        increment (int): The value by which the sequence is incremented.
+        comment (string): A comment for the sequence.
+
+    Python:
+
+        ```python
+        sequence = Sequence(
+            name="some_sequence",
+            owner="SYSADMIN",
+            start=100,
+            increment=10,
+            comment="This is a sample sequence."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        sequences:
+          - name: some_sequence
+            owner: SYSADMIN
+            start: 100
+            increment: 10
+            comment: This is a sample sequence.
+        ```
     """
 
     resource_type = ResourceType.SEQUENCE
