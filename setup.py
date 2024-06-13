@@ -4,7 +4,7 @@ setup(
     name="titan",
     version="0.5.0",
     description="Snowflake infrastructure as code",
-    long_description=open("README.md").read(),
+    long_description=open("README.md", encoding='utf-8').read(),
     long_description_content_type="text/markdown",
     url="https://github.com/teej/titan",
     author="TJ Murphy",
