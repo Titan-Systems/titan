@@ -105,6 +105,8 @@ class ResourceSpec:
 
             # Coerce resources
             elif issubclass(field_type, Resource):
+                if field_value == "ACCOUNTADMIN":
+                    print(f"[COERCE] {field_value}")
                 return convert_to_resource(field_type, field_value)
 
             elif field_type == ResourceName:

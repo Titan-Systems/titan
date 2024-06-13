@@ -34,16 +34,20 @@ class Share(Resource):
 
     Python:
 
+        ```python
         share = Share(
             name="some_share",
             comment="This is a snowflake share."
         )
+        ```
 
     Yaml:
 
-        share:
+        ```yaml
+        shares:
           - name: some_share
             comment: This is a snowflake share.
+        ```
     """
 
     resource_type = ResourceType.SHARE

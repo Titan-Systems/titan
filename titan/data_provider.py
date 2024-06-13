@@ -1110,7 +1110,8 @@ def fetch_resource_monitor(session, fqn: FQN):
     data = resource_monitors[0]
     return {
         "name": data["name"],
-        "credit_quota": data["credit_quota"],
+        "owner": data["owner"],
+        "credit_quota": int(float(data["credit_quota"])) if data["credit_quota"] else None,
         "frequency": data["frequency"],
         "start_timestamp": convert_to_gmt(data["start_time"]) if data["start_time"] else None,
         "end_timestamp": convert_to_gmt(data["end_time"]) if data["end_time"] else None,

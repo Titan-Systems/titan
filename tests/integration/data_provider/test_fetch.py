@@ -658,6 +658,7 @@ def test_fetch_resource_monitor(cursor, marked_for_cleanup):
 
     resource_monitor = res.ResourceMonitor(
         name="RESOURCE_MONITOR_EXAMPLE",
+        credit_quota=1000,
         start_timestamp="2049-01-01 00:00",
     )
     cursor.execute(resource_monitor.create_sql(if_not_exists=True))

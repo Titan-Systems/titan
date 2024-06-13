@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
 from ..props import (
@@ -23,11 +24,21 @@ class ResourceMonitorFrequency(ParseableEnum):
 @dataclass(unsafe_hash=True)
 class _ResourceMonitor(ResourceSpec):
     name: str
+    owner: Role = "ACCOUNTADMIN"
     credit_quota: int = None
     frequency: ResourceMonitorFrequency = None
     start_timestamp: str = None
     end_timestamp: str = None
     notify_users: list[str] = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.credit_quota is not None and not isinstance(self.credit_quota, int):
+            raise ValueError("credit_quota must be an integer or None")
+        if self.start_timestamp and self.frequency is None:
+            self.frequency = ResourceMonitorFrequency.MONTHLY
+        if self.owner.name != "ACCOUNTADMIN":
+            raise ValueError("ResourceMonitors can only be created by ACCOUNTADMIN")
 
 
 class ResourceMonitor(Resource):
@@ -48,26 +59,30 @@ class ResourceMonitor(Resource):
 
     Python:
 
+        ```python
         resource_monitor = ResourceMonitor(
             name="some_resource_monitor",
             credit_quota=1000,
             frequency="DAILY",
-            start_timestamp="2022-01-01T00:00:00Z",
-            end_timestamp="2022-12-31T23:59:59Z",
+            start_timestamp="2049-01-01 00:00",
+            end_timestamp="2049-12-31 23:59",
             notify_users=["user1", "user2"]
         )
+        ```
 
     Yaml:
 
-        resource_monitor:
+        ```yaml
+        resource_monitors:
           - name: some_resource_monitor
             credit_quota: 1000
             frequency: DAILY
-            start_timestamp: 2022-01-01T00:00:00Z
-            end_timestamp: 2022-12-31T23:59:59Z
+            start_timestamp: "2049-01-01 00:00"
+            end_timestamp: "2049-12-31 23:59"
             notify_users:
               - user1
               - user2
+        ```
     """
 
     resource_type = ResourceType.RESOURCE_MONITOR
@@ -86,7 +101,7 @@ class ResourceMonitor(Resource):
         self,
         name: str,
         credit_quota: int = None,
-        frequency: ResourceMonitorFrequency = ResourceMonitorFrequency.MONTHLY,
+        frequency: ResourceMonitorFrequency = None,
         start_timestamp: str = None,
         end_timestamp: str = None,
         notify_users: list[str] = None,
