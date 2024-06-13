@@ -9,6 +9,7 @@ description: >-
 
 A database role in Snowflake is a collection of privileges that can be assigned to users or other roles within a specific database context. It is used to manage access control and permissions at the database level.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ database_role = DatabaseRole(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -34,6 +36,7 @@ database_roles:
       department: finance
     comment: This role is for database-specific access control.
 ```
+
 
 ## Fields
 

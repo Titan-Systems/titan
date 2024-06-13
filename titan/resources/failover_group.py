@@ -4,9 +4,13 @@ from .resource import Resource, ResourceSpec
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
-
-
-from ..props import Props, EnumListProp, StringListProp, FlagProp, StringProp, IdentifierListProp
+from ..props import (
+    EnumListProp,
+    FlagProp,
+    IdentifierListProp,
+    Props,
+    StringProp,
+)
 
 
 class ObjectType(ParseableEnum):
@@ -42,14 +46,64 @@ class _FailoverGroup(ResourceSpec):
 
 class FailoverGroup(Resource):
     """
-    CREATE FAILOVER GROUP [ IF NOT EXISTS ] <name>
-        OBJECT_TYPES = <object_type> [ , <object_type> , ... ]
-        [ ALLOWED_DATABASES = <db_name> [ , <db_name> , ... ] ]
-        [ ALLOWED_SHARES = <share_name> [ , <share_name> , ... ] ]
-        [ ALLOWED_INTEGRATION_TYPES = <integration_type_name> [ , <integration_type_name> , ... ] ]
-        ALLOWED_ACCOUNTS = <org_name>.<target_account_name> [ , <org_name>.<target_account_name> ,  ... ]
-        [ IGNORE EDITION CHECK ]
-        [ REPLICATION_SCHEDULE = '{ <num> MINUTE | USING CRON <expr> <time_zone> }' ]
+    Description:
+        Represents a failover group in Snowflake, which is a collection of databases, shares, and other resources
+        that can be failed over together to a secondary account in case of a disaster recovery scenario.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-failover-group
+
+    Fields:
+        name (string, required): The name of the failover group.
+        object_types (list): The types of objects included in the failover group. Can include string or ObjectType.
+        allowed_accounts (list, required): The accounts that are allowed to be part of the failover group.
+        allowed_databases (list): The databases that are allowed to be part of the failover group.
+        allowed_shares (list): The shares that are allowed to be part of the failover group.
+        allowed_integration_types (list): The integration types that are allowed in the failover group. Can include string or IntegrationTypes.
+        ignore_edition_check (bool): Specifies whether to ignore the edition check. Defaults to None.
+        replication_schedule (string): The schedule for replication. Defaults to None.
+        owner (string or Role): The owner role of the failover group. Defaults to "ACCOUNTADMIN".
+
+    Python:
+
+        ```python
+        failover_group = FailoverGroup(
+            name="some_failover_group",
+            object_types=["DATABASES", "ROLES"],
+            allowed_accounts=["org1.account1", "org2.account2"],
+            allowed_databases=["db1", "db2"],
+            allowed_shares=["share1", "share2"],
+            allowed_integration_types=["SECURITY INTEGRATIONS", "API INTEGRATIONS"],
+            ignore_edition_check=True,
+            replication_schedule="USING CRON 0 0 * * * UTC",
+            owner="ACCOUNTADMIN"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        failover_groups:
+          - name: some_failover_group
+            object_types:
+              - DATABASES
+              - ROLES
+            allowed_accounts:
+              - org1.account1
+              - org2.account2
+            allowed_databases:
+              - db1
+              - db2
+            allowed_shares:
+              - share1
+              - share2
+            allowed_integration_types:
+              - SECURITY INTEGRATIONS
+              - API INTEGRATIONS
+            ignore_edition_check: true
+            replication_schedule: "USING CRON 0 0 * * * UTC"
+            owner: ACCOUNTADMIN
+        ```
     """
 
     resource_type = ResourceType.FAILOVER_GROUP

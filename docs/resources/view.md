@@ -10,6 +10,7 @@ description: >-
 Represents a view in Snowflake, which is a virtual table created by a stored query on the data.
 Views are used to simplify complex queries, improve security, or enhance performance.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ view = View(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -32,6 +34,7 @@ views:
     secure: true
     as_: "SELECT * FROM some_table"
 ```
+
 
 ## Fields
 

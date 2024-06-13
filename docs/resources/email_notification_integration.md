@@ -10,6 +10,7 @@ description: >-
 Manages the configuration for email-based notification integrations within Snowflake. This integration
 allows specifying recipients who will receive notifications via email.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ email_notification_integration = EmailNotificationIntegration(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -34,6 +36,7 @@ email_notification_integrations:
       - user2@example.com
     comment: "Example email notification integration"
 ```
+
 
 ## Fields
 

@@ -9,6 +9,7 @@ description: >-
 
 Manages OAuth security integrations for Snowservices in Snowflake, allowing external authentication mechanisms.
 
+
 ## Examples
 
 ### Python
@@ -21,6 +22,7 @@ snowservices_oauth = SnowservicesOAuthSecurityIntegration(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -29,6 +31,7 @@ snowservices_oauth:
     enabled: true
     comment: Integration for external OAuth services.
 ```
+
 
 ## Fields
 

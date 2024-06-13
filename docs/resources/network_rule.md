@@ -11,6 +11,7 @@ A Network Rule in Snowflake defines a set of network addresses, such as IP addre
 that can be allowed or denied access to a Snowflake account. This helps in managing network traffic
 and securing access based on network policies.
 
+
 ## Examples
 
 ### Python
@@ -25,6 +26,7 @@ network_rule = NetworkRule(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -35,6 +37,7 @@ network_rules:
     mode: INGRESS
     comment: "Example network rule"
 ```
+
 
 ## Fields
 

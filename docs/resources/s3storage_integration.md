@@ -9,6 +9,7 @@ description: >-
 
 Manages the integration of Snowflake with S3 storage.
 
+
 ## Examples
 
 ### Python
@@ -25,6 +26,7 @@ s3_storage_integration = S3StorageIntegration(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -39,6 +41,7 @@ s3_storage_integrations:
     storage_aws_object_acl: "bucket-owner-full-control"
     comment: "This is a sample S3 storage integration."
 ```
+
 
 ## Fields
 

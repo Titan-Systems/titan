@@ -9,6 +9,7 @@ description: >-
 
 Alerts trigger notifications when certain conditions are met.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ alert = Alert(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -33,6 +35,7 @@ alerts:
     condition: SELECT COUNT(*) FROM some_table
     then: CALL SYSTEM$SEND_EMAIL('example@example.com', 'Alert Triggered', 'The alert condition was met.')
 ```
+
 
 ## Fields
 

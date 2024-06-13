@@ -10,6 +10,7 @@ description: >-
 A security integration in Snowflake designed to manage external OAuth clients for authentication purposes.
 This integration supports specific OAuth clients such as Looker, Tableau Desktop, and Tableau Server.
 
+
 ## Examples
 
 ### Python
@@ -27,6 +28,7 @@ snowflake_partner_oauth_security_integration = SnowflakePartnerOAuthSecurityInte
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -40,6 +42,7 @@ security_integrations:
     oauth_refresh_token_validity: 7776000
     comment: Integration for Looker OAuth
 ```
+
 
 ## Fields
 

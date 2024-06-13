@@ -9,6 +9,7 @@ description: >-
 
 A Secret defines a set of sensitive data that can be used for authentication or other purposes.
 
+
 ## Examples
 
 ### Python
@@ -29,6 +30,7 @@ secret = Secret(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -47,6 +49,7 @@ secrets:
     comment: some_comment
     owner: SYSADMIN
 ```
+
 
 ## Fields
 

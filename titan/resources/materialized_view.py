@@ -32,19 +32,44 @@ class _MaterializedView(ResourceSpec):
 
 class MaterializedView(Resource):
     """
-    CREATE [ OR REPLACE ] [ SECURE ] MATERIALIZED VIEW [ IF NOT EXISTS ] <name>
-    [ COPY GRANTS ]
-    ( <column_list> )
-    [ <col1> [ WITH ] MASKING POLICY <policy_name> [ USING ( <col1> , <cond_col1> , ... ) ]
-            [ WITH ] PROJECTION POLICY <policy_name>
-            [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-    [ , <col2> [ ... ] ]
-    [ COMMENT = '<string_literal>' ]
-    [ [ WITH ] ROW ACCESS POLICY <policy_name> ON ( <col_name> [ , <col_name> ... ] ) ]
-    [ [ WITH ] AGGREGATION POLICY <policy_name> [ ENTITY KEY ( <col_name> [ , <col_name> ... ] ) ] ]
-    [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-    [ CLUSTER BY ( <expr1> [, <expr2> ... ] ) ]
-    AS <select_statement>
+    Description:
+        A Materialized View in Snowflake is a database object that contains the results of a query.
+        It is physically stored and automatically updated as data changes, providing faster access to data.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-materialized-view
+
+    Fields:
+        name (string, required): The name of the materialized view.
+        owner (string or Role): The owner role of the materialized view. Defaults to "SYSADMIN".
+        secure (bool): Specifies if the materialized view is secure. Defaults to False.
+        columns (list): A list of dictionaries specifying column definitions.
+        tags (dict): Tags associated with the materialized view.
+        copy_grants (bool): Specifies if grants should be copied from the source. Defaults to False.
+        comment (string): A comment for the materialized view.
+        cluster_by (list): A list of expressions defining the clustering of the materialized view.
+        as_ (string, required): The SELECT statement used to populate the materialized view.
+
+    Python:
+
+        ```python
+        materialized_view = MaterializedView(
+            name="some_materialized_view",
+            owner="SYSADMIN",
+            secure=True,
+            as_="SELECT * FROM some_table",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        materialized_views:
+          - name: some_materialized_view
+            owner: SYSADMIN
+            secure: true
+            as: SELECT * FROM some_table
+        ```
     """
 
     edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}

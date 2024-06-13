@@ -34,30 +34,73 @@ class _ServiceSpec(ResourceSpec):
 
 
 class Service(Resource):
-    """Service is a managed service that runs on a compute pool in Snowflake
+    """
+    Description:
+        Service is a managed resource in Snowflake that allows users to run instances of their applications
+        as a collection of containers on a compute pool. Each service instance can handle incoming traffic
+        with the help of a load balancer if multiple instances are run.
 
-    CREATE SERVICE [ IF NOT EXISTS ] <name>
-      IN COMPUTE POOL <compute_pool_name>
-      {
-        FROM @<stage>
-        SPECIFICATION_FILE = '<yaml_file_stage_path>'
-        |
-        FROM SPECIFICATION <specification_text>
-      }
-      [ EXTERNAL_ACCESS_INTEGRATIONS = ( <EAI_name> [ , ... ] ) ]
-      [ AUTO_RESUME = { TRUE | FALSE } ]
-      [ MIN_INSTANCES = <num> ]
-      [ MAX_INSTANCES = <num> ]
-      [ QUERY_WAREHOUSE = <warehouse_name> ]
-      [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
-      [ COMMENT = '{string_literal}']
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-service
+
+    Fields:
+        name (string, required): The unique identifier for the service within the schema.
+        compute_pool (string or ComputePool, required): The compute pool on which the service runs.
+        stage (string): The Snowflake internal stage where the specification file is stored.
+        yaml_file_stage_path (string): The path to the service specification file on the stage.
+        specification (string): The service specification as a string.
+        external_access_integrations (list): The names of external access integrations for the service.
+        auto_resume (bool): Specifies whether to automatically resume the service when a function or ingress is called. Defaults to True.
+        min_instances (int): The minimum number of service instances to run.
+        max_instances (int): The maximum number of service instances to run.
+        query_warehouse (string or Warehouse): The warehouse to use if a service container connects to Snowflake to execute a query.
+        tags (dict): Tags associated with the service.
+        comment (string): A comment for the service.
+
+    Python:
+
+        ```python
+        service = Service(
+            name="some_service",
+            compute_pool="some_compute_pool",
+            stage="@tutorial_stage",
+            yaml_file_stage_path="echo_spec.yaml",
+            specification="FROM SPECIFICATION $$some_specification$$",
+            external_access_integrations=["some_integration"],
+            auto_resume=True,
+            min_instances=1,
+            max_instances=2,
+            query_warehouse="some_warehouse",
+            tags={"key": "value"},
+            comment="This is a sample service."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        services:
+          - name: some_service
+            compute_pool: some_compute_pool
+            stage: @tutorial_stage
+            yaml_file_stage_path: echo_spec.yaml
+            specification: FROM SPECIFICATION $$some_specification$$
+            external_access_integrations:
+              - some_integration
+            auto_resume: true
+            min_instances: 1
+            max_instances: 2
+            query_warehouse: some_warehouse
+            tags:
+              key: value
+            comment: This is a sample service.
+        ```
     """
 
     edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.SERVICE
     props = Props(
         compute_pool=IdentifierProp("in compute pool", eq=False),
-        # stage=StringProp("stage"),
         specification_file=StringProp("specification_file"),
         specification=StringProp("from specification", eq=False),
         external_access_integrations=IdentifierListProp("external_access_integrations", parens=True),

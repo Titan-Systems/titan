@@ -9,6 +9,7 @@ description: >-
 
 Represents an Azure storage integration in Snowflake, which allows Snowflake to access external cloud storage using Azure credentials.
 
+
 ## Examples
 
 ### Python
@@ -24,6 +25,7 @@ azure_storage_integration = AzureStorageIntegration(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -37,6 +39,7 @@ azure_storage_integrations:
       - azure://someotherbucket/somepath/
     comment: This is an Azure storage integration.
 ```
+
 
 ## Fields
 

@@ -9,6 +9,7 @@ description: >-
 
 A virtual warehouse, often referred to simply as a "warehouse", is a cluster of compute resources in Snowflake. It provides the necessary CPU, memory, and temporary storage to execute SQL SELECT statements, perform DML operations such as INSERT, UPDATE, DELETE, and manage data loading and unloading.
 
+
 ## Examples
 
 ### Python
@@ -36,6 +37,7 @@ warehouse = Warehouse(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -60,6 +62,7 @@ warehouses:
     tags:
       env: test
 ```
+
 
 ## Fields
 

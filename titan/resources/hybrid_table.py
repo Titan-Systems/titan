@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
 from .column import Column
+from .role import Role
 
 from ..enums import ResourceType
 from ..scope import SchemaScope
@@ -30,6 +31,45 @@ class _HybridTable(ResourceSpec):
 
 
 class HybridTable(Resource):
+    """
+    Description:
+        `[UNDER DEVELOPMENT]`
+        A hybrid table is a Snowflake table type that is optimized for hybrid transactional and operational workloads that require low latency and high throughput on small random point reads and writes.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-hybrid-table.html
+
+    Fields:
+        name (string, required): The name of the hybrid table.
+        columns (list, required): The columns of the hybrid table.
+        tags (dict): Tags associated with the hybrid table.
+        owner (string or Role): The owner role of the hybrid table. Defaults to "SYSADMIN".
+        comment (string): A comment for the hybrid table.
+
+    Python:
+
+        ```python
+        hybrid_table = HybridTable(
+            name="some_hybrid_table",
+            columns=[Column(name="col1", type="STRING")],
+            owner="SYSADMIN",
+            comment="This is a hybrid table."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        hybrid_tables:
+          - name: some_hybrid_table
+            columns:
+              - name: col1
+                type: STRING
+            owner: SYSADMIN
+            comment: This is a hybrid table.
+        ```
+    """
+
     resource_type = ResourceType.HYBRID_TABLE
     props = Props(
         columns=SchemaProp(),
@@ -59,32 +99,6 @@ class HybridTable(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        """
-        CREATE [ OR REPLACE ] HYBRID TABLE [ IF NOT EXISTS ] <table_name>
-          ( <col_name> <col_type>
-            [
-              {
-                DEFAULT <expr>
-                  /* AUTOINCREMENT (or IDENTITY) is supported only for numeric data types (NUMBER, INT, FLOAT, etc.) */
-                | { AUTOINCREMENT | IDENTITY }
-                  [
-                    {
-                      ( <start_num> , <step_num> )
-                      | START <num> INCREMENT <num>
-                    }
-                  ]
-                  [ { ORDER | NOORDER } ]
-              }
-            ]
-            [ NOT NULL ]
-            [ inlineConstraint ]
-            [ , <col_name> <col_type> [ ... ] ]
-            [ , outoflineIndex ]
-            [ , ... ]
-          )
-          [ COMMENT = '<string_literal>' ]
-        """
-
         raise NotImplementedError
 
         # identifier, remainder = _parse_create_header(sql, cls.resource_type, cls.scope)

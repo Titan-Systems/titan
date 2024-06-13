@@ -41,15 +41,55 @@ class _TableStream(ResourceSpec):
 
 class TableStream(Resource):
     """
-    CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
-      <name>
-      [ COPY GRANTS ]
-      ON TABLE <table_name>
-      [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> | STREAM => '<name>' } ) ]
-      [ APPEND_ONLY = TRUE | FALSE ]
-      [ SHOW_INITIAL_ROWS = TRUE | FALSE ]
-      [ COMMENT = '<string_literal>' ]
+    Description:
+        Represents a stream on a table in Snowflake, which allows for change data capture on the table.
 
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-stream.html
+
+    Fields:
+        name (string, required): The name of the stream.
+        on_table (string, required): The name of the table the stream is based on.
+        owner (string or Role): The role that owns the stream. Defaults to "SYSADMIN".
+        copy_grants (bool): Whether to copy grants from the source table to the stream.
+        at (dict): A dictionary specifying the point in time for the stream to start, using keys like TIMESTAMP, OFFSET, STATEMENT, or STREAM.
+        before (dict): A dictionary specifying the point in time for the stream to start, similar to 'at' but defining a point before the specified time.
+        append_only (bool): If set to True, the stream records only append operations.
+        show_initial_rows (bool): If set to True, the stream includes the initial rows of the table at the time of stream creation.
+        comment (string): An optional description for the stream.
+
+    Python:
+
+        ```python
+        stream = TableStream(
+            name="some_stream",
+            on_table="some_table",
+            owner="SYSADMIN",
+            copy_grants=True,
+            at={"TIMESTAMP": "2022-01-01 00:00:00"},
+            before={"STREAM": "some_other_stream"},
+            append_only=False,
+            show_initial_rows=True,
+            comment="This is a sample stream."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        streams:
+          - name: some_stream
+            on_table: some_table
+            owner: SYSADMIN
+            copy_grants: true
+            at:
+              TIMESTAMP: "2022-01-01 00:00:00"
+            before:
+              STREAM: some_other_stream
+            append_only: false
+            show_initial_rows: true
+            comment: This is a sample stream.
+        ```
     """
 
     resource_type = ResourceType.STREAM
@@ -168,12 +208,41 @@ class _StageStream(ResourceSpec):
 
 class StageStream(Resource):
     """
-    -- Directory table
-    CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
-      <name>
-      [ COPY GRANTS ]
-      ON STAGE <stage_name>
-      [ COMMENT = '<string_literal>' ]
+    Description:
+        Represents a stream on a stage in Snowflake, which allows for capturing data changes on the stage.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-stream.html
+
+    Fields:
+        name (string, required): The name of the stream.
+        on_stage (string, required): The name of the stage the stream is based on.
+        owner (string or Role): The role that owns the stream. Defaults to "SYSADMIN".
+        copy_grants (bool): Whether to copy grants from the source stage to the stream.
+        comment (string): An optional description for the stream.
+
+    Python:
+
+        ```python
+        stream = StageStream(
+            name="some_stream",
+            on_stage="some_stage",
+            owner="SYSADMIN",
+            copy_grants=True,
+            comment="This is a sample stream."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        streams:
+          - name: some_stream
+            on_stage: some_stage
+            owner: SYSADMIN
+            copy_grants: true
+            comment: This is a sample stream.
+        ```
     """
 
     resource_type = ResourceType.STREAM
@@ -220,14 +289,56 @@ class _ViewStream(ResourceSpec):
 
 class ViewStream(Resource):
     """
-    CREATE [ OR REPLACE ] STREAM [IF NOT EXISTS]
-      <name>
-      [ COPY GRANTS ]
-      ON VIEW <view_name>
-      [ { AT | BEFORE } ( { TIMESTAMP => <timestamp> | OFFSET => <time_difference> | STATEMENT => <id> | STREAM => '<name>' } ) ]
-      [ APPEND_ONLY = TRUE | FALSE ]
-      [ SHOW_INITIAL_ROWS = TRUE | FALSE ]
-      [ COMMENT = '<string_literal>' ]
+    Description:
+        Represents a stream on a view in Snowflake, allowing for real-time data processing and querying.
+        This stream can be configured with various options such as time travel, append-only mode, and initial row visibility.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-stream.html
+
+    Fields:
+        name (string, required): The name of the stream.
+        on_view (string, required): The name of the view the stream is based on.
+        owner (string or Role): The role that owns the stream. Defaults to 'SYSADMIN'.
+        copy_grants (bool): Whether to copy grants from the view to the stream.
+        at (dict): A dictionary specifying the point in time for the stream to start, using keys like TIMESTAMP, OFFSET, STATEMENT, or STREAM.
+        before (dict): A dictionary specifying the point in time for the stream to start, similar to 'at' but defining a point before the specified time.
+        append_only (bool): If set to True, the stream records only append operations.
+        show_initial_rows (bool): If set to True, the stream includes the initial rows of the view at the time of stream creation.
+        comment (string): An optional description for the stream.
+
+    Python:
+
+        ```python
+        view_stream = ViewStream(
+            name="some_stream",
+            on_view="some_view",
+            owner="SYSADMIN",
+            copy_grants=True,
+            at={"TIMESTAMP": "2022-01-01 00:00:00"},
+            before={"STREAM": "some_other_stream"},
+            append_only=False,
+            show_initial_rows=True,
+            comment="This is a sample stream on a view."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        streams:
+          - name: some_stream
+            on_view: some_view
+            owner: SYSADMIN
+            copy_grants: true
+            at:
+              TIMESTAMP: "2022-01-01 00:00:00"
+            before:
+              STREAM: some_other_stream
+            append_only: false
+            show_initial_rows: true
+            comment: This is a sample stream on a view.
+        ```
     """
 
     resource_type = ResourceType.STREAM

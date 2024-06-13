@@ -9,6 +9,7 @@ description: >-
 
 A Javascript user-defined function (UDF) in Snowflake allows you to define a function using the JavaScript programming language.
 
+
 ## Examples
 
 ### Python
@@ -23,6 +24,7 @@ js_udf = JavascriptUDF(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -35,6 +37,7 @@ functions:
         data_type: STRING
     comment: Converts a string to uppercase
 ```
+
 
 ## Fields
 

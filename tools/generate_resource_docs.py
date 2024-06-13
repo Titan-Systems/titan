@@ -1,6 +1,7 @@
 import ast
 import re
 import os
+import sys
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS_ROOT = os.path.join(REPO_ROOT, "docs")
@@ -49,6 +50,14 @@ summary_template = """\
 """
 
 
+class EmptyDocstringError(Exception):
+    pass
+
+
+class LegacyDocstringError(Exception):
+    pass
+
+
 def parse_resource_docstring(docstring):
     sections = {
         "Description": "",
@@ -59,41 +68,42 @@ def parse_resource_docstring(docstring):
     }
 
     if not docstring:
-        return sections
-
-    def _strip_leading_spaces(text):
-        lines = text.split("\n")
-        return "\n".join(line[4:] for line in lines).strip()
-
-    # Normalize line breaks
-    docstring = docstring.strip()
-
-    # Split the docstring into sections
-    parts = re.split(r"\n\s*\n", docstring)
+        raise EmptyDocstringError()
+    if docstring.strip().startswith("CREATE"):
+        raise LegacyDocstringError()
+    if docstring.strip().startswith("GRANT"):
+        raise LegacyDocstringError()
 
     # Identify sections
     current_section = None
-    for part in parts:
-        if part.startswith("Description:"):
+    for line in docstring.split("\n"):
+        if line.startswith("Description:"):
             current_section = "Description"
-            part = part[11:].strip()
-        elif part.startswith("Snowflake Docs:"):
+            continue
+        elif line.startswith("Snowflake Docs:"):
             current_section = "Snowflake Docs"
-            part = part[13:].strip()
-        elif part.startswith("Fields:"):
+            continue
+        elif line.startswith("Fields:"):
             current_section = "Fields"
-            part = part[6:].strip()
-        elif part.startswith("Python:"):
+            continue
+        elif line.startswith("Python:"):
             current_section = "Python"
-            part = part[7:].strip()
-        elif part.startswith("Yaml:"):
+            continue
+        elif line.startswith("Yaml:"):
             current_section = "Yaml"
-            part = part[5:].strip()
+            continue
+
+        line = line[4:]
+        if line.strip() == "":
+            continue
 
         if current_section:
-            sections[current_section] += _strip_leading_spaces(part)
+            if current_section == "Snowflake Docs":
+                sections[current_section] += line
+            else:
+                sections[current_section] += line + "\n"
         else:
-            raise ValueError(f"Unknown section: {part}")
+            raise ValueError(f"Unknown section: {line}")
 
     return sections
 
@@ -176,7 +186,7 @@ def generate_resource_doc(resource_class_name: str, resource_docstring: str):
     parsed = parse_resource_docstring(resource_docstring)
 
     fields = parsed["Fields"].split("\n")
-    fields = [parse_field_docstring(field) for field in fields]
+    fields = [parse_field_docstring(field) for field in fields if field]
     fields = enrich_fields(fields)
     fields_md = "".join([field_template.format(**field) for field in fields])
     # print(fields_md)
@@ -204,19 +214,30 @@ def generate_summary(generated_docs):
         f.write(output)
 
 
-def main():
+def main(resource_file: str):
     generated_docs = []
     for file in os.listdir(RESOURCES_ROOT):
         if file.endswith(".py"):
+            if file == "resource.py":
+                continue
+            if resource_file and file != f"{resource_file}.py":
+                continue
             classes = get_resource_classes_for_file(os.path.join(RESOURCES_ROOT, file))
             for class_name, class_docstring in classes.items():
                 try:
                     generate_resource_doc(class_name, class_docstring)
                     generated_docs.append(class_name)
-                except Exception as e:
-                    print(f"[{file}] » Error generating {class_name}")
-    generate_summary(sorted(generated_docs))
+                except EmptyDocstringError:
+                    print(f"[{file}] » {class_name} has no docstring")
+                except LegacyDocstringError:
+                    print(f"[{file}] » {class_name} has a legacy docstring")
+                except ValueError as e:
+                    print(f"[{file}] » {class_name} has an invalid docstring: {e}")
+                # except Exception as e:
+                #     print(f"[{file}] » Error generating {class_name}")
+    if resource_file is None:
+        generate_summary(sorted(generated_docs))
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1] if len(sys.argv) > 1 else None)

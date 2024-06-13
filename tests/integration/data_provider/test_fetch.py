@@ -692,3 +692,22 @@ def test_fetch_email_notification_integration(cursor, email_address, marked_for_
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == data_provider.remove_none_values(email_notification_integration.to_dict())
+
+
+def test_fetch_event_table(cursor, test_db, marked_for_cleanup):
+    event_table = res.EventTable(
+        name="EVENT_TABLE_EXAMPLE",
+        change_tracking=True,
+        cluster_by=["START_TIMESTAMP"],
+        data_retention_time_in_days=1,
+        owner=TEST_ROLE,
+    )
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute(event_table.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(event_table)
+
+    result = safe_fetch(cursor, event_table.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(event_table.to_dict())

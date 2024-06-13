@@ -9,6 +9,7 @@ description: >-
 
 A user in Snowflake.
 
+
 ## Examples
 
 ### Python
@@ -21,6 +22,7 @@ user = User(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -29,6 +31,7 @@ users:
     owner: USERADMIN
     email: some.user@example.com
 ```
+
 
 ## Fields
 

@@ -9,6 +9,7 @@ description: >-
 
 Represents a share resource in Snowflake, which allows sharing data across Snowflake accounts.
 
+
 ## Examples
 
 ### Python
@@ -20,6 +21,7 @@ share = Share(
 )
 ```
 
+
 ### YAML
 
 ```yaml
@@ -27,6 +29,7 @@ shares:
   - name: some_share
     comment: This is a snowflake share.
 ```
+
 
 ## Fields
 
