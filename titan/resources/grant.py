@@ -22,7 +22,7 @@ class _Grant(ResourceSpec):
     on_type: ResourceType
     to: Role
     grant_option: bool = False
-    owner: str = None
+    owner: Role = None
     _privs: list[str] = field(default_factory=list, metadata={"forces_add": True})
 
     def __post_init__(self):
@@ -427,7 +427,7 @@ class _GrantOnAll(ResourceSpec):
     in_name: str
     to: Role
     grant_option: bool = False
-    owner: str = "SECURITYADMIN"
+    owner: Role = "SECURITYADMIN"
 
     def __post_init__(self):
         super().__post_init__()

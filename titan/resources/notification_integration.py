@@ -120,7 +120,7 @@ class _AWSOutboundNotificationIntegration(ResourceSpec):
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
     notification_provider: str = NotificationProvider.AWS_SNS
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
 
@@ -186,7 +186,7 @@ class _GCPOutboundNotificationIntegration(ResourceSpec):
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
     notification_provider: str = NotificationProvider.GCP_PUBSUB
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
 
@@ -248,7 +248,7 @@ class _AzureOutboundNotificationIntegration(ResourceSpec):
     direction: NotificationDirection = NotificationDirection.OUTBOUND
     type: str = NotificationType.QUEUE
     notification_provider: str = NotificationProvider.AZURE_EVENT_GRID
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
 
@@ -313,7 +313,7 @@ class _GCPInboundNotificationIntegration(ResourceSpec):
     direction: NotificationDirection = NotificationDirection.INBOUND
     type: str = NotificationType.QUEUE
     notification_provider: str = NotificationProvider.GCP_PUBSUB
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
 
@@ -372,7 +372,7 @@ class _AzureInboundNotificationIntegration(ResourceSpec):
     direction: NotificationDirection = NotificationDirection.INBOUND
     type: str = NotificationType.QUEUE
     notification_provider: str = NotificationProvider.AZURE_STORAGE_QUEUE
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from .warehouse import Warehouse
 from ..enums import ResourceType, WarehouseSize, TaskState
 from ..props import (
@@ -22,7 +23,7 @@ from ..scope import SchemaScope
 @dataclass(unsafe_hash=True)
 class _Task(ResourceSpec):
     name: ResourceName
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     warehouse: Warehouse = None
     user_task_managed_initial_warehouse_size: WarehouseSize = None
     schedule: str = None

@@ -13,7 +13,7 @@ from ..scope import AccountScope
 class _Database(ResourceSpec):
     name: ResourceName
     transient: bool = False
-    owner: Role = Role("SYSADMIN")
+    owner: Role = "SYSADMIN"
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None

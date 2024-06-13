@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from .resource import Resource, ResourcePointer, ResourceSpec
+from .role import Role
 from .table import Table
 from .view import View
 
@@ -22,7 +23,7 @@ class StreamType(ParseableEnum):
 class _TableStream(ResourceSpec):
     name: str
     on_table: Table
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     copy_grants: bool = None
     at: dict[str, str] = None
     before: dict[str, str] = None
@@ -160,7 +161,7 @@ class TableStream(Resource):
 class _StageStream(ResourceSpec):
     name: str
     on_stage: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     copy_grants: bool = None
     comment: str = None
 
@@ -208,7 +209,7 @@ class StageStream(Resource):
 class _ViewStream(ResourceSpec):
     name: str
     on_view: View
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     copy_grants: bool = None
     at: dict[str, str] = None
     before: dict[str, str] = None

@@ -6,6 +6,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ResourceType
 from ..parse import _parse_copy_into
 from ..props import BoolProp, Props, StringProp, QueryProp
@@ -16,7 +17,7 @@ from ..scope import SchemaScope
 class _Pipe(ResourceSpec):
     name: str
     as_: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     auto_ingest: bool = None
     error_integration: str = None
     aws_sns_topic: str = None

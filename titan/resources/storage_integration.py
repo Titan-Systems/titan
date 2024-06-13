@@ -223,7 +223,7 @@ class _AzureStorageIntegration(ResourceSpec):
     storage_blocked_locations: list[str] = None
     storage_provider: StorageProvider = StorageProvider.AZURE
     type: str = "EXTERNAL_STAGE"
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
     def __post_init__(self):

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
 from .database import Database
+from .role import Role
 from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
     FlagProp,
@@ -43,7 +44,7 @@ class _ReplicationGroup(ResourceSpec):
     allowed_integration_types: list[IntegrationType] = None
     ignore_edition_check: bool = None
     replication_schedule: str = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
 
 
 class ReplicationGroup(Resource):

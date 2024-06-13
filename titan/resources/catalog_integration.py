@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..props import Props, EnumProp, StringProp, BoolProp
 from ..resource_name import ResourceName
@@ -26,7 +27,7 @@ class _GlueCatalogIntegration(ResourceSpec):
     catalog_source: CatalogSource = CatalogSource.GLUE
     table_format: CatalogTableFormat = CatalogTableFormat.ICEBERG
     glue_region: str = None
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
     def __post_init__(self):

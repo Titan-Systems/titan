@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
 
@@ -32,7 +33,7 @@ class _NetworkRule(ResourceSpec):
     value_list: list[str]
     mode: NetworkRuleMode = NetworkRuleMode.INGRESS
     comment: str = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
 
     def __post_init__(self):
         super().__post_init__()

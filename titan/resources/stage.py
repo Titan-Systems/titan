@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
 from ..props import (
@@ -56,7 +57,7 @@ class EncryptionType(ParseableEnum):
 @dataclass(unsafe_hash=True)
 class _InternalStage(ResourceSpec):
     name: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     type: StageType = StageType.INTERNAL
     encryption: dict[str, EncryptionType] = field(default_factory=None, metadata={"fetchable": False})
     directory: dict[str, bool] = None
@@ -132,7 +133,7 @@ class InternalStage(Resource):
 class _ExternalStage(ResourceSpec):
     name: str
     url: str
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
     storage_integration: str = None
     credentials: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})

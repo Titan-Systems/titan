@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
 
@@ -24,7 +25,7 @@ class _APIIntegration(ResourceSpec):
     api_allowed_prefixes: list[str]
     api_blocked_prefixes: list[str] = None
     api_key: str = None
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
 
