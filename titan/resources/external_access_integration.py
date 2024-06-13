@@ -54,7 +54,7 @@ class ExternalAccessIntegration(Resource):
         ```python
         external_access_integration = ExternalAccessIntegration(
             name="some_external_access_integration",
-            allowed_network_rules=[NetworkRule("rule1"), NetworkRule("rule2")],
+            allowed_network_rules=["rule1", "rule2"],
             enabled=True
         )
         ```
