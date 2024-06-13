@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
 
@@ -26,7 +27,7 @@ class _PasswordPolicy(ResourceSpec):
     password_lockout_time_mins: int = 15
     password_history: int = 0
     comment: str = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
 
 
 class PasswordPolicy(Resource):

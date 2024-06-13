@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec
+from .role import Role
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..scope import DatabaseScope
@@ -15,7 +16,7 @@ class _Schema(ResourceSpec):
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
     tags: dict[str, str] = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     comment: str = None
 
     def __post_init__(self):

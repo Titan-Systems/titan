@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
 
@@ -36,7 +37,7 @@ class _FailoverGroup(ResourceSpec):
     allowed_integration_types: list[IntegrationTypes] = None
     ignore_edition_check: bool = None
     replication_schedule: str = None
-    owner: str = "ACCOUNTADMIN"
+    owner: Role = "ACCOUNTADMIN"
 
 
 class FailoverGroup(Resource):

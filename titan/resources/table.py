@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec
 from .column import Column
+from .role import Role
 
 # from .stage import InternalStage, copy_options
 from ..enums import ResourceType
@@ -37,7 +38,7 @@ class _Table(ResourceSpec):
     copy_grants: bool = False
     row_access_policy: dict[str, list] = None
     tags: dict[str, str] = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     comment: str = None
 
     def __post_init__(self):
@@ -153,7 +154,7 @@ class _CreateTableAsSelect(ResourceSpec):
     cluster_by: list[str] = None
     copy_grants: bool = False
     row_access_policy: dict[str, list] = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     comment: str = None
 
     def __post_init__(self):

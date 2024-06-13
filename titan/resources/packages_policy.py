@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import ResourceType, Language
 from ..scope import SchemaScope
 from ..props import (
@@ -19,7 +20,7 @@ class _PackagesPolicy(ResourceSpec):
     blocklist: list[str] = None
     additional_creation_blocklist: list[str] = None
     comment: str = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
 
     def __post_init__(self):
         super().__post_init__()

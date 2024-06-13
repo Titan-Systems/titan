@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Arg, Resource, ResourceSpec
+from .role import Role
 from ..scope import SchemaScope
 from ..enums import DataType, Language, NullHandling, ResourceType, Volatility
 from ..props import (
@@ -29,7 +30,7 @@ class _JavascriptUDF(ResourceSpec):
     handler: str = None
     imports: list[str] = None
     null_handling: NullHandling = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     packages: list[str] = None
     runtime_version: str = None
     secrets: dict[str, str] = None
@@ -152,7 +153,7 @@ class _PythonUDF(ResourceSpec):
     external_access_integrations: list[str] = None
     imports: list[str] = None
     null_handling: NullHandling = None
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     packages: list[str] = None
     secrets: dict[str, str] = None
     secure: bool = False

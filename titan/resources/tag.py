@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import AccountEdition, ResourceType
 from ..scope import SchemaScope
 from ..props import Props, StringProp, StringListProp

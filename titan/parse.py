@@ -185,7 +185,7 @@ def _parse_priv_grant(sql: str):
             on_arg = on_stmt.split(" ")[-1]
 
         return {
-            "priv": privs[0],
+            "priv": privs[0].upper(),
             on_keyword: on_arg,
             "to": results["to"],
         }

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from .resource import Arg, Resource, ResourceSpec
+from .role import Role
 from ..scope import SchemaScope
 from ..enums import DataType, ExecutionRights, NullHandling, Language, ResourceType
 from ..props import (
@@ -30,7 +31,7 @@ class _PythonStoredProcedure(ResourceSpec):
     external_access_integrations: list = None
     imports: list = field(default_factory=None, metadata={"triggers_replacement": True})
     null_handling: NullHandling = NullHandling.CALLED_ON_NULL_INPUT
-    owner: str = "SYSADMIN"
+    owner: Role = "SYSADMIN"
     secure: bool = False
 
     def __post_init__(self):

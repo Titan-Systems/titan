@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec
+from .role import Role
 from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
     IntProp,
