@@ -77,6 +77,8 @@ class ResourceSpec:
                 raise RuntimeError(f"Unexpected field type {field_type}")
 
             if not isclass(field_type):
+                # If we want to support quoted type annotations, this is the place to do it.
+                # eg owner "Role" = "SYSADMIN"
                 raise RuntimeError(f"Unexpected field type {field_type}")
 
             # Coerce enums

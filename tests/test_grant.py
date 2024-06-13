@@ -124,3 +124,8 @@ def test_grant_refs():
     assert ResourceName(str(repo.fqn)) == ResourceName("titan_app_db.titan_app.titan_app_image_repo")
     assert grant.priv == "READ"
     assert ResourcePointer("some_repo", ResourceType.IMAGE_REPOSITORY) in grant.refs
+
+
+def test_grant_priv_is_serialized_uppercase():
+    grant = Grant(priv="usage", on_warehouse="somewh", to="somerole")
+    assert grant.priv == "USAGE"
