@@ -136,7 +136,7 @@ def _parse_cluster_keys(cluster_keys_str: str) -> list[str]:
         LINEAR(C1, C3)
         LINEAR(SUBSTRING(C2, 5, 15), CAST(C1 AS DATE))
     """
-    if cluster_keys_str is None:
+    if cluster_keys_str is None or cluster_keys_str == "":
         return None
     cluster_keys_str = cluster_keys_str[len("LINEAR") :]
     cluster_keys_str = cluster_keys_str.strip("()")
@@ -221,7 +221,15 @@ def options_result_to_list(options_result):
 
 
 def remove_none_values(d):
-    return {k: v for k, v in d.items() if v is not None}
+    new_dict = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            new_dict[k] = remove_none_values(v)
+        elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+            new_dict[k] = [remove_none_values(item) for item in v if item is not None]
+        elif v is not None:
+            new_dict[k] = v
+    return new_dict
 
 
 def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
@@ -365,7 +373,7 @@ def fetch_columns(session, resource_type: str, fqn: FQN):
                 {
                     "name": col["name"],
                     "data_type": col["type"],
-                    "nullable": col["null?"] == "Y",
+                    "not_null": col["null?"] == "N",
                     "default": col["default"],
                     "comment": col["comment"] or None,
                 }
@@ -716,6 +724,18 @@ def fetch_password_policy(session, fqn: FQN):
         "comment": properties["COMMENT"] or None,
         "owner": properties["OWNER"],
     }
+
+
+def fetch_pipe(session, fqn: FQN):
+    show_result = execute(session, f"SHOW PIPES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple pipes matching {fqn}")
+
+    data = show_result[0]
+
+    return None
 
 
 def fetch_procedure(session, fqn: FQN):
@@ -1224,10 +1244,13 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
 
 
 def fetch_table(session, fqn: FQN):
-    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+    show_result = execute(session, "SHOW TABLES IN ACCOUNT", cacheable=True)
 
     tables = _filter_result(
-        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
+        show_result,
+        name=fqn.name,
+        database_name=fqn.database,
+        schema_name=fqn.schema,
     )
 
     if len(tables) == 0:
@@ -1238,15 +1261,23 @@ def fetch_table(session, fqn: FQN):
     columns = fetch_columns(session, "TABLE", fqn)
 
     data = tables[0]
+    tags = fetch_resource_tags(session, ResourceType.TABLE, fqn)
+    show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
+    params = params_result_to_dict(show_params_result)
+
     return {
         "name": data["name"],
+        "columns": columns,
+        "cluster_by": _parse_cluster_keys(data["cluster_by"]),
+        "transient": data["kind"] == "TRANSIENT",
         "owner": data["owner"],
         "comment": data["comment"] or None,
-        "cluster_by": data["cluster_by"] or None,
-        "columns": columns,
-        # This is here because of CTAS type tables.
-        # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
-        "as_": None,
+        "enable_schema_evolution": data["enable_schema_evolution"] == "Y",
+        "data_retention_time_in_days": int(data["retention_time"]),
+        "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days", None),
+        "default_ddl_collation": params.get("default_ddl_collation", None),
+        "change_tracking": data["change_tracking"] == "ON",
+        "tags": tags,
     }
 
 

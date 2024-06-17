@@ -40,6 +40,9 @@ class MissingPrivilegeException(Exception):
 class MissingResourceException(Exception):
     pass
 
+class MarkedForReplacementException(Exception):
+    pass
+
 
 class RunMode(ParseableEnum):
     CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
@@ -484,6 +487,7 @@ class Blueprint:
                 attr = list(delta.keys())[0]
                 attr_metadata = resource_cls.spec.get_metadata(attr)
                 if attr_metadata.get("triggers_replacement", False):
+                    raise MarkedForReplacementException(f"Resource {urn} is marked for replacement", resource_cls, attr)
                     marked_for_replacement.add(urn)
                 elif attr_metadata.get("forces_add", False):
                     changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=delta))
@@ -502,7 +506,7 @@ class Blueprint:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
 
         for urn in marked_for_replacement:
-            raise NotImplementedError("Marked for replacement")
+            raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
             # changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
             # changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
 
@@ -758,9 +762,9 @@ class Blueprint:
         try:
             completed_plan = self._plan(remote_state, manifest)
         except Exception as e:
-            logger.error("~" * 80, "REMOTE STATE")
+            logger.error("~" * 80 + "REMOTE STATE")
             logger.error(remote_state)
-            logger.error("~" * 80, "MANIFEST")
+            logger.error("~" * 80 + "MANIFEST")
             logger.error(manifest)
 
             raise e

@@ -547,7 +547,7 @@ class SchemaProp(Prop):
         for column in values:
             name = column["name"]
             data_type = str(column["data_type"])
-            comment = f" COMMENT '{column['comment']}'" if "comment" in column else ""
+            comment = f" COMMENT '{column['comment']}'" if "comment" in column and column["comment"] else ""
             column_str = f"{name} {data_type}{comment}"
             columns.append(column_str)
         return f"({', '.join(columns)})"

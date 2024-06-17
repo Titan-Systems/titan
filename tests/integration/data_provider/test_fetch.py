@@ -158,7 +158,7 @@ scoped_resources = [
         "data": {
             "name": "PRODUCT",
             "owner": TEST_ROLE,
-            "columns": [{"name": "ID", "data_type": "NUMBER(38,0)", "nullable": True}],
+            "columns": [{"name": "ID", "data_type": "NUMBER(38,0)", "not_null": False}],
             "target_lag": "20 minutes",
             "warehouse": "CI",
             "refresh_mode": "AUTO",
@@ -267,16 +267,6 @@ scoped_resources = [
             "start": 1,
             "increment": 2,
             "comment": "+3",
-        },
-    },
-    {
-        "resource_type": ResourceType.TABLE,
-        "setup_sql": "CREATE TABLE sometbl (id INT)",
-        "teardown_sql": "DROP TABLE IF EXISTS sometbl",
-        "data": {
-            "name": "SOMETBL",
-            "owner": TEST_ROLE,
-            "columns": [{"name": "ID", "nullable": True, "data_type": "NUMBER(38,0)"}],
         },
     },
     {

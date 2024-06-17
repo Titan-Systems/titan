@@ -30,7 +30,7 @@ from .sequence import Sequence
 from .service import Service
 from .stage import InternalStage, ExternalStage
 from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
-from .table import Table, CreateTableAsSelect
+from .table import Table  # , CreateTableAsSelect
 from .tag import Tag
 from .task import Task
 from .user import User
@@ -67,7 +67,7 @@ __all__ = [
     "AzureStorageIntegration",
     "Column",
     "ComputePool",
-    "CreateTableAsSelect",
+    # "CreateTableAsSelect",
     "CSVFileFormat",
     "Database",
     "DatabaseRole",

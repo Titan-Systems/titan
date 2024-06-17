@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourceSpec
+from .resource import Resource, ResourceContainer, ResourceSpec, ResourceNameTrait
 from .role import Role
 from .schema import Schema
 from ..enums import ResourceType
@@ -22,7 +22,7 @@ class _Database(ResourceSpec):
     comment: str = None
 
 
-class Database(Resource, ResourceContainer):
+class Database(ResourceNameTrait, Resource, ResourceContainer):
     """
     Description:
         Represents a database in Snowflake.
@@ -142,9 +142,9 @@ class Database(Resource, ResourceContainer):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Database(
-            name=name.upper(),
+            name=self._name,
             transient=transient,
             owner=owner,
             data_retention_time_in_days=data_retention_time_in_days,
@@ -162,3 +162,7 @@ class Database(Resource, ResourceContainer):
 
     def schemas(self):
         return self.items(resource_type=ResourceType.SCHEMA)
+
+    @property
+    def public_schema(self):
+        return self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA)

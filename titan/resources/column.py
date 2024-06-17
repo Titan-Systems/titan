@@ -14,7 +14,7 @@ class _Column(ResourceSpec):
     data_type: str
     collate: str = None
     comment: str = None
-    not_null: bool = None
+    not_null: bool = False
     constraint: str = None
 
 
@@ -44,6 +44,7 @@ class Column(Resource):
     )
     scope = TableScope()
     spec = _Column
+    in_place_serialization = True
 
     def __init__(
         self,
@@ -51,7 +52,7 @@ class Column(Resource):
         data_type: DataType,
         collate: str = None,
         comment: str = None,
-        not_null: bool = None,
+        not_null: bool = False,
         constraint: str = None,
         **kwargs,
     ):
@@ -72,5 +73,5 @@ class Column(Resource):
         props = _parse_props(cls.props, remainder)
         return cls(**parse_results, **props)
 
-    def serialize(self):
-        return {"name": self._data.name, "data_type": self._data.data_type}
+    # def serialize(self):
+    #     return {"name": self._data.name, "data_type": self._data.data_type}

@@ -84,3 +84,59 @@ def test_tags_definition():
     db = res.Database(name="DB", tags=ResourceTags({"project": "test_deployment", "priority": "low"}))
     assert db._data.tags is not None
     assert db._data.tags.to_dict() == {"project": "test_deployment", "priority": "low"}
+
+
+def test_database_scoped_container_construction():
+    db = res.Database(name="my_database")
+    schema = res.Schema(name="my_schema", database=db)
+    assert schema.container is not None
+    assert schema.container.name == "my_database"
+
+    schema = res.Schema(name="my_database.my_schema")
+    assert schema.container is not None
+    assert schema.container.name == "my_database"
+
+
+def test_schema_scoped_container_construction():
+    db = res.Database(name="my_database")
+    schema = res.Schema(name="my_schema", database=db)
+    tbl = res.Table(
+        name="my_table",
+        schema=schema,
+        columns=[{"name": "col1", "data_type": "VARCHAR(10)"}],
+    )
+    assert tbl.container is not None
+    assert tbl.container.name == "my_schema"
+    assert tbl.container.container is not None
+    assert tbl.container.container.name == "my_database"
+
+    tbl = res.Table(
+        name="my_table",
+        database="my_database",
+        schema="my_schema",
+        columns=[{"name": "col1", "data_type": "VARCHAR(10)"}],
+    )
+    assert tbl.container is not None
+    assert tbl.container.name == "my_schema"
+    assert tbl.container.container is not None
+    assert tbl.container.container.name == "my_database"
+
+    tbl = res.Table(
+        name="my_table",
+        database="my_database",
+        columns=[{"name": "col1", "data_type": "VARCHAR(10)"}],
+    )
+    assert tbl.container is not None
+    assert tbl.container.name == "PUBLIC"
+    assert tbl.container.container is not None
+    assert tbl.container.container.name == "my_database"
+
+    tbl = res.Table(
+        name="my_database.my_schema.my_table",
+        columns=[{"name": "col1", "data_type": "VARCHAR(10)"}],
+    )
+    assert tbl.name == "my_table"
+    assert tbl.container is not None
+    assert tbl.container.name == "my_schema"
+    assert tbl.container.container is not None
+    assert tbl.container.container.name == "my_database"

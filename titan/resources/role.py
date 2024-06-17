@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from ..enums import ResourceType
 from ..parse import parse_identifier
 from ..props import Props, StringProp, TagsProp
@@ -16,7 +16,7 @@ class _Role(ResourceSpec):
     comment: str = None
 
 
-class Role(Resource):
+class Role(ResourceNameTrait, Resource):
     """
     Description:
         A role in Snowflake defines a set of access controls and permissions.
@@ -66,17 +66,13 @@ class Role(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Role(
-            name=name,
+            name=self._name,
             owner=owner,
             tags=tags,
             comment=comment,
         )
-
-    @property
-    def name(self):
-        return self._data.name
 
 
 class DatabaseRole(Resource):

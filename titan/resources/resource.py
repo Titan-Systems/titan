@@ -164,6 +164,7 @@ class Resource(metaclass=_Resource):
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
+    in_place_serialization: bool = False
 
     def __init__(self, implicit: bool = False, **kwargs):
         super().__init__()
@@ -284,19 +285,6 @@ class Resource(metaclass=_Resource):
     def __hash__(self):
         return hash(self._data)
 
-    def _add_implied_containers(self, name):
-        implied_fqn = parse_identifier(str(name), is_db_scoped=isinstance(self.scope, DatabaseScope))
-        if implied_fqn.schema and isinstance(self.scope, SchemaScope):
-            schema = ResourcePointer(name=implied_fqn.schema, resource_type=ResourceType.SCHEMA)
-            schema.add(self)
-            if implied_fqn.database:
-                db = ResourcePointer(name=implied_fqn.database, resource_type=ResourceType.DATABASE)
-                db.add(schema)
-        elif implied_fqn.database and isinstance(self.scope, DatabaseScope):
-            db = ResourcePointer(name=implied_fqn.database, resource_type=ResourceType.DATABASE)
-            db.add(self)
-        return implied_fqn.name
-
     def to_dict(self):
         defaults = {f.name: f.default for f in fields(self.spec)}
 
@@ -306,9 +294,11 @@ class Resource(metaclass=_Resource):
             if isinstance(value, ResourcePointer):
                 return value.name
             elif isinstance(value, Resource):
-                if hasattr(value, "serialize"):
-                    return value.serialize()
-                elif hasattr(value._data, "name"):
+                # if hasattr(value, "serialize"):
+                #     return value.serialize()
+                if getattr(value, "in_place_serialization", False):
+                    return value.to_dict()
+                if hasattr(value._data, "name"):
                     return getattr(value._data, "name")
                 else:
                     raise Exception(f"Cannot serialize {value}")
@@ -372,6 +362,8 @@ class Resource(metaclass=_Resource):
         if isinstance(self.scope, SchemaScope):
             if schema is not None:
                 schema.add(self)
+            elif database is not None:
+                database.find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(self)
 
     @property
     def container(self):
@@ -414,7 +406,9 @@ class ResourceContainer:
 
     def find(self, resource_type: ResourceType, name: str) -> Resource:
         for resource in self.items(resource_type):
-            if resource._data.name == name:
+            if isinstance(resource, ResourcePointer) and resource.name == name:
+                return resource
+            elif isinstance(resource, Resource) and resource._data is not None and resource._data.name == name:
                 return resource
         raise KeyError(f"Resource {resource_type} {name} not found")
 
@@ -424,34 +418,31 @@ class ResourceContainer:
             resource._container = None
             resource.refs.remove(self)
 
+
+class ResourceNameTrait:
+    def __init__(self, name: str, **kwargs):
+        fqn = parse_identifier(str(name), is_db_scoped=isinstance(self.scope, DatabaseScope))
+        self._name = ResourceName(fqn.name)
+        if fqn.database and "database" in kwargs:
+            raise ValueError("Multiple database names found")
+        if fqn.schema and "schema" in kwargs:
+            raise ValueError("Multiple schema names found")
+        super().__init__(
+            database=kwargs.pop("database", fqn.database),
+            schema=kwargs.pop("schema", fqn.schema),
+            **kwargs,
+        )
+
     @property
     def name(self):
-        return self._data.name
+        return self._name
 
 
-class ResourcePointer(Resource, ResourceContainer):
+class ResourcePointer(ResourceNameTrait, Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
-        super().__init__()
-
-        if isinstance(self.scope, AccountScope):
-            self._name = ResourceName(name)
-        else:
-            fqn = parse_identifier(str(name), is_db_scoped=isinstance(self.scope, DatabaseScope))
-            self._name = ResourceName(fqn.name)
-            if isinstance(self.scope, DatabaseScope) and fqn.database:
-                db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
-                db.add(self)
-            elif isinstance(self.scope, SchemaScope) and fqn.schema:
-                if fqn.database:
-                    db = ResourcePointer(name=fqn.database, resource_type=ResourceType.DATABASE)
-                    schema = ResourcePointer(name=fqn.schema, resource_type=ResourceType.SCHEMA)
-                    db.add(schema)
-                    schema.add(self)
-                else:
-                    schema = ResourcePointer(name=fqn.schema, resource_type=ResourceType.SCHEMA)
-                    schema.add(self)
+        super().__init__(name)
 
         # Don't want to do this for all implicit resources but making an exception for PUBLIC schema
         # If this points to a database, assume it includes a PUBLIC schema
@@ -489,10 +480,6 @@ class ResourcePointer(Resource, ResourceContainer):
         return self.scope.fully_qualified_name(self.container, self.name)
 
     @property
-    def name(self):
-        return self._name
-
-    @property
     def resource_type(self):
         return self._resource_type
 
@@ -501,28 +488,7 @@ class ResourcePointer(Resource, ResourceContainer):
 
 
 def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource]) -> Resource:
-    """Convert a resource descriptor to a resource instance
-
-    Args:
-        cls (Resource): The resource class to convert to
-        resource_or_descriptor (Union[str, dict, Resource]): The resource descriptor to convert
-
-    Returns:
-        Resource: A new or existing resource instance based on the provided descriptor.
-
-    Examples:
-        >>> convert_to_resource(Database, "my_database")
-        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
-
-        >>> convert_to_resource(Database, {"name": "my_database"})
-        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
-
-        >>> convert_to_resource(Database, Database(name="my_database"))
-        Database(name="my_database")
-
-        >>> convert_to_resource(Database, ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE))
-        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
-    """
+    """Convert a resource descriptor to a resource instance"""
     if isinstance(resource_or_descriptor, str):
         return ResourcePointer(name=resource_or_descriptor, resource_type=cls.resource_type)
     elif isinstance(resource_or_descriptor, dict):
