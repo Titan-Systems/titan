@@ -16,6 +16,7 @@ from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class, parse_identifier
 from ..resource_name import ResourceName
+from ..resource_tags import ResourceTags
 from ..scope import (
     AccountScope,
     DatabaseScope,
@@ -114,9 +115,10 @@ class ResourceSpec:
             # Coerce resources
             elif issubclass(field_type, Resource):
                 return convert_to_resource(field_type, field_value)
-
             elif field_type == ResourceName:
                 return ResourceName(field_value)
+            elif field_type == ResourceTags:
+                return ResourceTags(field_value)
             else:
                 return field_value
 

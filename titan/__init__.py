@@ -1,5 +1,10 @@
+import logging.config
+
 from .blueprint import Blueprint
 from .resources import *
+
+logger = logging.getLogger("titan")
+
 
 __all__ = [
     "Blueprint",

@@ -18,7 +18,7 @@ Represents a Python stored procedure in Snowflake, allowing for the execution of
 procedure = PythonStoredProcedure(
     name="some_procedure",
     args=[],
-    returns=DataType.STRING,
+    returns="STRING",
     runtime_version="3.8",
     packages=["snowflake-snowpark-python"],
     handler="process_data",

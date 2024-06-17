@@ -2,6 +2,7 @@ import pytest
 
 from titan import resources as res
 from titan.resource_name import ResourceName
+from titan.resource_tags import ResourceTags
 from titan.enums import WarehouseSize
 from tests.helpers import get_sql_fixtures, get_json_fixtures
 
@@ -73,3 +74,13 @@ def test_resource_name_serialization():
     assert task.name == ResourceName('"~task"')
     assert task.to_dict()["name"] == "~task"
     assert task.fqn.name == "~task"
+
+
+def test_tags_definition():
+    db = res.Database(name="DB", tags={"project": "test_deployment", "priority": "low"})
+    assert db._data.tags is not None
+    assert db._data.tags.to_dict() == {"project": "test_deployment", "priority": "low"}
+
+    db = res.Database(name="DB", tags=ResourceTags({"project": "test_deployment", "priority": "low"}))
+    assert db._data.tags is not None
+    assert db._data.tags.to_dict() == {"project": "test_deployment", "priority": "low"}

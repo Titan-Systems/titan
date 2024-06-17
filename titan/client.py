@@ -1,3 +1,4 @@
+import logging
 import os
 import time
 
@@ -8,6 +9,8 @@ import snowflake.connector
 from snowflake.connector.cursor import SnowflakeCursor
 from snowflake.connector.connection import SnowflakeConnection
 from snowflake.connector.errors import ProgrammingError
+
+logger = logging.getLogger("titan")
 
 UNSUPPORTED_FEATURE = 2
 DOEST_NOT_EXIST_ERR = 2003

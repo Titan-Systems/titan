@@ -1,4 +1,5 @@
 import json
+import logging
 
 from dataclasses import dataclass
 from typing import List, Optional, Union
@@ -27,6 +28,7 @@ from .resources import Account, Database, Schema, Grant
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
+logger = logging.getLogger("titan")
 
 Manifest = dict[URN, dict]
 State = dict[URN, dict]
@@ -578,7 +580,7 @@ class Blueprint:
             except Exception as e:
                 data = None
             if data is None:
-                print(manifest)
+                logger.error(manifest)
                 raise MissingResourceException(f"Resource {reference} required by {parent} not found or failed to fetch")
 
         return state
@@ -756,10 +758,10 @@ class Blueprint:
         try:
             completed_plan = self._plan(remote_state, manifest)
         except Exception as e:
-            print("~" * 80, "REMOTE STATE")
-            print(remote_state)
-            print("~" * 80, "MANIFEST")
-            print(manifest)
+            logger.error("~" * 80, "REMOTE STATE")
+            logger.error(remote_state)
+            logger.error("~" * 80, "MANIFEST")
+            logger.error(manifest)
 
             raise e
         self._raise_for_nonconforming_plan(completed_plan)
@@ -803,9 +805,9 @@ class Blueprint:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {sql}, skipping...")
+                    logger.error(f"Resource already exists: {sql}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {sql}, skipping...")
+                    logger.error(f"Invalid grant: {sql}, skipping...")
                 else:
                     raise err
         return actions_taken

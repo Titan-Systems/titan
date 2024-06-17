@@ -6,6 +6,7 @@ from .schema import Schema
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..resource_name import ResourceName
+from ..resource_tags import ResourceTags
 from ..scope import AccountScope
 
 
@@ -17,7 +18,7 @@ class _Database(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    tags: dict[str, str] = None
+    tags: ResourceTags = None
     comment: str = None
 
 
