@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .resource_monitor import ResourceMonitor
 from .role import Role
 from ..enums import ParseableEnum, ResourceType, WarehouseSize
@@ -50,7 +50,7 @@ class _Warehouse(ResourceSpec):
     tags: dict[str, str] = None
 
 
-class Warehouse(Resource):
+class Warehouse(ResourceNameTrait, Resource):
     """
     Description:
         A virtual warehouse, often referred to simply as a "warehouse", is a cluster of compute resources in Snowflake. It provides the necessary CPU, memory, and temporary storage to execute SQL SELECT statements, perform DML operations such as INSERT, UPDATE, DELETE, and manage data loading and unloading.
@@ -174,9 +174,9 @@ class Warehouse(Resource):
         tags: dict[str, str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Warehouse(
-            name=name,
+            name=self._name,
             owner=owner,
             warehouse_type=warehouse_type,
             warehouse_size=warehouse_size,
@@ -195,7 +195,3 @@ class Warehouse(Resource):
             statement_timeout_in_seconds=statement_timeout_in_seconds,
             tags=tags,
         )
-
-    @property
-    def name(self):
-        return self._data.name

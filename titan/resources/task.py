@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from .warehouse import Warehouse
 from ..enums import ResourceType, WarehouseSize, TaskState
@@ -40,7 +40,7 @@ class _Task(ResourceSpec):
     as_: str = None
 
 
-class Task(Resource):
+class Task(ResourceNameTrait, Resource):
     """
     Description:
         Represents a scheduled task in Snowflake that performs a specified SQL statement at a recurring interval.
@@ -128,9 +128,9 @@ class Task(Resource):
         state: TaskState = TaskState.SUSPENDED,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Task(
-            name=name,
+            name=self._name,
             owner=owner,
             warehouse=warehouse,
             user_task_managed_initial_warehouse_size=user_task_managed_initial_warehouse_size,
@@ -147,7 +147,3 @@ class Task(Resource):
             as_=as_,
             state=state,
         )
-
-    @property
-    def name(self):
-        return self._data.name

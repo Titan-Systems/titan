@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
 from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
@@ -42,7 +42,7 @@ class _User(ResourceSpec):
             self.display_name = str(self.name).lower()
 
 
-class User(Resource):
+class User(ResourceNameTrait, Resource):
     """
     Description:
         A user in Snowflake.
@@ -150,9 +150,9 @@ class User(Resource):
         tags: dict[str, str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _User = _User(
-            name=name,
+            name=self._name,
             owner=owner,
             password=password,
             login_name=login_name,
@@ -176,10 +176,6 @@ class User(Resource):
             network_policy=network_policy,
             tags=tags,
         )
-
-    @property
-    def name(self):
-        return self._data.name
 
     @property
     def owner(self):

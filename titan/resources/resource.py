@@ -421,7 +421,20 @@ class ResourceContainer:
 
 class ResourceNameTrait:
     def __init__(self, name: str, **kwargs):
-        fqn = parse_identifier(str(name), is_db_scoped=isinstance(self.scope, DatabaseScope))
+        name = str(name)
+
+        if isinstance(self.scope, AccountScope):
+            self._name = ResourceName(name)
+            super().__init__(**kwargs)
+            return
+
+        try:
+            fqn = parse_identifier(name, is_db_scoped=isinstance(self.scope, DatabaseScope))
+        except pp.ParseException as err:
+            # Allow identifiers that should be quoted, so long as they aren't insane
+            if "." in name:
+                raise ValueError(f"Resource name not supported {name}")
+            fqn = parse_identifier(f'"{name}"', is_db_scoped=isinstance(self.scope, DatabaseScope))
         self._name = ResourceName(fqn.name)
         if fqn.database and "database" in kwargs:
             raise ValueError("Multiple database names found")

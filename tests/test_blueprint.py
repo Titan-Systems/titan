@@ -89,7 +89,9 @@ def test_blueprint_with_resources():
     assert manifest[table_urn] == {
         "name": "TABLE",
         "owner": "SYSADMIN",
-        "columns": [{"name": "ID", "data_type": "INT"}],
+        "columns": [
+            {"name": "ID", "data_type": "INT", "collate": None, "comment": None, "constraint": None, "not_null": False}
+        ],
         "constraints": None,
         "transient": False,
         "cluster_by": None,
