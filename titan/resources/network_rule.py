@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
+from ..resource_name import ResourceName
 from ..scope import SchemaScope
-
 from ..props import (
     EnumProp,
     Props,
@@ -28,7 +28,7 @@ class NetworkRuleMode(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _NetworkRule(ResourceSpec):
-    name: str
+    name: ResourceName
     type: NetworkIdentifierType
     value_list: list[str]
     mode: NetworkRuleMode = NetworkRuleMode.INGRESS
@@ -41,7 +41,7 @@ class _NetworkRule(ResourceSpec):
             raise ValueError("When TYPE is HOST_PORT, MODE must be set to EGRESS.")
 
 
-class NetworkRule(Resource):
+class NetworkRule(ResourceNameTrait, Resource):
     """
     Description:
         A Network Rule in Snowflake defines a set of network addresses, such as IP addresses or hostnames,
@@ -103,9 +103,9 @@ class NetworkRule(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _NetworkRule = _NetworkRule(
-            name=name,
+            name=self._name,
             type=type,
             value_list=value_list,
             mode=mode,

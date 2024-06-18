@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .compute_pool import ComputePool
 from .warehouse import Warehouse
 from ..enums import AccountEdition, ResourceType
@@ -33,7 +33,7 @@ class _ServiceSpec(ResourceSpec):
     comment: str = None
 
 
-class Service(Resource):
+class Service(ResourceNameTrait, Resource):
     """
     Description:
         Service is a managed resource in Snowflake that allows users to run instances of their applications
@@ -130,9 +130,9 @@ class Service(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _ServiceSpec(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _ServiceSpec = _ServiceSpec(
+            name=self._name,
             compute_pool=compute_pool,
             stage=stage,
             yaml_file_stage_path=yaml_file_stage_path,

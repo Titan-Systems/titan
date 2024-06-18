@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .column import Column
 from .role import Role
 
 from ..enums import ResourceType
 from ..scope import SchemaScope
+from ..resource_name import ResourceName
 from ..props import (
     Props,
     SchemaProp,
@@ -16,7 +17,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _HybridTable(ResourceSpec):
-    name: str
+    name: ResourceName
     columns: list[Column]
     tags: dict[str, str] = None
     owner: Role = "SYSADMIN"
@@ -30,7 +31,7 @@ class _HybridTable(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class HybridTable(Resource):
+class HybridTable(ResourceNameTrait, Resource):
     """
     Description:
         `[UNDER DEVELOPMENT]`
@@ -88,9 +89,9 @@ class HybridTable(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _HybridTable(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _HybridTable = _HybridTable(
+            name=self._name,
             columns=columns,
             tags=tags,
             owner=owner,

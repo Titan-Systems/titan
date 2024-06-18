@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
+from ..resource_name import ResourceName
 
 from ..props import (
     Props,
@@ -14,7 +15,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _PasswordPolicy(ResourceSpec):
-    name: str
+    name: ResourceName
     password_min_length: int = 8
     password_max_length: int = 256
     password_min_upper_case_chars: int = 1
@@ -30,7 +31,7 @@ class _PasswordPolicy(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class PasswordPolicy(Resource):
+class PasswordPolicy(ResourceNameTrait, Resource):
     """
     Description:
         Defines the rules and constraints for creating and managing passwords within the system, ensuring they meet specific security standards.
@@ -132,9 +133,9 @@ class PasswordPolicy(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _PasswordPolicy = _PasswordPolicy(
-            name=name,
+            name=self._name,
             password_min_length=password_min_length,
             password_max_length=password_max_length,
             password_min_upper_case_chars=password_min_upper_case_chars,

@@ -551,8 +551,6 @@ class Blueprint:
                 raise Exception("Fully managed mode with all resources is not supported yet")
             
             for resource_type in self._valid_resource_types:
-                # if resource_type not in (ResourceType.USER, ResourceType.ROLE, ResourceType.SCHEMA,):
-                #     raise Exception("Fully managed mode with all resources is not supported yet")
                 for name in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     urn = URN(resource_type=resource_type, fqn=parse_identifier(name, is_db_scoped=resource_type in (ResourceType.SCHEMA, ResourceType.ROLE)), account_locator=self._account_locator)
                     data = data_provider.fetch_resource(session, urn)

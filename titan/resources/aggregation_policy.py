@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
+from ..resource_name import ResourceName
 from ..scope import SchemaScope
 
 from ..props import (
@@ -14,7 +15,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _AggregationPolicy(ResourceSpec):
-    name: str
+    name: ResourceName
     body: str
     comment: str = None
     owner: Role = "SYSADMIN"
@@ -27,7 +28,7 @@ class _AggregationPolicy(ResourceSpec):
 #   [ COMMENT = '<string_literal>' ]
 
 
-class AggregationPolicy(Resource):
+class AggregationPolicy(ResourceNameTrait, Resource):
     resource_type = ResourceType.AGGREGATION_POLICY
     props = Props(
         _start_token="AS ()",
@@ -45,9 +46,9 @@ class AggregationPolicy(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _AggregationPolicy = _AggregationPolicy(
-            name=name,
+            name=self._name,
             body=body,
             comment=comment,
             owner=owner,

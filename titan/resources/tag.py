@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import AccountEdition, ResourceType
 from ..scope import SchemaScope
 from ..props import Props, StringProp, StringListProp
+from ..resource_name import ResourceName
 
 
 @dataclass(unsafe_hash=True)
 class _Tag(ResourceSpec):
-    name: str
+    name: ResourceName
     comment: str = None
     allowed_values: list = None
 
@@ -38,9 +39,9 @@ class Tag(Resource):
         allowed_values: list = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _Tag = _Tag(
-            name=name,
+            name=self._name,
             comment=comment,
             allowed_values=allowed_values,
         )

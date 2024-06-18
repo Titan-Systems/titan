@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourcePointer, ResourceSpec
+from .resource import Resource, ResourcePointer, ResourceSpec, ResourceNameTrait
 from .role import Role
 from .table import Table
 from .view import View
@@ -10,6 +10,7 @@ from .view import View
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
 from ..props import BoolProp, FlagProp, IdentifierProp, Props, StringProp, TimeTravelProp
+from ..resource_name import ResourceName
 
 
 class StreamType(ParseableEnum):
@@ -21,7 +22,7 @@ class StreamType(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _TableStream(ResourceSpec):
-    name: str
+    name: ResourceName
     on_table: Table
     owner: Role = "SYSADMIN"
     copy_grants: bool = None
@@ -39,7 +40,7 @@ class _TableStream(ResourceSpec):
             self.before = {k.lower(): v for k, v in self.before.items()}
 
 
-class TableStream(Resource):
+class TableStream(ResourceNameTrait, Resource):
     """
     Description:
         Represents a stream on a table in Snowflake, which allows for change data capture on the table.
@@ -118,9 +119,9 @@ class TableStream(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _TableStream(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _TableStream = _TableStream(
+            name=self._name,
             on_table=on_table,
             owner=owner,
             copy_grants=copy_grants,
@@ -199,14 +200,14 @@ class TableStream(Resource):
 
 @dataclass(unsafe_hash=True)
 class _StageStream(ResourceSpec):
-    name: str
+    name: ResourceName
     on_stage: str
     owner: Role = "SYSADMIN"
     copy_grants: bool = None
     comment: str = None
 
 
-class StageStream(Resource):
+class StageStream(ResourceNameTrait, Resource):
     """
     Description:
         Represents a stream on a stage in Snowflake, which allows for capturing data changes on the stage.
@@ -263,9 +264,9 @@ class StageStream(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _StageStream(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _StageStream = _StageStream(
+            name=self._name,
             on_stage=on_stage,
             owner=owner,
             copy_grants=copy_grants,
@@ -276,7 +277,7 @@ class StageStream(Resource):
 
 @dataclass(unsafe_hash=True)
 class _ViewStream(ResourceSpec):
-    name: str
+    name: ResourceName
     on_view: View
     owner: Role = "SYSADMIN"
     copy_grants: bool = None
@@ -287,7 +288,7 @@ class _ViewStream(ResourceSpec):
     comment: str = None
 
 
-class ViewStream(Resource):
+class ViewStream(ResourceNameTrait, Resource):
     """
     Description:
         Represents a stream on a view in Snowflake, allowing for real-time data processing and querying.
@@ -367,9 +368,9 @@ class ViewStream(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _ViewStream(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _ViewStream = _ViewStream(
+            name=self._name,
             on_view=on_view,
             owner=owner,
             copy_grants=copy_grants,

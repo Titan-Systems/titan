@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
+from ..resource_name import ResourceName
 from ..props import (
     BoolProp,
     EnumProp,
@@ -56,7 +57,7 @@ class EncryptionType(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _InternalStage(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: Role = "SYSADMIN"
     type: StageType = StageType.INTERNAL
     encryption: dict[str, EncryptionType] = field(default_factory=None, metadata={"fetchable": False})
@@ -75,7 +76,7 @@ class _InternalStage(ResourceSpec):
                 raise ValueError("Encryption 'type' must be SNOWFLAKE_FULL or SNOWFLAKE_SSE for InternalStage")
 
 
-class InternalStage(Resource):
+class InternalStage(ResourceNameTrait, Resource):
     """
     -- Internal stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <internal_stage_name>
@@ -118,9 +119,9 @@ class InternalStage(Resource):
         **kwargs,
     ):
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _InternalStage = _InternalStage(
-            name=name,
+            name=self._name,
             owner=owner,
             encryption=encryption,
             directory=directory,
@@ -131,7 +132,7 @@ class InternalStage(Resource):
 
 @dataclass(unsafe_hash=True)
 class _ExternalStage(ResourceSpec):
-    name: str
+    name: ResourceName
     url: str
     owner: Role = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
@@ -153,7 +154,7 @@ class _ExternalStage(ResourceSpec):
             )
 
 
-class ExternalStage(Resource):
+class ExternalStage(ResourceNameTrait, Resource):
     """
     -- External stage
     CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <external_stage_name>
@@ -253,11 +254,11 @@ class ExternalStage(Resource):
         **kwargs,
     ):
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         if directory is None:
             directory = {"enable": False}
         self._data: _ExternalStage = _ExternalStage(
-            name=name,
+            name=self._name,
             url=url,
             owner=owner,
             type=type,

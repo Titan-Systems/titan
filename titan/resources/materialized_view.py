@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import AccountEdition, ResourceType
 from ..scope import SchemaScope
-
+from ..resource_name import ResourceName
 from ..props import (
     BoolProp,
     ColumnNamesProp,
@@ -19,7 +19,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _MaterializedView(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: Role = "SYSADMIN"
     secure: bool = False
     columns: list[dict] = None
@@ -30,7 +30,7 @@ class _MaterializedView(ResourceSpec):
     as_: str = None
 
 
-class MaterializedView(Resource):
+class MaterializedView(ResourceNameTrait, Resource):
     """
     Description:
         A Materialized View in Snowflake is a database object that contains the results of a query.
@@ -99,9 +99,9 @@ class MaterializedView(Resource):
         as_: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _MaterializedView(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _MaterializedView = _MaterializedView(
+            name=self._name,
             owner=owner,
             cluster_by=cluster_by,
             secure=secure,
