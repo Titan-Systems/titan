@@ -41,7 +41,7 @@ grants = [
 Use Blueprint to apply those changes to your Snowflake account. Blueprint works similar to Terraform - add resources, call `plan(...)` to see what changes will be applied, and then call `apply(...)` to run the changes.
 
 ```Python
-from titan import Blueprint
+from titan import Blueprint, print_plan
 
 bp = Blueprint()
 bp.add(
@@ -50,7 +50,7 @@ bp.add(
     *grants,
 )
 plan = bp.plan(session)
-print(plan) # =>
+print_plan(plan) # =>
 """
 account:ABC123
 

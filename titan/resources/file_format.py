@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import BinaryFormat, Compression, FileType, ResourceType
 from ..props import (
@@ -44,7 +44,7 @@ class _CSVFileFormat(ResourceSpec):
     comment: str = None
 
 
-class CSVFileFormat(Resource):
+class CSVFileFormat(ResourceNameTrait, Resource):
     """
     Description:
         Defines the specifications for a CSV file format in Snowflake, including delimiters, encoding, and compression options.
@@ -132,7 +132,7 @@ class CSVFileFormat(Resource):
 
     def __init__(
         self,
-        name: ResourceName,
+        name: str,
         owner: str = "SYSADMIN",
         compression: Compression = None,
         record_delimiter: str = "\n",
@@ -159,9 +159,9 @@ class CSVFileFormat(Resource):
         **kwargs,
     ):
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
-        self._data = _CSVFileFormat(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _CSVFileFormat = _CSVFileFormat(
+            name=self._name,
             owner=owner,
             compression=compression,
             record_delimiter=record_delimiter,

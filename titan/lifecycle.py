@@ -130,6 +130,19 @@ def create_view(urn: URN, data: dict, props: Props, if_not_exists: bool = False)
     )
 
 
+def create_table(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    data = data.copy()
+    transient = data.pop("transient", None)
+    return tidy_sql(
+        "CREATE",
+        "TRANSIENT" if transient else "",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
+        props.render(data),
+    )
+
+
 def update_resource(urn: URN, data: dict, props: Props) -> str:
     return getattr(__this__, f"update_{urn.resource_label}", update__default)(urn, data, props)
 

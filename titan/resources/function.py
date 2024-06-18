@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
-from .resource import Arg, Resource, ResourceSpec
+from .resource import Arg, Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
+from ..resource_name import ResourceName
 from ..scope import SchemaScope
 from ..enums import DataType, Language, NullHandling, ResourceType, Volatility
 from ..props import (
@@ -19,7 +20,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _JavascriptUDF(ResourceSpec):
-    name: str
+    name: ResourceName
     returns: str
     as_: str
     language: Language = Language.JAVASCRIPT
@@ -38,7 +39,7 @@ class _JavascriptUDF(ResourceSpec):
     volatility: Volatility = None
 
 
-class JavascriptUDF(Resource):
+class JavascriptUDF(ResourceNameTrait, Resource):
     """
     Description:
         A Javascript user-defined function (UDF) in Snowflake allows you to define a function using the JavaScript programming language.
@@ -124,9 +125,9 @@ class JavascriptUDF(Resource):
         **kwargs,
     ):
         kwargs.pop("language", None)
-        super().__init__(**kwargs)
-        self._data = _JavascriptUDF(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _JavascriptUDF = _JavascriptUDF(
+            name=self._name,
             returns=returns,
             as_=as_,
             copy_grants=copy_grants,
@@ -141,7 +142,7 @@ class JavascriptUDF(Resource):
 
 @dataclass(unsafe_hash=True)
 class _PythonUDF(ResourceSpec):
-    name: str
+    name: ResourceName
     returns: str
     runtime_version: str
     handler: str
@@ -160,7 +161,7 @@ class _PythonUDF(ResourceSpec):
     volatility: Volatility = None
 
 
-class PythonUDF(Resource):
+class PythonUDF(ResourceNameTrait, Resource):
     """
     Description:
         A Python user-defined function (UDF) in Snowflake allows users to define their own custom functions in Python.
@@ -282,9 +283,9 @@ class PythonUDF(Resource):
         **kwargs,
     ):
         kwargs.pop("language", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _PythonUDF = _PythonUDF(
-            name=name,
+            name=self._name,
             returns=returns,
             runtime_version=runtime_version,
             handler=handler,

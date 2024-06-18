@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
+from ..resource_name import ResourceName
 from ..props import (
     EnumProp,
     IntProp,
@@ -23,7 +24,7 @@ class ResourceMonitorFrequency(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _ResourceMonitor(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: Role = "ACCOUNTADMIN"
     credit_quota: int = None
     frequency: ResourceMonitorFrequency = None
@@ -41,7 +42,7 @@ class _ResourceMonitor(ResourceSpec):
             raise ValueError("ResourceMonitors can only be created by ACCOUNTADMIN")
 
 
-class ResourceMonitor(Resource):
+class ResourceMonitor(ResourceNameTrait, Resource):
     """
     Description:
         Manages the monitoring of resource usage within an account.
@@ -107,12 +108,13 @@ class ResourceMonitor(Resource):
         notify_users: list[str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _ResourceMonitor(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _ResourceMonitor = _ResourceMonitor(
+            name=self._name,
             credit_quota=credit_quota,
             frequency=frequency,
             start_timestamp=start_timestamp,
             end_timestamp=end_timestamp,
             notify_users=notify_users,
         )
+        # TODO: rely on notify_users

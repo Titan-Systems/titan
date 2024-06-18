@@ -1,20 +1,22 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
-from ..scope import AccountScope
+from ..scope import SchemaScope
+from ..resource_name import ResourceName
 
 from ..props import (
     Props,
-    IntegerProp,
+    IntProp,
     StringProp,
 )
 
 
+# TODO: needs ownership, fetch
 @dataclass(unsafe_hash=True)
 class _SessionPolicy(ResourceSpec):
-    name: str
+    name: ResourceName
     session_idle_timeout_mins: int = None
     session_ui_idle_timeout_mins: int = None
     comment: str = None
@@ -27,7 +29,7 @@ class _SessionPolicy(ResourceSpec):
             raise ValueError("SESSION_UI_IDLE_TIMEOUT_MINS must be a positive integer.")
 
 
-class SessionPolicy(Resource):
+class SessionPolicy(ResourceNameTrait, Resource):
     """
     Description:
         Manages session policies in Snowflake, which define timeout settings for user sessions to enhance security.
@@ -65,11 +67,11 @@ class SessionPolicy(Resource):
 
     resource_type = ResourceType.SESSION_POLICY
     props = Props(
-        session_idle_timeout_mins=IntegerProp("session_idle_timeout_mins"),
-        session_ui_idle_timeout_mins=IntegerProp("session_ui_idle_timeout_mins"),
+        session_idle_timeout_mins=IntProp("session_idle_timeout_mins"),
+        session_ui_idle_timeout_mins=IntProp("session_ui_idle_timeout_mins"),
         comment=StringProp("comment"),
     )
-    scope = AccountScope()
+    scope = SchemaScope()
     spec = _SessionPolicy
 
     def __init__(
@@ -80,9 +82,9 @@ class SessionPolicy(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _SessionPolicy = _SessionPolicy(
-            name=name,
+            name=self._name,
             session_idle_timeout_mins=session_idle_timeout_mins,
             session_ui_idle_timeout_mins=session_ui_idle_timeout_mins,
             comment=comment,

@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
@@ -37,7 +37,7 @@ class _ComputePool(ResourceSpec):
     comment: str = None
 
 
-class ComputePool(Resource):
+class ComputePool(ResourceNameTrait, Resource):
     """
     A compute pool is a group of compute resources in Snowflake that can be used to execute SQL queries.
     CREATE COMPUTE POOL [ IF NOT EXISTS ] <name>
@@ -76,9 +76,9 @@ class ComputePool(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _ComputePool(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _ComputePool = _ComputePool(
+            name=self._name,
             min_nodes=min_nodes,
             max_nodes=max_nodes,
             instance_family=instance_family,

@@ -40,8 +40,7 @@ tables:
 * `name` (string, required) - The name of the table.
 * `columns` (list, required) - The columns of the table.
 * `constraints` (list) - The constraints of the table.
-* `volatile` (bool) - Whether the table is volatile. Defaults to False.
-* `transient` (bool) - Whether the table is transient. Defaults to False.
+* `transient` (bool) - Whether the table is transient.
 * `cluster_by` (list) - The clustering keys for the table.
 * `enable_schema_evolution` (bool) - Whether schema evolution is enabled. Defaults to False.
 * `data_retention_time_in_days` (int) - The data retention time in days.

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
+from ..resource_name import ResourceName
 from .network_rule import NetworkRule
 from .role import Role
 from .secret import Secret
@@ -12,7 +13,7 @@ from ..props import BoolProp, Props, StringProp, IdentifierListProp
 
 @dataclass(unsafe_hash=True)
 class _ExternalAccessIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     allowed_network_rules: list[NetworkRule]
     allowed_api_authentication_integrations: list[str] = None
     allowed_authentication_secrets: list[Secret] = None
@@ -33,7 +34,7 @@ class _ExternalAccessIntegration(ResourceSpec):
             raise ValueError("allowed_authentication_secrets must have at least one element if not None")
 
 
-class ExternalAccessIntegration(Resource):
+class ExternalAccessIntegration(ResourceNameTrait, Resource):
     """
     Description:
         External Access Integrations enable code within functions and stored procedures to utilize secrets and establish connections with external networks. This resource configures the rules and secrets that can be accessed by such code.
@@ -96,9 +97,9 @@ class ExternalAccessIntegration(Resource):
         owner: str = "ACCOUNTADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _ExternalAccessIntegration = _ExternalAccessIntegration(
-            name=name,
+            name=self._name,
             allowed_network_rules=allowed_network_rules,
             allowed_api_authentication_integrations=allowed_api_authentication_integrations,
             allowed_authentication_secrets=allowed_authentication_secrets,

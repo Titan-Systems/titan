@@ -1,4 +1,5 @@
 import json
+import logging
 
 from dataclasses import dataclass
 from typing import List, Optional, Union
@@ -27,6 +28,7 @@ from .resources import Account, Database, Schema, Grant
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
+logger = logging.getLogger("titan")
 
 Manifest = dict[URN, dict]
 State = dict[URN, dict]
@@ -36,6 +38,9 @@ class MissingPrivilegeException(Exception):
 
 
 class MissingResourceException(Exception):
+    pass
+
+class MarkedForReplacementException(Exception):
     pass
 
 
@@ -482,6 +487,7 @@ class Blueprint:
                 attr = list(delta.keys())[0]
                 attr_metadata = resource_cls.spec.get_metadata(attr)
                 if attr_metadata.get("triggers_replacement", False):
+                    raise MarkedForReplacementException(f"Resource {urn} is marked for replacement", resource_cls, attr)
                     marked_for_replacement.add(urn)
                 elif attr_metadata.get("forces_add", False):
                     changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=delta))
@@ -500,7 +506,7 @@ class Blueprint:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
 
         for urn in marked_for_replacement:
-            raise NotImplementedError("Marked for replacement")
+            raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
             # changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
             # changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
 
@@ -545,8 +551,6 @@ class Blueprint:
                 raise Exception("Fully managed mode with all resources is not supported yet")
             
             for resource_type in self._valid_resource_types:
-                # if resource_type not in (ResourceType.USER, ResourceType.ROLE, ResourceType.SCHEMA,):
-                #     raise Exception("Fully managed mode with all resources is not supported yet")
                 for name in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     urn = URN(resource_type=resource_type, fqn=parse_identifier(name, is_db_scoped=resource_type in (ResourceType.SCHEMA, ResourceType.ROLE)), account_locator=self._account_locator)
                     data = data_provider.fetch_resource(session, urn)
@@ -578,7 +582,7 @@ class Blueprint:
             except Exception as e:
                 data = None
             if data is None:
-                print(manifest)
+                logger.error(manifest)
                 raise MissingResourceException(f"Resource {reference} required by {parent} not found or failed to fetch")
 
         return state
@@ -628,9 +632,7 @@ class Blueprint:
                     raise Exception(f"Database [{resource.container}] for resource {resource} not found")
             else:
                 for db in databases:
-                    if db == resource.container:
-                        break
-                    elif db.name == resource.container.name:
+                    if db.name == resource.container.name and resource not in db:
                         db.add(resource)
                         break
 
@@ -756,10 +758,10 @@ class Blueprint:
         try:
             completed_plan = self._plan(remote_state, manifest)
         except Exception as e:
-            print("~" * 80, "REMOTE STATE")
-            print(remote_state)
-            print("~" * 80, "MANIFEST")
-            print(manifest)
+            logger.error("~" * 80 + "REMOTE STATE")
+            logger.error(remote_state)
+            logger.error("~" * 80 + "MANIFEST")
+            logger.error(manifest)
 
             raise e
         self._raise_for_nonconforming_plan(completed_plan)
@@ -803,9 +805,9 @@ class Blueprint:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
-                    print(f"Resource already exists: {sql}, skipping...")
+                    logger.error(f"Resource already exists: {sql}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
-                    print(f"Invalid grant: {sql}, skipping...")
+                    logger.error(f"Invalid grant: {sql}, skipping...")
                 else:
                     raise err
         return actions_taken

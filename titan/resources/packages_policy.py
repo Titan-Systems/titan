@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType, Language
 from ..scope import SchemaScope
+from ..resource_name import ResourceName
 from ..props import (
     EnumProp,
     Props,
@@ -14,7 +15,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _PackagesPolicy(ResourceSpec):
-    name: str
+    name: ResourceName
     language: Language = Language.PYTHON
     allowlist: list[str] = None
     blocklist: list[str] = None
@@ -28,7 +29,7 @@ class _PackagesPolicy(ResourceSpec):
             raise ValueError("Language must be PYTHON")
 
 
-class PackagesPolicy(Resource):
+class PackagesPolicy(ResourceNameTrait, Resource):
     """
     A Packages Policy defines a set of rules for allowed and blocked packages.
 
@@ -62,9 +63,9 @@ class PackagesPolicy(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _PackagesPolicy = _PackagesPolicy(
-            name=name,
+            name=self._name,
             language=language,
             allowlist=allowlist,
             blocklist=blocklist,

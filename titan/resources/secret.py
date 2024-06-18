@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
+from ..resource_name import ResourceName
 from ..enums import ParseableEnum, ResourceType
 from ..scope import SchemaScope
 from ..props import (
@@ -20,7 +21,7 @@ class SecretType(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _Secret(ResourceSpec):
-    name: str
+    name: ResourceName
     type: SecretType
     api_authentication: str
     oauth_scopes: list[str] = None
@@ -40,7 +41,7 @@ class _Secret(ResourceSpec):
             raise ValueError("api_authentication must not be set when type is not OAUTH2")
 
 
-class Secret(Resource):
+class Secret(ResourceNameTrait, Resource):
     """
     Description:
         A Secret defines a set of sensitive data that can be used for authentication or other purposes.
@@ -129,9 +130,9 @@ class Secret(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _Secret = _Secret(
-            name=name,
+            name=self._name,
             type=type,
             api_authentication=api_authentication,
             oauth_scopes=oauth_scopes,

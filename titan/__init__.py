@@ -1,11 +1,16 @@
+import logging.config
+
 from .blueprint import Blueprint
 from .resources import *
+
+logger = logging.getLogger("titan")
+
 
 __all__ = [
     "Blueprint",
 ]
 
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 
 LOGO = r"""
     __  _ __          

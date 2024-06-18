@@ -158,7 +158,7 @@ scoped_resources = [
         "data": {
             "name": "PRODUCT",
             "owner": TEST_ROLE,
-            "columns": [{"name": "ID", "data_type": "NUMBER(38,0)", "nullable": True}],
+            "columns": [{"name": "ID", "data_type": "NUMBER(38,0)", "not_null": False}],
             "target_lag": "20 minutes",
             "warehouse": "CI",
             "refresh_mode": "AUTO",
@@ -267,16 +267,6 @@ scoped_resources = [
             "start": 1,
             "increment": 2,
             "comment": "+3",
-        },
-    },
-    {
-        "resource_type": ResourceType.TABLE,
-        "setup_sql": "CREATE TABLE sometbl (id INT)",
-        "teardown_sql": "DROP TABLE IF EXISTS sometbl",
-        "data": {
-            "name": "SOMETBL",
-            "owner": TEST_ROLE,
-            "columns": [{"name": "ID", "nullable": True, "data_type": "NUMBER(38,0)"}],
         },
     },
     {
@@ -711,3 +701,40 @@ def test_fetch_event_table(cursor, test_db, marked_for_cleanup):
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == data_provider.remove_none_values(event_table.to_dict())
+
+
+def test_fetch_grant_with_fully_qualified_ref(cursor, test_db, suffix, marked_for_cleanup):
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute(f"CREATE SCHEMA if not exists {test_db}.my_schema")
+    cursor.execute(f"CREATE ROLE test_role_grant_{suffix}")
+    cursor.execute(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE test_role_grant_{suffix}")
+    grant = res.Grant.from_sql(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE test_role_grant_{suffix}")
+    grant._data.owner = TEST_ROLE
+    result = safe_fetch(cursor, grant.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    result["on"] = ResourceName(result["on"])
+    assert result == data_provider.remove_none_values(grant.to_dict())
+
+
+def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
+    pipe = res.Pipe(
+        name="PIPE_EXAMPLE",
+        as_=f"""
+        COPY INTO pipe_destination
+        FROM '@%pipe_destination'
+        FILE_FORMAT = (TYPE = 'CSV');
+        """,
+        comment="Pipe for testing",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute("USE SCHEMA PUBLIC")
+    cursor.execute("CREATE TABLE pipe_destination (id INT)")
+    cursor.execute(pipe.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(pipe)
+
+    result = safe_fetch(cursor, pipe.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(pipe.to_dict())

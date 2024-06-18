@@ -38,7 +38,7 @@ def pytest_collection_modifyitems(items):
 
 @pytest.fixture(scope="session")
 def suffix():
-    return str(uuid.uuid4())[:8]
+    return str(uuid.uuid4())[:8].upper()
 
 
 @pytest.fixture(scope="session")

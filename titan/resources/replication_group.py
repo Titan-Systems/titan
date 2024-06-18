@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
+from ..resource_name import ResourceName
 from .database import Database
 from .role import Role
 from ..enums import AccountEdition, ParseableEnum, ResourceType
@@ -36,7 +37,7 @@ class IntegrationType(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _ReplicationGroup(ResourceSpec):
-    name: str
+    name: ResourceName
     object_types: list[ObjectType]
     allowed_accounts: list[str]
     allowed_databases: list[Database] = None
@@ -47,7 +48,7 @@ class _ReplicationGroup(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class ReplicationGroup(Resource):
+class ReplicationGroup(ResourceNameTrait, Resource):
     """
     CREATE REPLICATION GROUP [ IF NOT EXISTS ] <name>
         OBJECT_TYPES = <object_type> [ , <object_type> , ... ]
@@ -86,9 +87,9 @@ class ReplicationGroup(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _ReplicationGroup = _ReplicationGroup(
-            name=name,
+            name=self._name,
             object_types=object_types,
             allowed_accounts=allowed_accounts,
             allowed_databases=allowed_databases,

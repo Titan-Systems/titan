@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourceSpec
+from .resource import Resource, ResourceContainer, ResourceSpec, ResourceNameTrait
 from .role import Role
 from .schema import Schema
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..resource_name import ResourceName
+from ..resource_tags import ResourceTags
 from ..scope import AccountScope
 
 
@@ -17,11 +18,11 @@ class _Database(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    tags: dict[str, str] = None
+    tags: ResourceTags = None
     comment: str = None
 
 
-class Database(Resource, ResourceContainer):
+class Database(ResourceNameTrait, Resource, ResourceContainer):
     """
     Description:
         Represents a database in Snowflake.
@@ -141,9 +142,9 @@ class Database(Resource, ResourceContainer):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Database(
-            name=name.upper(),
+            name=self._name,
             transient=transient,
             owner=owner,
             data_retention_time_in_days=data_retention_time_in_days,
@@ -161,3 +162,7 @@ class Database(Resource, ResourceContainer):
 
     def schemas(self):
         return self.items(resource_type=ResourceType.SCHEMA)
+
+    @property
+    def public_schema(self):
+        return self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA)

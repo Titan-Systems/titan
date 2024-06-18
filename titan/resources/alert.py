@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from .warehouse import Warehouse
 from ..enums import ResourceType
+from ..resource_name import ResourceName
 from ..scope import SchemaScope
 
 from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
@@ -11,7 +12,7 @@ from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
 
 @dataclass(unsafe_hash=True)
 class _Alert(ResourceSpec):
-    name: str
+    name: ResourceName
     warehouse: Warehouse
     schedule: str
     condition: str
@@ -21,7 +22,7 @@ class _Alert(ResourceSpec):
     tags: dict[str, str] = None
 
 
-class Alert(Resource):
+class Alert(ResourceNameTrait, Resource):
     """
     Description:
         Alerts trigger notifications when certain conditions are met.
@@ -87,9 +88,9 @@ class Alert(Resource):
         tags: dict[str, str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _Alert(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _Alert = _Alert(
+            name=self._name,
             warehouse=warehouse,
             schedule=schedule,
             condition=condition,

@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec
+from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
+from ..resource_name import ResourceName
 from ..scope import DatabaseScope
 
 
 @dataclass(unsafe_hash=True)
 class _Schema(ResourceSpec):
-    name: str
+    name: ResourceName
     transient: bool = False
     managed_access: bool = False
     data_retention_time_in_days: int = 1
@@ -27,7 +28,7 @@ class _Schema(ResourceSpec):
             self.data_retention_time_in_days = 1
 
 
-class Schema(Resource, ResourceContainer):
+class Schema(ResourceNameTrait, Resource, ResourceContainer):
     """
     Description:
         Represents a schema in Snowflake, which is a logical grouping of database objects such as tables, views, and stored procedures. Schemas are used to organize and manage such objects within a database.
@@ -105,11 +106,20 @@ class Schema(Resource, ResourceContainer):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        if name == "INFORMATION_SCHEMA":
+        super().__init__(name, **kwargs)
+
+        # TODO:
+        # This is a temporary fix to allow the creation of schemas in the format
+        # `DB.SCHEMA` without having to create the database first.
+        # The plan going forward is to put this behavior into a ResourceNameTrait trait
+        # and have all resources with names inherit from that.
+        # name = self._add_implied_containers(name)
+
+        if self._name == "INFORMATION_SCHEMA":
             comment = "Views describing the contents of schemas in this database"
+
         self._data: _Schema = _Schema(
-            name=name,
+            name=self._name,
             transient=transient,
             managed_access=managed_access,
             data_retention_time_in_days=data_retention_time_in_days,

@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name="titan",
-    version="0.5.2",
+    version="0.5.3",
     description="Snowflake infrastructure as code",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
@@ -22,11 +22,11 @@ setup(
     install_requires=[
         "click>=8.1.7",
         "inflection>=0.5.1",
+        "pygithub==1.55",
         "pyparsing>=3.0.9",
         "pyyaml",
         "snowflake-connector-python>=3.7.0",
         "snowflake-snowpark-python>=1.14.0",
-        "pygithub==1.55",
     ],
     extras_require={
         "dev": [

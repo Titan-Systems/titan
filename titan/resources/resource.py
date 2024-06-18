@@ -14,9 +14,16 @@ from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
 from ..lifecycle import create_resource, drop_resource
 from ..props import Props as ResourceProps
-from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..parse import _parse_create_header, _parse_props, _resolve_resource_class, parse_identifier
 from ..resource_name import ResourceName
-from ..scope import ResourceScope, OrganizationScope, DatabaseScope, SchemaScope
+from ..resource_tags import ResourceTags
+from ..scope import (
+    AccountScope,
+    DatabaseScope,
+    OrganizationScope,
+    ResourceScope,
+    SchemaScope,
+)
 
 
 def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
@@ -108,9 +115,10 @@ class ResourceSpec:
             # Coerce resources
             elif issubclass(field_type, Resource):
                 return convert_to_resource(field_type, field_value)
-
             elif field_type == ResourceName:
                 return ResourceName(field_value)
+            elif field_type == ResourceTags:
+                return ResourceTags(field_value)
             else:
                 return field_value
 
@@ -156,6 +164,7 @@ class Resource(metaclass=_Resource):
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
+    in_place_serialization: bool = False
 
     def __init__(self, implicit: bool = False, **kwargs):
         super().__init__()
@@ -285,9 +294,11 @@ class Resource(metaclass=_Resource):
             if isinstance(value, ResourcePointer):
                 return value.name
             elif isinstance(value, Resource):
-                if hasattr(value, "serialize"):
-                    return value.serialize()
-                elif hasattr(value._data, "name"):
+                # if hasattr(value, "serialize"):
+                #     return value.serialize()
+                if getattr(value, "in_place_serialization", False):
+                    return value.to_dict()
+                if hasattr(value._data, "name"):
                     return getattr(value._data, "name")
                 else:
                     raise Exception(f"Cannot serialize {value}")
@@ -351,6 +362,8 @@ class Resource(metaclass=_Resource):
         if isinstance(self.scope, SchemaScope):
             if schema is not None:
                 schema.add(self)
+            elif database is not None:
+                database.find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(self)
 
     @property
     def container(self):
@@ -371,6 +384,9 @@ class Resource(metaclass=_Resource):
 class ResourceContainer:
     def __init__(self):
         self._items: dict[ResourceType, list[Resource]] = {}
+
+    def __contains__(self, item: Resource):
+        return item in self._items.get(item.resource_type, [])
 
     def add(self, *items: Resource):
         if isinstance(items[0], list):
@@ -393,7 +409,9 @@ class ResourceContainer:
 
     def find(self, resource_type: ResourceType, name: str) -> Resource:
         for resource in self.items(resource_type):
-            if resource._data.name == name:
+            if isinstance(resource, ResourcePointer) and resource.name == name:
+                return resource
+            elif isinstance(resource, Resource) and resource._data is not None and resource._data.name == name:
                 return resource
         raise KeyError(f"Resource {resource_type} {name} not found")
 
@@ -403,20 +421,46 @@ class ResourceContainer:
             resource._container = None
             resource.refs.remove(self)
 
+
+class ResourceNameTrait:
+    def __init__(self, name: str, **kwargs):
+        name = str(name)
+
+        if isinstance(self.scope, AccountScope):
+            self._name = ResourceName(name)
+            super().__init__(**kwargs)
+            return
+
+        try:
+            fqn = parse_identifier(name, is_db_scoped=isinstance(self.scope, DatabaseScope))
+        except pp.ParseException as err:
+            # Allow identifiers that should be quoted, so long as they aren't insane
+            if "." in name:
+                raise ValueError(f"Resource name not supported {name}")
+            fqn = parse_identifier(f'"{name}"', is_db_scoped=isinstance(self.scope, DatabaseScope))
+        self._name = ResourceName(fqn.name)
+        if fqn.database and "database" in kwargs:
+            raise ValueError("Multiple database names found")
+        if fqn.schema and "schema" in kwargs:
+            raise ValueError("Multiple schema names found")
+        super().__init__(
+            database=kwargs.pop("database", fqn.database),
+            schema=kwargs.pop("schema", fqn.schema),
+            **kwargs,
+        )
+
     @property
     def name(self):
-        return self._data.name
+        return self._name
 
 
-class ResourcePointer(Resource, ResourceContainer):
+class ResourcePointer(ResourceNameTrait, Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
-        self._name: ResourceName = ResourceName(name)
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
-        super().__init__()
+        super().__init__(name)
 
         # Don't want to do this for all implicit resources but making an exception for PUBLIC schema
-
         # If this points to a database, assume it includes a PUBLIC schema
         if self._resource_type == ResourceType.DATABASE and self._name != "SNOWFLAKE":
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
@@ -452,10 +496,6 @@ class ResourcePointer(Resource, ResourceContainer):
         return self.scope.fully_qualified_name(self.container, self.name)
 
     @property
-    def name(self):
-        return self._name
-
-    @property
     def resource_type(self):
         return self._resource_type
 
@@ -464,28 +504,7 @@ class ResourcePointer(Resource, ResourceContainer):
 
 
 def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource]) -> Resource:
-    """Convert a resource descriptor to a resource instance
-
-    Args:
-        cls (Resource): The resource class to convert to
-        resource_or_descriptor (Union[str, dict, Resource]): The resource descriptor to convert
-
-    Returns:
-        Resource: A new or existing resource instance based on the provided descriptor.
-
-    Examples:
-        >>> convert_to_resource(Database, "my_database")
-        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
-
-        >>> convert_to_resource(Database, {"name": "my_database"})
-        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
-
-        >>> convert_to_resource(Database, Database(name="my_database"))
-        Database(name="my_database")
-
-        >>> convert_to_resource(Database, ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE))
-        ResourcePointer(name='my_database', resource_type=ResourceType.DATABASE)
-    """
+    """Convert a resource descriptor to a resource instance"""
     if isinstance(resource_or_descriptor, str):
         return ResourcePointer(name=resource_or_descriptor, resource_type=cls.resource_type)
     elif isinstance(resource_or_descriptor, dict):

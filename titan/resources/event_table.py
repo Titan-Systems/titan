@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
+from ..resource_name import ResourceName
 from ..props import (
     BoolProp,
     FlagProp,
@@ -17,7 +18,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _EventTable(ResourceSpec):
-    name: str
+    name: ResourceName
     cluster_by: list[str] = None
     data_retention_time_in_days: int = None
     max_data_extension_time_in_days: int = None
@@ -30,7 +31,7 @@ class _EventTable(ResourceSpec):
     tags: dict[str, str] = None
 
 
-class EventTable(Resource):
+class EventTable(ResourceNameTrait, Resource):
     """
     Description:
         An event table captures events, including logged messages from functions and procedures.
@@ -112,9 +113,9 @@ class EventTable(Resource):
         tags: dict[str, str] = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _EventTable = _EventTable(
-            name=name,
+            name=self._name,
             cluster_by=cluster_by,
             data_retention_time_in_days=data_retention_time_in_days,
             max_data_extension_time_in_days=max_data_extension_time_in_days,

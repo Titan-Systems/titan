@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
+from ..resource_name import ResourceName
 from ..scope import SchemaScope
 
 from ..props import (
@@ -18,7 +19,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _View(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: Role = "SYSADMIN"
     secure: bool = None
     volatile: bool = None
@@ -36,7 +37,7 @@ class _View(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class View(Resource):
+class View(ResourceNameTrait, Resource):
     """
     Description:
         Represents a view in Snowflake, which is a virtual table created by a stored query on the data.
@@ -110,9 +111,9 @@ class View(Resource):
         as_: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _View(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _View = _View(
+            name=self._name,
             owner=owner,
             secure=secure,
             volatile=volatile,

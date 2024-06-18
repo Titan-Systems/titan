@@ -3,15 +3,24 @@
     "columns": [
         {
             "name": "id",
-            "data_type": "INT"
+            "data_type": "INT",
+            "collate": null,
+            "comment": null,
+            "not_null": false,
+            "constraint": null,
+            "default": null
         },
         {
             "name": "amount",
-            "data_type": "NUMBER"
+            "data_type": "NUMBER",
+            "collate": null,
+            "comment": null,
+            "not_null": false,
+            "constraint": null,
+            "default": null
         }
     ],
     "constraints": null,
-    "volatile": false,
     "transient": false,
     "cluster_by": null,
     "enable_schema_evolution": false,
@@ -19,7 +28,7 @@
     "max_data_extension_time_in_days": null,
     "change_tracking": false,
     "default_ddl_collation": null,
-    "copy_grants": false,
+    "copy_grants": null,
     "row_access_policy": null,
     "tags": null,
     "owner": "SYSADMIN",

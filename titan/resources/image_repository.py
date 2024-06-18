@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import AccountEdition, ResourceType
 from ..props import Props
@@ -14,7 +14,7 @@ class _ImageRepository(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class ImageRepository(Resource):
+class ImageRepository(ResourceNameTrait, Resource):
     """
     Description:
         An image repository in Snowflake is a storage unit within a schema that allows for the management of OCIv2-compliant container images.
@@ -54,8 +54,8 @@ class ImageRepository(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _ImageRepository(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _ImageRepository = _ImageRepository(
+            name=self._name,
             owner=owner,
         )

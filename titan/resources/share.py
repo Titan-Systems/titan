@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
 from ..resource_name import ResourceName
@@ -19,7 +19,7 @@ class _Share(ResourceSpec):
     comment: str = None
 
 
-class Share(Resource):
+class Share(ResourceNameTrait, Resource):
     """
     Description:
         Represents a share resource in Snowflake, which allows sharing data across Snowflake accounts.
@@ -64,13 +64,9 @@ class Share(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Share(
-            name=name,
+            name=self._name,
             owner=owner,
             comment=comment,
         )
-
-    @property
-    def name(self):
-        return self._data.name

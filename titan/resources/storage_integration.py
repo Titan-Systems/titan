@@ -1,10 +1,11 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
+from ..resource_name import ResourceName
 
 
 class StorageProvider(ParseableEnum):
@@ -15,7 +16,7 @@ class StorageProvider(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _S3StorageIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     storage_aws_role_arn: str
     storage_allowed_locations: list[str]
@@ -32,7 +33,7 @@ class _S3StorageIntegration(ResourceSpec):
             raise ValueError("Type must be 'EXTERNAL_STAGE' for S3StorageIntegration")
 
 
-class S3StorageIntegration(Resource):
+class S3StorageIntegration(ResourceNameTrait, Resource):
     """
     Description:
         Manages the integration of Snowflake with S3 storage.
@@ -109,9 +110,9 @@ class S3StorageIntegration(Resource):
     ):
         kwargs.pop("storage_provider", None)
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _S3StorageIntegration = _S3StorageIntegration(
-            name=name,
+            name=self._name,
             enabled=enabled,
             storage_aws_role_arn=storage_aws_role_arn,
             storage_allowed_locations=storage_allowed_locations,
@@ -124,7 +125,7 @@ class S3StorageIntegration(Resource):
 
 @dataclass(unsafe_hash=True)
 class _GCSStorageIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     storage_allowed_locations: list[str]
     storage_blocked_locations: list[str] = None
@@ -139,7 +140,7 @@ class _GCSStorageIntegration(ResourceSpec):
             raise ValueError("Type must be 'EXTERNAL_STAGE' for GCSStorageIntegration")
 
 
-class GCSStorageIntegration(Resource):
+class GCSStorageIntegration(ResourceNameTrait, Resource):
     """
     Description:
         Manages the integration of Google Cloud Storage (GCS) as an external stage for storing data.
@@ -203,9 +204,9 @@ class GCSStorageIntegration(Resource):
     ):
         kwargs.pop("storage_provider", None)
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _GCSStorageIntegration = _GCSStorageIntegration(
-            name=name,
+            name=self._name,
             enabled=enabled,
             storage_allowed_locations=storage_allowed_locations,
             storage_blocked_locations=storage_blocked_locations,
@@ -216,7 +217,7 @@ class GCSStorageIntegration(Resource):
 
 @dataclass(unsafe_hash=True)
 class _AzureStorageIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     azure_tenant_id: str
     storage_allowed_locations: list[str]
@@ -232,7 +233,7 @@ class _AzureStorageIntegration(ResourceSpec):
             raise ValueError("Type must be 'EXTERNAL_STAGE' for _AzureStorageIntegration")
 
 
-class AzureStorageIntegration(Resource):
+class AzureStorageIntegration(ResourceNameTrait, Resource):
     """
     Description:
         Represents an Azure storage integration in Snowflake, which allows Snowflake to access external cloud storage using Azure credentials.
@@ -303,9 +304,9 @@ class AzureStorageIntegration(Resource):
     ):
         kwargs.pop("storage_provider", None)
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data: _AzureStorageIntegration = _AzureStorageIntegration(
-            name=name,
+            name=self._name,
             enabled=enabled,
             azure_tenant_id=azure_tenant_id,
             storage_allowed_locations=storage_allowed_locations,

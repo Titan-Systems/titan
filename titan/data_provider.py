@@ -136,7 +136,7 @@ def _parse_cluster_keys(cluster_keys_str: str) -> list[str]:
         LINEAR(C1, C3)
         LINEAR(SUBSTRING(C2, 5, 15), CAST(C1 AS DATE))
     """
-    if cluster_keys_str is None:
+    if cluster_keys_str is None or cluster_keys_str == "":
         return None
     cluster_keys_str = cluster_keys_str[len("LINEAR") :]
     cluster_keys_str = cluster_keys_str.strip("()")
@@ -221,7 +221,15 @@ def options_result_to_list(options_result):
 
 
 def remove_none_values(d):
-    return {k: v for k, v in d.items() if v is not None}
+    new_dict = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            new_dict[k] = remove_none_values(v)
+        elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+            new_dict[k] = [remove_none_values(item) for item in v if item is not None]
+        elif v is not None:
+            new_dict[k] = v
+    return new_dict
 
 
 def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
@@ -230,6 +238,17 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     if len(ownership_grant) == 0:
         return None
     return ownership_grant[0]["grantee_name"]
+
+
+def _show_objects(session, type_str, fqn: FQN):
+    if fqn.database is None and fqn.schema is None:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'")
+    elif fqn.database is None:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}")
+    elif fqn.schema is None:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+    else:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
 
 
 def fetch_resource(session, urn: URN) -> Optional[dict]:
@@ -361,15 +380,17 @@ def fetch_columns(session, resource_type: str, fqn: FQN):
         if col["kind"] != "COLUMN":
             raise Exception(f"Unexpected kind {col['kind']} in desc result")
         columns.append(
-            remove_none_values(
-                {
-                    "name": col["name"],
-                    "data_type": col["type"],
-                    "nullable": col["null?"] == "Y",
-                    "default": col["default"],
-                    "comment": col["comment"] or None,
-                }
-            )
+            # remove_none_values(
+            {
+                "name": col["name"],
+                "data_type": col["type"],
+                "not_null": col["null?"] == "N",
+                "default": col["default"],
+                "comment": col["comment"] or None,
+                "constraint": None,
+                "collate": None,
+            }
+            # )
         )
     return columns
 
@@ -452,14 +473,13 @@ def fetch_dynamic_table(session, fqn: FQN):
 
 
 def fetch_file_format(session, fqn: FQN):
-    show_result = execute(session, "SHOW FILE FORMATS IN ACCOUNT", cacheable=True)
-    file_formats = _filter_result(show_result, name=fqn.name)
-    if len(file_formats) == 0:
+    show_result = _show_objects(session, "FILE FORMATS", fqn)
+    if len(show_result) == 0:
         return None
-    if len(file_formats) > 1:
+    if len(show_result) > 1:
         raise Exception(f"Found multiple file formats matching {fqn}")
 
-    data = file_formats[0]
+    data = show_result[0]
     format_options = json.loads(data["format_options"])
 
     return {
@@ -715,6 +735,28 @@ def fetch_password_policy(session, fqn: FQN):
         "password_history": int(properties["PASSWORD_HISTORY"]),
         "comment": properties["COMMENT"] or None,
         "owner": properties["OWNER"],
+    }
+
+
+def fetch_pipe(session, fqn: FQN):
+    show_result = _show_objects(session, "PIPES", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple pipes matching {fqn}")
+
+    data = show_result[0]
+
+    # desc_result = execute(session, f"DESC PIPE {fqn}", cacheable=True)
+
+    return {
+        "name": data["name"],
+        "as_": data["definition"],
+        "owner": data["owner"],
+        "error_integration": data["error_integration"],
+        # "aws_sns_topic": data["aws_sns_topic"],
+        "integration": data["integration"],
+        "comment": data["comment"],
     }
 
 
@@ -1224,10 +1266,13 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
 
 
 def fetch_table(session, fqn: FQN):
-    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+    show_result = execute(session, "SHOW TABLES IN ACCOUNT", cacheable=True)
 
     tables = _filter_result(
-        show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema, kind="TABLE"
+        show_result,
+        name=fqn.name,
+        database_name=fqn.database,
+        schema_name=fqn.schema,
     )
 
     if len(tables) == 0:
@@ -1238,15 +1283,23 @@ def fetch_table(session, fqn: FQN):
     columns = fetch_columns(session, "TABLE", fqn)
 
     data = tables[0]
+    tags = fetch_resource_tags(session, ResourceType.TABLE, fqn)
+    show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
+    params = params_result_to_dict(show_params_result)
+
     return {
         "name": data["name"],
+        "columns": columns,
+        "cluster_by": _parse_cluster_keys(data["cluster_by"]),
+        "transient": data["kind"] == "TRANSIENT",
         "owner": data["owner"],
         "comment": data["comment"] or None,
-        "cluster_by": data["cluster_by"] or None,
-        "columns": columns,
-        # This is here because of CTAS type tables.
-        # we have no way of getting this back from Snowflake, unless we crammed it as a tag/comment somewhere
-        "as_": None,
+        "enable_schema_evolution": data["enable_schema_evolution"] == "Y",
+        # "data_retention_time_in_days": int(data["retention_time"]),
+        # "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days", None),
+        "default_ddl_collation": params.get("default_ddl_collation", None),
+        "change_tracking": data["change_tracking"] == "ON",
+        "tags": tags,
     }
 
 

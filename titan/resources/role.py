@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from ..enums import ResourceType
-from ..parse import parse_identifier
 from ..props import Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope, DatabaseScope
@@ -16,7 +15,7 @@ class _Role(ResourceSpec):
     comment: str = None
 
 
-class Role(Resource):
+class Role(ResourceNameTrait, Resource):
     """
     Description:
         A role in Snowflake defines a set of access controls and permissions.
@@ -66,20 +65,16 @@ class Role(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Role(
-            name=name,
+            name=self._name,
             owner=owner,
             tags=tags,
             comment=comment,
         )
 
-    @property
-    def name(self):
-        return self._data.name
 
-
-class DatabaseRole(Resource):
+class DatabaseRole(ResourceNameTrait, Resource):
     """
     Description:
         A database role in Snowflake is a collection of privileges that can be assigned to users or other roles within a specific database context. It is used to manage access control and permissions at the database level.
@@ -129,23 +124,15 @@ class DatabaseRole(Resource):
     def __init__(
         self,
         name: str,
-        database: str = None,
         owner: str = "USERADMIN",
         tags: dict[str, str] = None,
         comment: str = None,
         **kwargs,
     ):
-        fqn = parse_identifier(name, is_db_scoped=True)
-        if fqn.database:
-            database = fqn.database
-        super().__init__(database=database, **kwargs)
+        super().__init__(name, **kwargs)
         self._data: _Role = _Role(
-            name=fqn.name,
+            name=self._name,
             owner=owner,
             tags=tags,
             comment=comment,
         )
-
-    @property
-    def name(self):
-        return self._data.name

@@ -1,17 +1,8 @@
 import pytest
 
-from titan import (
-    Blueprint,
-    Database,
-    Role,
-    Grant,
-    PythonUDF,
-    JavascriptUDF,
-    Schema,
-    Table,
-    View,
-)
-from titan.blueprint import Action
+
+from titan import resources as res
+from titan.blueprint import Action, Blueprint, MarkedForReplacementException
 from titan.enums import ResourceType
 from titan.identifiers import URN, FQN
 from titan.parse import parse_URN
@@ -36,12 +27,12 @@ def remote_state() -> dict:
 
 def test_blueprint_with_resources():
     session_ctx = {"account": "SOMEACCT", "account_locator": "ABCD123"}
-    db = Database(name="DB")
-    schema = Schema(name="SCHEMA", database=db)
-    table = Table(name="TABLE", columns=[{"name": "ID", "data_type": "INT"}])
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCHEMA", database=db)
+    table = res.Table(name="TABLE", columns=[{"name": "ID", "data_type": "INT"}])
     schema.add(table)
-    view = View(name="VIEW", schema=schema, as_="SELECT 1")
-    udf = PythonUDF(
+    view = res.View(name="VIEW", schema=schema, as_="SELECT 1")
+    udf = res.PythonUDF(
         name="SOMEUDF",
         returns="VARCHAR",
         args=[],
@@ -98,9 +89,18 @@ def test_blueprint_with_resources():
     assert manifest[table_urn] == {
         "name": "TABLE",
         "owner": "SYSADMIN",
-        "columns": [{"name": "ID", "data_type": "INT"}],
+        "columns": [
+            {
+                "name": "ID",
+                "data_type": "INT",
+                "collate": None,
+                "comment": None,
+                "constraint": None,
+                "not_null": False,
+                "default": None,
+            }
+        ],
         "constraints": None,
-        "volatile": False,
         "transient": False,
         "cluster_by": None,
         "enable_schema_evolution": False,
@@ -108,7 +108,7 @@ def test_blueprint_with_resources():
         "max_data_extension_time_in_days": None,
         "change_tracking": False,
         "default_ddl_collation": None,
-        "copy_grants": False,
+        "copy_grants": None,
         "row_access_policy": None,
         "tags": None,
         "comment": None,
@@ -147,8 +147,8 @@ def test_blueprint_with_resources():
 
 
 def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
-    role = Role("SOME_ROLE")
-    db = Database("DB", owner=role)
+    role = res.Role("SOME_ROLE")
+    db = res.Database("DB", owner=role)
     blueprint = Blueprint(name="blueprint", resources=[db, role])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
@@ -170,7 +170,7 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
 
 
 def test_blueprint_deduplicate_resources(session_ctx, remote_state):
-    blueprint = Blueprint(name="blueprint", resources=[Database("DB"), Database("DB")])
+    blueprint = Blueprint(name="blueprint", resources=[res.Database("DB"), res.Database("DB")])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
@@ -180,8 +180,8 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
     blueprint = Blueprint(
         name="blueprint",
         resources=[
-            Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
-            Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
+            res.Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
+            res.Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
         ],
     )
     manifest = blueprint.generate_manifest(session_ctx)
@@ -192,8 +192,8 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
 
 
 def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
-    db = Database("DB")
-    public = Schema(name="PUBLIC", database=db, comment="this is ignored")
+    db = res.Database("DB")
+    public = res.Schema(name="PUBLIC", database=db, comment="this is ignored")
     blueprint = Blueprint(
         name="blueprint",
         resources=[db, public],
@@ -208,7 +208,7 @@ def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
 def test_blueprint_implied_container_tree(session_ctx, remote_state):
     remote_state[parse_URN("urn::ABCD123:database/STATIC_DB")] = {}
     remote_state[parse_URN("urn::ABCD123:schema/STATIC_DB.PUBLIC")] = {}
-    func = JavascriptUDF(name="func", returns="INT", as_="return 1;", database="STATIC_DB", schema="public")
+    func = res.JavascriptUDF(name="func", returns="INT", as_="return 1;", database="STATIC_DB", schema="public")
     blueprint = Blueprint(name="blueprint", resources=[func])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
@@ -218,12 +218,65 @@ def test_blueprint_implied_container_tree(session_ctx, remote_state):
 
 
 def test_blueprint_chained_ownership(session_ctx, remote_state):
-    role = Role("SOME_ROLE")
-    db = Database("DB", owner=role)
-    schema = Schema("SCHEMA", database=db, owner=role)
+    role = res.Role("SOME_ROLE")
+    db = res.Database("DB", owner=role)
+    schema = res.Schema("SCHEMA", database=db, owner=role)
     blueprint = Blueprint(name="blueprint", resources=[db, schema])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     # assert len(plan) == 1
     # assert plan[0].action == Action.ADD
     # assert plan[0].urn.fqn.name == "func"
+
+
+def test_blueprint_polymorphic_resource_resolution(session_ctx, remote_state):
+
+    role = res.Role(name="DEMO_ROLE")
+    sysad_grant = res.RoleGrant(role=role, to_role="SYSADMIN")
+    test_db = res.Database(name="TEST_TITAN", transient=False, data_retention_time_in_days=1, comment="Test Titan")
+    schema = res.Schema(name="TEST_SCHEMA", database=test_db, transient=False, comment="Test Titan Schema")
+    warehouse = res.Warehouse(name="FAKER_LOADER", auto_suspend=60)
+
+    future_schema_grant = res.FutureGrant(priv="usage", on_future_schemas_in=test_db, to=role)
+    post_grant = [future_schema_grant]
+
+    grants = [
+        res.Grant(priv="usage", to=role, on=warehouse),
+        res.Grant(priv="operate", to=role, on=warehouse),
+        res.Grant(priv="usage", to=role, on=test_db),
+        # future_schema_grant,
+        # x
+        # Grant(priv="usage", to=role, on=schema)
+    ]
+
+    sales_table = res.Table(
+        name="faker_data",
+        schema=schema,
+        columns=[
+            res.Column(name="NAME", data_type="VARCHAR(16777216)"),
+            res.Column(name="EMAIL", data_type="VARCHAR(16777216)"),
+            res.Column(name="ADDRESS", data_type="VARCHAR(16777216)"),
+            res.Column(name="ORDERED_AT_UTC", data_type="NUMBER(38,0)"),
+            res.Column(name="EXTRACTED_AT_UTC", data_type="NUMBER(38,0)"),
+            res.Column(name="SALES_ORDER_ID", data_type="VARCHAR(16777216)"),
+        ],
+        comment="Test Table",
+    )
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            role,
+            sysad_grant,
+            # user_grant,
+            test_db,
+            # *pre_grant,
+            schema,
+            sales_table,
+            # pipe,
+            warehouse,
+            *grants,
+        ],
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 9

@@ -1,23 +1,24 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
+from ..resource_name import ResourceName
 
 from ..props import Props, IntProp, StringProp
 
 
 @dataclass(unsafe_hash=True)
 class _Sequence(ResourceSpec):
-    name: str
+    name: ResourceName
     owner: Role = "SYSADMIN"
     start: int = None
     increment: int = None
     comment: str = None
 
 
-class Sequence(Resource):
+class Sequence(ResourceNameTrait, Resource):
     """
     Description:
         Manages the creation and configuration of sequences in Snowflake, which are objects that generate numeric values according to a specified sequence.
@@ -75,9 +76,9 @@ class Sequence(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _Sequence(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _Sequence = _Sequence(
+            name=self._name,
             owner=owner,
             start=start,
             increment=increment,

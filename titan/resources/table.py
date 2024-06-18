@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait, ResourceName
 from .column import Column
 from .role import Role
 
@@ -23,11 +23,10 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _Table(ResourceSpec):
-    name: str
+    name: ResourceName
     # TODO: allow columns to be specified as SQL
     columns: list[Column]
     constraints: list[str] = None
-    volatile: bool = False
     transient: bool = False
     cluster_by: list[str] = None
     enable_schema_evolution: bool = False
@@ -35,7 +34,7 @@ class _Table(ResourceSpec):
     max_data_extension_time_in_days: int = None
     change_tracking: bool = False
     default_ddl_collation: str = None
-    copy_grants: bool = False
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     row_access_policy: dict[str, list] = None
     tags: dict[str, str] = None
     owner: Role = "SYSADMIN"
@@ -49,7 +48,7 @@ class _Table(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class Table(Resource):
+class Table(ResourceNameTrait, Resource):
     """
     Description:
         A table in Snowflake.
@@ -61,8 +60,7 @@ class Table(Resource):
         name (string, required): The name of the table.
         columns (list, required): The columns of the table.
         constraints (list): The constraints of the table.
-        volatile (bool): Whether the table is volatile. Defaults to False.
-        transient (bool): Whether the table is transient. Defaults to False.
+        transient (bool): Whether the table is transient.
         cluster_by (list): The clustering keys for the table.
         enable_schema_evolution (bool): Whether schema evolution is enabled. Defaults to False.
         data_retention_time_in_days (int): The data retention time in days.
@@ -99,13 +97,10 @@ class Table(Resource):
 
     resource_type = ResourceType.TABLE
     props = Props(
-        volatile=FlagProp("volatile"),
         transient=FlagProp("transient"),
         columns=SchemaProp(),
         cluster_by=IdentifierListProp("cluster by", eq=False, parens=True),
         enable_schema_evolution=BoolProp("enable_schema_evolution"),
-        # stage_file_format=FileFormatProp("stage_file_format"),
-        # stage_copy_options=PropSet("stage_copy_options", copy_options),
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
         max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
         change_tracking=BoolProp("change_tracking"),
@@ -122,7 +117,6 @@ class Table(Resource):
         name: str,
         columns: list[Column],
         constraints: list[str] = None,
-        volatile: bool = False,
         transient: bool = False,
         cluster_by: list[str] = None,
         enable_schema_evolution: bool = False,
@@ -130,19 +124,18 @@ class Table(Resource):
         max_data_extension_time_in_days: int = None,
         change_tracking: bool = False,
         default_ddl_collation: str = None,
-        copy_grants: bool = False,
+        copy_grants: bool = None,
         row_access_policy: dict[str, list] = None,
         tags: dict[str, str] = None,
         owner: str = "SYSADMIN",
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _Table(
-            name=name,
+            name=self._name,
             columns=columns,
             constraints=constraints,
-            volatile=volatile,
             transient=transient,
             cluster_by=cluster_by,
             enable_schema_evolution=enable_schema_evolution,
@@ -193,78 +186,78 @@ class Table(Resource):
         return self._table_stage
 
 
-@dataclass(unsafe_hash=True)
-class _CreateTableAsSelect(ResourceSpec):
-    name: str
-    as_: str = field(default_factory=None, metadata={"triggers_replacement": True})
-    columns: list[Column] = field(default_factory=None, metadata={"triggers_replacement": True})
-    cluster_by: list[str] = None
-    copy_grants: bool = False
-    row_access_policy: dict[str, list] = None
-    owner: Role = "SYSADMIN"
-    comment: str = None
+# @dataclass(unsafe_hash=True)
+# class _CreateTableAsSelect(ResourceSpec):
+#     name: str
+#     as_: str = field(default_factory=None, metadata={"triggers_replacement": True})
+#     columns: list[Column] = field(default_factory=None, metadata={"triggers_replacement": True})
+#     cluster_by: list[str] = None
+#     copy_grants: bool = False
+#     row_access_policy: dict[str, list] = None
+#     owner: Role = "SYSADMIN"
+#     comment: str = None
 
-    def __post_init__(self):
-        super().__post_init__()
-        if self.as_ is None:
-            raise ValueError("as can't be None")
-
-
-class CreateTableAsSelect(Resource):
-    resource_type = ResourceType.TABLE
-    props = Props(
-        columns=SchemaProp(),
-        cluster_by=IdentifierListProp("cluster by", eq=False, parens=True),
-        copy_grants=FlagProp("copy grants"),
-        as_=QueryProp("as"),
-    )
-    scope = SchemaScope()
-    spec = _CreateTableAsSelect
-
-    def __init__(
-        self,
-        name: str,
-        columns: list[Column] = None,
-        cluster_by: list[str] = None,
-        copy_grants: bool = False,
-        row_access_policy: dict[str, list] = None,
-        as_: str = None,
-        owner: str = "SYSADMIN",
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self._data = _CreateTableAsSelect(
-            name=name,
-            as_=as_,
-            columns=columns,
-            cluster_by=cluster_by,
-            copy_grants=copy_grants,
-            row_access_policy=row_access_policy,
-            owner=owner,
-        )
-
-    @classmethod
-    def from_sql(cls, sql):
-        """
-        CREATE [ OR REPLACE ] TABLE <table_name> [ ( <col_name> [ <col_type> ] , <col_name> [ <col_type> ] , ... ) ]
-        [ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
-        [ COPY GRANTS ]
-        AS SELECT <query>
-        [ ... ]
-
-        """
-
-        identifier, remainder = _parse_create_header(sql, cls.resource_type, cls.scope)
-        table_schema, remainder = _parse_table_schema(remainder)
-        props = _parse_props(cls.props, remainder)
-        return cls(**identifier, **table_schema, **props)
+#     def __post_init__(self):
+#         super().__post_init__()
+#         if self.as_ is None:
+#             raise ValueError("as can't be None")
 
 
-# there's no detectable difference between a table created with CTAS and a table created with a regular CREATE TABLE
-def _resolver(data: dict):
-    if "as_" in data:
-        return CreateTableAsSelect
-    return Table
+# class CreateTableAsSelect(Resource):
+#     resource_type = ResourceType.TABLE
+#     props = Props(
+#         columns=SchemaProp(),
+#         cluster_by=IdentifierListProp("cluster by", eq=False, parens=True),
+#         copy_grants=FlagProp("copy grants"),
+#         as_=QueryProp("as"),
+#     )
+#     scope = SchemaScope()
+#     spec = _CreateTableAsSelect
+
+#     def __init__(
+#         self,
+#         name: str,
+#         columns: list[Column] = None,
+#         cluster_by: list[str] = None,
+#         copy_grants: bool = False,
+#         row_access_policy: dict[str, list] = None,
+#         as_: str = None,
+#         owner: str = "SYSADMIN",
+#         **kwargs,
+#     ):
+#         super().__init__(**kwargs)
+#         self._data = _CreateTableAsSelect(
+#             name=name,
+#             as_=as_,
+#             columns=columns,
+#             cluster_by=cluster_by,
+#             copy_grants=copy_grants,
+#             row_access_policy=row_access_policy,
+#             owner=owner,
+#         )
+
+#     @classmethod
+#     def from_sql(cls, sql):
+#         """
+#         CREATE [ OR REPLACE ] TABLE <table_name> [ ( <col_name> [ <col_type> ] , <col_name> [ <col_type> ] , ... ) ]
+#         [ CLUSTER BY ( <expr> [ , <expr> , ... ] ) ]
+#         [ COPY GRANTS ]
+#         AS SELECT <query>
+#         [ ... ]
+
+#         """
+
+#         identifier, remainder = _parse_create_header(sql, cls.resource_type, cls.scope)
+#         table_schema, remainder = _parse_table_schema(remainder)
+#         props = _parse_props(cls.props, remainder)
+#         return cls(**identifier, **table_schema, **props)
 
 
-Resource.__resolvers__[ResourceType.TABLE] = _resolver
+# # there's no detectable difference between a table created with CTAS and a table created with a regular CREATE TABLE
+# def _resolver(data: dict):
+#     if "as_" in data:
+#         return CreateTableAsSelect
+#     return Table
+
+
+# Resource.__resolvers__[ResourceType.TABLE] = _resolver

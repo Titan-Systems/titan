@@ -19,8 +19,12 @@ def resource(request):
 
 def test_data_identity(resource):
     resource_cls, data = resource
+    data = data.copy()
     instance = resource_cls(**data)
-    assert instance.to_dict() == data
+    serialized = instance.to_dict()
+    if "name" in serialized:
+        assert ResourceName(serialized.pop("name")) == ResourceName(data.pop("name"))
+    assert serialized == data
 
 
 def test_sql_identity(resource):

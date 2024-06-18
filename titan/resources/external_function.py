@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, Arg
+from .resource import Resource, ResourceSpec, Arg, ResourceNameTrait
 from .role import Role
 from ..enums import DataType, NullHandling, Volatility, ResourceType
 from ..scope import AccountScope
+from ..resource_name import ResourceName
 
 from ..props import (
     ArgsProp,
@@ -20,7 +21,7 @@ from ..props import (
 
 @dataclass(unsafe_hash=True)
 class _ExternalFunction(ResourceSpec):
-    name: str
+    name: ResourceName
     returns: DataType
     api_integration: str
     as_: str
@@ -38,7 +39,7 @@ class _ExternalFunction(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class ExternalFunction(Resource):
+class ExternalFunction(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] [ SECURE ] EXTERNAL FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )
       RETURNS <result_data_type>
@@ -95,9 +96,9 @@ class ExternalFunction(Resource):
         owner: str = "SYSADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _ExternalFunction(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _ExternalFunction = _ExternalFunction(
+            name=self._name,
             returns=returns,
             api_integration=api_integration,
             as_=as_,
