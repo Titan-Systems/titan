@@ -240,6 +240,17 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     return ownership_grant[0]["grantee_name"]
 
 
+def _show_objects(session, type_str, fqn: FQN):
+    if fqn.database is None and fqn.schema is None:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'")
+    elif fqn.database is None:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}")
+    elif fqn.schema is None:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+    else:
+        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+
+
 def fetch_resource(session, urn: URN) -> Optional[dict]:
     return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
@@ -729,7 +740,7 @@ def fetch_password_policy(session, fqn: FQN):
 
 
 def fetch_pipe(session, fqn: FQN):
-    show_result = execute(session, f"SHOW PIPES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    show_result = _show_objects(session, "PIPES", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -737,7 +748,17 @@ def fetch_pipe(session, fqn: FQN):
 
     data = show_result[0]
 
-    return None
+    # desc_result = execute(session, f"DESC PIPE {fqn}", cacheable=True)
+
+    return {
+        "name": data["name"],
+        "as_": data["definition"],
+        "owner": data["owner"],
+        "error_integration": data["error_integration"],
+        # "aws_sns_topic": data["aws_sns_topic"],
+        "integration": data["integration"],
+        "comment": data["comment"],
+    }
 
 
 def fetch_procedure(session, fqn: FQN):

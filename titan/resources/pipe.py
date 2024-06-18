@@ -3,37 +3,76 @@
 # This is a critical edge case of polymorphic resources. This requires the implementation
 # of ResourcePointers
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ResourceType
 from ..parse import _parse_copy_into
 from ..props import BoolProp, Props, StringProp, QueryProp
+from ..resource_name import ResourceName
 from ..scope import SchemaScope
 
 
 @dataclass(unsafe_hash=True)
 class _Pipe(ResourceSpec):
-    name: str
+    name: ResourceName
     as_: str
     owner: Role = "SYSADMIN"
-    auto_ingest: bool = None
+    auto_ingest: bool = field(default_factory=None, metadata={"fetchable": False})
     error_integration: str = None
     aws_sns_topic: str = None
     integration: str = None
     comment: str = None
 
 
-class Pipe(Resource):
+class Pipe(ResourceNameTrait, Resource):
     """
-    CREATE [ OR REPLACE ] PIPE [ IF NOT EXISTS ] <name>
-      [ AUTO_INGEST = [ TRUE | FALSE ] ]
-      [ ERROR_INTEGRATION = <integration_name> ]
-      [ AWS_SNS_TOPIC = '<string>' ]
-      [ INTEGRATION = '<string>' ]
-      [ COMMENT = '<string_literal>' ]
-      AS <copy_statement>
+    Description:
+        Represents a data ingestion pipeline in Snowflake, which automates the loading of data into tables.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-pipe.html
+
+    Fields:
+        name (string, required): The name of the pipe.
+        as_ (string, required): The SQL statement that defines the data loading operation.
+        owner (string or Role): The owner role of the pipe. Defaults to "SYSADMIN".
+        auto_ingest (bool): Specifies if the pipe automatically ingests data when files are added to the stage. Defaults to None.
+        error_integration (string): The name of the integration used for error notifications. Defaults to None.
+        aws_sns_topic (string): The AWS SNS topic where notifications are sent. Defaults to None.
+        integration (string): The integration used for data loading. Defaults to None.
+        comment (string): A comment for the pipe. Defaults to None.
+
+    Python:
+
+        ```python
+        pipe = Pipe(
+            name="some_pipe",
+            as_="COPY INTO some_table FROM @%some_stage",
+            owner="SYSADMIN",
+            auto_ingest=True,
+            error_integration="some_integration",
+            aws_sns_topic="some_topic",
+            integration="some_integration",
+            comment="This is a sample pipe"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        pipes:
+          - name: some_pipe
+            as: "COPY INTO some_table FROM @%some_stage"
+            owner: SYSADMIN
+            auto_ingest: true
+            error_integration: some_integration
+            aws_sns_topic: some_topic
+            integration: some_integration
+            comment: "This is a sample pipe"
+        ```
+
     """
 
     resource_type = ResourceType.PIPE
@@ -48,7 +87,6 @@ class Pipe(Resource):
     scope = SchemaScope()
     spec = _Pipe
 
-    # TODO: parse as_ statement and extract stage reference
     def __init__(
         self,
         name: str,
@@ -61,9 +99,10 @@ class Pipe(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
+        as_ = as_.strip().rstrip(";")
         self._data: _Pipe = _Pipe(
-            name=name,
+            name=self._name,
             as_=as_,
             owner=owner,
             auto_ingest=auto_ingest,

@@ -53,17 +53,19 @@ def dbt():
         comment="Test Table",
     )
 
-    # copy_statement = """
-    # COPY INTO fake_sales_orders
-    # FROM
-    # '@%fake_sales_orders' FILE_FORMAT = (TYPE = 'PARQUET');
-    # """
-    # pipe = Pipe(
-    #     name="TEST_TITAN_PIPE",
-    #     as_=copy_statement,
-    #     comment="Pipe for ingesting PARQUET data",
-    #     # schema=schema,
-    # )
+    copy_statement = f"""
+    COPY INTO {test_db.name}.{schema.name}.faker_data
+    FROM
+    '@{test_db.name}.{schema.name}.%faker_data' FILE_FORMAT = (TYPE = 'CSV');
+    """
+    pipe = Pipe(
+        name="TEST_TITAN_PIPE",
+        as_=copy_statement,
+        comment="Pipe for ingesting PARQUET data",
+        schema=schema,
+    )
+
+    pipe.requires = [sales_table]
 
     # streams
     # dynamic tables
@@ -75,8 +77,8 @@ def dbt():
         test_db,
         # *pre_grant,
         schema,
-        # sales_table,
-        # pipe,
+        sales_table,
+        pipe,
         warehouse,
         *grants,
     )
