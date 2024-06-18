@@ -641,14 +641,18 @@ class RoleGrant(Resource):
         to = to_role or to_user
         return f"RoleGrant(role={role}, to={to})"
 
+    # @property
+    # def fqn(self):
+    #     subject = "user" if self._data.to_user else "role"
+    #     name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
+    #     return FQN(
+    #         name=self._data.role.name,
+    #         params={subject: name},
+    #     )
+
     @property
     def fqn(self):
-        subject = "user" if self._data.to_user else "role"
-        name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
-        return FQN(
-            name=self._data.role.name,
-            params={subject: name},
-        )
+        return role_grant_fqn(self._data)
 
     @property
     def role(self) -> Role:
@@ -657,3 +661,12 @@ class RoleGrant(Resource):
     @property
     def to(self) -> Union[Role, User]:
         return self._data.to_role or self._data.to_user
+
+
+def role_grant_fqn(role_grant: _RoleGrant):
+    subject = "user" if role_grant.to_user else "role"
+    name = role_grant.to_user.name if role_grant.to_user else role_grant.to_role.name
+    return FQN(
+        name=role_grant.role.name,
+        params={subject: name},
+    )

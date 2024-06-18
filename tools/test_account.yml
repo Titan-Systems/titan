@@ -1,0 +1,75 @@
+roles:
+  - name: CI
+    comment: CI role, do not drop
+  - name: EMPTY
+    comment: This role is intentionally left empty
+  - name: static_role
+    comment: Static role
+
+databases:
+  - name: static_database
+
+role_grants:
+  - role: CI
+    roles:
+      - SYSADMIN
+  - role: EMPTY
+    roles:
+      - SYSADMIN
+  - role: static_role
+    roles:
+      - SYSADMIN
+
+# network_rules:
+#   - name: static_network_rule
+#     type: HOST_PORT
+#     value_list: ["example.com:443"]
+#     mode: EGRESS
+
+# secrets:
+#   - name: static_secret
+#     type: PASSWORD
+#     username: someuser
+#     password: somepass
+
+
+schemas:
+  - name: static_schema
+    database: static_database
+
+# internal_stages:
+#   - name: static_stage
+#     directory:
+#       enable: true
+#       refresh_on_create: true
+
+# table_streams:
+#   - name: static_stream
+#     on_table: static_table
+
+tables:
+  - name: static_table
+    columns:
+      - name: id
+        data_type: INT
+
+
+# tags:
+#   - name: static_tag
+
+# users:
+#   - name: static_user
+#     email: static.user@example.com
+#   - name: break_glass_admin
+
+views:
+  - name: static_view
+    columns:
+      - name: id
+        data_type: INT
+    as_: SELECT id FROM static_table
+
+warehouses:
+  - name: static_warehouse
+  - name: CI
+    warehouse_size: XSMALL

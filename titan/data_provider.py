@@ -11,7 +11,7 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES, SYSTEM_USERS
+from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES, SYSTEM_USERS, SYSTEM_SCHEMAS
 from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
 from .identifiers import URN, FQN, resource_type_for_label
@@ -1413,40 +1413,93 @@ def fetch_warehouse(session, fqn: FQN):
 ################ List functions
 
 
-def list_resource(session, resource_label: str) -> list[str]:
+def list_resource(session, resource_label: str) -> list[FQN]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
-def list_databases(session) -> list[str]:
+def list_databases(session) -> list[FQN]:
     show_result = execute(session, "SHOW DATABASES")
-    return [row["name"] for row in show_result if row["name"] not in SYSTEM_DATABASES]
+    return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_DATABASES]
 
 
-def list_schemas(session, database=None) -> list[str]:
+def list_roles(session) -> list[FQN]:
+    show_result = execute(session, "SHOW ROLES")
+    return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_ROLES]
+
+
+def list_role_grants(session) -> list[FQN]:
+    roles = show_result = execute(session, "SHOW ROLES")
+    grants = []
+    for role in roles:
+        role_name = ResourceName(role["name"])
+        show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
+        for data in show_result:
+            subject = "user" if data["granted_to"] == "USER" else "role"
+            if role_name in SYSTEM_ROLES:
+                continue
+            grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
+    return grants
+
+
+def list_schemas(session, database=None) -> list[FQN]:
     db = f" IN DATABASE {database}" if database else ""
     try:
         show_result = execute(session, f"SHOW SCHEMAS{db}")
-        return [f"{row['database_name']}.{row['name']}" for row in show_result]
+        schemas = []
+        for row in show_result:
+            if row["database_name"] in SYSTEM_DATABASES or row["name"] in SYSTEM_SCHEMAS:
+                continue
+            schemas.append(FQN(database=row["database_name"], name=row["name"]))
+        return schemas
     except ProgrammingError as err:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
             return []
         raise
 
 
-def list_stages(session) -> list[str]:
-    show_result = execute(session, "SHOW STAGES IN DATABASE")
+def list_stages(session) -> list[FQN]:
+    show_result = execute(session, "SHOW STAGES")
     stages = []
     for row in show_result:
-        row["fqn"] = f"{row['database_name']}.{row['schema_name']}.{row['name']}"
-        stages.append(row)
+        if row["database_name"] in SYSTEM_DATABASES:
+            continue
+        stages.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
     return stages
 
 
-def list_users(session) -> list[str]:
+def list_tables(session) -> list[FQN]:
+    show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+    tables = []
+    for row in show_result:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+            continue
+        tables.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+    return tables
+
+
+def list_users(session) -> list[FQN]:
     show_result = execute(session, "SHOW USERS")
-    return [row["name"] for row in show_result if row["name"] not in SYSTEM_USERS]
+    users = []
+    for row in show_result:
+        if row["name"] in SYSTEM_USERS:
+            continue
+        users.append(FQN(name=row["name"]))
+    return users
 
 
-def list_roles(session) -> list[str]:
-    show_result = execute(session, "SHOW ROLES")
-    return [row["name"] for row in show_result if row["name"] not in SYSTEM_ROLES]
+def list_views(session) -> list[FQN]:
+    show_result = execute(session, "SHOW VIEWS")
+    views = []
+    for row in show_result:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+            continue
+        views.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+    return views
+
+
+def list_warehouses(session) -> list[FQN]:
+    show_result = execute(session, "SHOW WAREHOUSES")
+    warehouses = []
+    for row in show_result:
+        warehouses.append(FQN(name=row["name"]))
+    return warehouses
