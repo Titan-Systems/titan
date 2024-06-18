@@ -90,7 +90,15 @@ def test_blueprint_with_resources():
         "name": "TABLE",
         "owner": "SYSADMIN",
         "columns": [
-            {"name": "ID", "data_type": "INT", "collate": None, "comment": None, "constraint": None, "not_null": False}
+            {
+                "name": "ID",
+                "data_type": "INT",
+                "collate": None,
+                "comment": None,
+                "constraint": None,
+                "not_null": False,
+                "default": None,
+            }
         ],
         "constraints": None,
         "transient": False,

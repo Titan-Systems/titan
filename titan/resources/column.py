@@ -16,6 +16,7 @@ class _Column(ResourceSpec):
     comment: str = None
     not_null: bool = False
     constraint: str = None
+    default: str = None
 
 
 class Column(Resource):
@@ -54,6 +55,7 @@ class Column(Resource):
         comment: str = None,
         not_null: bool = False,
         constraint: str = None,
+        default: str = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -64,6 +66,7 @@ class Column(Resource):
             comment=comment,
             not_null=not_null,
             constraint=constraint,
+            default=default,
         )
 
     @classmethod
@@ -72,6 +75,3 @@ class Column(Resource):
         remainder = parse_results.pop("remainder", "")
         props = _parse_props(cls.props, remainder)
         return cls(**parse_results, **props)
-
-    # def serialize(self):
-    #     return {"name": self._data.name, "data_type": self._data.data_type}

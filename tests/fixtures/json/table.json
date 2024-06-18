@@ -7,7 +7,8 @@
             "collate": null,
             "comment": null,
             "not_null": false,
-            "constraint": null
+            "constraint": null,
+            "default": null
         },
         {
             "name": "amount",
@@ -15,7 +16,8 @@
             "collate": null,
             "comment": null,
             "not_null": false,
-            "constraint": null
+            "constraint": null,
+            "default": null
         }
     ],
     "constraints": null,

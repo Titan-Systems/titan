@@ -634,9 +634,7 @@ class Blueprint:
                     raise Exception(f"Database [{resource.container}] for resource {resource} not found")
             else:
                 for db in databases:
-                    if db == resource.container:
-                        break
-                    elif db.name == resource.container.name:
+                    if db.name == resource.container.name and resource not in db:
                         db.add(resource)
                         break
 

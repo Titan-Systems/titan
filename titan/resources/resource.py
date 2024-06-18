@@ -385,6 +385,9 @@ class ResourceContainer:
     def __init__(self):
         self._items: dict[ResourceType, list[Resource]] = {}
 
+    def __contains__(self, item: Resource):
+        return item in self._items.get(item.resource_type, [])
+
     def add(self, *items: Resource):
         if isinstance(items[0], list):
             items = items[0]

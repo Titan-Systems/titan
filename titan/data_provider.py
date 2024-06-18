@@ -369,15 +369,17 @@ def fetch_columns(session, resource_type: str, fqn: FQN):
         if col["kind"] != "COLUMN":
             raise Exception(f"Unexpected kind {col['kind']} in desc result")
         columns.append(
-            remove_none_values(
-                {
-                    "name": col["name"],
-                    "data_type": col["type"],
-                    "not_null": col["null?"] == "N",
-                    "default": col["default"],
-                    "comment": col["comment"] or None,
-                }
-            )
+            # remove_none_values(
+            {
+                "name": col["name"],
+                "data_type": col["type"],
+                "not_null": col["null?"] == "N",
+                "default": col["default"],
+                "comment": col["comment"] or None,
+                "constraint": None,
+                "collate": None,
+            }
+            # )
         )
     return columns
 
