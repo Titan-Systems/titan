@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..props import Props, EnumProp, StringProp, BoolProp
@@ -38,7 +38,7 @@ class _GlueCatalogIntegration(ResourceSpec):
             raise ValueError(f"Invalid table format: {self.table_format}")
 
 
-class GlueCatalogIntegration(Resource):
+class GlueCatalogIntegration(ResourceNameTrait, Resource):
     """
     Description:
         Manages the integration of AWS Glue as a catalog in Snowflake, supporting the ICEBERG table format.
@@ -115,9 +115,9 @@ class GlueCatalogIntegration(Resource):
         **kwargs,
     ):
         kwargs.pop("catalog_source", None)
-        super().__init__(**kwargs)
-        self._data = _GlueCatalogIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _GlueCatalogIntegration = _GlueCatalogIntegration(
+            name=self._name,
             glue_aws_role_arn=glue_aws_role_arn,
             glue_catalog_id=glue_catalog_id,
             catalog_namespace=catalog_namespace,
@@ -145,7 +145,7 @@ class _ObjectStoreCatalogIntegration(ResourceSpec):
             raise ValueError(f"Invalid table format: {self.table_format}")
 
 
-class ObjectStoreCatalogIntegration(Resource):
+class ObjectStoreCatalogIntegration(ResourceNameTrait, Resource):
     """
     Description:
         Manages the integration of an object store as a catalog in Snowflake, supporting the ICEBERG table format.
@@ -200,9 +200,9 @@ class ObjectStoreCatalogIntegration(Resource):
         **kwargs,
     ):
         kwargs.pop("catalog_source", None)
-        super().__init__(**kwargs)
-        self._data = _ObjectStoreCatalogIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _ObjectStoreCatalogIntegration = _ObjectStoreCatalogIntegration(
+            name=self._name,
             table_format=table_format,
             enabled=enabled,
             comment=comment,

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
+from ..resource_name import ResourceName
 from ..props import (
     EnumListProp,
     FlagProp,
@@ -33,7 +34,7 @@ class IntegrationTypes(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _FailoverGroup(ResourceSpec):
-    name: str
+    name: ResourceName
     object_types: list[ObjectType]
     allowed_accounts: list[str]
     allowed_databases: list[str] = None
@@ -44,7 +45,7 @@ class _FailoverGroup(ResourceSpec):
     owner: Role = "ACCOUNTADMIN"
 
 
-class FailoverGroup(Resource):
+class FailoverGroup(ResourceNameTrait, Resource):
     """
     Description:
         Represents a failover group in Snowflake, which is a collection of databases, shares, and other resources
@@ -132,9 +133,9 @@ class FailoverGroup(Resource):
         owner: str = "ACCOUNTADMIN",
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _FailoverGroup(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _FailoverGroup = _FailoverGroup(
+            name=self._name,
             object_types=object_types,
             allowed_accounts=allowed_accounts,
             allowed_databases=allowed_databases,

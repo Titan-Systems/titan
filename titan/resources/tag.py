@@ -15,7 +15,7 @@ class _Tag(ResourceSpec):
     allowed_values: list = None
 
 
-class Tag(Resource):
+class Tag(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] TAG [ IF NOT EXISTS ] <name> [ COMMENT = '<string_literal>' ]
 

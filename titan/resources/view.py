@@ -37,7 +37,7 @@ class _View(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class View(Resource):
+class View(ResourceNameTrait, Resource):
     """
     Description:
         Represents a view in Snowflake, which is a virtual table created by a stored query on the data.

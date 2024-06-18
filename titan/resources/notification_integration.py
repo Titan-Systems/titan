@@ -2,11 +2,12 @@ from dataclasses import dataclass
 
 from inflection import camelize
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
 from ..scope import AccountScope
+from ..resource_name import ResourceName
 
 
 class NotificationType(ParseableEnum):
@@ -28,7 +29,7 @@ class NotificationDirection(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _EmailNotificationIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     allowed_recipients: list[str]
     type: NotificationType = NotificationType.EMAIL
@@ -41,7 +42,7 @@ class _EmailNotificationIntegration(ResourceSpec):
             raise ValueError("allowed_recipients can't be empty")
 
 
-class EmailNotificationIntegration(Resource):
+class EmailNotificationIntegration(ResourceNameTrait, Resource):
     """
     Description:
         Manages the configuration for email-based notification integrations within Snowflake. This integration
@@ -101,9 +102,9 @@ class EmailNotificationIntegration(Resource):
         **kwargs,
     ):
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
-        self._data = _EmailNotificationIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _EmailNotificationIntegration = _EmailNotificationIntegration(
+            name=self._name,
             enabled=enabled,
             allowed_recipients=allowed_recipients,
             comment=comment,
@@ -113,7 +114,7 @@ class EmailNotificationIntegration(Resource):
 
 @dataclass(unsafe_hash=True)
 class _AWSOutboundNotificationIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     aws_sns_topic_arn: str
     aws_sns_role_arn: str
@@ -124,7 +125,7 @@ class _AWSOutboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class AWSOutboundNotificationIntegration(Resource):
+class AWSOutboundNotificationIntegration(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -167,9 +168,9 @@ class AWSOutboundNotificationIntegration(Resource):
         kwargs.pop("type", None)
         kwargs.pop("direction", None)
         kwargs.pop("notification_provider", None)
-        super().__init__(**kwargs)
-        self._data = _AWSOutboundNotificationIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _AWSOutboundNotificationIntegration = _AWSOutboundNotificationIntegration(
+            name=self._name,
             enabled=enabled,
             aws_sns_topic_arn=aws_sns_topic_arn,
             aws_sns_role_arn=aws_sns_role_arn,
@@ -180,7 +181,7 @@ class AWSOutboundNotificationIntegration(Resource):
 
 @dataclass(unsafe_hash=True)
 class _GCPOutboundNotificationIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     gcp_pubsub_topic_name: str
     direction: NotificationDirection = NotificationDirection.OUTBOUND
@@ -190,7 +191,7 @@ class _GCPOutboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class GCPOutboundNotificationIntegration(Resource):
+class GCPOutboundNotificationIntegration(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -229,9 +230,9 @@ class GCPOutboundNotificationIntegration(Resource):
         kwargs.pop("type", None)
         kwargs.pop("direction", None)
         kwargs.pop("notification_provider", None)
-        super().__init__(**kwargs)
-        self._data = _GCPOutboundNotificationIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _GCPOutboundNotificationIntegration = _GCPOutboundNotificationIntegration(
+            name=self._name,
             enabled=enabled,
             gcp_pubsub_topic_name=gcp_pubsub_topic_name,
             owner=owner,
@@ -241,7 +242,7 @@ class GCPOutboundNotificationIntegration(Resource):
 
 @dataclass(unsafe_hash=True)
 class _AzureOutboundNotificationIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     azure_event_grid_topic_endpoint: str
     azure_tenant_id: str
@@ -252,7 +253,7 @@ class _AzureOutboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class AzureOutboundNotificationIntegration(Resource):
+class AzureOutboundNotificationIntegration(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -294,9 +295,9 @@ class AzureOutboundNotificationIntegration(Resource):
         kwargs.pop("type", None)
         kwargs.pop("direction", None)
         kwargs.pop("notification_provider", None)
-        super().__init__(**kwargs)
-        self._data = _AzureOutboundNotificationIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _AzureOutboundNotificationIntegration = _AzureOutboundNotificationIntegration(
+            name=self._name,
             enabled=enabled,
             azure_event_grid_topic_endpoint=azure_event_grid_topic_endpoint,
             azure_tenant_id=azure_tenant_id,
@@ -307,7 +308,7 @@ class AzureOutboundNotificationIntegration(Resource):
 
 @dataclass(unsafe_hash=True)
 class _GCPInboundNotificationIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     gcp_pubsub_subscription_name: str
     direction: NotificationDirection = NotificationDirection.INBOUND
@@ -317,7 +318,7 @@ class _GCPInboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class GCPInboundNotificationIntegration(Resource):
+class GCPInboundNotificationIntegration(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -353,9 +354,9 @@ class GCPInboundNotificationIntegration(Resource):
     ):
         kwargs.pop("type", None)
         kwargs.pop("notification_provider", None)
-        super().__init__(**kwargs)
-        self._data = _GCPInboundNotificationIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _GCPInboundNotificationIntegration = _GCPInboundNotificationIntegration(
+            name=self._name,
             enabled=enabled,
             gcp_pubsub_subscription_name=gcp_pubsub_subscription_name,
             owner=owner,
@@ -365,7 +366,7 @@ class GCPInboundNotificationIntegration(Resource):
 
 @dataclass(unsafe_hash=True)
 class _AzureInboundNotificationIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     enabled: bool
     azure_storage_queue_primary_uri: str
     azure_tenant_id: str
@@ -376,7 +377,7 @@ class _AzureInboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class AzureInboundNotificationIntegration(Resource):
+class AzureInboundNotificationIntegration(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -415,9 +416,9 @@ class AzureInboundNotificationIntegration(Resource):
     ):
         kwargs.pop("type", None)
         kwargs.pop("notification_provider", None)
-        super().__init__(**kwargs)
-        self._data = _AzureInboundNotificationIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _AzureInboundNotificationIntegration = _AzureInboundNotificationIntegration(
+            name=self._name,
             enabled=enabled,
             azure_storage_queue_primary_uri=azure_storage_queue_primary_uri,
             azure_tenant_id=azure_tenant_id,

@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
+from ..resource_name import ResourceName
 from ..scope import AccountScope
 
 
@@ -18,7 +19,7 @@ class ApiProvider(ParseableEnum):
 
 @dataclass(unsafe_hash=True)
 class _APIIntegration(ResourceSpec):
-    name: str
+    name: ResourceName
     api_provider: ApiProvider
     api_aws_role_arn: str
     enabled: bool
@@ -29,7 +30,7 @@ class _APIIntegration(ResourceSpec):
     comment: str = None
 
 
-class APIIntegration(Resource):
+class APIIntegration(ResourceNameTrait, Resource):
     """
     CREATE [ OR REPLACE ] API INTEGRATION [ IF NOT EXISTS ] <integration_name>
         API_PROVIDER = { aws_api_gateway | aws_private_api_gateway | aws_gov_api_gateway | aws_gov_private_api_gateway }
@@ -68,9 +69,9 @@ class APIIntegration(Resource):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
-        self._data = _APIIntegration(
-            name=name,
+        super().__init__(name, **kwargs)
+        self._data: _APIIntegration = _APIIntegration(
+            name=self._name,
             api_provider=api_provider,
             api_aws_role_arn=api_aws_role_arn,
             api_key=api_key,
