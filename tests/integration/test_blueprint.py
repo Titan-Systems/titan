@@ -151,13 +151,13 @@ def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
 
     # Create user
     user_name = f"TEST_USER_{suffix}_NAME_EQUIVALENCE".upper()
-    user = res.User(name=user_name, login_name="ALL_UPPERCASE", owner="ACCOUNTADMIN")
+    user = res.User(name=user_name, login_name=user_name, owner="ACCOUNTADMIN")
     cursor.execute(user.create_sql(if_not_exists=True))
     marked_for_cleanup.append(user)
 
     session = cursor.connection
     blueprint = Blueprint(name="test_name_equivalence_drift")
-    blueprint.add(res.User(name=user_name, login_name="all_uppercase", owner="ACCOUNTADMIN"))
+    blueprint.add(res.User(name=user_name, login_name=user_name.lower(), owner="ACCOUNTADMIN"))
     plan = blueprint.plan(session)
 
     assert len(plan) == 0, "Expected no changes in the blueprint plan but found some."

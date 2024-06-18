@@ -473,14 +473,13 @@ def fetch_dynamic_table(session, fqn: FQN):
 
 
 def fetch_file_format(session, fqn: FQN):
-    show_result = execute(session, "SHOW FILE FORMATS IN ACCOUNT", cacheable=True)
-    file_formats = _filter_result(show_result, name=fqn.name)
-    if len(file_formats) == 0:
+    show_result = _show_objects(session, "FILE FORMATS", fqn)
+    if len(show_result) == 0:
         return None
-    if len(file_formats) > 1:
+    if len(show_result) > 1:
         raise Exception(f"Found multiple file formats matching {fqn}")
 
-    data = file_formats[0]
+    data = show_result[0]
     format_options = json.loads(data["format_options"])
 
     return {
