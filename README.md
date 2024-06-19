@@ -14,7 +14,7 @@ Define any Snowflake resource, including users, roles, schemas, databases, integ
 If you want to run custom Titan code or use Titan on the command line, you can use the Titan Core Python API.
 
 ```bash
-python -m pip install git+https://github.com/teej/titan.git
+python -m pip install git+https://github.com/Titan-Systems/titan.git
 ```
 
 ### Usage

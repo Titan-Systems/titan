@@ -3,10 +3,10 @@ from setuptools import find_packages, setup
 setup(
     name="titan",
     version=open("version.md", encoding="utf-8").read().split(" ")[2],
-    description="Snowflake infrastructure as code",
+    description="Titan Core: Snowflake infrastructure as code",
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
-    url="https://github.com/teej/titan",
+    url="https://github.com/Titan-Systems/titan",
     author="TJ Murphy",
     packages=find_packages(include=["titan", "titan.*"]),
     python_requires=">=3.9",
