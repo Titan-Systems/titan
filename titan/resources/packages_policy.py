@@ -31,19 +31,51 @@ class _PackagesPolicy(ResourceSpec):
 
 class PackagesPolicy(ResourceNameTrait, Resource):
     """
-    A Packages Policy defines a set of rules for allowed and blocked packages.
+    Description:
+        A Packages Policy defines a set of rules for allowed and blocked packages
+        that are applied to user-defined functions and stored procedures.
 
-    CREATE [ OR REPLACE ] PACKAGES POLICY [ IF NOT EXISTS ] <name>
-      LANGUAGE PYTHON
-      [ ALLOWLIST = ( [ '<packageSpec>' ] [ , '<packageSpec>' ... ] ) ]
-      [ BLOCKLIST = ( [ '<packageSpec>' ] [ , '<packageSpec>' ... ] ) ]
-      [ ADDITIONAL_CREATION_BLOCKLIST = ( [ '<packageSpec>' ] [ , '<packageSpec>' ... ] ) ]
-      [ COMMENT = '<string_literal>' ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-packages-policy
+
+    Fields:
+        name (string, required): The name of the packages policy.
+        language (string or Language): The programming language for the packages. Defaults to PYTHON.
+        allowlist (list): A list of package specifications that are explicitly allowed.
+        blocklist (list): A list of package specifications that are explicitly blocked.
+        additional_creation_blocklist (list): A list of package specifications that are blocked during creation.
+        comment (string): A comment or description for the packages policy.
+        owner (string or Role): The owner role of the packages policy. Defaults to SYSADMIN.
+
+    Python:
+
+        ```python
+        packages_policy = PackagesPolicy(
+            name="some_packages_policy",
+            allowlist=["numpy", "pandas"],
+            blocklist=["os", "sys"],
+            comment="Policy for data processing packages."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        packages_policy:
+          - name: some_packages_policy
+            allowlist:
+              - numpy
+              - pandas
+            blocklist:
+              - os
+              - sys
+            comment: Policy for data processing packages.
+        ```
     """
 
     resource_type = ResourceType.PACKAGES_POLICY
     props = Props(
-        language=EnumProp("language", Language, eq=False),
+        language=EnumProp("language", [Language.PYTHON], eq=False),
         allowlist=StringListProp("allowlist", parens=True),
         blocklist=StringListProp("blocklist", parens=True),
         additional_creation_blocklist=StringListProp("additional_creation_blocklist", parens=True),

@@ -83,6 +83,7 @@ def _split_statements(sql_text):
     parser = parser.ignore(pp.c_style_comment | snowflake_sql_comment)
 
     results = []
+    end = 0
     for result, start, end in parser.scan_string(sql_text):
         results.append(result[0])
 

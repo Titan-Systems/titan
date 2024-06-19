@@ -24,6 +24,7 @@
 * [MaterializedView](resources/materialized_view.md)
 * [NetworkRule](resources/network_rule.md)
 * [ObjectStoreCatalogIntegration](resources/object_store_catalog_integration.md)
+* [PackagesPolicy](resources/packages_policy.md)
 * [PasswordPolicy](resources/password_policy.md)
 * [Pipe](resources/pipe.md)
 * [PythonStoredProcedure](resources/python_stored_procedure.md)

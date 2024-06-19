@@ -190,7 +190,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Materialized View             | ✅         |
 | Model                         | ❌         |
 | Network Rule                  | ✅         |
-| Packages Policy               | 🚧         |
+| Packages Policy               | ✅         |
 | Password Policy               | ✅         |
 | Pipe                          | ✅         |
 | Projection Policy             | ❌         |

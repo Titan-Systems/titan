@@ -46,7 +46,8 @@ def camelcase_to_snakecase(name: str) -> str:
 
 def check_resource_coverage():
 
-    print(DOCS)
+    # for cls in sorted(list([str(s) for s in SQL_FIXTURES])):
+    #     print("SQL:", cls)
 
     resources = []
     polymorphic_resources = set()
@@ -100,7 +101,7 @@ def check_resource_coverage():
         has_docs = camelcase_to_snakecase(resource.__name__) in DOCS
         is_stable = all([has_json, has_sql, has_fetch, has_docs])
 
-        print(resource_label)
+        # print(resource_label)
 
         audit = {
             "name": name,

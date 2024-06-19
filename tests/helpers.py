@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 
 import titan.resources as resources
 
@@ -7,6 +8,8 @@ from titan.resources import Resource
 from titan.enums import ResourceType
 from titan.parse import _split_statements
 
+
+logger = logging.getLogger("titan")
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "../examples")
@@ -49,16 +52,14 @@ def get_sql_fixtures():
             resource_name = f.split(".")[0]
             try:
                 resource_cls = _get_resource_cls(resource_name)
-            except ValueError:
+            except ValueError as err:
+                logger.warn(f"SQL fixture file {f} has a problem: {err}")
                 continue
-                # raise
-            try:
-                idx = 1
-                for fixture in get_sql_fixture(f):
-                    yield (resource_cls, fixture, idx)
-                    idx += 1
-            except Exception:
-                continue
+
+            idx = 1
+            for fixture in get_sql_fixture(f):
+                yield (resource_cls, fixture, idx)
+                idx += 1
 
 
 def get_sql_fixture(filename, lines=False):

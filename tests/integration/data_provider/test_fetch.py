@@ -671,3 +671,19 @@ def test_fetch_database_role(cursor, test_db, marked_for_cleanup):
     result = safe_fetch(cursor, database_role.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, database_role.to_dict())
+
+
+def test_fetch_packages_policy(cursor, test_db, marked_for_cleanup):
+    packages_policy = res.PackagesPolicy(
+        name="PACKAGES_POLICY_EXAMPLE",
+        allowlist=["numpy", "pandas"],
+        blocklist=["os", "sys"],
+        comment="Example packages policy",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(packages_policy.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(packages_policy)
+
+    result = safe_fetch(cursor, packages_policy.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, packages_policy.to_dict())

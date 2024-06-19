@@ -203,6 +203,12 @@ def _parse_comma_separated_values(values: str) -> list:
     return [value.strip(" ") for value in values.split(",")]
 
 
+def _parse_packages(packages_str: str) -> list:
+    if packages_str is None or packages_str == "":
+        return None
+    return json.loads(packages_str.replace("'", '"'))
+
+
 def params_result_to_dict(params_result):
     params = {}
     for param in params_result:
@@ -817,6 +823,28 @@ def fetch_notification_integration(session, fqn: FQN):
         raise Exception(f"Unsupported notification integration type: {data['type']}")
 
 
+def fetch_packages_policy(session, fqn: FQN):
+    show_result = _show_objects(session, "PACKAGES POLICIES", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple packages policies matching {fqn}")
+
+    data = show_result[0]
+    desc_result = execute(session, f"DESC PACKAGES POLICY {fqn}")
+    properties = desc_result[0]
+
+    return {
+        "name": data["name"],
+        "language": properties["language"],
+        "allowlist": _parse_packages(properties["allowlist"]),
+        "blocklist": _parse_packages(properties["blocklist"]),
+        "additional_creation_blocklist": _parse_packages(properties["additional_creation_blocklist"]),
+        "comment": data["comment"] or None,
+        "owner": data["owner"],
+    }
+
+
 def fetch_password_policy(session, fqn: FQN):
     show_result = execute(session, f"SHOW PASSWORD POLICIES IN SCHEMA {fqn.database}.{fqn.schema}")
     policies = _filter_result(show_result, name=fqn.name)
@@ -897,7 +925,7 @@ def fetch_procedure(session, fqn: FQN):
         "language": properties["language"],
         "null_handling": properties["null handling"],
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
-        "packages": json.loads(properties["packages"].replace("'", '"')),
+        "packages": _parse_packages(properties["packages"]),
         "returns": returns,
         "runtime_version": properties["runtime_version"],
         "secure": data["is_secure"] == "Y",
