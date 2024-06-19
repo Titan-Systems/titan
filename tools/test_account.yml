@@ -77,10 +77,10 @@ tables:
 #     allowed_values:
 #       - value: STATIC_TAG_VALUE
 
-# users:
-#   - name: static_user
-#     email: static.user@example.com
-#   - name: break_glass_admin
+users:
+  - name: static_user
+    email: info@applytitan.com
+    comment: This is a static user
 
 views:
   - name: static_view

@@ -429,7 +429,7 @@ class Blueprint:
         self._ignore_ownership: bool = ignore_ownership
         self._valid_resource_types: List[ResourceType] = [ResourceType(v) for v in valid_resource_types or []]
 
-        if ResourceType.USER in self._valid_resource_types:
+        if ResourceType.USER in self._valid_resource_types and self._run_mode != RunMode.CREATE_OR_UPDATE:
             raise Exception("User resource type is not allowed in this version of Titan")
 
         self.name = name

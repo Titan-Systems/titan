@@ -18,6 +18,18 @@ def main():
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     conn = snowflake.connector.connect(**connection_params)
+    users = config.pop("users")
+
+    users_bp = Blueprint(
+        name="reset-test-account-users",
+        run_mode="CREATE-OR-UPDATE",
+        valid_resource_types=["user"],
+        resources=collect_resources_from_config({"users": users}),
+    )
+    users_plan = users_bp.plan(conn)
+    print_plan(users_plan)
+    users_bp.apply(conn, users_plan)
+
     resources = collect_resources_from_config(config)
     bp = Blueprint(
         name="reset-test-account",
@@ -32,7 +44,6 @@ def main():
             # "table stream",
             "table",
             # "tag",
-            # "user",
             "grant",
             "role grant",
             "view",
