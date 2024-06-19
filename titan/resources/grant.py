@@ -14,6 +14,8 @@ from ..props import Props, FlagProp, IdentifierProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
 
+# TODO: Should Grant objects verify grant types in advance?
+
 
 @dataclass(unsafe_hash=True)
 class _Grant(ResourceSpec):

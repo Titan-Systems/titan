@@ -276,7 +276,6 @@ def test_blueprint_all_grant_forces_add(cursor, test_db, role):
 def test_blueprint_quoted_references(cursor):
     session = cursor.connection
 
-    cursor.execute(f"CREATE ROLE IF NOT EXISTS STATIC_ROLE")
     cursor.execute(f'CREATE USER IF NOT EXISTS "info@applytitan.com"')
     cursor.execute(f'GRANT ROLE STATIC_ROLE TO USER "info@applytitan.com"')
 
@@ -285,6 +284,7 @@ def test_blueprint_quoted_references(cursor):
         resources=[res.RoleGrant(role="STATIC_ROLE", to_user="info@applytitan.com")],
     )
     plan = blueprint.plan(session)
+    cursor.execute(f'DROP USER IF EXISTS "info@applytitan.com"')
 
     assert len(plan) == 0
 

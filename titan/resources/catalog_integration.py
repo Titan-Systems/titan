@@ -136,6 +136,7 @@ class _ObjectStoreCatalogIntegration(ResourceSpec):
     table_format: CatalogTableFormat = CatalogTableFormat.ICEBERG
     enabled: bool = True
     comment: str = None
+    owner: Role = "ACCOUNTADMIN"
 
     def __post_init__(self):
         super().__post_init__()
@@ -197,6 +198,7 @@ class ObjectStoreCatalogIntegration(ResourceNameTrait, Resource):
         table_format: CatalogTableFormat,
         enabled: bool = True,
         comment: str = None,
+        owner: str = "ACCOUNTADMIN",
         **kwargs,
     ):
         kwargs.pop("catalog_source", None)
@@ -206,6 +208,7 @@ class ObjectStoreCatalogIntegration(ResourceNameTrait, Resource):
             table_format=table_format,
             enabled=enabled,
             comment=comment,
+            owner=owner,
         )
 
 

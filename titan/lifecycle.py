@@ -46,12 +46,13 @@ def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
 
 
 def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    if if_not_exists:
+        raise Exception("IF NOT EXISTS not supported for CREATE PROCEDURE")
     db = f"{urn.fqn.database}." if urn.fqn.database else ""
     schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
     name = f"{db}{schema}{urn.fqn.name}"
     return tidy_sql(
         "CREATE",
-        "IF NOT EXISTS" if if_not_exists else "",
         urn.resource_type,
         name,
         props.render(data),
@@ -277,8 +278,8 @@ def drop_grant_on_all(urn: URN, data: dict, **kwargs):
 def drop_role_grant(urn: URN, data: dict, **kwargs):
     return tidy_sql(
         "REVOKE ROLE",
-        data["role"],
+        ResourceName(data["role"]),
         "FROM",
         "ROLE" if data.get("to_role") else "USER",
-        data["to_role"] if data.get("to_role") else data["to_user"],
+        ResourceName(data["to_role"] if data.get("to_role") else data["to_user"]),
     )

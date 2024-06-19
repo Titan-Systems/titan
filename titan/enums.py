@@ -39,6 +39,7 @@ class ParseableEnum(Enum, metaclass=_Parseable):
 
 class ResourceType(ParseableEnum):
     ACCOUNT = "ACCOUNT"
+    AGGREGATION_POLICY = "AGGREGATION POLICY"
     ALERT = "ALERT"
     API_INTEGRATION = "API INTEGRATION"
     CATALOG_INTEGRATION = "CATALOG INTEGRATION"

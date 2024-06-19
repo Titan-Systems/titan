@@ -77,6 +77,11 @@ def resources_from_users_config(users_config: list) -> list:
     return resources
 
 
+def process_requires(resource: Resource, requires: list):
+    for req in requires:
+        resource.requires(ResourcePointer(name=req["name"], resource_type=ResourceType(req["resource_type"])))
+
+
 def collect_resources_from_config(config: dict):
     # TODO: ResourcePointers should get resolved to top-level resource configs when possible
 
@@ -92,8 +97,10 @@ def collect_resources_from_config(config: dict):
     for resource_type in Resource.__types__.keys():
         resource_label = pluralize(resource_label_for_type(resource_type))
         for data in config.pop(resource_label, []):
+            requires = data.pop("requires", [])
             resource_cls = Resource.resolve_resource_cls(resource_type, data)
             resource = resource_cls(**data)
+            process_requires(resource, requires)
             resources.append(resource)
 
     if config:

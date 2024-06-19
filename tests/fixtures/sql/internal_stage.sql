@@ -9,6 +9,3 @@ CREATE STAGE my_int_stage_2
 CREATE STAGE stage_with_directory
   DIRECTORY = (ENABLE = TRUE)
   COMMENT = 'This is a stage with a directory';
-
-CREATE OR REPLACE STAGE s3_external_stage
-    url = 'https://s3.amazonaws.com/tripdata/';

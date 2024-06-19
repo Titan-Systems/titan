@@ -1,7 +1,10 @@
-// {
-//     "name": "SOME_PIPE",
-//     "auto_ingest": false,
-//     "integration": null,
-//     "aws_sns_topic": null,
-//     "as_": "copy into STATIC_TABLE from @STATIC_STAGE"
-// }
+{
+    "name": "SOME_PIPE",
+    "auto_ingest": false,
+    "integration": null,
+    "aws_sns_topic": null,
+    "as_": "copy into STATIC_TABLE from @STATIC_DATABASE.PUBLIC.STATIC_STAGE",
+    "comment": null,
+    "error_integration": null,
+    "owner": "SYSADMIN"
+}

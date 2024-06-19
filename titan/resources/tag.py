@@ -26,8 +26,8 @@ class Tag(ResourceNameTrait, Resource):
     edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.TAG
     props = Props(
+        allowed_values=StringListProp("allowed_values", eq=False, parens=False),
         comment=StringProp("comment"),
-        allowed_values=StringListProp("allowed_values", eq=False),
     )
     scope = SchemaScope()
     spec = _Tag

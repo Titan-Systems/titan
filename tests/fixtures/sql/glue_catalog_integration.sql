@@ -7,9 +7,3 @@ CREATE CATALOG INTEGRATION glueCatalogInt
   GLUE_REGION='us-east-1'
   ENABLED=TRUE
   COMMENT='This is a test catalog integration';
-
-CREATE CATALOG INTEGRATION myCatalogInt
-  CATALOG_SOURCE=OBJECT_STORE
-  TABLE_FORMAT=ICEBERG
-  ENABLED=TRUE
-  COMMENT='This is a test catalog integration';

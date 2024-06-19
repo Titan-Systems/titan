@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from .resource import Resource, ResourceSpec, Arg, ResourceNameTrait
 from .role import Role
 from ..enums import DataType, NullHandling, Volatility, ResourceType
-from ..scope import AccountScope
+from ..scope import SchemaScope
 from ..resource_name import ResourceName
 
 from ..props import (
@@ -73,7 +73,7 @@ class ExternalFunction(ResourceNameTrait, Resource):
         response_translator=IdentifierProp("response_translator"),
         as_=StringProp("as", eq=False),
     )
-    scope = AccountScope()
+    scope = SchemaScope()
     spec = _ExternalFunction
 
     def __init__(

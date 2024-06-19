@@ -27,6 +27,19 @@ def eq(lhs, rhs, key):
         lhs_copy = _scrub_defaults(lhs)
         rhs_copy = _scrub_defaults(rhs)
         return lhs_copy == rhs_copy
+    elif key == "columns":
+        if len(lhs) != len(rhs):
+            return False
+        for i, lhs_col in enumerate(lhs):
+            rhs_col = rhs[i]
+            for col_key, lhs_value in lhs_col.items():
+                if col_key not in rhs_col:
+                    # raise Exception(f"Column {col_key} not found in rhs {rhs}")
+                    continue
+                rhs_value = rhs_col[col_key]
+                if not eq(lhs_value, rhs_value, col_key):
+                    return False
+        return True
     else:
         return lhs == rhs
 

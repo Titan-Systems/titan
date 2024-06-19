@@ -12,7 +12,7 @@ from inflection import pluralize
 from snowflake.connector.errors import ProgrammingError
 
 from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES, SYSTEM_USERS, SYSTEM_SCHEMAS
-from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOEST_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
+from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOES_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
 from .identifiers import URN, FQN, resource_type_for_label
 from .parse import (
@@ -241,14 +241,20 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
 
 
 def _show_objects(session, type_str, fqn: FQN):
-    if fqn.database is None and fqn.schema is None:
-        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'")
-    elif fqn.database is None:
-        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}")
-    elif fqn.schema is None:
-        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}")
-    else:
-        return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    try:
+        if fqn.database is None and fqn.schema is None:
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'")
+        elif fqn.database is None:
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}")
+        elif fqn.schema is None:
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+        else:
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    except ProgrammingError as err:
+        if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
+            return []
+        else:
+            raise
 
 
 def fetch_resource(session, urn: URN) -> Optional[dict]:
@@ -472,6 +478,27 @@ def fetch_dynamic_table(session, fqn: FQN):
     }
 
 
+def fetch_event_table(session, fqn: FQN):
+    show_result = execute(session, "SHOW EVENT TABLES IN ACCOUNT")
+
+    tables = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
+
+    if len(tables) == 0:
+        return None
+    if len(tables) > 1:
+        raise Exception(f"Found multiple tables matching {fqn}")
+
+    data = tables[0]
+    return {
+        "name": data["name"],
+        "comment": data["comment"] or None,
+        "cluster_by": _parse_cluster_keys(data["cluster_by"]),
+        "data_retention_time_in_days": int(data["retention_time"]),
+        "change_tracking": data["change_tracking"] == "ON",
+        "owner": data["owner"],
+    }
+
+
 def fetch_file_format(session, fqn: FQN):
     show_result = _show_objects(session, "FILE FORMATS", fqn)
     if len(show_result) == 0:
@@ -556,12 +583,22 @@ def fetch_future_grant(session, fqn: FQN):
         """
 
     except ProgrammingError as err:
-        if err.errno == DOEST_NOT_EXIST_ERR:
+        if err.errno == DOES_NOT_EXIST_ERR:
             return None
         raise
 
     in_type, name = fqn.params["on"].split("/")
     in_name = name.split(".")[0]
+
+    # If the resource we want to grant on isn't fully qualified in the FQN for the future grant, this filter step will fail.
+    # For example:
+    # fetch_future_grant(...,
+    #   FQN(name=FUTURE_GRANT_ROLE_CBDBE971?priv=SELECT&on=schema/PUBLIC.<TABLE>)
+    # )
+    # name = "PUBLIC.<TABLE>"
+    #
+    # Whereas in SHOW FUTURE GRANTS
+    # - name: 'TEST_DB_RUN_CBDBE971.PUBLIC.<TABLE>'
 
     grants = _filter_result(
         show_result,
@@ -581,7 +618,7 @@ def fetch_future_grant(session, fqn: FQN):
     return {
         "priv": data["privilege"],
         "on_type": data["grant_on"],
-        "in_type": in_type,
+        "in_type": in_type.upper(),
         "in_name": in_name,
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
@@ -604,7 +641,7 @@ def fetch_grant(session, fqn: FQN):
         }
         """
     except ProgrammingError as err:
-        if err.errno == DOEST_NOT_EXIST_ERR:
+        if err.errno == DOES_NOT_EXIST_ERR:
             return None
         raise
     priv = fqn.params["priv"]
@@ -802,7 +839,7 @@ def fetch_role_grants(session, role: str):
     try:
         show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
     except ProgrammingError as err:
-        if err.errno == DOEST_NOT_EXIST_ERR:
+        if err.errno == DOES_NOT_EXIST_ERR:
             return None
         raise
     session_ctx = fetch_session(session)
@@ -851,7 +888,7 @@ def fetch_role_grant(session, fqn: FQN):
     try:
         show_result = execute(session, f"SHOW GRANTS OF ROLE {fqn.name}", cacheable=True)
     except ProgrammingError as err:
-        if err.errno == DOEST_NOT_EXIST_ERR:
+        if err.errno == DOES_NOT_EXIST_ERR:
             return None
         raise
 
@@ -1032,7 +1069,7 @@ def fetch_shared_database(session, fqn: FQN):
 
 
 def fetch_stage(session, fqn: FQN):
-    show_result = execute(session, "SHOW STAGES")
+    show_result = _show_objects(session, "STAGES", fqn)
     stages = _filter_result(show_result, name=fqn.name)
 
     if len(stages) == 0:
@@ -1041,7 +1078,7 @@ def fetch_stage(session, fqn: FQN):
         raise Exception(f"Found multiple stages matching {fqn}")
 
     data = stages[0]
-    desc_result = execute(session, f"DESC STAGE {fqn.name}")
+    desc_result = execute(session, f"DESC STAGE {fqn}")
     properties = _desc_type3_result_to_dict(desc_result, lower_properties=True)
     tags = fetch_resource_tags(session, ResourceType.STAGE, fqn)
 
@@ -1119,25 +1156,15 @@ def fetch_stream(session, fqn: FQN):
     }
 
 
-def fetch_event_table(session, fqn: FQN):
-    show_result = execute(session, "SHOW EVENT TABLES IN ACCOUNT")
-
-    tables = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
-
-    if len(tables) == 0:
-        return None
-    if len(tables) > 1:
-        raise Exception(f"Found multiple tables matching {fqn}")
-
-    data = tables[0]
-    return {
-        "name": data["name"],
-        "comment": data["comment"] or None,
-        "cluster_by": _parse_cluster_keys(data["cluster_by"]),
-        "data_retention_time_in_days": int(data["retention_time"]),
-        "change_tracking": data["change_tracking"] == "ON",
-        "owner": data["owner"],
-    }
+def fetch_tag(session, fqn: FQN):
+    try:
+        show_result = execute(session, "SHOW TAGS IN ACCOUNT", cacheable=True)
+    except ProgrammingError as err:
+        if err.errno == UNSUPPORTED_FEATURE:
+            return None
+        raise
+    tags = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
+    return tags[0]
 
 
 def fetch_task(session, fqn: FQN):
@@ -1422,21 +1449,43 @@ def list_databases(session) -> list[FQN]:
     return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_DATABASES]
 
 
+def list_grants(session) -> list[FQN]:
+    roles = execute(session, "SHOW ROLES")
+    grants = []
+    for role in roles:
+        role_name = ResourceName(role["name"])
+        if role_name in SYSTEM_ROLES:
+            continue
+        show_result = execute(session, f"SHOW GRANTS TO ROLE {role_name}")
+        for data in show_result:
+            on = f"{data['granted_on'].lower()}/{data['name']}"
+            grants.append(
+                FQN(
+                    name=role_name,
+                    params={
+                        "priv": data["privilege"],
+                        "on": on,
+                    },
+                )
+            )
+    return grants
+
+
 def list_roles(session) -> list[FQN]:
     show_result = execute(session, "SHOW ROLES")
     return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_ROLES]
 
 
 def list_role_grants(session) -> list[FQN]:
-    roles = show_result = execute(session, "SHOW ROLES")
+    roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
         role_name = ResourceName(role["name"])
+        if role_name in SYSTEM_ROLES:
+            continue
         show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
         for data in show_result:
             subject = "user" if data["granted_to"] == "USER" else "role"
-            if role_name in SYSTEM_ROLES:
-                continue
             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
     return grants
 
@@ -1464,6 +1513,7 @@ def list_stages(session) -> list[FQN]:
         if row["database_name"] in SYSTEM_DATABASES:
             continue
         stages.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        print(row)
     return stages
 
 

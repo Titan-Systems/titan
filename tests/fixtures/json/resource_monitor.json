@@ -1,0 +1,11 @@
+{
+    "name": "my_mon_2",
+    "credit_quota": 5,
+    "frequency": "DAILY",
+    "start_timestamp": "IMMEDIATELY",
+    "notify_users": [
+        "teej",
+        "jack",
+        "jill"
+    ]
+}

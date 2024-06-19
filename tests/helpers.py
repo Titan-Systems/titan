@@ -11,32 +11,6 @@ from titan.parse import _split_statements
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "../examples")
 
-STATIC_RESOURCES = {
-    ResourceType.DATABASE: resources.Database(name="static_database"),
-    ResourceType.NETWORK_RULE: resources.NetworkRule(
-        name="static_network_rule",
-        type=resources.network_rule.NetworkIdentifierType.HOST_PORT,
-        value_list=["example.com:443"],
-        mode=resources.network_rule.NetworkRuleMode.EGRESS,
-    ),
-    ResourceType.ROLE: resources.Role(name="static_role"),
-    ResourceType.SECRET: resources.Secret(
-        name="static_secret", type=resources.secret.SecretType.PASSWORD, username="someuser", password="somepass"
-    ),
-    ResourceType.SCHEMA: resources.Schema(name="static_schema"),
-    ResourceType.STAGE: resources.InternalStage(
-        name="static_stage", directory={"enable": True, "refresh_on_create": True}
-    ),
-    ResourceType.STREAM: resources.TableStream(name="static_stream", on_table="static_table"),
-    ResourceType.TABLE: resources.Table(name="static_table", columns=[{"name": "id", "data_type": "INT"}]),
-    ResourceType.TAG: resources.Tag(name="static_tag"),
-    ResourceType.USER: resources.User(name="static_user", email="static.user@example.com"),
-    ResourceType.VIEW: resources.View(
-        name="static_view", columns=[{"name": "id", "data_type": "INT"}], as_="SELECT id FROM static_table"
-    ),
-    ResourceType.WAREHOUSE: resources.Warehouse(name="static_warehouse"),
-}
-
 
 def _get_resource_cls(resource_name):
     resource_name = resource_name.replace("_", "")
@@ -77,6 +51,7 @@ def get_sql_fixtures():
                 resource_cls = _get_resource_cls(resource_name)
             except ValueError:
                 continue
+                # raise
             try:
                 idx = 1
                 for fixture in get_sql_fixture(f):

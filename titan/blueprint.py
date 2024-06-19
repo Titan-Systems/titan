@@ -9,7 +9,7 @@ import snowflake.connector
 
 from . import data_provider, lifecycle
 from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES
-from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, DOES_NOT_EXIST_ERR, execute, reset_cache
 from .diff import diff, Action
 from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
@@ -685,6 +685,10 @@ class Blueprint:
 
                     if not found:
                         self._root.add(database_pointer)
+
+            for ref in resource.refs:
+                if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
+                    resource.container.add(ref)
                 
         for database in databases:
             merge_schemas = []
@@ -826,6 +830,8 @@ class Blueprint:
                     logger.error(f"Resource already exists: {sql}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
                     logger.error(f"Invalid grant: {sql}, skipping...")
+                elif err.errno == DOES_NOT_EXIST_ERR and sql.startswith("REVOKE"):
+                    logger.error(f"Resource does not exist: {sql}, skipping...")
                 else:
                     raise err
         return actions_taken

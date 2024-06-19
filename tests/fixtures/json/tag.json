@@ -1,0 +1,9 @@
+{
+    "name": "cost_center",
+    "comment": "cost_center tag",
+    "allowed_values": [
+        "finance",
+        "engineering",
+        "sales"
+    ]
+}

@@ -3,5 +3,6 @@
     "catalog_source": "OBJECT_STORE",
     "table_format": "ICEBERG",
     "enabled": true,
-    "comment": "This is a test catalog integration"
+    "comment": "This is a test catalog integration",
+    "owner": "ACCOUNTADMIN"
 }

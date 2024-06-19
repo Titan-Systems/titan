@@ -1,5 +1,7 @@
 from .resource import Resource
+
 from .account import Account
+from .aggregation_policy import AggregationPolicy
 from .alert import Alert
 from .api_integration import APIIntegration
 from .catalog_integration import GlueCatalogIntegration, ObjectStoreCatalogIntegration
@@ -14,6 +16,7 @@ from .failover_group import FailoverGroup
 from .file_format import CSVFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
+from .hybrid_table import HybridTable
 from .image_repository import ImageRepository
 from .materialized_view import MaterializedView
 from .network_rule import NetworkRule
@@ -28,6 +31,7 @@ from .schema import Schema
 from .secret import Secret
 from .sequence import Sequence
 from .service import Service
+from .share import Share
 from .stage import InternalStage, ExternalStage
 from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
 from .table import Table  # , CreateTableAsSelect
@@ -59,6 +63,7 @@ from .storage_integration import (
 
 __all__ = [
     "Account",
+    "AggregationPolicy",
     "Alert",
     "APIIntegration",
     "AWSOutboundNotificationIntegration",
@@ -85,6 +90,7 @@ __all__ = [
     "GlueCatalogIntegration",
     "Grant",
     "GrantOnAll",
+    "HybridTable",
     "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
@@ -106,6 +112,7 @@ __all__ = [
     "Secret",
     "Sequence",
     "Service",
+    "Share",
     "SnowflakePartnerOAuthSecurityIntegration",
     "StageStream",
     "Table",
