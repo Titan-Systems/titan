@@ -4,6 +4,7 @@
         "example.com:443"
     ],
     "mode": "EGRESS",
+    "type": "HOST_PORT",
     "comment": "Network rule for testing",
     "owner": "SYSADMIN"
 }

@@ -29,3 +29,6 @@ build:
 
 docs:
 	python tools/generate_resource_docs.py
+
+coverage: clean
+	python tools/check_resource_coverage.py
