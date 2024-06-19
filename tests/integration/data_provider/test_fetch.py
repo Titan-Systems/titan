@@ -687,3 +687,19 @@ def test_fetch_packages_policy(cursor, test_db, marked_for_cleanup):
     result = safe_fetch(cursor, packages_policy.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, packages_policy.to_dict())
+
+
+def test_fetch_aggregation_policy(cursor, test_db, marked_for_cleanup):
+    aggregation_policy = res.AggregationPolicy(
+        name="AGGREGATION_POLICY_EXAMPLE",
+        body="AGGREGATION_CONSTRAINT(MIN_GROUP_SIZE => 5)",
+        owner=TEST_ROLE,
+        database=test_db,
+        schema="PUBLIC",
+    )
+    cursor.execute(aggregation_policy.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(aggregation_policy)
+
+    result = safe_fetch(cursor, aggregation_policy.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, aggregation_policy.to_dict())

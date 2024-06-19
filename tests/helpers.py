@@ -53,7 +53,7 @@ def get_sql_fixtures():
             try:
                 resource_cls = _get_resource_cls(resource_name)
             except ValueError as err:
-                logger.warn(f"SQL fixture file {f} has a problem: {err}")
+                logger.warning(f"SQL fixture file {f} has a problem: {err}")
                 continue
 
             idx = 1

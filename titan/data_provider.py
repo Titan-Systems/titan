@@ -246,7 +246,7 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     return ownership_grant[0]["grantee_name"]
 
 
-def _show_objects(session, type_str, fqn: FQN, cacheable: bool = True):
+def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True):
     try:
         if fqn.database is None and fqn.schema is None:
             return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'", cacheable=cacheable)
@@ -337,6 +337,22 @@ def fetch_account(session, fqn: FQN):
     return {}
 
 
+def fetch_aggregation_policy(session, fqn: FQN):
+    show_result = _show_resources(session, "AGGREGATION POLICIES", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple aggregation policies matching {fqn}")
+    data = show_result[0]
+    desc_result = execute(session, f"DESC AGGREGATION POLICY {fqn}")
+    properties = desc_result[0]
+    return {
+        "name": data["name"],
+        "body": properties["body"],
+        "owner": data["owner"],
+    }
+
+
 def fetch_alert(session, fqn: FQN):
     show_result = execute(session, "SHOW ALERTS", cacheable=True)
     alerts = _filter_result(show_result, name=fqn.name)
@@ -357,7 +373,7 @@ def fetch_alert(session, fqn: FQN):
 
 
 def fetch_api_integration(session, fqn: FQN):
-    show_result = _show_objects(session, "API INTEGRATIONS", fqn)
+    show_result = _show_resources(session, "API INTEGRATIONS", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -556,7 +572,7 @@ def fetch_event_table(session, fqn: FQN):
 
 
 def fetch_file_format(session, fqn: FQN):
-    show_result = _show_objects(session, "FILE FORMATS", fqn)
+    show_result = _show_resources(session, "FILE FORMATS", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -775,7 +791,7 @@ def fetch_materialized_view(session, fqn: FQN):
 
 
 def fetch_network_rule(session, fqn: FQN):
-    show_result = _show_objects(session, "NETWORK RULES", fqn)
+    show_result = _show_resources(session, "NETWORK RULES", fqn)
 
     if len(show_result) == 0:
         return None
@@ -824,7 +840,7 @@ def fetch_notification_integration(session, fqn: FQN):
 
 
 def fetch_packages_policy(session, fqn: FQN):
-    show_result = _show_objects(session, "PACKAGES POLICIES", fqn)
+    show_result = _show_resources(session, "PACKAGES POLICIES", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -876,7 +892,7 @@ def fetch_password_policy(session, fqn: FQN):
 
 
 def fetch_pipe(session, fqn: FQN):
-    show_result = _show_objects(session, "PIPES", fqn)
+    show_result = _show_resources(session, "PIPES", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -1171,7 +1187,7 @@ def fetch_shared_database(session, fqn: FQN):
 
 
 def fetch_stage(session, fqn: FQN):
-    show_result = _show_objects(session, "STAGES", fqn)
+    show_result = _show_resources(session, "STAGES", fqn)
     stages = _filter_result(show_result, name=fqn.name)
 
     if len(stages) == 0:

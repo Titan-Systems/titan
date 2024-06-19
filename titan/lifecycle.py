@@ -32,6 +32,17 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
+def create_aggregation_policy(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    return tidy_sql(
+        "CREATE",
+        "AGGREGATION POLICY",
+        "IF NOT EXISTS" if if_not_exists else "",
+        fqn_to_sql(urn.fqn),
+        "AS () RETURNS AGGREGATION_CONSTRAINT",
+        props.render(data),
+    )
+
+
 def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     db = f"{urn.fqn.database}." if urn.fqn.database else ""
     schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""

@@ -1,7 +1,10 @@
 import pytest
 
+import snowflake.connector.errors
+
 from tests.helpers import get_json_fixtures
 
+from titan.client import FEATURE_NOT_ENABLED_ERR
 from titan.enums import AccountEdition
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -16,9 +19,6 @@ def resource(request):
     resource_cls, data = request.param
     res = resource_cls(**data)
 
-    if AccountEdition.STANDARD not in resource_cls.edition:
-        pytest.skip(f"Skipping {resource_cls.__name__}, it's not supported in standard edition")
-
     yield res
 
 
@@ -26,9 +26,18 @@ def resource(request):
 def test_create_drop_from_json(resource, test_db, cursor):
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute("USE WAREHOUSE CI")
+
+    # if AccountEdition.STANDARD not in resource_cls.edition:
+    #     pytest.skip(f"Skipping {resource_cls.__name__}, it's not supported in standard edition")
+
     try:
         create_sql = resource.create_sql()
         cursor.execute(create_sql)
+    except snowflake.connector.errors.ProgrammingError as err:
+        if err.errno == FEATURE_NOT_ENABLED_ERR:
+            pytest.skip(f"Skipping {resource.__class__.__name__}, feature not enabled")
+        else:
+            pytest.fail(f"Failed to create resource with sql {create_sql}")
     except Exception as e:
         pytest.fail(f"Failed to create resource with sql {create_sql}")
     finally:

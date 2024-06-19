@@ -5,10 +5,10 @@ description: >-
 
 # PackagesPolicy
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-packages-policy.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-packages-policy)
 
 A Packages Policy defines a set of rules for allowed and blocked packages
-that can be applied to various operations within the system.
+that are applied to user-defined functions and stored procedures.
 
 
 ## Examples

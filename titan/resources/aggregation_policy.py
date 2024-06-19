@@ -8,8 +8,8 @@ from ..scope import SchemaScope
 from ..enums import AccountEdition
 
 from ..props import (
-    EnumProp,
     Props,
+    QueryProp,
     StringProp,
 )
 
@@ -18,24 +18,56 @@ from ..props import (
 class _AggregationPolicy(ResourceSpec):
     name: ResourceName
     body: str
-    comment: str = None
+    # comment: str = None
     owner: Role = "SYSADMIN"
 
 
 # TODO:
-# Aggregation policies have a weird construction and may require new prop types to handle
+# Aggregation policies have a weird construction and may require new prop types to handle comment
 # CREATE [ OR REPLACE ] AGGREGATION POLICY [ IF NOT EXISTS ] <name>
 #   AS () RETURNS AGGREGATION_CONSTRAINT -> <body>
 #   [ COMMENT = '<string_literal>' ]
 
 
 class AggregationPolicy(ResourceNameTrait, Resource):
+    """
+    Description:
+        Represents an aggregation policy in Snowflake, which defines constraints on aggregation operations.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-aggregation-policy
+
+    Fields:
+        name (string, required): The name of the aggregation policy.
+        body (string, required): The SQL expression defining the aggregation constraint.
+        owner (string or Role): The owner of the aggregation policy. Defaults to "SYSADMIN".
+
+    Python:
+
+        ```python
+        aggregation_policy = AggregationPolicy(
+            name="some_aggregation_policy",
+            body="AGGREGATION_CONSTRAINT(MIN_GROUP_SIZE => 5)",
+            owner="SYSADMIN"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        aggregation_policies:
+          - name: some_aggregation_policy
+            body: AGGREGATION_CONSTRAINT(MIN_GROUP_SIZE => 5)
+            owner: SYSADMIN
+        ```
+
+    """
+
     edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.AGGREGATION_POLICY
     props = Props(
-        _start_token="AS ()",
-        body=StringProp("body"),
-        comment=StringProp("comment"),
+        _start_token="AS () RETURNS AGGREGATION_CONSTRAINT",
+        body=QueryProp("->"),
     )
     scope = SchemaScope()
     spec = _AggregationPolicy
@@ -44,7 +76,6 @@ class AggregationPolicy(ResourceNameTrait, Resource):
         self,
         name: str,
         body: str,
-        comment: str = None,
         owner: str = "SYSADMIN",
         **kwargs,
     ):
@@ -52,6 +83,5 @@ class AggregationPolicy(ResourceNameTrait, Resource):
         self._data: _AggregationPolicy = _AggregationPolicy(
             name=self._name,
             body=body,
-            comment=comment,
             owner=owner,
         )

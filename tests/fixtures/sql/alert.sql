@@ -16,3 +16,17 @@ CREATE OR REPLACE ALERT alert_new_rows
        AND SNOWFLAKE.ALERT.SCHEDULED_TIME()
   ))
   THEN CALL SYSTEM$SEND_EMAIL(...);
+
+
+CREATE ALERT my_alert
+  WAREHOUSE = my_warehouse
+  SCHEDULE = '1 MINUTE'
+  IF (EXISTS (
+    SELECT * FROM my_source_table))
+  THEN
+    BEGIN
+      LET condition_result_set RESULTSET :=
+        (SELECT * FROM TABLE(RESULT_SCAN(SNOWFLAKE.ALERT.GET_CONDITION_QUERY_UUID())));
+      ...
+    END;
+

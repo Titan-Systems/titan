@@ -1,6 +1,5 @@
 {
     "name": "my_policy",
     "body": "AGGREGATION_CONSTRAINT(MIN_GROUP_SIZE => 5)",
-    "comment": "This is a comment",
     "owner": "SYSADMIN"
 }
