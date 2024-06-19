@@ -16,6 +16,8 @@ def resource(request):
     resource_cls, data = request.param
     yield resource_cls, data
 
+
+def test_data_identity(resource):
     resource_cls, data = resource
     data = data.copy()
     instance = resource_cls(**data)
