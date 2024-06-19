@@ -657,3 +657,17 @@ def test_fetch_api_integration(cursor, test_db, marked_for_cleanup):
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
+
+
+def test_fetch_database_role(cursor, test_db, marked_for_cleanup):
+    database_role = res.DatabaseRole(
+        name="DATABASE_ROLE_EXAMPLE",
+        database=test_db,
+        owner=TEST_ROLE,
+    )
+    cursor.execute(database_role.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(database_role)
+
+    result = safe_fetch(cursor, database_role.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, database_role.to_dict())

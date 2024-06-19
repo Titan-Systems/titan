@@ -166,7 +166,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Warehouse                     | ✅         |
 |                               |            |
 | **Database Resources**        |            |
-| Database Role                 | 🚧         |
+| Database Role                 | ✅         |
 | Schema                        | ✅         |
 |                               |            |
 | **Schema Resources**          |            |

@@ -486,6 +486,23 @@ def fetch_database(session, fqn: FQN):
     }
 
 
+def fetch_database_role(session, fqn: FQN):
+    show_result = execute(session, f"SHOW DATABASE ROLES IN DATABASE {fqn.database}", cacheable=True)
+    roles = _filter_result(show_result, name=fqn.name)
+    if len(roles) == 0:
+        return None
+    if len(roles) > 1:
+        raise Exception(f"Found multiple database roles matching {fqn}")
+    data = roles[0]
+    tags = fetch_resource_tags(session, "DATABASE ROLE", fqn)
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "tags": tags,
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_dynamic_table(session, fqn: FQN):
     show_result = execute(session, f"SHOW DYNAMIC TABLES LIKE '{fqn.name}'")
 

@@ -82,7 +82,9 @@ def check_resource_coverage():
         if resource.scope.__class__ != current_scope:
             # print(">>>", resource.scope.__class__)
             current_scope = resource.scope.__class__
-            audits.append({"name": f"**{resource.scope.__class__.__name__}**"})
+            scope_header = headers.copy()
+            scope_header["name"] = f"**{resource.scope.__class__.__name__}**"
+            audits.append(scope_header)
 
         if resource.resource_type != current_data_type:
             current_data_type = resource.resource_type
