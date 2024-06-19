@@ -1,0 +1,9 @@
+{
+    "name": "NETWORK_RULE_EXAMPLE",
+    "value_list": [
+        "example.com:443"
+    ],
+    "mode": "EGRESS",
+    "comment": "Network rule for testing",
+    "owner": "SYSADMIN"
+}

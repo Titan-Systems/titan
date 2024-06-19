@@ -25,7 +25,7 @@ def main():
         valid_resource_types=[
             "database",
             "role",
-            # "network rule",
+            "network rule",
             # "secret",
             "schema",
             "stage",

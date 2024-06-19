@@ -3,8 +3,11 @@ roles:
     comment: CI role, do not drop
   - name: EMPTY
     comment: This role is intentionally left empty
-  - name: static_role
+  - name: STATIC_ROLE
     comment: Static role
+  - name: ~@#$%^&*()_+
+    owner: ACCOUNTADMIN
+    comment: This role has some issues
 
 databases:
   - name: static_database
@@ -20,11 +23,13 @@ role_grants:
     roles:
       - SYSADMIN
 
-# network_rules:
-#   - name: static_network_rule
-#     type: HOST_PORT
-#     value_list: ["example.com:443"]
-#     mode: EGRESS
+network_rules:
+  - name: static_network_rule
+    type: HOST_PORT
+    value_list: ["example.com:443"]
+    mode: EGRESS
+    database: static_database
+    schema: public
 
 # secrets:
 #   - name: static_secret

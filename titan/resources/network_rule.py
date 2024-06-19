@@ -30,7 +30,7 @@ class NetworkRuleMode(ParseableEnum):
 class _NetworkRule(ResourceSpec):
     name: ResourceName
     type: NetworkIdentifierType
-    value_list: list[str]
+    value_list: list[str] = None
     mode: NetworkRuleMode = NetworkRuleMode.INGRESS
     comment: str = None
     owner: Role = "SYSADMIN"
@@ -39,6 +39,9 @@ class _NetworkRule(ResourceSpec):
         super().__post_init__()
         if self.type == NetworkIdentifierType.HOST_PORT and self.mode != NetworkRuleMode.EGRESS:
             raise ValueError("When TYPE is HOST_PORT, MODE must be set to EGRESS.")
+
+        if len(self.value_list) == 0:
+            raise ValueError("value_list must have at least one entry")
 
 
 class NetworkRule(ResourceNameTrait, Resource):
@@ -49,7 +52,7 @@ class NetworkRule(ResourceNameTrait, Resource):
         and securing access based on network policies.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-network-policy
+        https://docs.snowflake.com/en/sql-reference/sql/create-network-rule
 
     Fields:
         name (string, required): The name of the network rule.
@@ -86,7 +89,7 @@ class NetworkRule(ResourceNameTrait, Resource):
     resource_type = ResourceType.NETWORK_RULE
     props = Props(
         type=EnumProp("type", NetworkIdentifierType),
-        value_list=StringListProp("value_list", parens=True),
+        value_list=StringListProp("value_list", parens=True, eq=True),
         mode=EnumProp("mode", NetworkRuleMode),
         comment=StringProp("comment"),
     )
@@ -97,7 +100,7 @@ class NetworkRule(ResourceNameTrait, Resource):
         self,
         name: str,
         type: NetworkIdentifierType = NetworkIdentifierType.IPV4,
-        value_list: list[str] = [],
+        value_list: list[str] = None,
         mode: NetworkRuleMode = NetworkRuleMode.INGRESS,
         comment: str = None,
         owner: str = "SYSADMIN",

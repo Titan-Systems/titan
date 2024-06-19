@@ -240,16 +240,20 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     return ownership_grant[0]["grantee_name"]
 
 
-def _show_objects(session, type_str, fqn: FQN):
+def _show_objects(session, type_str, fqn: FQN, cacheable: bool = True):
     try:
         if fqn.database is None and fqn.schema is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'")
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'", cacheable=cacheable)
         elif fqn.database is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}")
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}", cacheable=cacheable)
         elif fqn.schema is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+            return execute(
+                session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}", cacheable=cacheable
+            )
         else:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+            return execute(
+                session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=cacheable
+            )
     except ProgrammingError as err:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
             return []
@@ -715,6 +719,28 @@ def fetch_materialized_view(session, fqn: FQN):
     return {
         "name": fqn.name,
         "owner": data["owner"],
+    }
+
+
+def fetch_network_rule(session, fqn: FQN):
+    show_result = _show_objects(session, "NETWORK RULES", fqn)
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple network rules matching {fqn}")
+
+    desc_result = execute(session, f"DESC NETWORK RULE {fqn}", cacheable=True)
+    properties = desc_result[0]
+
+    data = show_result[0]
+    return {
+        "name": fqn.name,
+        "owner": data["owner"],
+        "type": data["type"],
+        "value_list": _parse_comma_separated_values(properties["value_list"]),
+        "mode": data["mode"],
+        "comment": data["comment"] or None,
     }
 
 
@@ -1446,6 +1472,14 @@ def list_resource(session, resource_label: str) -> list[FQN]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
+def list_schema_scoped_resource(session, resource) -> list[FQN]:
+    show_result = execute(session, f"SHOW {resource}")
+    resources = []
+    for row in show_result:
+        resources.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+    return resources
+
+
 def list_databases(session) -> list[FQN]:
     show_result = execute(session, "SHOW DATABASES")
     return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_DATABASES]
@@ -1558,3 +1592,7 @@ def list_warehouses(session) -> list[FQN]:
     for row in show_result:
         warehouses.append(FQN(name=row["name"]))
     return warehouses
+
+
+def list_network_rules(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "NETWORK RULES")
