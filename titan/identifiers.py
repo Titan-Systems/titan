@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 from .enums import ResourceType
 
@@ -15,6 +15,14 @@ def resource_label_for_type(resource_type: ResourceType) -> str:
 
 def resource_type_for_label(resource_label: str) -> ResourceType:
     return ResourceType(resource_label.upper().replace("_", " "))
+
+
+def names_are_equal(name1: Union[None, str, ResourceName], name2: Union[None, str, ResourceName]) -> bool:
+    if name1 is None and name2 is None:
+        return True
+    if name1 is None or name2 is None:
+        return False
+    return ResourceName(name1) == ResourceName(name2)
 
 
 class FQN:
@@ -36,21 +44,29 @@ class FQN:
         if not isinstance(other, FQN):
             return False
         return (
-            ResourceName(self.name) == ResourceName(other.name)
-            and self.database == other.database
-            and self.schema == other.schema
+            names_are_equal(self.name, other.name)
+            and names_are_equal(self.database, other.database)
+            and names_are_equal(self.schema, other.schema)
             and self.arg_types == other.arg_types
             and self.params == other.params
         )
 
     def __hash__(self):
         return hash(
-            (ResourceName(self.name), self.database, self.schema, tuple(self.arg_types), tuple(self.params.items()))
+            (
+                ResourceName(self.name),
+                ResourceName(self.database) if self.database else None,
+                ResourceName(self.schema) if self.schema else None,
+                tuple(self.arg_types),
+                tuple(
+                    self.params.items(),
+                ),
+            )
         )
 
     def __str__(self):
-        db = f"{self.database}." if self.database else ""
-        schema = f"{self.schema}." if self.schema else ""
+        db = f"{ResourceName(self.database)}." if self.database else ""
+        schema = f"{ResourceName(self.schema)}." if self.schema else ""
         arg_types = f"({', '.join(self.arg_types)})" if self.arg_types else ""
         params = "?" + _params_to_str(self.params) if self.params else ""
         return f"{db}{schema}{self.name}{arg_types}{params}"

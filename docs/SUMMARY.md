@@ -22,6 +22,7 @@
 * [NetworkRule](resources/network_rule.md)
 * [ObjectStoreCatalogIntegration](resources/object_store_catalog_integration.md)
 * [PasswordPolicy](resources/password_policy.md)
+* [Pipe](resources/pipe.md)
 * [PythonStoredProcedure](resources/python_stored_procedure.md)
 * [PythonUDF](resources/python_udf.md)
 * [ResourceMonitor](resources/resource_monitor.md)

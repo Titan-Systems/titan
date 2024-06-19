@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec, ResourceNameTrait
 from .role import Role
+from ..builtins import SYSTEM_SCHEMAS
 from ..enums import ResourceType
 from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
 from ..resource_name import ResourceName
@@ -117,6 +118,9 @@ class Schema(ResourceNameTrait, Resource, ResourceContainer):
 
         if self._name == "INFORMATION_SCHEMA":
             comment = "Views describing the contents of schemas in this database"
+
+        if self._name in SYSTEM_SCHEMAS:
+            self.implicit = True
 
         self._data: _Schema = _Schema(
             name=self._name,

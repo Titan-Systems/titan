@@ -9,7 +9,7 @@ import snowflake.connector
 
 from . import data_provider, lifecycle
 from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES
-from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, execute, reset_cache
+from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, DOES_NOT_EXIST_ERR, execute, reset_cache
 from .diff import diff, Action
 from .enums import ResourceType, ParseableEnum
 from .logical_grant import And, LogicalGrant, Or
@@ -26,6 +26,7 @@ from .privs import (
 )
 from .resources import Account, Database, Schema, Grant
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
+from .resource_name import ResourceName
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
@@ -128,7 +129,10 @@ def dump_plan(plan: Plan, format: str = "json"):
                 action_marker = "~"
             elif change.action == Action.REMOVE:
                 action_marker = "-"
-            output += f"{action_marker} {change.urn}" "{\n"
+            output += f"{action_marker} {change.urn}"
+            if change.action != Action.REMOVE:
+                output += " {"
+            output += "\n"
             key_lengths = [len(key) for key in change.delta.keys()]
             max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
             for key, value in change.delta.items():
@@ -137,7 +141,9 @@ def dump_plan(plan: Plan, format: str = "json"):
                 if key in change.before:
                     before_value = _render_value(change.before[key]) + " -> "
                 output += f"  {action_marker} {key:<{max_key_length}} = {before_value}{new_value}\n"
-            output += "}" + "\n\n"
+            if change.action != Action.REMOVE:
+                output += "}\n"
+            output += "\n"
         return output
     else:
         raise Exception(f"Unsupported format {format}")
@@ -363,6 +369,13 @@ def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_role
     return priv_map
 
 
+def _raise_if_plan_would_drop_session_user(session_ctx: dict, plan: Plan):
+    for change in plan:
+        if change.urn.resource_type == ResourceType.USER and change.action == Action.REMOVE:
+            if ResourceName(session_ctx["user"]) == ResourceName(change.urn.fqn.name):
+                raise Exception("Plan would drop the current session user, which is not allowed")
+
+
 # TODO
 def _raise_if_missing_privs(required: list, available: dict):
     return
@@ -415,6 +428,9 @@ class Blueprint:
         self._allow_role_switching: bool = allow_role_switching
         self._ignore_ownership: bool = ignore_ownership
         self._valid_resource_types: List[ResourceType] = [ResourceType(v) for v in valid_resource_types or []]
+
+        if ResourceType.USER in self._valid_resource_types:
+            raise Exception("User resource type is not allowed in this version of Titan")
 
         self.name = name
         self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
@@ -551,8 +567,8 @@ class Blueprint:
                 raise Exception("Fully managed mode with all resources is not supported yet")
             
             for resource_type in self._valid_resource_types:
-                for name in data_provider.list_resource(session, resource_label_for_type(resource_type)):
-                    urn = URN(resource_type=resource_type, fqn=parse_identifier(name, is_db_scoped=resource_type in (ResourceType.SCHEMA, ResourceType.ROLE)), account_locator=self._account_locator)
+                for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
+                    urn = URN(resource_type=resource_type, fqn=fqn, account_locator=self._account_locator)
                     data = data_provider.fetch_resource(session, urn)
                     if data is not None:
                         normalized_data = _normalize(urn, data)
@@ -669,6 +685,10 @@ class Blueprint:
 
                     if not found:
                         self._root.add(database_pointer)
+
+            for ref in resource.refs:
+                if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
+                    resource.container.add(ref)
                 
         for database in databases:
             merge_schemas = []
@@ -789,6 +809,8 @@ class Blueprint:
         """
 
         session_ctx = data_provider.fetch_session(session)
+
+        _raise_if_plan_would_drop_session_user(session_ctx, plan)
     
         # required_privs = _collect_required_privs(session_ctx, plan)
         # available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
@@ -808,6 +830,8 @@ class Blueprint:
                     logger.error(f"Resource already exists: {sql}, skipping...")
                 elif err.errno == INVALID_GRANT_ERR:
                     logger.error(f"Invalid grant: {sql}, skipping...")
+                elif err.errno == DOES_NOT_EXIST_ERR and sql.startswith("REVOKE"):
+                    logger.error(f"Resource does not exist: {sql}, skipping...")
                 else:
                     raise err
         return actions_taken
@@ -863,7 +887,7 @@ class Blueprint:
             elif change.action == Action.CHANGE:
                 action = lifecycle.update_resource(change.urn, change.delta, props)
             elif change.action == Action.REMOVE:
-                action = lifecycle.drop_resource(change.urn, change.before)
+                action = lifecycle.drop_resource(change.urn, change.before, if_exists=True)
 
             action_queue.extend(before_action)
             action_queue.append(action)

@@ -1,0 +1,93 @@
+roles:
+  - name: CI
+    comment: CI role, do not drop
+  - name: EMPTY
+    comment: This role is intentionally left empty
+  - name: static_role
+    comment: Static role
+
+databases:
+  - name: static_database
+
+role_grants:
+  - role: CI
+    roles:
+      - SYSADMIN
+  - role: EMPTY
+    roles:
+      - SYSADMIN
+  - role: static_role
+    roles:
+      - SYSADMIN
+
+# network_rules:
+#   - name: static_network_rule
+#     type: HOST_PORT
+#     value_list: ["example.com:443"]
+#     mode: EGRESS
+
+# secrets:
+#   - name: static_secret
+#     type: PASSWORD
+#     username: someuser
+#     password: somepass
+
+
+grants:
+  - GRANT USAGE ON WAREHOUSE STATIC_WAREHOUSE TO ROLE CI
+  - GRANT USAGE ON DATABASE static_database TO ROLE CI
+  - GRANT USAGE ON SCHEMA static_database.static_schema TO ROLE CI
+  - GRANT SELECT ON TABLE static_database.public.static_table TO ROLE CI
+  - GRANT SELECT ON VIEW static_database.public.static_view TO ROLE CI
+  - GRANT READ ON STAGE static_database.public.static_stage TO ROLE CI
+
+
+schemas:
+  - name: static_schema
+    database: static_database
+
+stages:
+  - name: static_stage
+    type: INTERNAL
+    directory:
+      enable: true
+
+# table_streams:
+#   - name: static_stream
+#     on_table: static_table
+
+tables:
+  - name: static_table
+    columns:
+      - name: id
+        data_type: NUMBER(38,0)
+    change_tracking: true
+
+
+# tags:
+#   - name: static_tag
+#     database: static_database
+#     schema: PUBLIC
+#     comment: This is a static tag
+#     allowed_values:
+#       - value: STATIC_TAG_VALUE
+
+# users:
+#   - name: static_user
+#     email: static.user@example.com
+#   - name: break_glass_admin
+
+views:
+  - name: static_view
+    columns:
+      - name: id
+        data_type: NUMBER(38,0)
+    as_: SELECT id FROM STATIC_DATABASE.public.static_table
+    requires:
+      - name: static_table
+        resource_type: table
+
+warehouses:
+  - name: static_warehouse
+  - name: CI
+    warehouse_size: XSMALL

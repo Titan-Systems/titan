@@ -15,7 +15,7 @@ from ..props import (
 @dataclass(unsafe_hash=True)
 class _Share(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: Role = "ACCOUNTADMIN"
     comment: str = None
 
 
@@ -29,7 +29,7 @@ class Share(ResourceNameTrait, Resource):
 
     Fields:
         name (string, required): The name of the share.
-        owner (string or Role): The owner of the share. Defaults to "SYSADMIN".
+        owner (string or Role): The owner of the share. Defaults to "ACCOUNTADMIN".
         comment (string): A comment about the share.
 
     Python:
@@ -60,7 +60,7 @@ class Share(ResourceNameTrait, Resource):
     def __init__(
         self,
         name: str,
-        owner: str = "SYSADMIN",
+        owner: str = "ACCOUNTADMIN",
         comment: str = None,
         **kwargs,
     ):

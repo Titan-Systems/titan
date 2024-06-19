@@ -503,9 +503,9 @@ class ResourcePointer(ResourceNameTrait, Resource, ResourceContainer):
         return {"name": self.name}
 
 
-def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource]) -> Resource:
+def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource, ResourceName]) -> Resource:
     """Convert a resource descriptor to a resource instance"""
-    if isinstance(resource_or_descriptor, str):
+    if isinstance(resource_or_descriptor, str) or isinstance(resource_or_descriptor, ResourceName):
         return ResourcePointer(name=resource_or_descriptor, resource_type=cls.resource_type)
     elif isinstance(resource_or_descriptor, dict):
         # We permit two types of anonymous resource descriptors

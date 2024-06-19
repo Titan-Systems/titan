@@ -221,7 +221,7 @@ class StringListProp(Prop):
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
-            f"({value_list})",
+            f"({value_list})" if self.parens else value_list,
         )
 
 

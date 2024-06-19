@@ -5,6 +5,7 @@ from .role import Role
 from ..enums import ResourceType
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
+from ..enums import AccountEdition
 
 from ..props import (
     EnumProp,
@@ -29,6 +30,7 @@ class _AggregationPolicy(ResourceSpec):
 
 
 class AggregationPolicy(ResourceNameTrait, Resource):
+    edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.AGGREGATION_POLICY
     props = Props(
         _start_token="AS ()",

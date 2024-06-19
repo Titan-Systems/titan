@@ -2,7 +2,7 @@
     "name": "SOME_MV",
     "owner": "SYSADMIN",
     "comment": "Test view",
-    "as_": "SELECT id FROM static_table",
+    "as_": "SELECT id FROM STATIC_DATABASE.public.static_table",
     "cluster_by": [
         "id"
     ],

@@ -34,7 +34,7 @@ shares:
 ## Fields
 
 * `name` (string, required) - The name of the share.
-* `owner` (string or [Role](role.md)) - The owner of the share. Defaults to "SYSADMIN".
+* `owner` (string or [Role](role.md)) - The owner of the share. Defaults to "ACCOUNTADMIN".
 * `comment` (string) - A comment about the share.
 
 

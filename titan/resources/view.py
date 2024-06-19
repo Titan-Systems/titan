@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
@@ -29,7 +29,8 @@ class _View(ResourceSpec):
     change_tracking: bool = None
     copy_grants: bool = None
     comment: str = None
-    as_: str = None
+    # TODO: remove this if parsing is feasible
+    as_: str = field(default_factory=None, metadata={"fetchable": False})
 
     def __post_init__(self):
         super().__post_init__()

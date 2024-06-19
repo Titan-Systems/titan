@@ -1,13 +1,13 @@
+from titan import resources as res
 from titan.enums import ResourceType
 from titan.privs import _all_privs_for_resource_type
 from titan.identifiers import URN
 from titan.resource_name import ResourceName
-from titan.resources import FutureGrant, Grant, ImageRepository, Role, RoleGrant, Schema, User, Warehouse
 from titan.resources.resource import ResourcePointer
 
 
 def test_grant_global_priv():
-    grant = Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
+    grant = res.Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
     assert grant.priv == "CREATE WAREHOUSE"
     assert grant.on == "ACCOUNT"
     assert grant.to.name == "somerole"
@@ -16,8 +16,8 @@ def test_grant_global_priv():
 
 
 def test_grant_account_obj_priv_with_resource():
-    wh = Warehouse(name="somewh")
-    grant = Grant(priv="MODIFY", on=wh, to="somerole")
+    wh = res.Warehouse(name="somewh")
+    grant = res.Grant(priv="MODIFY", on=wh, to="somerole")
     assert grant.priv == "MODIFY"
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
@@ -26,7 +26,7 @@ def test_grant_account_obj_priv_with_resource():
 
 
 def test_grant_account_obj_priv_with_kwarg():
-    grant = Grant(priv="MODIFY", on_warehouse="somewh", to="somerole")
+    grant = res.Grant(priv="MODIFY", on_warehouse="somewh", to="somerole")
     assert grant.priv == "MODIFY"
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
@@ -35,8 +35,8 @@ def test_grant_account_obj_priv_with_kwarg():
 
 
 def test_grant_schema_priv_with_resource():
-    sch = Schema(name="someschema")
-    grant = Grant(priv="CREATE VIEW", on=sch, to="somerole")
+    sch = res.Schema(name="someschema")
+    grant = res.Grant(priv="CREATE VIEW", on=sch, to="somerole")
     assert grant.priv == "CREATE VIEW"
     assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
@@ -45,7 +45,7 @@ def test_grant_schema_priv_with_resource():
 
 
 def test_grant_schema_priv_with_kwarg():
-    grant = Grant(priv="CREATE VIEW", on_schema="someschema", to="somerole")
+    grant = res.Grant(priv="CREATE VIEW", on_schema="someschema", to="somerole")
     assert grant.priv == "CREATE VIEW"
     assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
@@ -54,7 +54,7 @@ def test_grant_schema_priv_with_kwarg():
 
 
 def test_grant_all():
-    grant = Grant(priv="ALL", on_warehouse="somewh", to="somerole")
+    grant = res.Grant(priv="ALL", on_warehouse="somewh", to="somerole")
     assert grant.priv == "ALL"
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
@@ -63,8 +63,8 @@ def test_grant_all():
     assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=ALL&on=warehouse/SOMEWH"
 
 
-def test_grant_future_schemas_priv():
-    grant = FutureGrant(priv="CREATE VIEW", on_future_schemas_in_database="somedb", to="somerole")
+def test_future_grant_schemas_priv():
+    grant = res.FutureGrant(priv="CREATE VIEW", on_future_schemas_in_database="somedb", to="somerole")
     assert grant.priv == "CREATE VIEW"
     assert grant.on_type == ResourceType.SCHEMA
     assert grant.in_type == ResourceType.DATABASE
@@ -73,8 +73,50 @@ def test_grant_future_schemas_priv():
     assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=CREATE VIEW&on=database/SOMEDB.<SCHEMA>"
 
 
+def test_future_grant_anonymous_target():
+    grant = res.FutureGrant(priv="SELECT", on_future_tables_in_schema="someschema", to="somerole")
+    assert grant.priv == "SELECT"
+    assert grant.on_type == ResourceType.TABLE
+    assert grant.in_type == ResourceType.SCHEMA
+    assert grant.in_name == "SOMESCHEMA"
+    assert grant.to.name == "SOMEROLE"
+    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
+
+
+def test_future_grant_anonymous_nested_target():
+    grant = res.FutureGrant(priv="SELECT", on_future_tables_in_schema="somedb.someschema", to="somerole")
+    assert grant.priv == "SELECT"
+    assert grant.on_type == ResourceType.TABLE
+    assert grant.in_type == ResourceType.SCHEMA
+    assert grant.in_name == "SOMESCHEMA"
+    assert grant.to.name == "SOMEROLE"
+    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
+
+
+def test_future_grant_referenced_target():
+    schema = res.Schema(name="someschema")
+    grant = res.FutureGrant(priv="SELECT", on_future_tables_in_schema=schema, to="somerole")
+    assert grant.priv == "SELECT"
+    assert grant.on_type == ResourceType.TABLE
+    assert grant.in_type == ResourceType.SCHEMA
+    assert grant.in_name == "SOMESCHEMA"
+    assert grant.to.name == "SOMEROLE"
+    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
+
+
+def test_future_grant_referenced_inferred_target():
+    schema = res.Schema(name="someschema")
+    grant = res.FutureGrant(priv="SELECT", on_future_tables_in=schema, to="somerole")
+    assert grant.priv == "SELECT"
+    assert grant.on_type == ResourceType.TABLE
+    assert grant.in_type == ResourceType.SCHEMA
+    assert grant.in_name == "SOMESCHEMA"
+    assert grant.to.name == "SOMEROLE"
+    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
+
+
 def test_role_grant_to_user_with_kwargs():
-    grant = RoleGrant(role="somerole", to_user="someuser")
+    grant = res.RoleGrant(role="somerole", to_user="someuser")
     assert grant.role.name == "somerole"
     assert grant._data.to_user is not None
     assert grant.to.name == "someuser"
@@ -82,7 +124,7 @@ def test_role_grant_to_user_with_kwargs():
 
 
 def test_role_grant_to_user_with_resource():
-    grant = RoleGrant(role="somerole", to=User(name="someuser"))
+    grant = res.RoleGrant(role="somerole", to=res.User(name="someuser"))
     assert grant.role.name == "somerole"
     assert grant._data.to_user is not None
     assert grant.to.name == "someuser"
@@ -90,7 +132,7 @@ def test_role_grant_to_user_with_resource():
 
 
 def test_role_grant_to_role_with_kwargs():
-    grant = RoleGrant(role="somerole", to_role="someotherrole")
+    grant = res.RoleGrant(role="somerole", to_role="someotherrole")
     assert grant.role.name == "somerole"
     assert grant._data.to_role is not None
     assert grant.to.name == "someotherrole"
@@ -98,7 +140,7 @@ def test_role_grant_to_role_with_kwargs():
 
 
 def test_role_grant_to_role_with_resource():
-    grant = RoleGrant(role="somerole", to=Role(name="someotherrole"))
+    grant = res.RoleGrant(role="somerole", to=res.Role(name="someotherrole"))
     assert grant.role.name == "somerole"
     assert grant._data.to_role is not None
     assert grant.to.name == "someotherrole"
@@ -106,7 +148,7 @@ def test_role_grant_to_role_with_resource():
 
 
 # def test_grant_all_schemas_priv():
-#     grant = Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
+#     grant = res.Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
 #     assert grant.priv == "CREATE VIEW"
 #     assert grant.on == "database somedb"
 #     assert grant.on_all == "SCHEMAS"
@@ -114,8 +156,8 @@ def test_role_grant_to_role_with_resource():
 
 
 def test_grant_refs():
-    grant = Grant.from_sql("GRANT READ ON IMAGE REPOSITORY some_repo TO ROLE titan_app_admin")
-    repo = ImageRepository(
+    grant = res.Grant.from_sql("GRANT READ ON IMAGE REPOSITORY some_repo TO ROLE titan_app_admin")
+    repo = res.ImageRepository(
         name="titan_app_image_repo",
         owner="titan_app_admin",
         database="titan_app_db",
@@ -127,5 +169,5 @@ def test_grant_refs():
 
 
 def test_grant_priv_is_serialized_uppercase():
-    grant = Grant(priv="usage", on_warehouse="somewh", to="somerole")
+    grant = res.Grant(priv="usage", on_warehouse="somewh", to="somerole")
     assert grant.priv == "USAGE"

@@ -106,6 +106,7 @@ class ResourceMonitor(ResourceNameTrait, Resource):
         start_timestamp: str = None,
         end_timestamp: str = None,
         notify_users: list[str] = None,
+        owner: str = "ACCOUNTADMIN",
         **kwargs,
     ):
         super().__init__(name, **kwargs)
@@ -116,5 +117,6 @@ class ResourceMonitor(ResourceNameTrait, Resource):
             start_timestamp=start_timestamp,
             end_timestamp=end_timestamp,
             notify_users=notify_users,
+            owner=owner,
         )
         # TODO: rely on notify_users
