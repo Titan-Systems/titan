@@ -639,3 +639,23 @@ def test_fetch_network_rule(cursor, test_db, marked_for_cleanup):
     result = safe_fetch(cursor, network_rule.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
+
+
+def test_fetch_api_integration(cursor, test_db, marked_for_cleanup):
+    api_integration = res.APIIntegration(
+        name="API_INTEGRATION_EXAMPLE",
+        api_provider="AWS_API_GATEWAY",
+        api_aws_role_arn="arn:aws:iam::123456789012:role/MyRole",
+        api_allowed_prefixes=["https://xyz.execute-api.us-west-2.amazonaws.com/production"],
+        api_blocked_prefixes=["https://xyz.execute-api.us-west-2.amazonaws.com/test"],
+        comment="Example API integration",
+        enabled=False,
+        owner=TEST_ROLE,
+    )
+
+    cursor.execute(api_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(api_integration)
+
+    result = safe_fetch(cursor, api_integration.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())

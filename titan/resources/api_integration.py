@@ -32,15 +32,51 @@ class _APIIntegration(ResourceSpec):
 
 class APIIntegration(ResourceNameTrait, Resource):
     """
-    CREATE [ OR REPLACE ] API INTEGRATION [ IF NOT EXISTS ] <integration_name>
-        API_PROVIDER = { aws_api_gateway | aws_private_api_gateway | aws_gov_api_gateway | aws_gov_private_api_gateway }
-        API_AWS_ROLE_ARN = '<iam_role>'
-        [ API_KEY = '<api_key>' ]
-        API_ALLOWED_PREFIXES = ('<...>')
-        [ API_BLOCKED_PREFIXES = ('<...>') ]
-        ENABLED = { TRUE | FALSE }
-        [ COMMENT = '<string_literal>' ]
-        ;
+    Description:
+        Manages API integrations in Snowflake, allowing external services to interact with Snowflake resources securely.
+        This class supports creating, replacing, and checking the existence of API integrations with various configurations.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-api-integration.html
+
+    Fields:
+        name (string, required): The unique name of the API integration.
+        api_provider (string or ApiProvider, required): The provider of the API service. Defaults to AWS_API_GATEway.
+        api_aws_role_arn (string, required): The AWS IAM role ARN associated with the API integration.
+        api_key (string): The API key used for authentication.
+        api_allowed_prefixes (list): The list of allowed prefixes for the API endpoints.
+        api_blocked_prefixes (list): The list of blocked prefixes for the API endpoints.
+        enabled (bool, required): Specifies if the API integration is enabled. Defaults to TRUE.
+        comment (string): A comment or description for the API integration.
+
+    Python:
+
+        ```python
+        api_integration = APIIntegration(
+            name="some_api_integration",
+            api_provider="AWS_API_GATEWAY",
+            api_aws_role_arn="arn:aws:iam::123456789012:role/MyRole",
+            enabled=True,
+            api_allowed_prefixes=["/prod/", "/dev/"],
+            api_blocked_prefixes=["/test/"],
+            api_key="ABCD1234",
+            comment="Example API integration"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        api_integrations:
+          - name: some_api_integration
+            api_provider: AWS_API_GATEWAY
+            api_aws_role_arn: "arn:aws:iam::123456789012:role/MyRole"
+            enabled: true
+            api_allowed_prefixes: ["/prod/", "/dev/"]
+            api_blocked_prefixes: ["/test/"]
+            api_key: "ABCD1234"
+            comment: "Example API integration"
+        ```
     """
 
     resource_type = ResourceType.API_INTEGRATION

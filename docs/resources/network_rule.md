@@ -5,7 +5,7 @@ description: >-
 
 # NetworkRule
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-network-policy)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-network-rule)
 
 A Network Rule in Snowflake defines a set of network addresses, such as IP addresses or hostnames,
 that can be allowed or denied access to a Snowflake account. This helps in managing network traffic

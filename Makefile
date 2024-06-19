@@ -1,4 +1,4 @@
-.PHONY: install install-dev test integration style check clean build
+.PHONY: install install-dev test integration style check clean build docs coverage
 EDITION ?= standard
 
 install:
@@ -27,7 +27,7 @@ build:
 	mkdir -p dist
 	zip -vrX dist/titan-$(shell python setup.py -V).zip titan/
 
-docs:
+docs: 
 	python tools/generate_resource_docs.py
 
 coverage: clean

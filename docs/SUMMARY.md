@@ -4,6 +4,7 @@
 
 ## Resources
 
+* [APIIntegration](resources/api_integration.md)
 * [Alert](resources/alert.md)
 * [AzureStorageIntegration](resources/azure_storage_integration.md)
 * [Database](resources/database.md)

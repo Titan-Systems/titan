@@ -321,6 +321,11 @@ def fetch_session(session):
     }
 
 
+# ------------------------------
+# Fetch Resources
+# ------------------------------
+
+
 def fetch_account(session, fqn: FQN):
     # raise NotImplementedError()
     return {}
@@ -342,6 +347,30 @@ def fetch_alert(session, fqn: FQN):
         "condition": data["condition"],
         "then": data["action"],
         "owner": data["owner"],
+    }
+
+
+def fetch_api_integration(session, fqn: FQN):
+    show_result = _show_objects(session, "API INTEGRATIONS", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple api integrations matching {fqn}")
+    data = show_result[0]
+    desc_result = execute(session, f"DESC API INTEGRATION {fqn}")
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
+
+    return {
+        "name": data["name"],
+        "api_provider": properties["api_provider"],
+        "api_aws_role_arn": properties["api_aws_role_arn"],
+        "enabled": properties["enabled"],
+        "api_allowed_prefixes": properties["api_allowed_prefixes"],
+        "api_blocked_prefixes": properties["api_blocked_prefixes"],
+        "api_key": properties["api_key"],
+        "owner": owner,
+        "comment": data["comment"] or None,
     }
 
 
