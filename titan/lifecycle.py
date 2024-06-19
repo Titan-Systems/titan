@@ -256,7 +256,7 @@ def drop_grant(urn: URN, data: dict, **kwargs):
         data["priv"],
         "ON",
         data["on_type"],
-        data["on"],
+        data["on"] if data["on_type"] != "ACCOUNT" else "",
         "FROM",
         data["to"],
         # "CASCADE" if cascade else "RESTRICT",

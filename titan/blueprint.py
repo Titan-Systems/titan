@@ -887,7 +887,7 @@ class Blueprint:
             elif change.action == Action.CHANGE:
                 action = lifecycle.update_resource(change.urn, change.delta, props)
             elif change.action == Action.REMOVE:
-                action = lifecycle.drop_resource(change.urn, change.before)
+                action = lifecycle.drop_resource(change.urn, change.before, if_exists=True)
 
             action_queue.extend(before_action)
             action_queue.append(action)

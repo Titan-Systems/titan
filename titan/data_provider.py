@@ -865,14 +865,16 @@ def fetch_role_grants(session, role: str):
 
 def fetch_role(session, fqn: FQN):
     role_name = fqn.name._name if isinstance(fqn.name, ResourceName) else fqn.name
-    show_result = execute(session, f"SHOW ROLES LIKE '{role_name}'", cacheable=True)
+    show_result = execute(session, f"SHOW ROLES", cacheable=True)
 
-    if len(show_result) == 0:
+    roles = _filter_result(show_result, name=role_name)
+
+    if len(roles) == 0:
         return None
-    if len(show_result) > 1:
+    if len(roles) > 1:
         raise Exception(f"Found multiple roles matching {fqn}")
 
-    data = show_result[0]
+    data = roles[0]
 
     return {
         "name": data["name"],
@@ -1458,6 +1460,9 @@ def list_grants(session) -> list[FQN]:
             continue
         show_result = execute(session, f"SHOW GRANTS TO ROLE {role_name}")
         for data in show_result:
+            if data["granted_on"] == "ROLE":
+                # raise Exception(f"Role grants are not supported yet: {data}")
+                continue
             on = f"{data['granted_on'].lower()}/{data['name']}"
             grants.append(
                 FQN(

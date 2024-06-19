@@ -82,7 +82,7 @@ views:
     columns:
       - name: id
         data_type: NUMBER(38,0)
-    as_: SELECT id FROM static_table
+    as_: SELECT id FROM STATIC_DATABASE.public.static_table
     requires:
       - name: static_table
         resource_type: table

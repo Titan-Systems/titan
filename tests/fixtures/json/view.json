@@ -2,7 +2,7 @@
     "name": "MY_VIEW",
     "owner": "SYSADMIN",
     "volatile": true,
-    "as_": "SELECT id FROM STATIC_TABLE",
+    "as_": "SELECT id FROM STATIC_DATABASE.public.static_table",
     "change_tracking": null,
     "columns": [
         {
