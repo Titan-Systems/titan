@@ -37,6 +37,10 @@ docs_path = os.path.join(os.path.dirname(__file__), "..", "docs", "resources")
 # List all files in the docs directory that end with .md
 DOCS = [f[:-3] for f in os.listdir(docs_path) if f.endswith(".md")]
 
+test_fetch_file = open(
+    os.path.join(os.path.dirname(__file__), "..", "tests", "integration", "data_provider", "test_fetch.py"), "r"
+).read()
+
 
 def camelcase_to_snakecase(name: str) -> str:
     pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
@@ -72,6 +76,7 @@ def check_resource_coverage():
         "json": "json",
         "sql": "sql",
         "fetch": "fetch",
+        "tests": "tests",
         "docs": "docs",
         "stable": "stable",
     }
@@ -98,8 +103,9 @@ def check_resource_coverage():
         has_json = resource in JSON_FIXTURES
         has_sql = resource in SQL_FIXTURES
         has_fetch = hasattr(titan.data_provider, f"fetch_{resource_label}")
+        has_tests = f"test_fetch_{resource_label}" in test_fetch_file
         has_docs = camelcase_to_snakecase(resource.__name__) in DOCS
-        is_stable = all([has_json, has_sql, has_fetch, has_docs])
+        is_stable = all([has_json, has_sql, has_fetch, has_tests, has_docs])
 
         # print(resource_label)
 
@@ -108,6 +114,7 @@ def check_resource_coverage():
             "json": "✔" if has_json else "-",
             "sql": "✔" if has_sql else "-",
             "fetch": "✔" if has_fetch else "-",
+            "tests": "✔" if has_tests else "-",
             "docs": "✔" if has_docs else "-",
             "stable": "✅" if is_stable else "-",
         }

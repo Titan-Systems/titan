@@ -53,8 +53,8 @@ def test_fetch_privilege_grant(cursor, suffix, marked_for_cleanup):
 
 def test_fetch_future_grant(cursor, suffix, marked_for_cleanup):
     role = res.Role(name=f"future_grant_role_{suffix}")
-    cursor.execute(role.create_sql(if_not_exists=True))
     marked_for_cleanup.append(role)
+    cursor.execute(role.create_sql(if_not_exists=True))
 
     future_grant = res.FutureGrant(priv="usage", to=role, on_future_schemas_in_database="STATIC_DATABASE")
     cursor.execute(future_grant.create_sql(if_not_exists=True))
@@ -105,8 +105,8 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
 
 def test_fetch_grant_on_account(cursor, suffix, marked_for_cleanup):
     role = res.Role(name=f"TEST_ACCOUNT_GRANTS_ROLE_{suffix}")
-    cursor.execute(role.create_sql(if_not_exists=True))
     marked_for_cleanup.append(role)
+    cursor.execute(role.create_sql(if_not_exists=True))
     cursor.execute(f"GRANT AUDIT ON ACCOUNT TO ROLE {role.name}")
     cursor.execute(f"GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE {role.name}")
 
@@ -128,8 +128,8 @@ def test_fetch_grant_on_account(cursor, suffix, marked_for_cleanup):
 
 def test_fetch_database(cursor, suffix, marked_for_cleanup):
     database = res.Database(name=f"SOMEDB_{suffix}", owner=TEST_ROLE)
-    cursor.execute(database.create_sql(if_not_exists=True))
     marked_for_cleanup.append(database)
+    cursor.execute(database.create_sql(if_not_exists=True))
 
     result = safe_fetch(cursor, database.urn)
     assert result is not None
@@ -639,7 +639,7 @@ def test_fetch_network_rule(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
 
 
-def test_fetch_api_integration(cursor, test_db, marked_for_cleanup):
+def test_fetch_api_integration(cursor, marked_for_cleanup):
     api_integration = res.APIIntegration(
         name="API_INTEGRATION_EXAMPLE",
         api_provider="AWS_API_GATEWAY",
@@ -673,7 +673,7 @@ def test_fetch_database_role(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, database_role.to_dict())
 
 
-def test_fetch_packages_policy(cursor, test_db, marked_for_cleanup):
+def test_fetch_packages_policy(cursor, marked_for_cleanup):
     packages_policy = res.PackagesPolicy(
         name="PACKAGES_POLICY_EXAMPLE",
         allowlist=["numpy", "pandas"],
@@ -703,3 +703,21 @@ def test_fetch_aggregation_policy(cursor, test_db, marked_for_cleanup):
     result = safe_fetch(cursor, aggregation_policy.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, aggregation_policy.to_dict())
+
+
+def test_fetch_compute_pool(cursor, marked_for_cleanup):
+    compute_pool = res.ComputePool(
+        name="SOME_COMPUTE_POOL",
+        min_nodes=1,
+        max_nodes=1,
+        instance_family="CPU_X64_XS",
+        auto_resume=False,
+        auto_suspend_secs=60,
+        comment="Compute Pool comment",
+    )
+    cursor.execute(compute_pool.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(compute_pool)
+
+    result = safe_fetch(cursor, compute_pool.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, compute_pool.to_dict())

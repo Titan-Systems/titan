@@ -43,7 +43,7 @@ class ComputePool(ResourceNameTrait, Resource):
         A compute pool is a group of compute resources in Snowflake that can be used to execute SQL queries.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-compute-pool.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-compute-pool
 
     Fields:
         name (string, required): The unique name of the compute pool.

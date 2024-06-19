@@ -56,12 +56,19 @@ class Grant(Resource):
     Python:
 
         ```python
-        grant = Grant(
-            priv="SELECT",
-            on="some_table",
-            to="some_role",
-            grant_option=True
-        )
+        # Global Privs:
+        grant = Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
+
+        # Warehouse Privs:
+        grant = Grant(priv="OPERATE", on=Warehouse(name="foo"), to="somerole")
+        grant = Grant(priv="OPERATE", on_warehouse="foo", to="somerole")
+
+        # Schema Privs:
+        grant = Grant(priv="CREATE TABLE", on=Schema(name="foo"), to="somerole")
+        grant = Grant(priv="CREATE TABLE", on_schema="foo", to="somerole")
+
+        # Table Privs:
+        grant = Grant(priv="SELECT", on_table="sometable", to="somerole")
         ```
 
     Yaml:
@@ -92,22 +99,86 @@ class Grant(Resource):
         owner: str = None,
         **kwargs,
     ):
+
+        kwargs.pop("_privs", None)
+
+        priv = priv.value if isinstance(priv, ParseableEnum) else priv
+
+        # Handle instantiation from data dict
+        on_type = kwargs.pop("on_type", None)
+        if on_type:
+            on_type = ResourceType(on_type)
+
+        # Collect on_ kwargs
+        on_kwargs = {}
+        for keyword, arg in kwargs.copy().items():
+            if keyword.startswith("on_"):
+                on_kwargs[keyword] = kwargs.pop(keyword)
+
+        # Handle dynamic on_ kwargs
+        if on_kwargs:
+            for keyword, arg in on_kwargs.items():
+                if on is not None:
+                    raise ValueError("You can only specify one 'on' parameter, multiple found")
+                elif keyword.startswith("on_all"):
+                    raise ValueError("You must use GrantOnAll for all grants")
+                elif keyword.startswith("on_future"):
+                    raise ValueError("You must use FutureGrant for future grants")
+                else:
+                    # Grant targeting a specific resource
+                    # on_{resource} kwargs
+                    # on_schema="foo" -> on=Schema(name="foo")
+                    on = arg
+                    on_type = resource_type_for_label(keyword[3:])
+        # Handle on= kwarg
+        else:
+            if on is None:
+                raise ValueError("You must specify an 'on' parameter")
+            elif isinstance(on, ResourcePointer):
+                on_type = on.resource_type
+                on = on.name
+            elif isinstance(on, Resource):
+                on_type = on.resource_type
+                on = on._data.name
+            elif isinstance(on, str) and on.upper() == "ACCOUNT":
+                on = "ACCOUNT"
+                on_type = ResourceType.ACCOUNT
+
+        if owner is None:
+            if on_type == ResourceType.ACCOUNT and isinstance(priv, GlobalPriv):
+                owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
+            # Hacky fix
+            elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
+                owner = "ACCOUNTADMIN"
+            elif "INTEGRATION" in str(on_type):
+                owner = "ACCOUNTADMIN"
+            else:
+                owner = "SYSADMIN"
+
+        if to is None and kwargs.get("to_role"):
+            to = kwargs.pop("to_role")
+
         super().__init__(**kwargs)
         self._data: _Grant = _Grant(
             priv=priv,
             on=on,
-            on_type=ResourceType.determine_type(on),
+            on_type=on_type,
             to=to,
             grant_option=grant_option,
-            owner=owner or self.default_owner(priv, on),
+            owner=owner,
         )
+
         self.requires(self._data.to)
-        if self._data.on_type:
-            granted_on = ResourcePointer(name=self._data.on, resource_type=self._data.on_type)
+        granted_on = None
+        if on_type:
+            granted_on = ResourcePointer(name=on, resource_type=on_type)
             self.requires(granted_on)
 
     def __repr__(self):  # pragma: no cover
-        return f"{self.__class__.__name__}(priv={self._data.priv}, on={self._data.on}, to={self._data.to})"
+        priv = getattr(self._data, "priv", "")
+        on = getattr(self._data, "on", "")
+        to = getattr(self._data, "to", "")
+        return f"{self.__class__.__name__}(priv={priv}, on={on}, to={to})"
 
     @classmethod
     def from_sql(cls, sql):
@@ -133,11 +204,6 @@ class Grant(Resource):
     @property
     def priv(self):
         return self._data.priv
-
-    def default_owner(self, priv, on):
-        if isinstance(on, str) and on.upper() == "ACCOUNT":
-            return GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
-        return "SYSADMIN"
 
 
 def grant_fqn(grant: _Grant):

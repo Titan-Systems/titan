@@ -1,6 +1,6 @@
 {
     "name": "SOME_SERVICE",
-    "compute_pool": "some_compute_pool",
+    "compute_pool": "static_compute_pool",
     "specification": "spec:\n  container:\n  - name: container_name\n    image: /some/image/path:latest\n    env:\n      PORT: 8000\n      EXAMPLE_ENV_VARIABLE: my_value\n  endpoint:\n  - name: apiendpoint\n    port: 8000\n    public: true",
     "min_instances": 1,
     "max_instances": 1,

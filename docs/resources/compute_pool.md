@@ -5,7 +5,7 @@ description: >-
 
 # ComputePool
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-compute-pool.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-compute-pool)
 
 A compute pool is a group of compute resources in Snowflake that can be used to execute SQL queries.
 

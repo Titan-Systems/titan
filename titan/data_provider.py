@@ -462,7 +462,7 @@ def fetch_compute_pool(session, fqn: FQN):
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
-        raise Exception(f"Found multiple databases matching {fqn}")
+        raise Exception(f"Found multiple compute pools matching {fqn}")
 
     data = show_result[0]
 
@@ -1568,6 +1568,11 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
     for row in show_result:
         resources.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
     return resources
+
+
+def list_compute_pools(session) -> list[FQN]:
+    show_result = execute(session, "SHOW COMPUTE POOLS")
+    return [FQN(name=row["name"]) for row in show_result]
 
 
 def list_databases(session) -> list[FQN]:

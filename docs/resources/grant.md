@@ -15,12 +15,16 @@ Represents a grant of privileges on a resource to a role in Snowflake.
 ### Python
 
 ```python
-grant = Grant(
-    priv="SELECT",
-    on="some_table",
-    to="some_role",
-    grant_option=True
-)
+# Global Privs:
+grant = Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
+# Warehouse Privs:
+grant = Grant(priv="OPERATE", on=Warehouse(name="foo"), to="somerole")
+grant = Grant(priv="OPERATE", on_warehouse="foo", to="somerole")
+# Schema Privs:
+grant = Grant(priv="CREATE TABLE", on=Schema(name="foo"), to="somerole")
+grant = Grant(priv="CREATE TABLE", on_schema="foo", to="somerole")
+# Table Privs:
+grant = Grant(priv="SELECT", on_table="sometable", to="somerole")
 ```
 
 
