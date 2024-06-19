@@ -7,7 +7,6 @@ from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
 from titan.parse import parse_identifier, parse_URN
-from titan.resources.grant import _FutureGrant, _Grant, future_grant_fqn, grant_fqn
 from titan.resource_name import ResourceName
 
 
@@ -224,7 +223,6 @@ def test_fetch_resource_monitor(cursor, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, resource_monitor.to_dict())
 
 
-@pytest.mark.skip(reason="Requires user account with validated email address")
 def test_fetch_email_notification_integration(cursor, email_address, marked_for_cleanup):
 
     email_notification_integration = res.EmailNotificationIntegration(
