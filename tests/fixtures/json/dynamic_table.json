@@ -1,0 +1,17 @@
+{
+    "name": "some_dynamic_table",
+    "columns": [
+        {
+            "name": "id",
+            "data_type": "NUMBER(38,0)"
+        }
+    ],
+    "target_lag": "1 HOUR",
+    "warehouse": "static_warehouse",
+    "refresh_mode": "AUTO",
+    "initialize": "ON_CREATE",
+    "as_": "SELECT id FROM static_database.public.static_table",
+    "comment": "This is a sample dynamic table",
+    "owner": "SYSADMIN",
+    "tags": null
+}

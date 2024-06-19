@@ -434,9 +434,9 @@ def test_fetch_s3_storage_integration(cursor, suffix, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
 
 
-def test_fetch_alert(cursor, test_db, marked_for_cleanup):
+def test_fetch_alert(cursor, suffix, test_db, marked_for_cleanup):
     alert = res.Alert(
-        name="SOMEALERT",
+        name=f"SOMEALERT_{suffix}",
         warehouse="STATIC_WAREHOUSE",
         schedule="60 MINUTE",
         condition="SELECT 1",
@@ -453,7 +453,6 @@ def test_fetch_alert(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, alert.to_dict())
 
 
-@pytest.mark.skip(reason="Dynamic tables are emitting column constraints for some reason")
 def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
     dynamic_table = res.DynamicTable(
         name="PRODUCT",
@@ -567,9 +566,9 @@ def test_fetch_schema(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, schema.to_dict())
 
 
-def test_fetch_sequence(cursor, test_db, marked_for_cleanup):
+def test_fetch_sequence(cursor, suffix, test_db, marked_for_cleanup):
     sequence = res.Sequence(
-        name="SOMESEQ",
+        name=f"SOMESEQ_{suffix}",
         start=1,
         increment=2,
         comment="+3",
@@ -585,9 +584,9 @@ def test_fetch_sequence(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, sequence.to_dict())
 
 
-def test_fetch_task(cursor, test_db, marked_for_cleanup):
+def test_fetch_task(cursor, suffix, test_db, marked_for_cleanup):
     task = res.Task(
-        name="SOMETASK",
+        name=f"SOMETASK_{suffix}",
         schedule="60 MINUTE",
         state="SUSPENDED",
         as_="SELECT 1",
@@ -603,9 +602,9 @@ def test_fetch_task(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, task.to_dict())
 
 
-def test_fetch_network_rule(cursor, test_db, marked_for_cleanup):
+def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
     network_rule = res.NetworkRule(
-        name="NETWORK_RULE_EXAMPLE_HOST_PORT",
+        name=f"NETWORK_RULE_EXAMPLE_HOST_PORT_{suffix}",
         database=test_db,
         schema="PUBLIC",
         type="HOST_PORT",
@@ -622,7 +621,7 @@ def test_fetch_network_rule(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
 
     network_rule = res.NetworkRule(
-        name="NETWORK_RULE_EXAMPLE_IPV4",
+        name=f"NETWORK_RULE_EXAMPLE_IPV4_{suffix}",
         database=test_db,
         schema="PUBLIC",
         type="IPV4",
@@ -639,9 +638,9 @@ def test_fetch_network_rule(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
 
 
-def test_fetch_api_integration(cursor, marked_for_cleanup):
+def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
     api_integration = res.APIIntegration(
-        name="API_INTEGRATION_EXAMPLE",
+        name=f"API_INTEGRATION_EXAMPLE_{suffix}",
         api_provider="AWS_API_GATEWAY",
         api_aws_role_arn="arn:aws:iam::123456789012:role/MyRole",
         api_allowed_prefixes=["https://xyz.execute-api.us-west-2.amazonaws.com/production"],
@@ -659,9 +658,9 @@ def test_fetch_api_integration(cursor, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
 
 
-def test_fetch_database_role(cursor, test_db, marked_for_cleanup):
+def test_fetch_database_role(cursor, suffix, test_db, marked_for_cleanup):
     database_role = res.DatabaseRole(
-        name="DATABASE_ROLE_EXAMPLE",
+        name=f"DATABASE_ROLE_EXAMPLE_{suffix}",
         database=test_db,
         owner=TEST_ROLE,
     )
@@ -673,9 +672,9 @@ def test_fetch_database_role(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, database_role.to_dict())
 
 
-def test_fetch_packages_policy(cursor, marked_for_cleanup):
+def test_fetch_packages_policy(cursor, suffix, marked_for_cleanup):
     packages_policy = res.PackagesPolicy(
-        name="PACKAGES_POLICY_EXAMPLE",
+        name=f"PACKAGES_POLICY_EXAMPLE_{suffix}",
         allowlist=["numpy", "pandas"],
         blocklist=["os", "sys"],
         comment="Example packages policy",
@@ -689,9 +688,9 @@ def test_fetch_packages_policy(cursor, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, packages_policy.to_dict())
 
 
-def test_fetch_aggregation_policy(cursor, test_db, marked_for_cleanup):
+def test_fetch_aggregation_policy(cursor, suffix, test_db, marked_for_cleanup):
     aggregation_policy = res.AggregationPolicy(
-        name="AGGREGATION_POLICY_EXAMPLE",
+        name=f"AGGREGATION_POLICY_EXAMPLE_{suffix}",
         body="AGGREGATION_CONSTRAINT(MIN_GROUP_SIZE => 5)",
         owner=TEST_ROLE,
         database=test_db,
@@ -705,9 +704,9 @@ def test_fetch_aggregation_policy(cursor, test_db, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, aggregation_policy.to_dict())
 
 
-def test_fetch_compute_pool(cursor, marked_for_cleanup):
+def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
     compute_pool = res.ComputePool(
-        name="SOME_COMPUTE_POOL",
+        name=f"SOME_COMPUTE_POOL_{suffix}",
         min_nodes=1,
         max_nodes=1,
         instance_family="CPU_X64_XS",
@@ -723,9 +722,9 @@ def test_fetch_compute_pool(cursor, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, compute_pool.to_dict())
 
 
-def test_fetch_warehouse(cursor, marked_for_cleanup):
+def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
     warehouse = res.Warehouse(
-        name="SOME_WAREHOUSE",
+        name=f"SOME_WAREHOUSE_{suffix}",
         warehouse_size="XSMALL",
         auto_suspend=60,
         auto_resume=True,

@@ -106,6 +106,7 @@ class DynamicTable(ResourceNameTrait, Resource):
         warehouse=IdentifierProp("warehouse"),
         refresh_mode=EnumProp("refresh_mode", RefreshMode),
         initialize=EnumProp("initialize", InitializeBehavior),
+        comment=StringProp("comment"),
         as_=QueryProp("as"),
         tags=TagsProp(),
     )
