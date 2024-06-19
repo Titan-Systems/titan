@@ -170,7 +170,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Schema                        | ✅         |
 |                               |            |
 | **Schema Resources**          |            |
-| Aggregation Policy            | 🚧         |
+| Aggregation Policy            | ✅         |
 | Alert                         | ✅         |
 | Dynamic Table                 | ✅         |
 | Event Table                   | ✅         |

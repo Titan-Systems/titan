@@ -98,13 +98,14 @@ def check_resource_coverage():
                 audits.append({"name": str(resource.resource_type).title()})
 
         resource_label = resource_label_for_type(resource.resource_type)
+        class_label = camelcase_to_snakecase(resource.__name__)
 
         name = f"↳ {resource.__name__}" if resource in polymorphic_resources else resource.__name__
         has_json = resource in JSON_FIXTURES
         has_sql = resource in SQL_FIXTURES
         has_fetch = hasattr(titan.data_provider, f"fetch_{resource_label}")
-        has_tests = f"test_fetch_{resource_label}" in test_fetch_file
-        has_docs = camelcase_to_snakecase(resource.__name__) in DOCS
+        has_tests = f"test_fetch_{class_label}" in test_fetch_file
+        has_docs = class_label in DOCS
         is_stable = all([has_json, has_sql, has_fetch, has_tests, has_docs])
 
         # print(resource_label)

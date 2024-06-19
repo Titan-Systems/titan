@@ -721,3 +721,19 @@ def test_fetch_compute_pool(cursor, marked_for_cleanup):
     result = safe_fetch(cursor, compute_pool.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, compute_pool.to_dict())
+
+
+def test_fetch_warehouse(cursor, marked_for_cleanup):
+    warehouse = res.Warehouse(
+        name="SOME_WAREHOUSE",
+        warehouse_size="XSMALL",
+        auto_suspend=60,
+        auto_resume=True,
+        owner=TEST_ROLE,
+    )
+    cursor.execute(warehouse.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(warehouse)
+
+    result = safe_fetch(cursor, warehouse.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, warehouse.to_dict())
