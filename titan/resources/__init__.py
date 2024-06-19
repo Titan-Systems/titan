@@ -28,7 +28,7 @@ from .replication_group import ReplicationGroup
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
-from .secret import Secret
+from .secret import PasswordSecret
 from .sequence import Sequence
 from .service import Service
 from .share import Share
@@ -99,6 +99,7 @@ __all__ = [
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
     "PasswordPolicy",
+    "PasswordSecret",
     "Pipe",
     "PythonStoredProcedure",
     "PythonUDF",
@@ -109,7 +110,6 @@ __all__ = [
     "RoleGrant",
     "S3StorageIntegration",
     "Schema",
-    "Secret",
     "Sequence",
     "Service",
     "Share",

@@ -24,6 +24,14 @@ def test_data_identity(resource):
     serialized = instance.to_dict()
     if "name" in serialized:
         assert ResourceName(serialized.pop("name")) == ResourceName(data.pop("name"))
+    if "columns" in serialized:
+        lhs_cols = serialized.pop("columns")
+        rhs_cols = data.pop("columns")
+        assert len(lhs_cols) == len(rhs_cols)
+        for lhs, rhs in zip(lhs_cols, rhs_cols):
+            if "name" in lhs:
+                assert ResourceName(lhs.pop("name")) == ResourceName(rhs.pop("name"))
+            assert lhs == rhs
     assert serialized == data
 
 

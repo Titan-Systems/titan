@@ -1066,6 +1066,27 @@ def fetch_schema(session, fqn: FQN):
     }
 
 
+def fetch_secret(session, fqn: FQN):
+    show_result = _show_resources(session, "SECRETS", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple secrets matching {fqn}")
+    data = show_result[0]
+    desc_result = execute(session, f"DESC SECRET {fqn}")
+    properties = desc_result[0]
+    if data["secret_type"] == "PASSWORD":
+        return {
+            "name": data["name"],
+            "secret_type": data["secret_type"],
+            "username": properties["username"],
+            "owner": data["owner"],
+            "comment": data["comment"] or None,
+        }
+    else:
+        raise NotImplementedError(f"Unsupported secret type {data['secret_type']}")
+
+
 def fetch_security_integration(session, fqn: FQN):
     show_result = execute(session, f"SHOW SECURITY INTEGRATIONS LIKE '{fqn.name}'")
 

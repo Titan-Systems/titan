@@ -20,6 +20,18 @@ def _assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
     assert data_provider.remove_none_values(lhs) == data_provider.remove_none_values(rhs)
 
 
+def _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:
+    lhs = data_provider.remove_none_values(lhs)
+    rhs = data_provider.remove_none_values(rhs)
+    keys = set(lhs.keys()) | set(rhs.keys())
+    for attr in keys:
+        attr_metadata = spec.get_metadata(attr)
+        if not attr_metadata.get("fetchable", True):
+            lhs.pop(attr, None)
+            rhs.pop(attr, None)
+    assert lhs == rhs
+
+
 def safe_fetch(cursor, urn):
     reset_cache()
     return data_provider.fetch_resource(cursor, urn)
@@ -736,3 +748,19 @@ def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
     result = safe_fetch(cursor, warehouse.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, warehouse.to_dict())
+
+
+def test_fetch_password_secret(cursor, suffix, marked_for_cleanup):
+    secret = res.PasswordSecret(
+        name=f"SECRET_EXAMPLE_{suffix}",
+        username="my_username",
+        password="my_password",
+        comment="Password secret for accessing external database",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(secret.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(secret)
+
+    result = safe_fetch(cursor, secret.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())

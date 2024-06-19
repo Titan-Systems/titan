@@ -137,3 +137,8 @@ class DatabaseRole(ResourceNameTrait, Resource):
             tags=tags,
             comment=comment,
         )
+
+    def to_dict(self):
+        data = super().to_dict()
+        data["database"] = self.container.name
+        return data
