@@ -148,7 +148,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ Azure                       | 🚧         |
 | ↳ GCP                         | 🚧         |
 | Replication Group             | ✅         |
-| Resource Monitor              | 🚧         |
+| Resource Monitor              | ✅         |
 | Role                          | ✅         |
 | Role Grant                    | ✅         |
 | Security Integration          |            |

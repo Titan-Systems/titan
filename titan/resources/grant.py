@@ -40,83 +40,39 @@ class _Grant(ResourceSpec):
 
 class Grant(Resource):
     """
-    GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
-        | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
-        | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { SCHEMA <schema_name> | ALL SCHEMAS IN DATABASE <db_name> }
-        | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { FUTURE SCHEMAS IN DATABASE <db_name> }
-        | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
-        | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
-        }
-    TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
+    Description:
+        Represents a grant of privileges on a resource to a role in Snowflake.
 
-    globalPrivileges ::=
-        {
-            CREATE {
-                    ACCOUNT | DATA EXCHANGE LISTING | DATABASE | FAILOVER GROUP | INTEGRATION
-                    | NETWORK POLICY | REPLICATION GROUP | ROLE | SHARE | USER | WAREHOUSE
-            }
-            | APPLY { { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY | TAG }
-            | ATTACH POLICY | AUDIT |
-            | EXECUTE { ALERT | TASK }
-            | IMPORT SHARE
-            | MANAGE GRANTS
-            | MODIFY { LOG LEVEL | TRACE LEVEL | SESSION LOG LEVEL | SESSION TRACE LEVEL }
-            | MONITOR { EXECUTION | SECURITY | USAGE }
-            | OVERRIDE SHARE RESTRICTIONS | RESOLVE ALL
-        }
-        [ , ... ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/grant-privilege
 
-    accountObjectPrivileges ::=
-        -- For DATABASE
-            { CREATE { DATABASE ROLE | SCHEMA } | IMPORTED PRIVILEGES | MODIFY | MONITOR | USAGE } [ , ... ]
-        -- For FAILOVER GROUP
-            { FAILOVER | MODIFY | MONITOR | REPLICATE } [ , ... ]
-        -- For INTEGRATION
-            { USAGE | USE_ANY_ROLE } [ , ... ]
-        -- For REPLICATION GROUP
-            { MODIFY | MONITOR | REPLICATE } [ , ... ]
-        -- For RESOURCE MONITOR
-            { MODIFY | MONITOR } [ , ... ]
-        -- For USER
-            { MONITOR } [ , ... ]
-        -- For WAREHOUSE
-            { MODIFY | MONITOR | USAGE | OPERATE } [ , ... ]
+    Fields:
+        priv (string, required): The privilege to grant. Examples include 'SELECT', 'INSERT', 'CREATE TABLE'.
+        on (string or Resource, required): The resource on which the privilege is granted. Can be a string like 'ACCOUNT' or a specific resource object.
+        to (string or Role, required): The role to which the privileges are granted.
+        grant_option (bool): Specifies whether the grantee can grant the privileges to other roles. Defaults to False.
+        owner (string or Role): The owner role of the grant. Defaults to 'SYSADMIN'.
 
-    schemaPrivileges ::=
-        ADD SEARCH OPTIMIZATION
-        | CREATE {
-            ALERT | EXTERNAL TABLE | FILE FORMAT | FUNCTION
-            | MATERIALIZED VIEW | PIPE | PROCEDURE
-            | { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY
-            | SECRET | SEQUENCE | STAGE | STREAM
-            | TAG | TABLE | TASK | VIEW
-            }
-        | MODIFY | MONITOR | USAGE
-        [ , ... ]
+    Python:
 
-    schemaObjectPrivileges ::=
-        -- For ALERT
-            OPERATE [ , ... ]
-        -- For EVENT TABLE
-            { SELECT | INSERT } [ , ... ]
-        -- For FILE FORMAT, FUNCTION (UDF or external function), PROCEDURE, SECRET, or SEQUENCE
-            USAGE [ , ... ]
-        -- For PIPE
-            { MONITOR | OPERATE } [ , ... ]
-        -- For { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY or TAG
-            APPLY [ , ... ]
-        -- For external STAGE
-            USAGE [ , ... ]
-        -- For internal STAGE
-            READ [ , WRITE ] [ , ... ]
-        -- For STREAM
-            SELECT [ , ... ]
-        -- For TABLE
-            { SELECT | INSERT | UPDATE | DELETE | TRUNCATE | REFERENCES } [ , ... ]
-        -- For TASK
-            { MONITOR | OPERATE } [ , ... ]
-        -- For VIEW or MATERIALIZED VIEW
-            { SELECT | REFERENCES } [ , ... ]
+        ```python
+        grant = Grant(
+            priv="SELECT",
+            on="some_table",
+            to="some_role",
+            grant_option=True
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        - Grant:
+            priv: "SELECT"
+            on: "some_table"
+            to: "some_role"
+            grant_option: true
+        ```
     """
 
     resource_type = ResourceType.GRANT
@@ -136,105 +92,22 @@ class Grant(Resource):
         owner: str = None,
         **kwargs,
     ):
-        """
-        Usage
-        -----
-
-        Global Privs:
-        >>> Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
-
-        Warehouse Privs:
-        >>> Grant(priv="OPERATE", on=Warehouse(name="foo"), to="somerole")
-        >>> Grant(priv="OPERATE", on_warehouse="foo", to="somerole")
-
-        Schema Privs:
-        >>> Grant(priv="CREATE TABLE", on=Schema(name="foo"), to="somerole")
-        >>> Grant(priv="CREATE TABLE", on_schema="foo", to="somerole")
-
-        Table Privs:
-        >>> Grant(priv="SELECT", on_table="sometable", to="somerole")
-
-        """
-
-        kwargs.pop("_privs", None)
-
-        priv = priv.value if isinstance(priv, ParseableEnum) else priv
-
-        # Handle instantiation from data dict
-        on_type = kwargs.pop("on_type", None)
-        if on_type:
-            on_type = ResourceType(on_type)
-
-        # Collect on_ kwargs
-        on_kwargs = {}
-        for keyword, arg in kwargs.copy().items():
-            if keyword.startswith("on_"):
-                on_kwargs[keyword] = kwargs.pop(keyword)
-
-        # Handle dynamic on_ kwargs
-        if on_kwargs:
-            for keyword, arg in on_kwargs.items():
-                if on is not None:
-                    raise ValueError("You can only specify one 'on' parameter, multiple found")
-                elif keyword.startswith("on_all"):
-                    raise ValueError("You must use GrantOnAll for all grants")
-                elif keyword.startswith("on_future"):
-                    raise ValueError("You must use FutureGrant for future grants")
-                else:
-                    # Grant targeting a specific resource
-                    # on_{resource} kwargs
-                    # on_schema="foo" -> on=Schema(name="foo")
-                    on = arg
-                    on_type = resource_type_for_label(keyword[3:])
-        # Handle on= kwarg
-        else:
-            if on is None:
-                raise ValueError("You must specify an 'on' parameter")
-            elif isinstance(on, ResourcePointer):
-                on_type = on.resource_type
-                on = on.name
-            elif isinstance(on, Resource):
-                on_type = on.resource_type
-                on = on._data.name
-            elif isinstance(on, str) and on.upper() == "ACCOUNT":
-                on = "ACCOUNT"
-                on_type = ResourceType.ACCOUNT
-
-        if owner is None:
-            if on_type == ResourceType.ACCOUNT and isinstance(priv, GlobalPriv):
-                owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
-            # Hacky fix
-            elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
-                owner = "ACCOUNTADMIN"
-            elif "INTEGRATION" in str(on_type):
-                owner = "ACCOUNTADMIN"
-            else:
-                owner = "SYSADMIN"
-
-        if to is None and kwargs.get("to_role"):
-            to = kwargs.pop("to_role")
-
         super().__init__(**kwargs)
         self._data: _Grant = _Grant(
             priv=priv,
             on=on,
-            on_type=on_type,
+            on_type=ResourceType.determine_type(on),
             to=to,
             grant_option=grant_option,
-            owner=owner,
+            owner=owner or self.default_owner(priv, on),
         )
-
         self.requires(self._data.to)
-        granted_on = None
-        if on_type:
-            granted_on = ResourcePointer(name=on, resource_type=on_type)
+        if self._data.on_type:
+            granted_on = ResourcePointer(name=self._data.on, resource_type=self._data.on_type)
             self.requires(granted_on)
 
     def __repr__(self):  # pragma: no cover
-        priv = getattr(self._data, "priv", "")
-        on = getattr(self._data, "on", "")
-        to = getattr(self._data, "to", "")
-        return f"{self.__class__.__name__}(priv={priv}, on={on}, to={to})"
+        return f"{self.__class__.__name__}(priv={self._data.priv}, on={self._data.on}, to={self._data.to})"
 
     @classmethod
     def from_sql(cls, sql):
@@ -260,6 +133,11 @@ class Grant(Resource):
     @property
     def priv(self):
         return self._data.priv
+
+    def default_owner(self, priv, on):
+        if isinstance(on, str) and on.upper() == "ACCOUNT":
+            return GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
+        return "SYSADMIN"
 
 
 def grant_fqn(grant: _Grant):
