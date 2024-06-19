@@ -1080,8 +1080,15 @@ def fetch_secret(session, fqn: FQN):
             "name": data["name"],
             "secret_type": data["secret_type"],
             "username": properties["username"],
-            "owner": data["owner"],
             "comment": data["comment"] or None,
+            "owner": data["owner"],
+        }
+    elif data["secret_type"] == "GENERIC_STRING":
+        return {
+            "name": data["name"],
+            "secret_type": data["secret_type"],
+            "comment": data["comment"] or None,
+            "owner": data["owner"],
         }
     else:
         raise NotImplementedError(f"Unsupported secret type {data['secret_type']}")

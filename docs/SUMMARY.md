@@ -17,6 +17,7 @@
 * [ExternalAccessIntegration](resources/external_access_integration.md)
 * [FailoverGroup](resources/failover_group.md)
 * [GCSStorageIntegration](resources/gcs_storage_integration.md)
+* [GenericSecret](resources/generic_secret.md)
 * [GlueCatalogIntegration](resources/glue_catalog_integration.md)
 * [Grant](resources/grant.md)
 * [HybridTable](resources/hybrid_table.md)

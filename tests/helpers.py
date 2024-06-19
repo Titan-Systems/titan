@@ -1,6 +1,7 @@
 import json
 import os
 import logging
+import re
 
 import titan.resources as resources
 
@@ -23,10 +24,21 @@ def _get_resource_cls(resource_name):
     raise ValueError(f"Resource class {resource_name} not found")
 
 
+def camelcase_to_snakecase(name: str) -> str:
+    pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+    name = pattern.sub("_", name).lower()
+    return name
+
+
 def get_json_fixture(resource_name):
     with open(os.path.join(FIXTURES_DIR, "json", f"{resource_name}.json"), "r") as file:
         content = file.read()
-        return json.loads(content)
+        if not content:
+            raise ValueError(f"Empty JSON fixture for {resource_name}")
+        try:
+            return json.loads(content)
+        except Exception as err:
+            raise ValueError(f"Failed to decode JSON for {resource_name}: {err}")
 
 
 def get_json_fixtures():

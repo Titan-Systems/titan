@@ -3,12 +3,12 @@ description: >-
   
 ---
 
-# PasswordSecret
+# GenericSecret
 
 [Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-secret)
 
 A Secret defines a set of sensitive data that can be used for authentication or other purposes.
-This class defines a password secret.
+This class defines a generic secret.
 
 
 ## Examples
@@ -16,10 +16,9 @@ This class defines a password secret.
 ### Python
 
 ```python
-secret = PasswordSecret(
+secret = GenericSecret(
     name="some_secret",
-    username="some_username",
-    password="some_password",
+    secret_string="some_secret_string",
     comment="some_comment",
     owner="SYSADMIN",
 )
@@ -31,9 +30,8 @@ secret = PasswordSecret(
 ```yaml
 secrets:
   - name: some_secret
-    secret_type: PASSWORD
-    username: some_username
-    password: some_password
+    secret_type: GENERIC_STRING
+    secret_string: some_secret_string
     comment: some_comment
     owner: SYSADMIN
 ```
@@ -42,8 +40,7 @@ secrets:
 ## Fields
 
 * `name` (string, required) - The name of the secret.
-* `username` (string) - The username for the secret.
-* `password` (string) - The password for the secret.
+* `secret_string` (string) - The secret string.
 * `comment` (string) - A comment for the secret.
 * `owner` (string or [Role](role.md)) - The owner of the secret. Defaults to SYSADMIN.
 

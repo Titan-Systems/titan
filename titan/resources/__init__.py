@@ -28,7 +28,7 @@ from .replication_group import ReplicationGroup
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
-from .secret import PasswordSecret
+from .secret import PasswordSecret, GenericSecret
 from .sequence import Sequence
 from .service import Service
 from .share import Share
@@ -87,6 +87,7 @@ __all__ = [
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
+    "GenericSecret",
     "GlueCatalogIntegration",
     "Grant",
     "GrantOnAll",

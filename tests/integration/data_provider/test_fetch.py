@@ -752,10 +752,25 @@ def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
 
 def test_fetch_password_secret(cursor, suffix, marked_for_cleanup):
     secret = res.PasswordSecret(
-        name=f"SECRET_EXAMPLE_{suffix}",
+        name=f"PASSWORD_SECRET_EXAMPLE_{suffix}",
         username="my_username",
         password="my_password",
         comment="Password secret for accessing external database",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(secret.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(secret)
+
+    result = safe_fetch(cursor, secret.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+
+
+def test_fetch_generic_secret(cursor, suffix, marked_for_cleanup):
+    secret = res.GenericSecret(
+        name=f"GENERIC_SECRET_EXAMPLE_{suffix}",
+        secret_string="my_secret_string",
+        comment="Generic secret for various purposes",
         owner=TEST_ROLE,
     )
     cursor.execute(secret.create_sql(if_not_exists=True))
