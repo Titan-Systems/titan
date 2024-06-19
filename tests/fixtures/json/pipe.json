@@ -3,7 +3,7 @@
     "auto_ingest": false,
     "integration": null,
     "aws_sns_topic": null,
-    "as_": "copy into STATIC_TABLE from @STATIC_DATABASE.PUBLIC.STATIC_STAGE",
+    "as_": "copy into STATIC_DATABASE.PUBLIC.STATIC_TABLE from @STATIC_DATABASE.PUBLIC.STATIC_STAGE",
     "comment": null,
     "error_integration": null,
     "owner": "SYSADMIN"
