@@ -784,8 +784,7 @@ def test_fetch_generic_secret(cursor, suffix, marked_for_cleanup):
 def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
     secret = res.OAuthSecret(
         name=f"OAUTH_SECRET_EXAMPLE_WITH_SCOPES_{suffix}",
-        api_authentication="my_security_integration",
-        oauth_scopes=["scope1", "scope2"],
+        api_authentication="STATIC_SECURITY_INTEGRATION",
         comment="OAuth secret for accessing external API",
         owner=TEST_ROLE,
     )
@@ -798,7 +797,7 @@ def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
 
     secret = res.OAuthSecret(
         name=f"OAUTH_SECRET_EXAMPLE_WITH_TOKEN_{suffix}",
-        api_authentication="my_security_integration",
+        api_authentication="STATIC_SECURITY_INTEGRATION",
         oauth_refresh_token="my_refresh_token",
         oauth_refresh_token_expiry_time="2049-01-06 20:00:00",
         comment="OAuth secret for accessing external API",
@@ -810,3 +809,40 @@ def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
     result = safe_fetch(cursor, secret.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+
+
+def test_fetch_snowservices_oauth_security_integration(cursor, suffix, marked_for_cleanup):
+    security_integration = res.SnowservicesOAuthSecurityIntegration(
+        name=f"SNOWSERVICES_INGRESS_OAUTH_{suffix}",
+        type="OAUTH",
+        oauth_client="snowservices_ingress",
+        enabled=True,
+    )
+    cursor.execute(security_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(security_integration)
+
+    result = safe_fetch(cursor, security_integration.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, security_integration.to_dict())
+
+
+def test_fetch_api_authentication_security_integration(cursor, suffix, marked_for_cleanup):
+    security_integration = res.APIAuthenticationSecurityIntegration(
+        name=f"API_AUTHENTICATION_SECURITY_INTEGRATION_{suffix}",
+        type="api_authentication",
+        auth_type="OAUTH2",
+        oauth_client_id="sn-oauth-134o9erqfedlc",
+        oauth_client_secret="eb9vaXsrcEvrFdfcvCaoijhilj4fc",
+        oauth_token_endpoint="https://myinstance.service-now.com/oauth_token.do",
+        enabled=True,
+    )
+    cursor.execute(security_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(security_integration)
+
+    result = safe_fetch(cursor, security_integration.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(
+        res.APIAuthenticationSecurityIntegration.spec,
+        result,
+        security_integration.to_dict(),
+    )

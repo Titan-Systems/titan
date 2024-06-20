@@ -11,7 +11,13 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES, SYSTEM_USERS, SYSTEM_SCHEMAS
+from .builtins import (
+    SYSTEM_DATABASES,
+    SYSTEM_ROLES,
+    SYSTEM_USERS,
+    SYSTEM_SCHEMAS,
+    SYSTEM_SECURITY_INTEGRATIONS,
+)
 from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOES_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
 from .identifiers import URN, FQN, resource_type_for_label
@@ -128,6 +134,21 @@ def _urn_from_grant(row, session_ctx):
             account_locator=session_ctx["account_locator"],
             fqn=fqn,
         )
+
+
+def _convert_to_gmt(dt: datetime.datetime, fmt_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """
+    datetime.datetime(2049, 1, 6, 12, 0, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>)
+
+    =>
+
+    2049-01-06 20:00
+    """
+    if not dt:
+        return None
+    gmt = pytz.timezone("GMT")
+    dt_gmt = dt.astimezone(gmt)
+    return dt_gmt.strftime(fmt_str)
 
 
 def _parse_cluster_keys(cluster_keys_str: str) -> list[str]:
@@ -521,6 +542,7 @@ def fetch_database_role(session, fqn: FQN):
         "name": data["name"],
         "owner": data["owner"],
         "tags": tags,
+        "database": fqn.database,
         "comment": data["comment"] or None,
     }
 
@@ -1091,11 +1113,23 @@ def fetch_secret(session, fqn: FQN):
             "owner": data["owner"],
         }
     else:
+        data
+        return {
+            "name": data["name"],
+            "api_authentication": properties["integration_name"],
+            "secret_type": data["secret_type"],
+            "oauth_scopes": data["oauth_scopes"],
+            "oauth_refresh_token_expiry_time": _convert_to_gmt(properties["oauth_refresh_token_expiry_time"]),
+            "comment": data["comment"] or None,
+            "owner": data["owner"],
+        }
         raise NotImplementedError(f"Unsupported secret type {data['secret_type']}")
 
 
 def fetch_security_integration(session, fqn: FQN):
-    show_result = execute(session, f"SHOW SECURITY INTEGRATIONS LIKE '{fqn.name}'")
+    show_result = execute(session, f"SHOW SECURITY INTEGRATIONS", cacheable=True)
+
+    show_result = _filter_result(show_result, name=fqn.name)
 
     if len(show_result) == 0:
         return None
@@ -1104,12 +1138,29 @@ def fetch_security_integration(session, fqn: FQN):
 
     data = show_result[0]
 
-    type_, oauth_client = data["type"].split(" - ")
+    #
 
     desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
-    properties = _desc_type2_result_to_dict(desc_result)
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
 
-    if type_ == "OAUTH":
+    if data["type"] == "API_AUTHENTICATION":
+        print("")
+        return {
+            "name": data["name"],
+            "type": data["type"],
+            "auth_type": properties["auth_type"],
+            "enabled": data["enabled"] == "true",
+            "oauth_token_endpoint": properties["oauth_token_endpoint"],
+            "oauth_client_auth_method": properties["oauth_client_auth_method"],
+            "oauth_client_id": properties["oauth_client_id"],
+            "oauth_grant": properties["oauth_grant"],
+            "oauth_access_token_validity": properties["oauth_access_token_validity"],
+            "oauth_allowed_scopes": properties["oauth_allowed_scopes"],
+            "comment": data["comment"] or None,
+        }
+
+    elif data["type"].startswith("OAUTH"):
+        type_, oauth_client = data["type"].split(" - ")
         if oauth_client == "SNOWSERVICES_INGRESS":
             return {
                 "name": data["name"],
@@ -1117,7 +1168,7 @@ def fetch_security_integration(session, fqn: FQN):
                 "oauth_client": oauth_client,
                 "enabled": data["enabled"] == "true",
             }
-    raise Exception(f"Unsupported security integration type {type_}")
+    raise Exception(f"Unsupported security integration type {data['type']}")
 
     # return {
     #     "name": data["name"],
@@ -1361,21 +1412,6 @@ def fetch_replication_group(session, fqn: FQN):
     }
 
 
-def convert_to_gmt(dt: datetime.datetime) -> str:
-    """
-    Converts a datetime object in any timezone to a GMT datetime string in the format YYYY-MM-DD HH:MM.
-
-    Args:
-        dt (datetime): The datetime object to convert.
-
-    Returns:
-        str: The converted datetime string in GMT.
-    """
-    gmt = pytz.timezone("GMT")
-    dt_gmt = dt.astimezone(gmt)
-    return dt_gmt.strftime("%Y-%m-%d %H:%M")
-
-
 def fetch_resource_monitor(session, fqn: FQN):
     show_result = execute(session, f"SHOW RESOURCE MONITORS LIKE '{fqn.name}'")
     resource_monitors = _filter_result(show_result)
@@ -1389,8 +1425,8 @@ def fetch_resource_monitor(session, fqn: FQN):
         "owner": data["owner"],
         "credit_quota": int(float(data["credit_quota"])) if data["credit_quota"] else None,
         "frequency": data["frequency"],
-        "start_timestamp": convert_to_gmt(data["start_time"]) if data["start_time"] else None,
-        "end_timestamp": convert_to_gmt(data["end_time"]) if data["end_time"] else None,
+        "start_timestamp": _convert_to_gmt(data["start_time"], "%Y-%m-%d %H:%M"),
+        "end_timestamp": _convert_to_gmt(data["end_time"], "%Y-%m-%d %H:%M"),
         "notify_users": data["notify_users"] or None,
     }
 
@@ -1666,6 +1702,16 @@ def list_schemas(session, database=None) -> list[FQN]:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
             return []
         raise
+
+
+def list_security_integrations(session) -> list[FQN]:
+    show_result = execute(session, "SHOW SECURITY INTEGRATIONS")
+    integrations = []
+    for row in show_result:
+        if row["name"] in SYSTEM_SECURITY_INTEGRATIONS:
+            continue
+        integrations.append(FQN(name=row["name"]))
+    return integrations
 
 
 def list_stages(session) -> list[FQN]:

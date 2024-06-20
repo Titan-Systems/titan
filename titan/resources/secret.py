@@ -202,7 +202,7 @@ class _OAuthSecret(ResourceSpec):
     api_authentication: str
     secret_type: SecretType = SecretType.OAUTH2
     oauth_scopes: list[str] = None
-    oauth_refresh_token: str = None
+    oauth_refresh_token: str = field(default_factory=None, metadata={"fetchable": False})
     oauth_refresh_token_expiry_time: str = None
     comment: str = None
     owner: Role = "SYSADMIN"

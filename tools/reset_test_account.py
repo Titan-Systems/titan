@@ -42,6 +42,7 @@ def main():
             "role grant",
             "role",
             "schema",
+            "security integration",
             "stage",
             "table",
             "view",

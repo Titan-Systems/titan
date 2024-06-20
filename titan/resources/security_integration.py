@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec
+from .resource import Resource, ResourceSpec, ResourceNameTrait
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..resource_name import ResourceName
@@ -9,6 +9,7 @@ from ..scope import AccountScope
 from ..props import (
     BoolProp,
     StringProp,
+    StringListProp,
     Props,
     IntProp,
     EnumProp,
@@ -49,7 +50,7 @@ class _SnowflakePartnerOAuthSecurityIntegration(ResourceSpec):
             raise ValueError(f"Invalid OAuth client: {self.oauth_client}")
 
 
-class SnowflakePartnerOAuthSecurityIntegration(Resource):
+class SnowflakePartnerOAuthSecurityIntegration(ResourceNameTrait, Resource):
     """
     Description:
         A security integration in Snowflake designed to manage external OAuth clients for authentication purposes.
@@ -127,9 +128,9 @@ class SnowflakePartnerOAuthSecurityIntegration(Resource):
         **kwargs,
     ):
         kwargs.pop("type", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _SnowflakePartnerOAuthSecurityIntegration(
-            name=name,
+            name=self._name,
             enabled=enabled,
             oauth_client=oauth_client,
             oauth_client_secret=oauth_client_secret,
@@ -149,7 +150,7 @@ class _SnowservicesOAuthSecurityIntegration(ResourceSpec):
     comment: str = None
 
 
-class SnowservicesOAuthSecurityIntegration(Resource):
+class SnowservicesOAuthSecurityIntegration(ResourceNameTrait, Resource):
     """
     Description:
         Manages OAuth security integrations for Snowservices in Snowflake, allowing external authentication mechanisms.
@@ -201,9 +202,76 @@ class SnowservicesOAuthSecurityIntegration(Resource):
     ):
         kwargs.pop("type", None)
         kwargs.pop("oauth_client", None)
-        super().__init__(**kwargs)
+        super().__init__(name, **kwargs)
         self._data = _SnowservicesOAuthSecurityIntegration(
-            name=name,
+            name=self._name,
+            enabled=enabled,
+            comment=comment,
+        )
+
+
+@dataclass(unsafe_hash=True)
+class _APIAuthenticationSecurityIntegration(ResourceSpec):
+    name: ResourceName
+    type: SecurityIntegrationType = SecurityIntegrationType.API_AUTHENTICATION
+    auth_type: str = "OAUTH2"
+    enabled: bool = True
+    oauth_token_endpoint: str = None
+    oauth_client_auth_method: str = "CLIENT_SECRET_POST"
+    oauth_client_id: str = None
+    oauth_client_secret: str = field(default_factory=None, metadata={"fetchable": False})
+    oauth_grant: str = None
+    oauth_access_token_validity: int = None
+    oauth_allowed_scopes: list[str] = None
+    comment: str = None
+
+
+class APIAuthenticationSecurityIntegration(ResourceNameTrait, Resource):
+    resource_type = ResourceType.SECURITY_INTEGRATION
+    props = Props(
+        type=EnumProp("type", [SecurityIntegrationType.API_AUTHENTICATION]),
+        auth_type=StringProp("auth_type"),
+        enabled=BoolProp("enabled"),
+        oauth_token_endpoint=StringProp("oauth_token_endpoint"),
+        oauth_client_auth_method=StringProp("oauth_client_auth_method"),
+        oauth_client_id=StringProp("oauth_client_id"),
+        oauth_client_secret=StringProp("oauth_client_secret"),
+        oauth_grant=StringProp("oauth_grant"),
+        oauth_access_token_validity=IntProp("oauth_access_token_validity"),
+        oauth_allowed_scopes=StringListProp("oauth_allowed_scopes", parens=True),
+        comment=StringProp("comment"),
+    )
+    scope = AccountScope()
+    spec = _APIAuthenticationSecurityIntegration
+
+    def __init__(
+        self,
+        name: str,
+        auth_type: str = "OAUTH2",
+        oauth_token_endpoint: str = None,
+        oauth_client_auth_method: str = "CLIENT_SECRET_POST",
+        oauth_client_id: str = None,
+        oauth_client_secret: str = None,
+        oauth_grant: str = None,
+        oauth_access_token_validity: int = 0,
+        oauth_allowed_scopes: list[str] = None,
+        enabled: bool = True,
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        kwargs.pop("oauth_client", None)
+        super().__init__(name, **kwargs)
+        self._data: _APIAuthenticationSecurityIntegration = _APIAuthenticationSecurityIntegration(
+            name=self._name,
+            auth_type=auth_type,
+            oauth_token_endpoint=oauth_token_endpoint,
+            oauth_client_auth_method=oauth_client_auth_method,
+            oauth_client_id=oauth_client_id,
+            oauth_client_secret=oauth_client_secret,
+            oauth_grant=oauth_grant,
+            oauth_access_token_validity=oauth_access_token_validity,
+            oauth_allowed_scopes=oauth_allowed_scopes or [],
             enabled=enabled,
             comment=comment,
         )
@@ -211,7 +279,9 @@ class SnowservicesOAuthSecurityIntegration(Resource):
 
 def _resolver(data: dict):
     security_integration_type = SecurityIntegrationType(data["type"])
-    if security_integration_type == SecurityIntegrationType.OAUTH:
+    if security_integration_type == SecurityIntegrationType.API_AUTHENTICATION:
+        return APIAuthenticationSecurityIntegration
+    elif security_integration_type == SecurityIntegrationType.OAUTH:
         oauth_client = OAuthClient(data["oauth_client"])
         if oauth_client in [
             OAuthClient.LOOKER,
@@ -221,7 +291,8 @@ def _resolver(data: dict):
             return SnowflakePartnerOAuthSecurityIntegration
         elif oauth_client == OAuthClient.CUSTOM:
             # return SnowflakeCustomOAuthSecurityIntegration
-            return None
+            # return None
+            raise NotImplementedError
         elif oauth_client == OAuthClient.SNOWSERVICES_INGRESS:
             return SnowservicesOAuthSecurityIntegration
     return None

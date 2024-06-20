@@ -51,7 +51,9 @@ from .notification_integration import (
 )
 
 from .security_integration import (
+    APIAuthenticationSecurityIntegration,
     SnowflakePartnerOAuthSecurityIntegration,
+    SnowservicesOAuthSecurityIntegration,
 )
 
 from .storage_integration import (
@@ -66,6 +68,7 @@ __all__ = [
     "AggregationPolicy",
     "Alert",
     "APIIntegration",
+    "APIAuthenticationSecurityIntegration",
     "AWSOutboundNotificationIntegration",
     "AzureInboundNotificationIntegration",
     "AzureOutboundNotificationIntegration",
@@ -116,6 +119,7 @@ __all__ = [
     "Service",
     "Share",
     "SnowflakePartnerOAuthSecurityIntegration",
+    "SnowservicesOAuthSecurityIntegration",
     "StageStream",
     "Table",
     "TableStream",

@@ -841,7 +841,7 @@ class Blueprint:
         default_role = session_ctx["role"]
         # usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
 
-        def _queue_change(change: ResourceChange, props):
+        def _queue_change(change: ResourceChange):
             """
             In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
 
@@ -866,9 +866,8 @@ class Blueprint:
             before_action = []
             action = None
             after_action = []
-
-
             if change.action == Action.ADD:
+                props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
                 # TODO: raise exception if role isn't usable. Maybe can just let this fail naturally
 
                 if "owner" in change.after:
@@ -885,7 +884,7 @@ class Blueprint:
                 
                 action = lifecycle.create_resource(change.urn, change.after, props)
             elif change.action == Action.CHANGE:
-                action = lifecycle.update_resource(change.urn, change.delta, props)
+                action = lifecycle.update_resource(change.urn, change.delta)
             elif change.action == Action.REMOVE:
                 action = lifecycle.drop_resource(change.urn, change.before, if_exists=True)
 
@@ -896,8 +895,7 @@ class Blueprint:
         if self._allow_role_switching:
             action_queue.append("USE SECONDARY ROLES ALL")
         for change in plan:
-            props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-            _queue_change(change, props)
+            _queue_change(change)
         return action_queue
 
     def destroy(self, session, manifest: Manifest=None):
