@@ -300,8 +300,7 @@ class FutureGrant(Resource):
                     if isinstance(arg, Resource):
                         on_type = ResourceType(singularize(keyword[10:-3]))
                         in_type = arg.resource_type
-                        # in_name = str(arg.fqn)
-                        in_name = arg.fqn.name
+                        in_name = str(arg.fqn)
                         granted_in_ref = arg
                     else:
                         on_stmt, in_stmt = keyword.split("_in_")
@@ -309,12 +308,6 @@ class FutureGrant(Resource):
                         in_type = ResourceType(in_stmt)
                         in_name = arg
                         granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
-
-        # TODO: Migrate this to blueprint
-        # if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
-        #     owner = "ACCOUNTADMIN"
-        # else:
-        #     owner = "SECURITYADMIN"
 
         super().__init__(**kwargs)
         self._data: _FutureGrant = _FutureGrant(

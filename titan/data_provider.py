@@ -34,6 +34,10 @@ from .resource_name import ResourceName, attribute_is_resource_name
 __this__ = sys.modules[__name__]
 
 
+def _quote_identifier(identifier: str) -> str:
+    return str(ResourceName(identifier))
+
+
 def _desc_result_to_dict(desc_result):
     return dict([(row["property"], row["value"]) for row in desc_result])
 
@@ -1040,14 +1044,14 @@ def fetch_role_grant(session, fqn: FQN):
         if ResourceName(data["granted_to"]) == subject and ResourceName(data["grantee_name"]) == name:
             if data["granted_to"] == "ROLE":
                 return {
-                    "role": fqn.name,
-                    "to_role": data["grantee_name"],
+                    "role": _quote_identifier(fqn.name),
+                    "to_role": _quote_identifier(data["grantee_name"]),
                     # "owner": data["granted_by"],
                 }
             elif data["granted_to"] == "USER":
                 return {
-                    "role": fqn.name,
-                    "to_user": data["grantee_name"],
+                    "role": _quote_identifier(fqn.name),
+                    "to_user": _quote_identifier(data["grantee_name"]),
                     # "owner": data["granted_by"],
                 }
             else:
