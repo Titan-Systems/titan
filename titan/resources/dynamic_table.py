@@ -62,9 +62,9 @@ class _DynamicTable(ResourceSpec):
     columns: list[DynamicTableColumn]
     target_lag: str
     warehouse: Warehouse
-    refresh_mode: RefreshMode
-    initialize: str
     as_: str
+    refresh_mode: RefreshMode = RefreshMode.AUTO
+    initialize: InitializeBehavior = InitializeBehavior.ON_CREATE
     comment: str = None
     owner: Role = "SYSADMIN"
     tags: dict[str, str] = None
@@ -81,12 +81,12 @@ class DynamicTable(ResourceNameTrait, Resource):
 
     Fields:
         name (string, required): The name of the dynamic table.
-        columns (list, required): A list of Column objects defining the structure of the table.
+        columns (list, required): A list of dicts defining the structure of the table.
         target_lag (string): The acceptable lag (delay) for data in the table. Defaults to "DOWNSTREAM".
         warehouse (string or Warehouse, required): The warehouse where the table is stored.
-        refresh_mode (string or RefreshMode, required): The mode of refreshing the table (AUTO, FULL, INCREMENTAL).
-        initialize (string or InitializeBehavior, required): The behavior when the table is initialized (ON_CREATE, ON_SCHEDULE).
         as_ (string, required): The query used to populate the table.
+        refresh_mode (string or RefreshMode): The mode of refreshing the table (AUTO, FULL, INCREMENTAL).
+        initialize (string or InitializeBehavior): The behavior when the table is initialized (ON_CREATE, ON_SCHEDULE).
         comment (string): An optional comment for the table.
         owner (string or Role): The owner of the table. Defaults to "SYSADMIN".
 
@@ -95,7 +95,7 @@ class DynamicTable(ResourceNameTrait, Resource):
         ```python
         dynamic_table = DynamicTable(
             name="some_dynamic_table",
-            columns=[Column(name="id", type="int"), Column(name="data", type="string")],
+            columns=[{"name": "id"}, {"name": "data"}],
             target_lag="1 HOUR",
             warehouse="some_warehouse",
             refresh_mode="AUTO",
@@ -113,9 +113,7 @@ class DynamicTable(ResourceNameTrait, Resource):
           name: some_dynamic_table
           columns:
             - name: id
-              type: int
             - name: data
-              type: string
           target_lag: "1 HOUR"
           warehouse: some_warehouse
           refresh_mode: AUTO
@@ -146,9 +144,9 @@ class DynamicTable(ResourceNameTrait, Resource):
         columns: list[dict],
         target_lag: str,
         warehouse: str,
-        refresh_mode: RefreshMode,
-        initialize: InitializeBehavior,
         as_: str,
+        refresh_mode: RefreshMode = RefreshMode.AUTO,
+        initialize: InitializeBehavior = InitializeBehavior.ON_CREATE,
         comment: str = None,
         owner: str = "SYSADMIN",
         tags: dict[str, str] = None,

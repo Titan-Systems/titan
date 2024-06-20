@@ -129,7 +129,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | **Account Resources**         |           |
 | API Integration               | ✅         |
 | Catalog Integration           |           |
-| ↳ Glue                        | ✅         |
+| ↳ Glue                        | 🚧         |
 | ↳ Object Store                | ✅         |
 | Compute Pool                  | ✅         |
 | Connection                    | ❌         |
@@ -147,7 +147,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ AWS                         | 🚧         |
 | ↳ Azure                       | 🚧         |
 | ↳ GCP                         | 🚧         |
-| Replication Group             | ✅         |
+| Replication Group             | 🚧         |
 | Resource Monitor              | ✅         |
 | Role                          | ✅         |
 | Role Grant                    | ✅         |
@@ -161,7 +161,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Storage Integration           |           |
 | ↳ AWS                         | 🚧         |
 | ↳ Azure                       | 🚧         |
-| ↳ GCP                         | ✅         |
+| ↳ GCS                         | 🚧         |
 | User                          | ✅         |
 | Warehouse                     | ✅         |
 |                               |            |
@@ -175,7 +175,6 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Dynamic Table                 | ✅         |
 | Event Table                   | ✅         |
 | External Function             | 🚧         |
-| External Stage                | ✅         |
 | External Table                | ❌         |
 | File Format                   |           |
 | ↳ CSV                         | ✅         |
@@ -226,7 +225,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ Python                      | ✅         |
 | ↳ Scala                       | ❌         |
 | ↳ SQL                         | ❌         |
-| View                          | 🚧         |
+| View                          | ✅         |
 
 
 
