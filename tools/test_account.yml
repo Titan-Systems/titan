@@ -57,9 +57,11 @@ stages:
     directory:
       enable: true
 
-# table_streams:
-#   - name: static_stream
-#     on_table: static_table
+streams:
+  - name: static_stream
+    database: static_database
+    schema: public
+    on_table: static_database.public.static_table
 
 tables:
   - name: static_table

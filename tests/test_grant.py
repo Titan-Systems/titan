@@ -147,12 +147,12 @@ def test_role_grant_to_role_with_resource():
     assert str(URN.from_resource(grant)) == "urn:::role_grant/SOMEROLE?role=SOMEOTHERROLE"
 
 
-# def test_grant_all_schemas_priv():
-#     grant = res.Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
-#     assert grant.priv == "CREATE VIEW"
-#     assert grant.on == "database somedb"
-#     assert grant.on_all == "SCHEMAS"
-#     assert grant.to == "somerole"
+def test_grant_all_schemas_priv():
+    grant = res.Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
+    assert grant.priv == "CREATE VIEW"
+    assert grant.on == "database somedb"
+    assert grant.on_all == "SCHEMAS"
+    assert grant.to == "somerole"
 
 
 def test_grant_refs():

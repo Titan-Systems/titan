@@ -30,11 +30,11 @@ def test_table_stream():
     assert isinstance(res, resources.TableStream)
 
 
-# def test_external_table_stream():
-#     data = get_json_fixture("external_table_stream")
-#     data["resource_type"] = ResourceType.STREAM
-#     res = resources.Resource.from_dict(data)
-#     assert isinstance(res, resources.ExternalTableStream)
+def test_external_table_stream():
+    data = get_json_fixture("external_table_stream")
+    data["resource_type"] = ResourceType.STREAM
+    res = resources.Resource.from_dict(data)
+    assert isinstance(res, resources.ExternalTableStream)
 
 
 def test_stage_stream():

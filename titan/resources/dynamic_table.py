@@ -7,7 +7,7 @@ from ..enums import ParseableEnum, ResourceType
 from ..resource_name import ResourceName
 from ..scope import SchemaScope, TableScope
 from ..props import (
-    ArgsProp,
+    ColumnNamesProp,
     EnumProp,
     IdentifierProp,
     Props,
@@ -128,7 +128,7 @@ class DynamicTable(ResourceNameTrait, Resource):
 
     resource_type = ResourceType.DYNAMIC_TABLE
     props = Props(
-        columns=ArgsProp(),
+        columns=ColumnNamesProp(),
         target_lag=StringProp("target_lag", alt_tokens=["DOWNSTREAM"]),
         warehouse=IdentifierProp("warehouse"),
         refresh_mode=EnumProp("refresh_mode", RefreshMode),

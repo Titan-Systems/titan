@@ -468,7 +468,7 @@ def test_fetch_alert(cursor, suffix, test_db, marked_for_cleanup):
 def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
     dynamic_table = res.DynamicTable(
         name="PRODUCT",
-        columns=[{"name": "ID", "data_type": "NUMBER(38,0)"}],
+        columns=[{"name": "ID", "comment": "This is a comment"}],
         target_lag="20 minutes",
         warehouse="CI",
         refresh_mode="AUTO",

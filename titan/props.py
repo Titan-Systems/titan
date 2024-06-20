@@ -517,7 +517,7 @@ class ColumnNamesProp(Prop):
             column = column_data.as_dict()
             column["name"] = column["name"].strip('"')
             if "comment" in column:
-                column["comment"] = column["comment"]
+                column["comment"] = column["comment"].strip("'")
             columns.append(column)
         return columns
 

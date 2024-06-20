@@ -556,6 +556,7 @@ def fetch_dynamic_table(session, fqn: FQN):
         raise Exception(f"Found multiple dynamic tables matching {fqn}")
 
     columns = fetch_columns(session, "DYNAMIC TABLE", fqn)
+    columns = [{"name": col["name"], "comment": col["comment"]} for col in columns]
 
     data = show_result[0]
     refresh_mode, initialize, as_ = _parse_dynamic_table_text(data["text"])

@@ -19,19 +19,20 @@ def example(request):
     yield yaml.safe_load(example_content)
 
 
-# @pytest.mark.requires_snowflake
-# def test_example(example, cursor, marked_for_cleanup):
-#     cursor.execute("USE WAREHOUSE CI")
+@pytest.mark.skip("TODO: This test is failing")
+@pytest.mark.requires_snowflake
+def test_example(example, cursor, marked_for_cleanup):
+    cursor.execute("USE WAREHOUSE CI")
 
-#     resources = collect_resources_from_config(example)
-#     for resource in resources:
-#         marked_for_cleanup.append(resource)
-#     blueprint = Blueprint(
-#         name="test-example",
-#         resources=resources,
-#         dry_run=False,
-#         allow_role_switching=True,
-#         ignore_ownership=False,
-#     )
-#     plan = blueprint.plan(cursor.connection)
-#     blueprint.apply(cursor.connection, plan)
+    resources = collect_resources_from_config(example)
+    for resource in resources:
+        marked_for_cleanup.append(resource)
+    blueprint = Blueprint(
+        name="test-example",
+        resources=resources,
+        dry_run=False,
+        allow_role_switching=True,
+        ignore_ownership=False,
+    )
+    plan = blueprint.plan(cursor.connection)
+    blueprint.apply(cursor.connection, plan)
