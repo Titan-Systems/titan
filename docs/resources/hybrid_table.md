@@ -5,7 +5,7 @@ description: >-
 
 # HybridTable
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-hybrid-table)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-hybrid-table.html)
 
 `[UNDER DEVELOPMENT]`
 A hybrid table is a Snowflake table type that is optimized for hybrid transactional and operational workloads that require low latency and high throughput on small random point reads and writes.

@@ -5,7 +5,7 @@ description: >-
 
 # EmailNotificationIntegration
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-notification-integration)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-notification-integration.html)
 
 Manages the configuration for email-based notification integrations within Snowflake. This integration
 allows specifying recipients who will receive notifications via email.

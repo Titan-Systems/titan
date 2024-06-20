@@ -4,6 +4,7 @@
 
 ## Resources
 
+* [APIAuthenticationSecurityIntegration](resources/api_authentication_security_integration.md)
 * [APIIntegration](resources/api_integration.md)
 * [AggregationPolicy](resources/aggregation_policy.md)
 * [Alert](resources/alert.md)
@@ -25,7 +26,7 @@
 * [JavascriptUDF](resources/javascript_udf.md)
 * [MaterializedView](resources/materialized_view.md)
 * [NetworkRule](resources/network_rule.md)
-* [OAuthSecret](resources/o_auth_secret.md)
+* [OAuthSecret](resources/oauth_secret.md)
 * [ObjectStoreCatalogIntegration](resources/object_store_catalog_integration.md)
 * [PackagesPolicy](resources/packages_policy.md)
 * [PasswordPolicy](resources/password_policy.md)
@@ -41,8 +42,8 @@
 * [Service](resources/service.md)
 * [SessionPolicy](resources/session_policy.md)
 * [Share](resources/share.md)
-* [SnowflakePartnerOAuthSecurityIntegration](resources/snowflake_partner_o_auth_security_integration.md)
-* [SnowservicesOAuthSecurityIntegration](resources/snowservices_o_auth_security_integration.md)
+* [SnowflakePartnerOAuthSecurityIntegration](resources/snowflake_partner_oauth_security_integration.md)
+* [SnowservicesOAuthSecurityIntegration](resources/snowservices_oauth_security_integration.md)
 * [StageStream](resources/stage_stream.md)
 * [Table](resources/table.md)
 * [TableStream](resources/table_stream.md)
