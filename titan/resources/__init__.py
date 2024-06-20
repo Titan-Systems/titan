@@ -28,7 +28,7 @@ from .replication_group import ReplicationGroup
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
-from .secret import PasswordSecret, GenericSecret
+from .secret import PasswordSecret, GenericSecret, OAuthSecret
 from .sequence import Sequence
 from .service import Service
 from .share import Share
@@ -97,6 +97,7 @@ __all__ = [
     "JavascriptUDF",
     "MaterializedView",
     "NetworkRule",
+    "OAuthSecret",
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
     "PasswordPolicy",

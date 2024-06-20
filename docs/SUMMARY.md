@@ -25,6 +25,7 @@
 * [JavascriptUDF](resources/javascript_udf.md)
 * [MaterializedView](resources/materialized_view.md)
 * [NetworkRule](resources/network_rule.md)
+* [OAuthSecret](resources/o_auth_secret.md)
 * [ObjectStoreCatalogIntegration](resources/object_store_catalog_integration.md)
 * [PackagesPolicy](resources/packages_policy.md)
 * [PasswordPolicy](resources/password_policy.md)

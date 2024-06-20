@@ -105,3 +105,7 @@ compute_pools:
     auto_resume: false
     auto_suspend_secs: 60
     instance_family: CPU_X64_XS
+  
+security_integrations:
+  - name: SNOWSERVICES_INGRESS_OAUTH
+  

@@ -779,3 +779,34 @@ def test_fetch_generic_secret(cursor, suffix, marked_for_cleanup):
     result = safe_fetch(cursor, secret.urn)
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+
+
+def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
+    secret = res.OAuthSecret(
+        name=f"OAUTH_SECRET_EXAMPLE_WITH_SCOPES_{suffix}",
+        api_authentication="my_security_integration",
+        oauth_scopes=["scope1", "scope2"],
+        comment="OAuth secret for accessing external API",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(secret.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(secret)
+
+    result = safe_fetch(cursor, secret.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+
+    secret = res.OAuthSecret(
+        name=f"OAUTH_SECRET_EXAMPLE_WITH_TOKEN_{suffix}",
+        api_authentication="my_security_integration",
+        oauth_refresh_token="my_refresh_token",
+        oauth_refresh_token_expiry_time="2049-01-06 20:00:00",
+        comment="OAuth secret for accessing external API",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(secret.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(secret)
+
+    result = safe_fetch(cursor, secret.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
