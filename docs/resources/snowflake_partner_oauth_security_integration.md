@@ -5,7 +5,7 @@ description: >-
 
 # SnowflakePartnerOAuthSecurityIntegration
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-security-integration.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-security-integration)
 
 A security integration in Snowflake designed to manage external OAuth clients for authentication purposes.
 This integration supports specific OAuth clients such as Looker, Tableau Desktop, and Tableau Server.
@@ -48,7 +48,7 @@ security_integrations:
 
 * `name` (string, required) - The name of the security integration.
 * `enabled` (bool) - Specifies if the security integration is enabled. Defaults to True.
-* `oauth_client` (string or [OAuthClient](o_auth_client.md)) - The OAuth client used for authentication. Supported clients are 'LOOKER', 'TABLEAU_DESKTOP', and 'TABLEAU_SERVER'.
+* `oauth_client` (string or [OAuthClient](oauth_client.md)) - The OAuth client used for authentication. Supported clients are 'LOOKER', 'TABLEAU_DESKTOP', and 'TABLEAU_SERVER'.
 * `oauth_client_secret` (string) - The secret associated with the OAuth client.
 * `oauth_redirect_uri` (string) - The redirect URI configured for the OAuth client.
 * `oauth_issue_refresh_tokens` (bool) - Indicates if refresh tokens should be issued. Defaults to True.

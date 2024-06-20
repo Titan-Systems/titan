@@ -1,3 +1,5 @@
+import pytest
+
 from titan import resources as res
 from titan.enums import ResourceType
 from titan.privs import _all_privs_for_resource_type
@@ -88,31 +90,24 @@ def test_future_grant_anonymous_nested_target():
     assert grant.priv == "SELECT"
     assert grant.on_type == ResourceType.TABLE
     assert grant.in_type == ResourceType.SCHEMA
-    assert grant.in_name == "SOMESCHEMA"
+    assert grant.in_name == "somedb.SOMESCHEMA"
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
-
-
-def test_future_grant_referenced_target():
-    schema = res.Schema(name="someschema")
-    grant = res.FutureGrant(priv="SELECT", on_future_tables_in_schema=schema, to="somerole")
-    assert grant.priv == "SELECT"
-    assert grant.on_type == ResourceType.TABLE
-    assert grant.in_type == ResourceType.SCHEMA
-    assert grant.in_name == "SOMESCHEMA"
-    assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
+    assert (
+        str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMEDB.SOMESCHEMA.<TABLE>"
+    )
 
 
 def test_future_grant_referenced_inferred_target():
-    schema = res.Schema(name="someschema")
+    schema = res.Schema(name="somedb.someschema")
     grant = res.FutureGrant(priv="SELECT", on_future_tables_in=schema, to="somerole")
     assert grant.priv == "SELECT"
     assert grant.on_type == ResourceType.TABLE
     assert grant.in_type == ResourceType.SCHEMA
-    assert grant.in_name == "SOMESCHEMA"
+    assert grant.in_name == "somedb.SOMESCHEMA"
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
+    assert (
+        str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMEDB.SOMESCHEMA.<TABLE>"
+    )
 
 
 def test_role_grant_to_user_with_kwargs():
@@ -147,12 +142,18 @@ def test_role_grant_to_role_with_resource():
     assert str(URN.from_resource(grant)) == "urn:::role_grant/SOMEROLE?role=SOMEOTHERROLE"
 
 
-# def test_grant_all_schemas_priv():
-#     grant = res.Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
-#     assert grant.priv == "CREATE VIEW"
-#     assert grant.on == "database somedb"
-#     assert grant.on_all == "SCHEMAS"
-#     assert grant.to == "somerole"
+def test_grant_redirect_to_all():
+    with pytest.raises(ValueError):
+        res.Grant(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
+
+
+def test_grant_on_all():
+    grant = res.GrantOnAll(priv="CREATE VIEW", on_all_schemas_in_database="somedb", to="somerole")
+    assert grant._data.priv == "CREATE VIEW"
+    assert grant._data.on_type == ResourceType.SCHEMA
+    assert grant._data.in_type == ResourceType.DATABASE
+    assert grant._data.in_name == "somedb"
+    assert grant._data.to.name == "somerole"
 
 
 def test_grant_refs():

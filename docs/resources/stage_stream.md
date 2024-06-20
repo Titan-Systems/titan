@@ -5,7 +5,7 @@ description: >-
 
 # StageStream
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-stream.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-stream)
 
 Represents a stream on a stage in Snowflake, which allows for capturing data changes on the stage.
 

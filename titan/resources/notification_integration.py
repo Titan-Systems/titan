@@ -49,7 +49,7 @@ class EmailNotificationIntegration(ResourceNameTrait, Resource):
         allows specifying recipients who will receive notifications via email.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-notification-integration.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-notification-integration
 
     Fields:
         name (string, required): The name of the email notification integration.

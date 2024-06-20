@@ -1,6 +1,6 @@
 {
     "name": "SOME_VIEW_STREAM",
-    "on_view": "STATIC_VIEW",
+    "on_view": "STATIC_DATABASE.PUBLIC.STATIC_VIEW",
     "owner": "SYSADMIN",
     "copy_grants": null,
     "at": null,

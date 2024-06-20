@@ -1,5 +1,5 @@
-.PHONY: install install-dev test integration style check clean build
-EDITION ?= standard
+.PHONY: install install-dev test integration style check clean build docs coverage
+EDITION ?= standard or enterprise
 
 install:
 	pip install -e .
@@ -11,7 +11,7 @@ test:
 	python -m pytest
 
 integration:
-	python -m pytest --snowflake -m $(EDITION)
+	python -m pytest --snowflake -m "$(EDITION)"
 
 style:
 	python -m black .
@@ -27,5 +27,8 @@ build:
 	mkdir -p dist
 	zip -vrX dist/titan-$(shell python setup.py -V).zip titan/
 
-docs:
+docs: 
 	python tools/generate_resource_docs.py
+
+coverage: clean
+	python tools/check_resource_coverage.py

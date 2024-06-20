@@ -32,7 +32,7 @@ class Pipe(ResourceNameTrait, Resource):
         Represents a data ingestion pipeline in Snowflake, which automates the loading of data into tables.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-pipe.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-pipe
 
     Fields:
         name (string, required): The name of the pipe.

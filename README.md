@@ -14,7 +14,7 @@ Define any Snowflake resource, including users, roles, schemas, databases, integ
 If you want to run custom Titan code or use Titan on the command line, you can use the Titan Core Python API.
 
 ```bash
-python -m pip install git+https://github.com/teej/titan.git
+python -m pip install git+https://github.com/Titan-Systems/titan.git
 ```
 
 ### Usage
@@ -129,7 +129,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | **Account Resources**         |           |
 | API Integration               | ✅         |
 | Catalog Integration           |           |
-| ↳ Glue                        | ✅         |
+| ↳ Glue                        | 🚧         |
 | ↳ Object Store                | ✅         |
 | Compute Pool                  | ✅         |
 | Connection                    | ❌         |
@@ -147,8 +147,8 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ AWS                         | 🚧         |
 | ↳ Azure                       | 🚧         |
 | ↳ GCP                         | 🚧         |
-| Replication Group             | ✅         |
-| Resource Monitor              | 🚧         |
+| Replication Group             | 🚧         |
+| Resource Monitor              | ✅         |
 | Role                          | ✅         |
 | Role Grant                    | ✅         |
 | Security Integration          |            |
@@ -161,21 +161,20 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Storage Integration           |           |
 | ↳ AWS                         | 🚧         |
 | ↳ Azure                       | 🚧         |
-| ↳ GCP                         | ✅         |
+| ↳ GCS                         | 🚧         |
 | User                          | ✅         |
 | Warehouse                     | ✅         |
 |                               |            |
 | **Database Resources**        |            |
-| Database Role                 | 🚧         |
+| Database Role                 | ✅         |
 | Schema                        | ✅         |
 |                               |            |
 | **Schema Resources**          |            |
-| Aggregation Policy            | 🚧         |
+| Aggregation Policy            | ✅         |
 | Alert                         | ✅         |
 | Dynamic Table                 | ✅         |
 | Event Table                   | ✅         |
 | External Function             | 🚧         |
-| External Stage                | ✅         |
 | External Table                | ❌         |
 | File Format                   |           |
 | ↳ CSV                         | ✅         |
@@ -189,13 +188,16 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Masking Policy                | ❌         |
 | Materialized View             | ✅         |
 | Model                         | ❌         |
-| Network Rule                  | 🚧         |
-| Packages Policy               | 🚧         |
+| Network Rule                  | ✅         |
+| Packages Policy               | ✅         |
 | Password Policy               | ✅         |
 | Pipe                          | ✅         |
 | Projection Policy             | ❌         |
 | Row Access Policy             | ❌         |
-| Secret                        | 🚧         |
+| Secret                        |            |
+| ↳ Generic                     | ✅         |
+| ↳ OAuth                       | ✅         |
+| ↳ Password                    | ✅         |
 | Sequence                      | ✅         |
 | Service                       | ✅         |
 | Session Policy                | ✅         |
@@ -215,7 +217,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ View                        | 🚧         |
 | Streamlit                     | ❌         |
 | Table                         | 🚧         |
-| Tag                           | 🚧         |
+| Tag                           | ✅         |
 | Task                          | ✅         |
 | User-Defined Function         |            |
 | ↳ Java                        | ❌         |
@@ -223,7 +225,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ Python                      | ✅         |
 | ↳ Scala                       | ❌         |
 | ↳ SQL                         | ❌         |
-| View                          | 🚧         |
+| View                          | ✅         |
 
 
 

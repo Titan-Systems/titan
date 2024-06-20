@@ -1,14 +1,13 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .column import Column
 from .role import Role
 from .warehouse import Warehouse
 from ..enums import ParseableEnum, ResourceType
 from ..resource_name import ResourceName
-from ..scope import SchemaScope
+from ..scope import SchemaScope, TableScope
 from ..props import (
-    ArgsProp,
+    ColumnNamesProp,
     EnumProp,
     IdentifierProp,
     Props,
@@ -30,14 +29,42 @@ class InitializeBehavior(ParseableEnum):
 
 
 @dataclass(unsafe_hash=True)
+class _DynamicTableColumn(ResourceSpec):
+    name: str
+    comment: str = None
+
+
+class DynamicTableColumn(Resource):
+    resource_type = ResourceType.COLUMN
+    props = Props(
+        comment=StringProp("comment", eq=False),
+    )
+    scope = TableScope()
+    spec = _DynamicTableColumn
+    serialize_inline = True
+
+    def __init__(
+        self,
+        name: str,
+        comment: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data: _DynamicTableColumn = _DynamicTableColumn(
+            name,
+            comment=comment,
+        )
+
+
+@dataclass(unsafe_hash=True)
 class _DynamicTable(ResourceSpec):
     name: ResourceName
-    columns: list[Column]
+    columns: list[DynamicTableColumn]
     target_lag: str
     warehouse: Warehouse
-    refresh_mode: RefreshMode
-    initialize: str
     as_: str
+    refresh_mode: RefreshMode = RefreshMode.AUTO
+    initialize: InitializeBehavior = InitializeBehavior.ON_CREATE
     comment: str = None
     owner: Role = "SYSADMIN"
     tags: dict[str, str] = None
@@ -54,12 +81,12 @@ class DynamicTable(ResourceNameTrait, Resource):
 
     Fields:
         name (string, required): The name of the dynamic table.
-        columns (list, required): A list of Column objects defining the structure of the table.
+        columns (list, required): A list of dicts defining the structure of the table.
         target_lag (string): The acceptable lag (delay) for data in the table. Defaults to "DOWNSTREAM".
         warehouse (string or Warehouse, required): The warehouse where the table is stored.
-        refresh_mode (string or RefreshMode, required): The mode of refreshing the table (AUTO, FULL, INCREMENTAL).
-        initialize (string or InitializeBehavior, required): The behavior when the table is initialized (ON_CREATE, ON_SCHEDULE).
         as_ (string, required): The query used to populate the table.
+        refresh_mode (string or RefreshMode): The mode of refreshing the table (AUTO, FULL, INCREMENTAL).
+        initialize (string or InitializeBehavior): The behavior when the table is initialized (ON_CREATE, ON_SCHEDULE).
         comment (string): An optional comment for the table.
         owner (string or Role): The owner of the table. Defaults to "SYSADMIN".
 
@@ -68,7 +95,7 @@ class DynamicTable(ResourceNameTrait, Resource):
         ```python
         dynamic_table = DynamicTable(
             name="some_dynamic_table",
-            columns=[Column(name="id", type="int"), Column(name="data", type="string")],
+            columns=[{"name": "id"}, {"name": "data"}],
             target_lag="1 HOUR",
             warehouse="some_warehouse",
             refresh_mode="AUTO",
@@ -86,9 +113,7 @@ class DynamicTable(ResourceNameTrait, Resource):
           name: some_dynamic_table
           columns:
             - name: id
-              type: int
             - name: data
-              type: string
           target_lag: "1 HOUR"
           warehouse: some_warehouse
           refresh_mode: AUTO
@@ -101,11 +126,12 @@ class DynamicTable(ResourceNameTrait, Resource):
 
     resource_type = ResourceType.DYNAMIC_TABLE
     props = Props(
-        columns=ArgsProp(),
+        columns=ColumnNamesProp(),
         target_lag=StringProp("target_lag", alt_tokens=["DOWNSTREAM"]),
         warehouse=IdentifierProp("warehouse"),
         refresh_mode=EnumProp("refresh_mode", RefreshMode),
         initialize=EnumProp("initialize", InitializeBehavior),
+        comment=StringProp("comment"),
         as_=QueryProp("as"),
         tags=TagsProp(),
     )
@@ -115,12 +141,12 @@ class DynamicTable(ResourceNameTrait, Resource):
     def __init__(
         self,
         name: str,
-        columns: list[Column],
+        columns: list[dict],
         target_lag: str,
         warehouse: str,
-        refresh_mode: RefreshMode,
-        initialize: InitializeBehavior,
         as_: str,
+        refresh_mode: RefreshMode = RefreshMode.AUTO,
+        initialize: InitializeBehavior = InitializeBehavior.ON_CREATE,
         comment: str = None,
         owner: str = "SYSADMIN",
         tags: dict[str, str] = None,

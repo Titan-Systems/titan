@@ -40,83 +40,46 @@ class _Grant(ResourceSpec):
 
 class Grant(Resource):
     """
-    GRANT {  { globalPrivileges         | ALL [ PRIVILEGES ] } ON ACCOUNT
-        | { accountObjectPrivileges  | ALL [ PRIVILEGES ] } ON { USER | RESOURCE MONITOR | WAREHOUSE | DATABASE | INTEGRATION | FAILOVER GROUP | REPLICATION GROUP } <object_name>
-        | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { SCHEMA <schema_name> | ALL SCHEMAS IN DATABASE <db_name> }
-        | { schemaPrivileges         | ALL [ PRIVILEGES ] } ON { FUTURE SCHEMAS IN DATABASE <db_name> }
-        | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON { <object_type> <object_name> | ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> } }
-        | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON FUTURE <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
-        }
-    TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
+    Description:
+        Represents a grant of privileges on a resource to a role in Snowflake.
 
-    globalPrivileges ::=
-        {
-            CREATE {
-                    ACCOUNT | DATA EXCHANGE LISTING | DATABASE | FAILOVER GROUP | INTEGRATION
-                    | NETWORK POLICY | REPLICATION GROUP | ROLE | SHARE | USER | WAREHOUSE
-            }
-            | APPLY { { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY | TAG }
-            | ATTACH POLICY | AUDIT |
-            | EXECUTE { ALERT | TASK }
-            | IMPORT SHARE
-            | MANAGE GRANTS
-            | MODIFY { LOG LEVEL | TRACE LEVEL | SESSION LOG LEVEL | SESSION TRACE LEVEL }
-            | MONITOR { EXECUTION | SECURITY | USAGE }
-            | OVERRIDE SHARE RESTRICTIONS | RESOLVE ALL
-        }
-        [ , ... ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/grant-privilege
 
-    accountObjectPrivileges ::=
-        -- For DATABASE
-            { CREATE { DATABASE ROLE | SCHEMA } | IMPORTED PRIVILEGES | MODIFY | MONITOR | USAGE } [ , ... ]
-        -- For FAILOVER GROUP
-            { FAILOVER | MODIFY | MONITOR | REPLICATE } [ , ... ]
-        -- For INTEGRATION
-            { USAGE | USE_ANY_ROLE } [ , ... ]
-        -- For REPLICATION GROUP
-            { MODIFY | MONITOR | REPLICATE } [ , ... ]
-        -- For RESOURCE MONITOR
-            { MODIFY | MONITOR } [ , ... ]
-        -- For USER
-            { MONITOR } [ , ... ]
-        -- For WAREHOUSE
-            { MODIFY | MONITOR | USAGE | OPERATE } [ , ... ]
+    Fields:
+        priv (string, required): The privilege to grant. Examples include 'SELECT', 'INSERT', 'CREATE TABLE'.
+        on (string or Resource, required): The resource on which the privilege is granted. Can be a string like 'ACCOUNT' or a specific resource object.
+        to (string or Role, required): The role to which the privileges are granted.
+        grant_option (bool): Specifies whether the grantee can grant the privileges to other roles. Defaults to False.
+        owner (string or Role): The owner role of the grant. Defaults to 'SYSADMIN'.
 
-    schemaPrivileges ::=
-        ADD SEARCH OPTIMIZATION
-        | CREATE {
-            ALERT | EXTERNAL TABLE | FILE FORMAT | FUNCTION
-            | MATERIALIZED VIEW | PIPE | PROCEDURE
-            | { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY
-            | SECRET | SEQUENCE | STAGE | STREAM
-            | TAG | TABLE | TASK | VIEW
-            }
-        | MODIFY | MONITOR | USAGE
-        [ , ... ]
+    Python:
 
-    schemaObjectPrivileges ::=
-        -- For ALERT
-            OPERATE [ , ... ]
-        -- For EVENT TABLE
-            { SELECT | INSERT } [ , ... ]
-        -- For FILE FORMAT, FUNCTION (UDF or external function), PROCEDURE, SECRET, or SEQUENCE
-            USAGE [ , ... ]
-        -- For PIPE
-            { MONITOR | OPERATE } [ , ... ]
-        -- For { MASKING | PASSWORD | ROW ACCESS | SESSION } POLICY or TAG
-            APPLY [ , ... ]
-        -- For external STAGE
-            USAGE [ , ... ]
-        -- For internal STAGE
-            READ [ , WRITE ] [ , ... ]
-        -- For STREAM
-            SELECT [ , ... ]
-        -- For TABLE
-            { SELECT | INSERT | UPDATE | DELETE | TRUNCATE | REFERENCES } [ , ... ]
-        -- For TASK
-            { MONITOR | OPERATE } [ , ... ]
-        -- For VIEW or MATERIALIZED VIEW
-            { SELECT | REFERENCES } [ , ... ]
+        ```python
+        # Global Privs:
+        grant = Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
+
+        # Warehouse Privs:
+        grant = Grant(priv="OPERATE", on=Warehouse(name="foo"), to="somerole")
+        grant = Grant(priv="OPERATE", on_warehouse="foo", to="somerole")
+
+        # Schema Privs:
+        grant = Grant(priv="CREATE TABLE", on=Schema(name="foo"), to="somerole")
+        grant = Grant(priv="CREATE TABLE", on_schema="foo", to="somerole")
+
+        # Table Privs:
+        grant = Grant(priv="SELECT", on_table="sometable", to="somerole")
+        ```
+
+    Yaml:
+
+        ```yaml
+        - Grant:
+            priv: "SELECT"
+            on: "some_table"
+            to: "some_role"
+            grant_option: true
+        ```
     """
 
     resource_type = ResourceType.GRANT
@@ -136,25 +99,6 @@ class Grant(Resource):
         owner: str = None,
         **kwargs,
     ):
-        """
-        Usage
-        -----
-
-        Global Privs:
-        >>> Grant(priv="CREATE WAREHOUSE", on="ACCOUNT", to="somerole")
-
-        Warehouse Privs:
-        >>> Grant(priv="OPERATE", on=Warehouse(name="foo"), to="somerole")
-        >>> Grant(priv="OPERATE", on_warehouse="foo", to="somerole")
-
-        Schema Privs:
-        >>> Grant(priv="CREATE TABLE", on=Schema(name="foo"), to="somerole")
-        >>> Grant(priv="CREATE TABLE", on_schema="foo", to="somerole")
-
-        Table Privs:
-        >>> Grant(priv="SELECT", on_table="sometable", to="somerole")
-
-        """
 
         kwargs.pop("_privs", None)
 
@@ -356,8 +300,7 @@ class FutureGrant(Resource):
                     if isinstance(arg, Resource):
                         on_type = ResourceType(singularize(keyword[10:-3]))
                         in_type = arg.resource_type
-                        # in_name = str(arg.fqn)
-                        in_name = arg.fqn.name
+                        in_name = str(arg.fqn)
                         granted_in_ref = arg
                     else:
                         on_stmt, in_stmt = keyword.split("_in_")
@@ -365,12 +308,6 @@ class FutureGrant(Resource):
                         in_type = ResourceType(in_stmt)
                         in_name = arg
                         granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
-
-        # TODO: Migrate this to blueprint
-        # if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
-        #     owner = "ACCOUNTADMIN"
-        # else:
-        #     owner = "SECURITYADMIN"
 
         super().__init__(**kwargs)
         self._data: _FutureGrant = _FutureGrant(

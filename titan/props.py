@@ -493,7 +493,7 @@ class ArgsProp(Prop):
             return "()"
         args = []
         for arg in value:
-            default = f" DEFAULT {arg['default']}" if "default" in arg else ""
+            default = f" DEFAULT {arg['default']}" if arg.get("default") else ""
             args.append(f"{arg['name']} {str(arg['data_type'])}{default}")
         return f"({', '.join(args)})"
 
@@ -517,7 +517,7 @@ class ColumnNamesProp(Prop):
             column = column_data.as_dict()
             column["name"] = column["name"].strip('"')
             if "comment" in column:
-                column["comment"] = column["comment"]
+                column["comment"] = column["comment"].strip("'")
             columns.append(column)
         return columns
 

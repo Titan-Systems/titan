@@ -4,19 +4,9 @@ import pytest
 
 from titan import data_provider
 from titan import resources as res
+from titan.enums import ResourceType
 from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
-
-# from titan.resources import (
-#     FutureGrant,
-#     Database,
-#     Grant,
-#     JavascriptUDF,
-#     User,
-#     Role,
-#     RoleGrant,
-#     Schema,
-# )
 
 from tests.helpers import get_json_fixtures
 
@@ -134,19 +124,6 @@ def test_blueprint_crossreferenced_database(cursor):
     assert len(plan) == 4
 
 
-# noprivs_role is causing issues and breaking other integration tests
-# @pytest.mark.requires_snowflake
-# def test_privilege_scanning(resource, noprivs_role, cursor, marked_for_cleanup):
-#     resource_cls, data = resource
-#     cursor.execute(f"USE ROLE {noprivs_role}")
-#     bp = Blueprint(name="test", allow_role_switching=False)
-#     res = resource_cls(**data)
-#     bp.add(res)
-#     marked_for_cleanup.append(res)
-#     with pytest.raises(MissingPrivilegeException):
-#         bp.apply(cursor.connection)
-
-
 def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
 
     # Create user
@@ -218,59 +195,57 @@ def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     assert plan[0].action == Action.ADD
 
 
-# TODO: This test is failing
-# @pytest.mark.requires_snowflake
-# def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db):
-#     session = cursor.connection
-#     blueprint = Blueprint(
-#         name="blueprint",
-#         resources=[
-#             Schema(name="INFORMATION_SCHEMA", database=test_db),
-#         ],
-#         run_mode="fully-managed",
-#         valid_resource_types=[ResourceType.SCHEMA],
-#     )
-#     plan = blueprint.plan(session)
-#     assert len(plan) == 0
+@pytest.mark.skip("This test is failing")
+def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db):
+    session = cursor.connection
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
+        ],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 0
 
-#     blueprint = Blueprint(
-#         name="blueprint",
-#         resources=[
-#             Schema(name="ABSENT", database=test_db),
-#             Schema(name="INFORMATION_SCHEMA", database=test_db),
-#         ],
-#         run_mode="fully-managed",
-#         valid_resource_types=[ResourceType.SCHEMA],
-#     )
-#     plan = blueprint.plan(session)
-#     assert len(plan) == 1
-#     assert plan[0].action == Action.ADD
-#     assert plan[0].urn.fqn.name == "ABSENT"
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            res.Schema(name="ABSENT", database=test_db),
+            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
+        ],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn.fqn.name == "ABSENT"
 
+    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            res.Schema(name="PRESENT", database=test_db),
+            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
+        ],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 0
 
-# cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
-# blueprint = Blueprint(
-#     name="blueprint",
-#     resources=[
-#         Schema(name="PRESENT", database=test_db),
-#         Schema(name="INFORMATION_SCHEMA", database=test_db),
-#     ],
-#     run_mode="fully-managed",
-#     valid_resource_types=[ResourceType.SCHEMA],
-# )
-# plan = blueprint.plan(session)
-# assert len(plan) == 0
-
-# blueprint = Blueprint(
-#     name="blueprint",
-#     resources=[Schema(name="INFORMATION_SCHEMA", database=test_db)],
-#     run_mode="fully-managed",
-#     valid_resource_types=[ResourceType.SCHEMA],
-# )
-# plan = blueprint.plan(session)
-# assert len(plan) == 1
-# assert plan[0].action == Action.REMOVE
-# assert plan[0].urn.fqn.name == "PRESENT"
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[res.Schema(name="INFORMATION_SCHEMA", database=test_db)],
+        run_mode="fully-managed",
+        valid_resource_types=[ResourceType.SCHEMA],
+    )
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.REMOVE
+    assert plan[0].urn.fqn.name == "PRESENT"
 
 
 def test_blueprint_quoted_references(cursor):

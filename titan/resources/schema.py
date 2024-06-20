@@ -35,7 +35,7 @@ class Schema(ResourceNameTrait, Resource, ResourceContainer):
         Represents a schema in Snowflake, which is a logical grouping of database objects such as tables, views, and stored procedures. Schemas are used to organize and manage such objects within a database.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-schema.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-schema
 
     Fields:
         name (string, required): The name of the schema.

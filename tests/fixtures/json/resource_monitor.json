@@ -6,8 +6,6 @@
     "end_timestamp": "2049-12-31 23:59",
     "owner": "ACCOUNTADMIN",
     "notify_users": [
-        "teej",
-        "jack",
-        "jill"
+        "STATIC_USER"
     ]
 }

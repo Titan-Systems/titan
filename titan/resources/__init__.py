@@ -28,7 +28,7 @@ from .replication_group import ReplicationGroup
 from .resource_monitor import ResourceMonitor
 from .role import Role, DatabaseRole
 from .schema import Schema
-from .secret import Secret
+from .secret import PasswordSecret, GenericSecret, OAuthSecret
 from .sequence import Sequence
 from .service import Service
 from .share import Share
@@ -51,7 +51,9 @@ from .notification_integration import (
 )
 
 from .security_integration import (
+    APIAuthenticationSecurityIntegration,
     SnowflakePartnerOAuthSecurityIntegration,
+    SnowservicesOAuthSecurityIntegration,
 )
 
 from .storage_integration import (
@@ -66,6 +68,7 @@ __all__ = [
     "AggregationPolicy",
     "Alert",
     "APIIntegration",
+    "APIAuthenticationSecurityIntegration",
     "AWSOutboundNotificationIntegration",
     "AzureInboundNotificationIntegration",
     "AzureOutboundNotificationIntegration",
@@ -87,6 +90,7 @@ __all__ = [
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
+    "GenericSecret",
     "GlueCatalogIntegration",
     "Grant",
     "GrantOnAll",
@@ -96,9 +100,11 @@ __all__ = [
     "JavascriptUDF",
     "MaterializedView",
     "NetworkRule",
+    "OAuthSecret",
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
     "PasswordPolicy",
+    "PasswordSecret",
     "Pipe",
     "PythonStoredProcedure",
     "PythonUDF",
@@ -109,11 +115,11 @@ __all__ = [
     "RoleGrant",
     "S3StorageIntegration",
     "Schema",
-    "Secret",
     "Sequence",
     "Service",
     "Share",
     "SnowflakePartnerOAuthSecurityIntegration",
+    "SnowservicesOAuthSecurityIntegration",
     "StageStream",
     "Table",
     "TableStream",

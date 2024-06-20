@@ -11,7 +11,13 @@ from inflection import pluralize
 
 from snowflake.connector.errors import ProgrammingError
 
-from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES, SYSTEM_USERS, SYSTEM_SCHEMAS
+from .builtins import (
+    SYSTEM_DATABASES,
+    SYSTEM_ROLES,
+    SYSTEM_USERS,
+    SYSTEM_SCHEMAS,
+    SYSTEM_SECURITY_INTEGRATIONS,
+)
 from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOES_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
 from .enums import ResourceType, WarehouseSize
 from .identifiers import URN, FQN, resource_type_for_label
@@ -26,6 +32,10 @@ from .resource_name import ResourceName, attribute_is_resource_name
 
 
 __this__ = sys.modules[__name__]
+
+
+def _quote_identifier(identifier: str) -> str:
+    return str(ResourceName(identifier))
 
 
 def _desc_result_to_dict(desc_result):
@@ -130,6 +140,21 @@ def _urn_from_grant(row, session_ctx):
         )
 
 
+def _convert_to_gmt(dt: datetime.datetime, fmt_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+    """
+    datetime.datetime(2049, 1, 6, 12, 0, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>)
+
+    =>
+
+    2049-01-06 20:00
+    """
+    if not dt:
+        return None
+    gmt = pytz.timezone("GMT")
+    dt_gmt = dt.astimezone(gmt)
+    return dt_gmt.strftime(fmt_str)
+
+
 def _parse_cluster_keys(cluster_keys_str: str) -> list[str]:
     """
     Assume cluster key statement is in the form of:
@@ -203,6 +228,12 @@ def _parse_comma_separated_values(values: str) -> list:
     return [value.strip(" ") for value in values.split(",")]
 
 
+def _parse_packages(packages_str: str) -> list:
+    if packages_str is None or packages_str == "":
+        return None
+    return json.loads(packages_str.replace("'", '"'))
+
+
 def params_result_to_dict(params_result):
     params = {}
     for param in params_result:
@@ -240,16 +271,20 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     return ownership_grant[0]["grantee_name"]
 
 
-def _show_objects(session, type_str, fqn: FQN):
+def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True):
     try:
         if fqn.database is None and fqn.schema is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'")
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'", cacheable=cacheable)
         elif fqn.database is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}")
+            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}", cacheable=cacheable)
         elif fqn.schema is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+            return execute(
+                session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}", cacheable=cacheable
+            )
         else:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+            return execute(
+                session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=cacheable
+            )
     except ProgrammingError as err:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
             return []
@@ -317,9 +352,30 @@ def fetch_session(session):
     }
 
 
+# ------------------------------
+# Fetch Resources
+# ------------------------------
+
+
 def fetch_account(session, fqn: FQN):
     # raise NotImplementedError()
     return {}
+
+
+def fetch_aggregation_policy(session, fqn: FQN):
+    show_result = _show_resources(session, "AGGREGATION POLICIES", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple aggregation policies matching {fqn}")
+    data = show_result[0]
+    desc_result = execute(session, f"DESC AGGREGATION POLICY {fqn}")
+    properties = desc_result[0]
+    return {
+        "name": data["name"],
+        "body": properties["body"],
+        "owner": data["owner"],
+    }
 
 
 def fetch_alert(session, fqn: FQN):
@@ -338,6 +394,30 @@ def fetch_alert(session, fqn: FQN):
         "condition": data["condition"],
         "then": data["action"],
         "owner": data["owner"],
+    }
+
+
+def fetch_api_integration(session, fqn: FQN):
+    show_result = _show_resources(session, "API INTEGRATIONS", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple api integrations matching {fqn}")
+    data = show_result[0]
+    desc_result = execute(session, f"DESC API INTEGRATION {fqn}")
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
+
+    return {
+        "name": data["name"],
+        "api_provider": properties["api_provider"],
+        "api_aws_role_arn": properties["api_aws_role_arn"],
+        "enabled": properties["enabled"],
+        "api_allowed_prefixes": properties["api_allowed_prefixes"],
+        "api_blocked_prefixes": properties["api_blocked_prefixes"],
+        "api_key": properties["api_key"],
+        "owner": owner,
+        "comment": data["comment"] or None,
     }
 
 
@@ -407,7 +487,7 @@ def fetch_compute_pool(session, fqn: FQN):
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
-        raise Exception(f"Found multiple databases matching {fqn}")
+        raise Exception(f"Found multiple compute pools matching {fqn}")
 
     data = show_result[0]
 
@@ -453,6 +533,24 @@ def fetch_database(session, fqn: FQN):
     }
 
 
+def fetch_database_role(session, fqn: FQN):
+    show_result = execute(session, f"SHOW DATABASE ROLES IN DATABASE {fqn.database}", cacheable=True)
+    roles = _filter_result(show_result, name=fqn.name)
+    if len(roles) == 0:
+        return None
+    if len(roles) > 1:
+        raise Exception(f"Found multiple database roles matching {fqn}")
+    data = roles[0]
+    tags = fetch_resource_tags(session, "DATABASE ROLE", fqn)
+    return {
+        "name": data["name"],
+        "owner": data["owner"],
+        "tags": tags,
+        "database": fqn.database,
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_dynamic_table(session, fqn: FQN):
     show_result = execute(session, f"SHOW DYNAMIC TABLES LIKE '{fqn.name}'")
 
@@ -462,6 +560,7 @@ def fetch_dynamic_table(session, fqn: FQN):
         raise Exception(f"Found multiple dynamic tables matching {fqn}")
 
     columns = fetch_columns(session, "DYNAMIC TABLE", fqn)
+    columns = [{"name": col["name"], "comment": col["comment"]} for col in columns]
 
     data = show_result[0]
     refresh_mode, initialize, as_ = _parse_dynamic_table_text(data["text"])
@@ -500,7 +599,7 @@ def fetch_event_table(session, fqn: FQN):
 
 
 def fetch_file_format(session, fqn: FQN):
-    show_result = _show_objects(session, "FILE FORMATS", fqn)
+    show_result = _show_resources(session, "FILE FORMATS", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -718,6 +817,28 @@ def fetch_materialized_view(session, fqn: FQN):
     }
 
 
+def fetch_network_rule(session, fqn: FQN):
+    show_result = _show_resources(session, "NETWORK RULES", fqn)
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple network rules matching {fqn}")
+
+    desc_result = execute(session, f"DESC NETWORK RULE {fqn}", cacheable=True)
+    properties = desc_result[0]
+
+    data = show_result[0]
+    return {
+        "name": fqn.name,
+        "owner": data["owner"],
+        "type": data["type"],
+        "value_list": _parse_comma_separated_values(properties["value_list"]),
+        "mode": data["mode"],
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_notification_integration(session, fqn: FQN):
     show_result = execute(session, f"SHOW NOTIFICATION INTEGRATIONS LIKE '{fqn.name}'")
     if len(show_result) == 0:
@@ -743,6 +864,28 @@ def fetch_notification_integration(session, fqn: FQN):
         }
     else:
         raise Exception(f"Unsupported notification integration type: {data['type']}")
+
+
+def fetch_packages_policy(session, fqn: FQN):
+    show_result = _show_resources(session, "PACKAGES POLICIES", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple packages policies matching {fqn}")
+
+    data = show_result[0]
+    desc_result = execute(session, f"DESC PACKAGES POLICY {fqn}")
+    properties = desc_result[0]
+
+    return {
+        "name": data["name"],
+        "language": properties["language"],
+        "allowlist": _parse_packages(properties["allowlist"]),
+        "blocklist": _parse_packages(properties["blocklist"]),
+        "additional_creation_blocklist": _parse_packages(properties["additional_creation_blocklist"]),
+        "comment": data["comment"] or None,
+        "owner": data["owner"],
+    }
 
 
 def fetch_password_policy(session, fqn: FQN):
@@ -776,7 +919,7 @@ def fetch_password_policy(session, fqn: FQN):
 
 
 def fetch_pipe(session, fqn: FQN):
-    show_result = _show_objects(session, "PIPES", fqn)
+    show_result = _show_resources(session, "PIPES", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -825,7 +968,7 @@ def fetch_procedure(session, fqn: FQN):
         "language": properties["language"],
         "null_handling": properties["null handling"],
         "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
-        "packages": json.loads(properties["packages"].replace("'", '"')),
+        "packages": _parse_packages(properties["packages"]),
         "returns": returns,
         "runtime_version": properties["runtime_version"],
         "secure": data["is_secure"] == "Y",
@@ -901,14 +1044,14 @@ def fetch_role_grant(session, fqn: FQN):
         if ResourceName(data["granted_to"]) == subject and ResourceName(data["grantee_name"]) == name:
             if data["granted_to"] == "ROLE":
                 return {
-                    "role": fqn.name,
-                    "to_role": data["grantee_name"],
+                    "role": _quote_identifier(fqn.name),
+                    "to_role": _quote_identifier(data["grantee_name"]),
                     # "owner": data["granted_by"],
                 }
             elif data["granted_to"] == "USER":
                 return {
-                    "role": fqn.name,
-                    "to_user": data["grantee_name"],
+                    "role": _quote_identifier(fqn.name),
+                    "to_user": _quote_identifier(data["grantee_name"]),
                     # "owner": data["granted_by"],
                 }
             else:
@@ -950,8 +1093,48 @@ def fetch_schema(session, fqn: FQN):
     }
 
 
+def fetch_secret(session, fqn: FQN):
+    show_result = _show_resources(session, "SECRETS", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple secrets matching {fqn}")
+    data = show_result[0]
+    desc_result = execute(session, f"DESC SECRET {fqn}")
+    properties = desc_result[0]
+    if data["secret_type"] == "PASSWORD":
+        return {
+            "name": data["name"],
+            "secret_type": data["secret_type"],
+            "username": properties["username"],
+            "comment": data["comment"] or None,
+            "owner": data["owner"],
+        }
+    elif data["secret_type"] == "GENERIC_STRING":
+        return {
+            "name": data["name"],
+            "secret_type": data["secret_type"],
+            "comment": data["comment"] or None,
+            "owner": data["owner"],
+        }
+    else:
+        data
+        return {
+            "name": data["name"],
+            "api_authentication": properties["integration_name"],
+            "secret_type": data["secret_type"],
+            "oauth_scopes": data["oauth_scopes"],
+            "oauth_refresh_token_expiry_time": _convert_to_gmt(properties["oauth_refresh_token_expiry_time"]),
+            "comment": data["comment"] or None,
+            "owner": data["owner"],
+        }
+        raise NotImplementedError(f"Unsupported secret type {data['secret_type']}")
+
+
 def fetch_security_integration(session, fqn: FQN):
-    show_result = execute(session, f"SHOW SECURITY INTEGRATIONS LIKE '{fqn.name}'")
+    show_result = execute(session, f"SHOW SECURITY INTEGRATIONS", cacheable=True)
+
+    show_result = _filter_result(show_result, name=fqn.name)
 
     if len(show_result) == 0:
         return None
@@ -960,12 +1143,29 @@ def fetch_security_integration(session, fqn: FQN):
 
     data = show_result[0]
 
-    type_, oauth_client = data["type"].split(" - ")
+    #
 
     desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
-    properties = _desc_type2_result_to_dict(desc_result)
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
 
-    if type_ == "OAUTH":
+    if data["type"] == "API_AUTHENTICATION":
+        print("")
+        return {
+            "name": data["name"],
+            "type": data["type"],
+            "auth_type": properties["auth_type"],
+            "enabled": data["enabled"] == "true",
+            "oauth_token_endpoint": properties["oauth_token_endpoint"],
+            "oauth_client_auth_method": properties["oauth_client_auth_method"],
+            "oauth_client_id": properties["oauth_client_id"],
+            "oauth_grant": properties["oauth_grant"],
+            "oauth_access_token_validity": properties["oauth_access_token_validity"],
+            "oauth_allowed_scopes": properties["oauth_allowed_scopes"],
+            "comment": data["comment"] or None,
+        }
+
+    elif data["type"].startswith("OAUTH"):
+        type_, oauth_client = data["type"].split(" - ")
         if oauth_client == "SNOWSERVICES_INGRESS":
             return {
                 "name": data["name"],
@@ -973,7 +1173,7 @@ def fetch_security_integration(session, fqn: FQN):
                 "oauth_client": oauth_client,
                 "enabled": data["enabled"] == "true",
             }
-    raise Exception(f"Unsupported security integration type {type_}")
+    raise Exception(f"Unsupported security integration type {data['type']}")
 
     # return {
     #     "name": data["name"],
@@ -1071,7 +1271,7 @@ def fetch_shared_database(session, fqn: FQN):
 
 
 def fetch_stage(session, fqn: FQN):
-    show_result = _show_objects(session, "STAGES", fqn)
+    show_result = _show_resources(session, "STAGES", fqn)
     stages = _filter_result(show_result, name=fqn.name)
 
     if len(stages) == 0:
@@ -1150,12 +1350,16 @@ def fetch_stream(session, fqn: FQN):
         raise Exception(f"Found multiple streams matching {fqn}")
 
     data = streams[0]
-    return {
-        "name": data["name"],
-        "comment": data["comment"] or None,
-        "append_only": data["mode"] == "APPEND_ONLY",
-        "on_table": data["table_name"] if data["source_type"] == "Table" else None,
-    }
+    if data["source_type"] == "Table":
+        return {
+            "name": data["name"],
+            "comment": data["comment"] or None,
+            "append_only": data["mode"] == "APPEND_ONLY",
+            "on_table": data["table_name"],
+            "owner": data["owner"],
+        }
+    else:
+        raise NotImplementedError(f"Unsupported stream source type {data['source_type']}")
 
 
 def fetch_tag(session, fqn: FQN):
@@ -1166,7 +1370,16 @@ def fetch_tag(session, fqn: FQN):
             return None
         raise
     tags = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
-    return tags[0]
+    if len(tags) == 0:
+        return None
+    if len(tags) > 1:
+        raise Exception(f"Found multiple tags matching {fqn}")
+    data = tags[0]
+    return {
+        "name": data["name"],
+        "comment": data["comment"] or None,
+        "allowed_values": json.loads(data["allowed_values"]) if data["allowed_values"] else None,
+    }
 
 
 def fetch_task(session, fqn: FQN):
@@ -1217,21 +1430,6 @@ def fetch_replication_group(session, fqn: FQN):
     }
 
 
-def convert_to_gmt(dt: datetime.datetime) -> str:
-    """
-    Converts a datetime object in any timezone to a GMT datetime string in the format YYYY-MM-DD HH:MM.
-
-    Args:
-        dt (datetime): The datetime object to convert.
-
-    Returns:
-        str: The converted datetime string in GMT.
-    """
-    gmt = pytz.timezone("GMT")
-    dt_gmt = dt.astimezone(gmt)
-    return dt_gmt.strftime("%Y-%m-%d %H:%M")
-
-
 def fetch_resource_monitor(session, fqn: FQN):
     show_result = execute(session, f"SHOW RESOURCE MONITORS LIKE '{fqn.name}'")
     resource_monitors = _filter_result(show_result)
@@ -1245,8 +1443,8 @@ def fetch_resource_monitor(session, fqn: FQN):
         "owner": data["owner"],
         "credit_quota": int(float(data["credit_quota"])) if data["credit_quota"] else None,
         "frequency": data["frequency"],
-        "start_timestamp": convert_to_gmt(data["start_time"]) if data["start_time"] else None,
-        "end_timestamp": convert_to_gmt(data["end_time"]) if data["end_time"] else None,
+        "start_timestamp": _convert_to_gmt(data["start_time"], "%Y-%m-%d %H:%M"),
+        "end_timestamp": _convert_to_gmt(data["end_time"], "%Y-%m-%d %H:%M"),
         "notify_users": data["notify_users"] or None,
     }
 
@@ -1446,6 +1644,19 @@ def list_resource(session, resource_label: str) -> list[FQN]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
+def list_schema_scoped_resource(session, resource) -> list[FQN]:
+    show_result = execute(session, f"SHOW {resource}")
+    resources = []
+    for row in show_result:
+        resources.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+    return resources
+
+
+def list_compute_pools(session) -> list[FQN]:
+    show_result = execute(session, "SHOW COMPUTE POOLS")
+    return [FQN(name=row["name"]) for row in show_result]
+
+
 def list_databases(session) -> list[FQN]:
     show_result = execute(session, "SHOW DATABASES")
     return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_DATABASES]
@@ -1511,6 +1722,16 @@ def list_schemas(session, database=None) -> list[FQN]:
         raise
 
 
+def list_security_integrations(session) -> list[FQN]:
+    show_result = execute(session, "SHOW SECURITY INTEGRATIONS")
+    integrations = []
+    for row in show_result:
+        if row["name"] in SYSTEM_SECURITY_INTEGRATIONS:
+            continue
+        integrations.append(FQN(name=row["name"]))
+    return integrations
+
+
 def list_stages(session) -> list[FQN]:
     show_result = execute(session, "SHOW STAGES")
     stages = []
@@ -1522,6 +1743,10 @@ def list_stages(session) -> list[FQN]:
     return stages
 
 
+def list_streams(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "STREAMS")
+
+
 def list_tables(session) -> list[FQN]:
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
     tables = []
@@ -1530,6 +1755,16 @@ def list_tables(session) -> list[FQN]:
             continue
         tables.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
     return tables
+
+
+def list_tags(session) -> list[FQN]:
+    show_result = execute(session, "SHOW TAGS")
+    tags = []
+    for row in show_result:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+            continue
+        tags.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+    return tags
 
 
 def list_users(session) -> list[FQN]:
@@ -1558,3 +1793,7 @@ def list_warehouses(session) -> list[FQN]:
     for row in show_result:
         warehouses.append(FQN(name=row["name"]))
     return warehouses
+
+
+def list_network_rules(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "NETWORK RULES")

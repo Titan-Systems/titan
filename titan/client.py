@@ -13,11 +13,13 @@ from snowflake.connector.errors import ProgrammingError
 logger = logging.getLogger("titan")
 
 UNSUPPORTED_FEATURE = 2
+OBJECT_ALREADY_EXISTS_ERR = 2002
 DOES_NOT_EXIST_ERR = 2003
 OBJECT_DOES_NOT_EXIST_ERR = 2043
 ACCESS_CONTROL_ERR = 3001
 ALREADY_EXISTS_ERR = 3041  # Not sure this is correct
 INVALID_GRANT_ERR = 3042
+FEATURE_NOT_ENABLED_ERR = 3078  # Unsure if this is just Replication Groups or not
 
 connection_params = {
     "account": os.environ.get("SNOWFLAKE_ACCOUNT"),

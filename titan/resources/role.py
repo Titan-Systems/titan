@@ -124,15 +124,21 @@ class DatabaseRole(ResourceNameTrait, Resource):
     def __init__(
         self,
         name: str,
+        database: str,
         owner: str = "USERADMIN",
         tags: dict[str, str] = None,
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(name, **kwargs)
+        super().__init__(name, database=database, **kwargs)
         self._data: _Role = _Role(
             name=self._name,
             owner=owner,
             tags=tags,
             comment=comment,
         )
+
+    def to_dict(self):
+        data = super().to_dict()
+        data["database"] = self.container.name
+        return data

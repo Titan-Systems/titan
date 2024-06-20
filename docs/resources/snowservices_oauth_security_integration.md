@@ -5,7 +5,7 @@ description: >-
 
 # SnowservicesOAuthSecurityIntegration
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-security-integration.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-security-integration)
 
 Manages OAuth security integrations for Snowservices in Snowflake, allowing external authentication mechanisms.
 

@@ -32,6 +32,17 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
+def create_aggregation_policy(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    return tidy_sql(
+        "CREATE",
+        "AGGREGATION POLICY",
+        "IF NOT EXISTS" if if_not_exists else "",
+        fqn_to_sql(urn.fqn),
+        "AS () RETURNS AGGREGATION_CONSTRAINT",
+        props.render(data),
+    )
+
+
 def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     db = f"{urn.fqn.database}." if urn.fqn.database else ""
     schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
@@ -144,11 +155,11 @@ def create_table(urn: URN, data: dict, props: Props, if_not_exists: bool = False
     )
 
 
-def update_resource(urn: URN, data: dict, props: Props) -> str:
-    return getattr(__this__, f"update_{urn.resource_label}", update__default)(urn, data, props)
+def update_resource(urn: URN, data: dict) -> str:
+    return getattr(__this__, f"update_{urn.resource_label}", update__default)(urn, data)
 
 
-def update__default(urn: URN, data: dict, props: Props) -> str:
+def update__default(urn: URN, data: dict) -> str:
     attr, new_value = data.popitem()
     attr = attr.lower()
     if new_value is None:
@@ -170,12 +181,12 @@ def update__default(urn: URN, data: dict, props: Props) -> str:
         )
 
 
-def update_event_table(urn: URN, data: dict, props: Props) -> str:
+def update_event_table(urn: URN, data: dict) -> str:
     new_urn = URN(ResourceType.TABLE, urn.fqn, urn.account_locator)
-    return update__default(new_urn, data, props)
+    return update__default(new_urn, data)
 
 
-def update_procedure(urn: URN, data: dict, props: Props) -> str:
+def update_procedure(urn: URN, data: dict) -> str:
     if "execute_as" in data:
         return tidy_sql(
             "ALTER",
@@ -185,14 +196,14 @@ def update_procedure(urn: URN, data: dict, props: Props) -> str:
             data["execute_as"],
         )
     else:
-        return update__default(urn, data, props)
+        return update__default(urn, data)
 
 
-def update_role_grant(urn: URN, data: dict, props: Props) -> str:
+def update_role_grant(urn: URN, data: dict) -> str:
     raise NotImplementedError
 
 
-def update_schema(urn: URN, data: dict, props: Props) -> str:
+def update_schema(urn: URN, data: dict) -> str:
     attr, new_value = data.popitem()
     attr = attr.lower()
     if new_value is None:
@@ -219,7 +230,7 @@ def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
         "DROP",
         urn.resource_type,
         "IF EXISTS" if if_exists else "",
-        urn.fqn,
+        fqn_to_sql(urn.fqn),
     )
 
 

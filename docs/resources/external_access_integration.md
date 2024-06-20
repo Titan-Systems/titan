@@ -5,7 +5,7 @@ description: >-
 
 # ExternalAccessIntegration
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-external-access-integration.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-external-access-integration)
 
 External Access Integrations enable code within functions and stored procedures to utilize secrets and establish connections with external networks. This resource configures the rules and secrets that can be accessed by such code.
 

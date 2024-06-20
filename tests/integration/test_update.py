@@ -11,6 +11,6 @@ def test_update_schema(cursor, test_db, marked_for_cleanup):
     marked_for_cleanup.append(sch)
     result = data_provider.fetch_schema(cursor, sch.fqn)
     assert result["max_data_extension_time_in_days"] == 10
-    cursor.execute(lifecycle.update_resource(sch.urn, {"max_data_extension_time_in_days": 9}, sch.props))
+    cursor.execute(lifecycle.update_resource(sch.urn, {"max_data_extension_time_in_days": 9}))
     result = data_provider.fetch_schema(cursor, sch.fqn)
     assert result["max_data_extension_time_in_days"] == 9

@@ -3,7 +3,7 @@ import types
 
 import difflib
 
-from dataclasses import asdict, dataclass, fields
+from dataclasses import dataclass, fields
 from typing import Any, TypedDict, Type, Union, get_args, get_origin
 from inspect import isclass
 from itertools import chain
@@ -53,84 +53,83 @@ class Returns(TypedDict):
     metadata: str
 
 
+def _coerce_resource_field(field_value, field_type):
+    if field_type == Any:
+        return field_value
+
+    # Recursively traverse lists and dicts
+    if get_origin(field_type) == list:
+        if not isinstance(field_value, list):
+            raise Exception
+        list_element_type = get_args(field_type) or (str,)
+        return [_coerce_resource_field(v, field_type=list_element_type[0]) for v in field_value]
+    elif get_origin(field_type) == dict:
+        if not isinstance(field_value, dict):
+            raise Exception
+        dict_types = get_args(field_type)
+        if len(dict_types) < 2:
+            raise RuntimeError(f"Unexpected field type {field_type}")
+        return {k: _coerce_resource_field(v, field_type=dict_types[1]) for k, v in field_value.items()}
+
+    # Check for field_value's type in a Union
+    if get_origin(field_type) == Union:
+        union_types = get_args(field_type)
+        for union_type in union_types:
+            expected_type = get_origin(union_type) or union_type
+            if isinstance(field_value, expected_type):
+                return _coerce_resource_field(field_value, field_type=expected_type)
+        raise RuntimeError(f"Unexpected field type {field_type}")
+
+    if not isclass(field_type):
+        # If we want to support quoted type annotations, this is the place to do it.
+        # eg owner "Role" = "SYSADMIN"
+        raise RuntimeError(f"Unexpected field type {field_type}")
+
+    # Coerce enums
+    if issubclass(field_type, ParseableEnum):
+        return field_type(field_value)
+
+    # Coerce args
+    elif field_type == Arg:
+        arg_dict = {
+            "name": field_value["name"].upper(),
+            "data_type": DataType(field_value["data_type"]),
+        }
+        if "default" in field_value:
+            arg_dict["default"] = field_value["default"]
+        return arg_dict
+
+    # Coerce returns
+    elif field_type == Returns:
+        returns_dict = {
+            "data_type": DataType(field_value["data_type"]),
+            "metadata": field_value["metadata"],
+        }
+        if "returns_null" in field_value:
+            returns_dict["returns_null"] = field_value["returns_null"]
+        return returns_dict
+
+    # Coerce resources
+    elif issubclass(field_type, Resource):
+        return convert_to_resource(field_type, field_value)
+    elif field_type == ResourceName:
+        return ResourceName(field_value)
+    elif field_type == ResourceTags:
+        return ResourceTags(field_value)
+    else:
+        return field_value
+
+
 @dataclass
 class ResourceSpec:
     def __post_init__(self):
-        def _coerce(field_value, field_type):
-            if field_type == Any:
-                return field_value
-
-            # Recursively traverse lists and dicts
-            if get_origin(field_type) == list:  # or issubclass(field_type, list):
-                if not isinstance(field_value, list):
-                    raise Exception
-                list_element_type = get_args(field_type) or (str,)
-                return [_coerce(v, field_type=list_element_type[0]) for v in field_value]
-            elif get_origin(field_type) == dict:  # issubclass(field_type, dict):
-                if not isinstance(field_value, dict):
-                    raise Exception
-                dict_types = get_args(field_type)
-                if len(dict_types) < 2:
-                    raise RuntimeError(f"Unexpected field type {field_type}")
-                return {k: _coerce(v, field_type=dict_types[1]) for k, v in field_value.items()}
-
-            # Check for field_value's type in a Union
-            if get_origin(field_type) == Union:
-                union_types = get_args(field_type)
-                for union_type in union_types:
-                    expected_type = get_origin(union_type) or union_type
-                    if isinstance(field_value, expected_type):
-                        return _coerce(field_value, field_type=expected_type)
-                raise RuntimeError(f"Unexpected field type {field_type}")
-
-            if not isclass(field_type):
-                # If we want to support quoted type annotations, this is the place to do it.
-                # eg owner "Role" = "SYSADMIN"
-                raise RuntimeError(f"Unexpected field type {field_type}")
-
-            # Coerce enums
-            if issubclass(field_type, ParseableEnum):
-                return field_type(field_value)
-
-            # Coerce args
-            elif field_type == Arg:
-                arg_dict = {
-                    "name": field_value["name"].upper(),
-                    "data_type": DataType(field_value["data_type"]),
-                }
-                if "default" in field_value:
-                    arg_dict["default"] = field_value["default"]
-                return arg_dict
-
-            # Coerce returns
-            elif field_type == Returns:
-                returns_dict = {
-                    "data_type": DataType(field_value["data_type"]),
-                    "metadata": field_value["metadata"],
-                }
-                if "returns_null" in field_value:
-                    returns_dict["returns_null"] = field_value["returns_null"]
-                return returns_dict
-
-            # Coerce resources
-            elif issubclass(field_type, Resource):
-                return convert_to_resource(field_type, field_value)
-            elif field_type == ResourceName:
-                return ResourceName(field_value)
-            elif field_type == ResourceTags:
-                return ResourceTags(field_value)
-            else:
-                return field_value
-
         for field in fields(self):
             field_value = getattr(self, field.name)
-
             if field_value is None:
                 continue
-            # elif isinstance(field.type, _GenericAlias):
-            #     continue
             else:
-                setattr(self, field.name, _coerce(field_value, field.type))
+                new_value = _coerce_resource_field(field_value, field.type)
+                setattr(self, field.name, new_value)
 
     @classmethod
     def get_metadata(cls, field_name: str):
@@ -164,7 +163,7 @@ class Resource(metaclass=_Resource):
     resource_type: ResourceType
     scope: ResourceScope
     spec: Type[ResourceSpec]
-    in_place_serialization: bool = False
+    serialize_inline: bool = False
 
     def __init__(self, implicit: bool = False, **kwargs):
         super().__init__()
@@ -286,17 +285,15 @@ class Resource(metaclass=_Resource):
         return hash(self._data)
 
     def to_dict(self):
-        defaults = {f.name: f.default for f in fields(self.spec)}
-
         serialized = {}
 
         def _serialize(value):
             if isinstance(value, ResourcePointer):
-                return value.name
+                return str(value.fqn)
             elif isinstance(value, Resource):
                 # if hasattr(value, "serialize"):
                 #     return value.serialize()
-                if getattr(value, "in_place_serialization", False):
+                if getattr(value, "serialize_inline", False):
                     return value.to_dict()
                 if hasattr(value._data, "name"):
                     return getattr(value._data, "name")
@@ -313,13 +310,11 @@ class Resource(metaclass=_Resource):
             else:
                 return value
 
-        for key, value in asdict(self._data).items():
-            skip_field = (value is None) or (value == defaults[key])
-            skip_field = skip_field and (key != "owner")
-            if skip_field:
-                # continue
-                pass
-            serialized[key] = _serialize(value)
+        # for key, value in asdict(self._data).items():
+        #     serialized[key] = _serialize(value)
+        for field in fields(self._data):
+            value = getattr(self._data, field.name)
+            serialized[field.name] = _serialize(value)
 
         return serialized
 
@@ -423,6 +418,20 @@ class ResourceContainer:
 
 
 class ResourceNameTrait:
+    """
+    This class is a mixin that allows resources to be constructed with fully qualified names
+    without a bunch of user-land cruft to make it all work. This keeps titan close to the behavior
+    of snowflake.
+
+    For example:
+
+    Without this trait, a scoped resource would need to be defined as:
+    >>> tbl = Table(name="TBL", database="DB", schema="SCHEMA")
+
+    With this trait, the same table can be defined this way instead:
+    >>> tbl = Table(name="DB.SCHEMA.TBL")
+    """
+
     def __init__(self, name: str, **kwargs):
         name = str(name)
 
@@ -438,11 +447,13 @@ class ResourceNameTrait:
             if "." in name:
                 raise ValueError(f"Resource name not supported {name}")
             fqn = parse_identifier(f'"{name}"', is_db_scoped=isinstance(self.scope, DatabaseScope))
+
         self._name = ResourceName(fqn.name)
         if fqn.database and "database" in kwargs:
             raise ValueError("Multiple database names found")
         if fqn.schema and "schema" in kwargs:
             raise ValueError("Multiple schema names found")
+
         super().__init__(
             database=kwargs.pop("database", fqn.database),
             schema=kwargs.pop("schema", fqn.schema),
@@ -467,9 +478,11 @@ class ResourcePointer(ResourceNameTrait, Resource, ResourceContainer):
             # self.add(ResourcePointer(name="INFORMATION_SCHEMA", resource_type=ResourceType.SCHEMA))
 
     def __copy__(self):
+        raise Exception
         return ResourcePointer(self._name, self._resource_type)
 
     def __deepcopy__(self, memo):
+        raise Exception
         result = ResourcePointer(self._name, self._resource_type)
         memo[id(self)] = result
         return result
@@ -516,7 +529,9 @@ def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, 
         # Example:
         #   table = Table(name='my_table', columns=[{'name': 'id', 'data_type': 'int'}])
 
-        if cls.__name__ == "Column":
+        # if cls.__name__ == "Column":
+        #     return cls(**resource_or_descriptor)
+        if cls.serialize_inline:
             return cls(**resource_or_descriptor)
         else:
             return ResourcePointer(**resource_or_descriptor, resource_type=cls.resource_type)

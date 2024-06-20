@@ -25,11 +25,11 @@ class _TableStream(ResourceSpec):
     name: ResourceName
     on_table: Table
     owner: Role = "SYSADMIN"
-    copy_grants: bool = None
-    at: dict[str, str] = None
-    before: dict[str, str] = None
-    append_only: bool = None
-    show_initial_rows: bool = field(default_factory=None, metadata={"triggers_replacement": True})
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    at: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    before: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    append_only: bool = False
+    show_initial_rows: bool = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
 
     def __post_init__(self):
@@ -46,7 +46,7 @@ class TableStream(ResourceNameTrait, Resource):
         Represents a stream on a table in Snowflake, which allows for change data capture on the table.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-stream.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-stream
 
     Fields:
         name (string, required): The name of the stream.
@@ -114,7 +114,7 @@ class TableStream(ResourceNameTrait, Resource):
         copy_grants: bool = None,
         at: dict[str, str] = None,
         before: dict[str, str] = None,
-        append_only: bool = None,
+        append_only: bool = False,
         show_initial_rows: bool = None,
         comment: str = None,
         **kwargs,
@@ -213,7 +213,7 @@ class StageStream(ResourceNameTrait, Resource):
         Represents a stream on a stage in Snowflake, which allows for capturing data changes on the stage.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-stream.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-stream
 
     Fields:
         name (string, required): The name of the stream.
@@ -295,7 +295,7 @@ class ViewStream(ResourceNameTrait, Resource):
         This stream can be configured with various options such as time travel, append-only mode, and initial row visibility.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-stream.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-stream
 
     Fields:
         name (string, required): The name of the stream.

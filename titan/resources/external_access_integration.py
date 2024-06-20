@@ -4,7 +4,6 @@ from .resource import Resource, ResourceSpec, ResourceNameTrait
 from ..resource_name import ResourceName
 from .network_rule import NetworkRule
 from .role import Role
-from .secret import Secret
 from ..enums import ResourceType
 from ..scope import AccountScope
 
@@ -16,7 +15,8 @@ class _ExternalAccessIntegration(ResourceSpec):
     name: ResourceName
     allowed_network_rules: list[NetworkRule]
     allowed_api_authentication_integrations: list[str] = None
-    allowed_authentication_secrets: list[Secret] = None
+    # This is a special case where this resource relies on another polymorphic resource
+    allowed_authentication_secrets: list[str] = None
     enabled: bool = True
     comment: str = None
     owner: Role = "ACCOUNTADMIN"
@@ -30,8 +30,15 @@ class _ExternalAccessIntegration(ResourceSpec):
             and len(self.allowed_api_authentication_integrations) < 1
         ):
             raise ValueError("allowed_api_authentication_integrations must have at least one element if not None")
-        if self.allowed_authentication_secrets is not None and len(self.allowed_authentication_secrets) < 1:
-            raise ValueError("allowed_authentication_secrets must have at least one element if not None")
+        if self.allowed_authentication_secrets is not None:
+            if len(self.allowed_authentication_secrets) < 1:
+                raise ValueError("allowed_authentication_secrets must have at least one element if not None")
+
+            if "any" in self.allowed_authentication_secrets and len(self.allowed_authentication_secrets) > 1:
+                raise ValueError("allowed_authentication_secrets must not contain 'any' if there are other secrets")
+
+            if "none" in self.allowed_authentication_secrets and len(self.allowed_authentication_secrets) > 1:
+                raise ValueError("allowed_authentication_secrets must not contain 'none' if there are other secrets")
 
 
 class ExternalAccessIntegration(ResourceNameTrait, Resource):
@@ -40,7 +47,7 @@ class ExternalAccessIntegration(ResourceNameTrait, Resource):
         External Access Integrations enable code within functions and stored procedures to utilize secrets and establish connections with external networks. This resource configures the rules and secrets that can be accessed by such code.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-external-access-integration.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-external-access-integration
 
     Fields:
         name (string, required): The name of the external access integration.
@@ -89,9 +96,9 @@ class ExternalAccessIntegration(ResourceNameTrait, Resource):
     def __init__(
         self,
         name: str,
-        allowed_network_rules: list[NetworkRule] = [],
+        allowed_network_rules: list[NetworkRule] = None,
         allowed_api_authentication_integrations: list[str] = None,
-        allowed_authentication_secrets: list[Secret] = None,
+        allowed_authentication_secrets: list[str] = None,
         enabled: bool = True,
         comment: str = None,
         owner: str = "ACCOUNTADMIN",
@@ -100,7 +107,7 @@ class ExternalAccessIntegration(ResourceNameTrait, Resource):
         super().__init__(name, **kwargs)
         self._data: _ExternalAccessIntegration = _ExternalAccessIntegration(
             name=self._name,
-            allowed_network_rules=allowed_network_rules,
+            allowed_network_rules=allowed_network_rules or [],
             allowed_api_authentication_integrations=allowed_api_authentication_integrations,
             allowed_authentication_secrets=allowed_authentication_secrets,
             enabled=enabled,

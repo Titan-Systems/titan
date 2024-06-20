@@ -1,5 +1,7 @@
 import json
 import os
+import logging
+import re
 
 import titan.resources as resources
 
@@ -7,6 +9,8 @@ from titan.resources import Resource
 from titan.enums import ResourceType
 from titan.parse import _split_statements
 
+
+logger = logging.getLogger("titan")
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "../examples")
@@ -20,10 +24,22 @@ def _get_resource_cls(resource_name):
     raise ValueError(f"Resource class {resource_name} not found")
 
 
+def camelcase_to_snakecase(name: str) -> str:
+    name = name.replace("OAuth", "OAUTH")
+    pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+    name = pattern.sub("_", name).lower()
+    return name
+
+
 def get_json_fixture(resource_name):
     with open(os.path.join(FIXTURES_DIR, "json", f"{resource_name}.json"), "r") as file:
         content = file.read()
-        return json.loads(content)
+        if not content:
+            raise ValueError(f"Empty JSON fixture for {resource_name}")
+        try:
+            return json.loads(content)
+        except Exception as err:
+            raise ValueError(f"Failed to decode JSON for {resource_name}: {err}")
 
 
 def get_json_fixtures():
@@ -49,16 +65,14 @@ def get_sql_fixtures():
             resource_name = f.split(".")[0]
             try:
                 resource_cls = _get_resource_cls(resource_name)
-            except ValueError:
+            except ValueError as err:
+                logger.warning(f"SQL fixture file {f} has a problem: {err}")
                 continue
-                # raise
-            try:
-                idx = 1
-                for fixture in get_sql_fixture(f):
-                    yield (resource_cls, fixture, idx)
-                    idx += 1
-            except Exception:
-                continue
+
+            idx = 1
+            for fixture in get_sql_fixture(f):
+                yield (resource_cls, fixture, idx)
+                idx += 1
 
 
 def get_sql_fixture(filename, lines=False):

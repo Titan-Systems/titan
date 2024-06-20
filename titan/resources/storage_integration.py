@@ -39,7 +39,7 @@ class S3StorageIntegration(ResourceNameTrait, Resource):
         Manages the integration of Snowflake with S3 storage.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-storage-integration.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-storage-integration
 
     Fields:
         name (string, required): The name of the storage integration.
@@ -146,7 +146,7 @@ class GCSStorageIntegration(ResourceNameTrait, Resource):
         Manages the integration of Google Cloud Storage (GCS) as an external stage for storing data.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-storage-integration.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-storage-integration
 
     Fields:
         name (string, required): The name of the storage integration.

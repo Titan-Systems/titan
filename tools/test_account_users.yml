@@ -1,0 +1,4 @@
+users:
+  - name: static_user
+    email: info@applytitan.com
+    comment: This is a static user

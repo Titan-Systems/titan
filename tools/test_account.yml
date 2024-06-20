@@ -3,8 +3,11 @@ roles:
     comment: CI role, do not drop
   - name: EMPTY
     comment: This role is intentionally left empty
-  - name: static_role
+  - name: STATIC_ROLE
     comment: Static role
+  - name: ~@#$%^&*()_+
+    owner: ACCOUNTADMIN
+    comment: This role has some issues
 
 databases:
   - name: static_database
@@ -20,11 +23,13 @@ role_grants:
     roles:
       - SYSADMIN
 
-# network_rules:
-#   - name: static_network_rule
-#     type: HOST_PORT
-#     value_list: ["example.com:443"]
-#     mode: EGRESS
+network_rules:
+  - name: static_network_rule
+    type: HOST_PORT
+    value_list: ["example.com:443"]
+    mode: EGRESS
+    database: static_database
+    schema: public
 
 # secrets:
 #   - name: static_secret
@@ -52,9 +57,12 @@ stages:
     directory:
       enable: true
 
-# table_streams:
-#   - name: static_stream
-#     on_table: static_table
+streams:
+  - name: static_stream
+    database: static_database
+    schema: public
+    on_table: static_database.public.static_table
+    copy_grants: false
 
 tables:
   - name: static_table
@@ -63,19 +71,6 @@ tables:
         data_type: NUMBER(38,0)
     change_tracking: true
 
-
-# tags:
-#   - name: static_tag
-#     database: static_database
-#     schema: PUBLIC
-#     comment: This is a static tag
-#     allowed_values:
-#       - value: STATIC_TAG_VALUE
-
-# users:
-#   - name: static_user
-#     email: static.user@example.com
-#   - name: break_glass_admin
 
 views:
   - name: static_view
@@ -91,3 +86,27 @@ warehouses:
   - name: static_warehouse
   - name: CI
     warehouse_size: XSMALL
+
+compute_pools:
+  - name: static_compute_pool
+    min_nodes: 1
+    max_nodes: 1
+    initially_suspended: true
+    auto_resume: false
+    auto_suspend_secs: 60
+    instance_family: CPU_X64_XS
+  
+security_integrations:
+  - name: SNOWSERVICES_INGRESS_OAUTH
+    type: OAUTH
+    oauth_client: snowservices_ingress
+    enabled: true
+  - name: STATIC_SECURITY_INTEGRATION
+    type: api_authentication
+    auth_type: OAUTH2
+    oauth_client_auth_method: client_secret_post
+    oauth_client_id: 'sn-oauth-134o9erqfedlc'
+    oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
+    oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'
+    enabled: true
+

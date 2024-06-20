@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec, ResourceNameTrait
-from ..resource_name import ResourceName
 from .database import Database
 from .role import Role
+from .share import Share
+from ..resource_name import ResourceName
 from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
     FlagProp,
@@ -41,7 +42,7 @@ class _ReplicationGroup(ResourceSpec):
     object_types: list[ObjectType]
     allowed_accounts: list[str]
     allowed_databases: list[Database] = None
-    allowed_shares: list[str] = None
+    allowed_shares: list[Share] = None
     allowed_integration_types: list[IntegrationType] = None
     ignore_edition_check: bool = None
     replication_schedule: str = None

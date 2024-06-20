@@ -83,6 +83,7 @@ def _split_statements(sql_text):
     parser = parser.ignore(pp.c_style_comment | snowflake_sql_comment)
 
     results = []
+    end = 0
     for result, start, end in parser.scan_string(sql_text):
         results.append(result[0])
 
@@ -517,7 +518,7 @@ def _parse_stage_path(stage_path_str):
 
 def _parse_dynamic_table_text(text: str):
     """
-    To the annoyance of some, the only way to get the canonical values of refresh_mode, initialize, and as
+    To the annoyance of some, the only way to get the canonical values of refresh_mode, initialize, and as_
     is to parse it out of the `text` field of the dynamic table. This function does that.
 
     In a SHOW DYNAMIC TABLES statement, the `text` field is the DDL statement for the dynamic table. Snowflake
@@ -548,7 +549,9 @@ def _parse_dynamic_table_text(text: str):
     initialize = match_initialize.group(1) if match_initialize else None
 
     # Parse as
-    match_as = re.search(r"\s+AS\s+(.*)$", text)
+    # 2024-06-19: discovered this failing today because the "AS" was lowercase. Unclear
+    # if this was due to a Snowflake behavior change or some other factor.
+    match_as = re.search(r"\s+AS\s+(.*)$", text, re.IGNORECASE)
     as_ = match_as.group(1) if match_as else None
 
     return (
