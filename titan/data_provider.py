@@ -1726,6 +1726,10 @@ def list_stages(session) -> list[FQN]:
     return stages
 
 
+def list_streams(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "STREAMS")
+
+
 def list_tables(session) -> list[FQN]:
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
     tables = []

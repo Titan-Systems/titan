@@ -34,8 +34,8 @@ logger = logging.getLogger("titan")
 Manifest = dict[URN, dict]
 State = dict[URN, dict]
 
-class MissingPrivilegeException(Exception):
-    pass
+# class MissingPrivilegeException(Exception):
+#     pass
 
 
 class MissingResourceException(Exception):

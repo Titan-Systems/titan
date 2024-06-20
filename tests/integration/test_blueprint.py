@@ -5,7 +5,7 @@ import pytest
 from titan import data_provider
 from titan import resources as res
 from titan.enums import ResourceType
-from titan.blueprint import Action, Blueprint, MissingResourceException, MissingPrivilegeException, plan_sql
+from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
 
 from tests.helpers import get_json_fixtures
@@ -122,18 +122,6 @@ def test_blueprint_crossreferenced_database(cursor):
     )
     plan = bp.plan(session)
     assert len(plan) == 4
-
-
-@pytest.mark.skip("noprivs_role is causing issues and breaking other integration tests")
-def test_privilege_scanning(resource, noprivs_role, cursor, marked_for_cleanup):
-    resource_cls, data = resource
-    cursor.execute(f"USE ROLE {noprivs_role}")
-    bp = Blueprint(name="test", allow_role_switching=False)
-    res = resource_cls(**data)
-    bp.add(res)
-    marked_for_cleanup.append(res)
-    with pytest.raises(MissingPrivilegeException):
-        bp.apply(cursor.connection)
 
 
 def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
