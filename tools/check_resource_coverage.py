@@ -43,6 +43,7 @@ test_fetch_file = open(
 
 
 def camelcase_to_snakecase(name: str) -> str:
+    name = name.replace("OAuth", "OAUTH")
     pattern = re.compile(r"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
     name = pattern.sub("_", name).lower()
     return name

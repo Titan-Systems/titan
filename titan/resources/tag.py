@@ -17,10 +17,38 @@ class _Tag(ResourceSpec):
 
 class Tag(ResourceNameTrait, Resource):
     """
-    CREATE [ OR REPLACE ] TAG [ IF NOT EXISTS ] <name> [ COMMENT = '<string_literal>' ]
+    Description:
+        Represents a tag in Snowflake, which can be used to label various resources for better management and categorization.
 
-    CREATE [ OR REPLACE ] TAG [ IF NOT EXISTS ] <name>
-        [ ALLOWED_VALUES '<val_1>' [ , '<val_2>' , [ ... ] ] ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-tag
+
+    Fields:
+        name (string, required): The name of the tag.
+        allowed_values (list): A list of allowed values for the tag.
+        comment (string): A comment or description for the tag.
+
+    Python:
+
+        ```python
+        tag = Tag(
+            name="cost_center",
+            allowed_values=["finance", "engineering", "sales"],
+            comment="This is a sample tag",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        tags:
+          - name: cost_center
+            comment: This is a sample tag
+            allowed_values:
+              - finance
+              - engineering
+              - sales
+        ```
     """
 
     edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}

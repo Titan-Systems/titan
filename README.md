@@ -195,7 +195,10 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | Pipe                          | ✅         |
 | Projection Policy             | ❌         |
 | Row Access Policy             | ❌         |
-| Secret                        | 🚧         |
+| Secret                        |            |
+| ↳ Generic                     | ✅         |
+| ↳ OAuth                       | ✅         |
+| ↳ Password                    | ✅         |
 | Sequence                      | ✅         |
 | Service                       | ✅         |
 | Session Policy                | ✅         |
@@ -215,7 +218,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ View                        | 🚧         |
 | Streamlit                     | ❌         |
 | Table                         | 🚧         |
-| Tag                           | 🚧         |
+| Tag                           | ✅         |
 | Task                          | ✅         |
 | User-Defined Function         |            |
 | ↳ Java                        | ❌         |

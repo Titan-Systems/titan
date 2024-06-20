@@ -47,6 +47,7 @@
 * [StageStream](resources/stage_stream.md)
 * [Table](resources/table.md)
 * [TableStream](resources/table_stream.md)
+* [Tag](resources/tag.md)
 * [Task](resources/task.md)
 * [User](resources/user.md)
 * [View](resources/view.md)
