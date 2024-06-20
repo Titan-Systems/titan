@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .column import Column
 from .role import Role
 from .warehouse import Warehouse
 from ..enums import ParseableEnum, ResourceType
 from ..resource_name import ResourceName
-from ..scope import SchemaScope
+from ..scope import SchemaScope, TableScope
 from ..props import (
     ArgsProp,
     EnumProp,
@@ -30,9 +29,37 @@ class InitializeBehavior(ParseableEnum):
 
 
 @dataclass(unsafe_hash=True)
+class _DynamicTableColumn(ResourceSpec):
+    name: str
+    comment: str = None
+
+
+class DynamicTableColumn(Resource):
+    resource_type = ResourceType.COLUMN
+    props = Props(
+        comment=StringProp("comment", eq=False),
+    )
+    scope = TableScope()
+    spec = _DynamicTableColumn
+    serialize_inline = True
+
+    def __init__(
+        self,
+        name: str,
+        comment: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data: _DynamicTableColumn = _DynamicTableColumn(
+            name,
+            comment=comment,
+        )
+
+
+@dataclass(unsafe_hash=True)
 class _DynamicTable(ResourceSpec):
     name: ResourceName
-    columns: list[Column]
+    columns: list[DynamicTableColumn]
     target_lag: str
     warehouse: Warehouse
     refresh_mode: RefreshMode
@@ -116,7 +143,7 @@ class DynamicTable(ResourceNameTrait, Resource):
     def __init__(
         self,
         name: str,
-        columns: list[Column],
+        columns: list[dict],
         target_lag: str,
         warehouse: str,
         refresh_mode: RefreshMode,

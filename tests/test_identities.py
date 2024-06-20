@@ -1,7 +1,11 @@
 import pytest
 
+from dataclasses import fields
+from typing import get_args, get_origin
+
 from tests.helpers import get_json_fixtures
 
+from titan.resources import Resource
 from titan.resource_name import ResourceName
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -17,21 +21,46 @@ def resource(request):
     yield resource_cls, data
 
 
+def _resource_field_type_is_resource(field):
+    if issubclass(field.type, Resource):
+        return True
+    elif get_origin(field.type) == list and issubclass(get_args(field.type)[0], Resource):
+        return True
+
+    return False
+
+
+def _resource_names_are_eq(lhs, rhs):
+    if lhs is None and rhs is None:
+        return True
+    if isinstance(lhs, list):
+        return [ResourceName(item) for item in lhs] == [ResourceName(item) for item in rhs]
+    else:
+        return ResourceName(lhs) == ResourceName(rhs)
+
+
 def test_data_identity(resource):
     resource_cls, data = resource
     data: dict = data.copy()
     instance = resource_cls(**data)
+
     serialized: dict = instance.to_dict()
     if "name" in serialized:
-        assert ResourceName(serialized.pop("name")) == ResourceName(data.pop("name"))
+        assert _resource_names_are_eq(serialized.pop("name"), data.pop("name"))
     if "columns" in serialized:
-        lhs_cols = serialized.pop("columns", [])
-        rhs_cols = data.pop("columns", [])
+        lhs_cols = serialized.pop("columns", []) or []
+        rhs_cols = data.pop("columns", []) or []
         assert len(lhs_cols) == len(rhs_cols)
         for lhs, rhs in zip(lhs_cols, rhs_cols):
             if "name" in lhs:
-                assert ResourceName(lhs.pop("name")) == ResourceName(rhs.pop("name"))
+                assert _resource_names_are_eq(lhs.pop("name"), rhs.pop("name"))
             assert lhs == rhs
+    for field in fields(instance._data):
+        if field.name in ["name", "columns"]:
+            continue
+        if _resource_field_type_is_resource(field):
+            assert _resource_names_are_eq(serialized.pop(field.name), data.pop(field.name))
+
     assert serialized == data
 
 

@@ -45,7 +45,7 @@ class Column(Resource):
     )
     scope = TableScope()
     spec = _Column
-    in_place_serialization = True
+    serialize_inline = True
 
     def __init__(
         self,

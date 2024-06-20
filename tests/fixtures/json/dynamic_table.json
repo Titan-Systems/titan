@@ -3,7 +3,7 @@
     "columns": [
         {
             "name": "id",
-            "data_type": "NUMBER(38,0)"
+            "comment": "This is the first column"
         }
     ],
     "target_lag": "1 HOUR",
