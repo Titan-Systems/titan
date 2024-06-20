@@ -25,11 +25,11 @@ class _TableStream(ResourceSpec):
     name: ResourceName
     on_table: Table
     owner: Role = "SYSADMIN"
-    copy_grants: bool = None
-    at: dict[str, str] = None
-    before: dict[str, str] = None
-    append_only: bool = None
-    show_initial_rows: bool = field(default_factory=None, metadata={"triggers_replacement": True})
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    at: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    before: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    append_only: bool = False
+    show_initial_rows: bool = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
 
     def __post_init__(self):
@@ -114,7 +114,7 @@ class TableStream(ResourceNameTrait, Resource):
         copy_grants: bool = None,
         at: dict[str, str] = None,
         before: dict[str, str] = None,
-        append_only: bool = None,
+        append_only: bool = False,
         show_initial_rows: bool = None,
         comment: str = None,
         **kwargs,

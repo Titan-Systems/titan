@@ -7,7 +7,7 @@
         "stream": "STATIC_DATABASE.PUBLIC.STATIC_STREAM"
     },
     "before": null,
-    "append_only": null,
+    "append_only": false,
     "show_initial_rows": null,
     "comment": null
 }

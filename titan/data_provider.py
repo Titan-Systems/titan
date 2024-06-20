@@ -1350,12 +1350,16 @@ def fetch_stream(session, fqn: FQN):
         raise Exception(f"Found multiple streams matching {fqn}")
 
     data = streams[0]
-    return {
-        "name": data["name"],
-        "comment": data["comment"] or None,
-        "append_only": data["mode"] == "APPEND_ONLY",
-        "on_table": data["table_name"] if data["source_type"] == "Table" else None,
-    }
+    if data["source_type"] == "Table":
+        return {
+            "name": data["name"],
+            "comment": data["comment"] or None,
+            "append_only": data["mode"] == "APPEND_ONLY",
+            "on_table": data["table_name"],
+            "owner": data["owner"],
+        }
+    else:
+        raise NotImplementedError(f"Unsupported stream source type {data['source_type']}")
 
 
 def fetch_tag(session, fqn: FQN):
@@ -1366,7 +1370,16 @@ def fetch_tag(session, fqn: FQN):
             return None
         raise
     tags = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
-    return tags[0]
+    if len(tags) == 0:
+        return None
+    if len(tags) > 1:
+        raise Exception(f"Found multiple tags matching {fqn}")
+    data = tags[0]
+    return {
+        "name": data["name"],
+        "comment": data["comment"] or None,
+        "allowed_values": json.loads(data["allowed_values"]) if data["allowed_values"] else None,
+    }
 
 
 def fetch_task(session, fqn: FQN):
@@ -1742,6 +1755,16 @@ def list_tables(session) -> list[FQN]:
             continue
         tables.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
     return tables
+
+
+def list_tags(session) -> list[FQN]:
+    show_result = execute(session, "SHOW TAGS")
+    tags = []
+    for row in show_result:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+            continue
+        tags.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+    return tags
 
 
 def list_users(session) -> list[FQN]:

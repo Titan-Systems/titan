@@ -1,3 +1,5 @@
+import copy
+
 import pytest
 
 from dataclasses import fields
@@ -41,7 +43,7 @@ def _resource_names_are_eq(lhs, rhs):
 
 def test_data_identity(resource):
     resource_cls, data = resource
-    data: dict = data.copy()
+    data: dict = copy.deepcopy(data)
     instance = resource_cls(**data)
 
     serialized: dict = instance.to_dict()

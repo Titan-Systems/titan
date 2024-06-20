@@ -230,7 +230,7 @@ def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
         "DROP",
         urn.resource_type,
         "IF EXISTS" if if_exists else "",
-        urn.fqn,
+        fqn_to_sql(urn.fqn),
     )
 
 

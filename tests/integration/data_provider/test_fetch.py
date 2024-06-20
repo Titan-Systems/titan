@@ -56,7 +56,6 @@ def test_fetch_privilege_grant(cursor, suffix, marked_for_cleanup):
 
     grant = res.Grant(priv="usage", on_type="database", on="STATIC_DATABASE", to=role)
     cursor.execute(grant.create_sql(if_not_exists=True))
-    marked_for_cleanup.append(grant)
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
@@ -97,7 +96,7 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         f"""
             CREATE SCHEMA {test_db}.ENTERPRISE_TEST_SCHEMA
                 DATA_RETENTION_TIME_IN_DAYS = 90
-                WITH TAG (STATIC_DB.PUBLIC.STATIC_TAG = 'STATIC_TAG_VALUE')
+                WITH TAG (STATIC_DATABASE.PUBLIC.STATIC_TAG = 'STATIC_TAG_VALUE')
         """
     )
 
@@ -109,43 +108,47 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "data_retention_time_in_days": 90,
         "max_data_extension_time_in_days": 14,
         "default_ddl_collation": None,
-        "tags": {"STATIC_TAG": "SOMEVALUE"},
+        "tags": {"STATIC_DATABASE.PUBLIC.STATIC_TAG": "STATIC_TAG_VALUE"},
         "owner": TEST_ROLE,
         "comment": None,
     }
 
 
-def test_fetch_grant_on_account(cursor, suffix, marked_for_cleanup):
+def test_fetch_grant_on_account(cursor, suffix):
     role = res.Role(name=f"TEST_ACCOUNT_GRANTS_ROLE_{suffix}")
-    marked_for_cleanup.append(role)
     cursor.execute(role.create_sql(if_not_exists=True))
     cursor.execute(f"GRANT AUDIT ON ACCOUNT TO ROLE {role.name}")
     cursor.execute(f"GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE {role.name}")
 
-    bind_service_urn = parse_URN(f"urn:::grant/{role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
-    bind_service_grant = safe_fetch(cursor, bind_service_urn)
-    assert bind_service_grant is not None
-    assert bind_service_grant["priv"] == "BIND SERVICE ENDPOINT"
-    assert bind_service_grant["on"] == "ACCOUNT"
-    assert bind_service_grant["on_type"] == "ACCOUNT"
-    assert bind_service_grant["to"] == role.name
-    audit_urn = parse_URN(f"urn:::grant/{role.name}?priv=AUDIT&on=account/ACCOUNT")
-    audit_grant = safe_fetch(cursor, audit_urn)
-    assert audit_grant is not None
-    assert audit_grant["priv"] == "AUDIT"
-    assert audit_grant["on"] == "ACCOUNT"
-    assert audit_grant["on_type"] == "ACCOUNT"
-    assert audit_grant["to"] == role.name
+    try:
+        bind_service_urn = parse_URN(f"urn:::grant/{role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
+        bind_service_grant = safe_fetch(cursor, bind_service_urn)
+        assert bind_service_grant is not None
+        assert bind_service_grant["priv"] == "BIND SERVICE ENDPOINT"
+        assert bind_service_grant["on"] == "ACCOUNT"
+        assert bind_service_grant["on_type"] == "ACCOUNT"
+        assert bind_service_grant["to"] == role.name
+        audit_urn = parse_URN(f"urn:::grant/{role.name}?priv=AUDIT&on=account/ACCOUNT")
+        audit_grant = safe_fetch(cursor, audit_urn)
+        assert audit_grant is not None
+        assert audit_grant["priv"] == "AUDIT"
+        assert audit_grant["on"] == "ACCOUNT"
+        assert audit_grant["on_type"] == "ACCOUNT"
+        assert audit_grant["to"] == role.name
+    finally:
+        cursor.execute(role.drop_sql(if_exists=True))
 
 
-def test_fetch_database(cursor, suffix, marked_for_cleanup):
+def test_fetch_database(cursor, suffix):
     database = res.Database(name=f"SOMEDB_{suffix}", owner=TEST_ROLE)
-    marked_for_cleanup.append(database)
     cursor.execute(database.create_sql(if_not_exists=True))
 
-    result = safe_fetch(cursor, database.urn)
-    assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, database.to_dict())
+    try:
+        result = safe_fetch(cursor, database.urn)
+        assert result is not None
+        _assert_resource_dicts_eq_ignore_nulls(result, database.to_dict())
+    finally:
+        cursor.execute(database.drop_sql(if_exists=True))
 
 
 def test_fetch_grant_all_on_resource(cursor):
@@ -310,36 +313,50 @@ def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
     assert result == data_provider.remove_none_values(pipe.to_dict())
 
 
-@pytest.mark.skip(reason="Requires view DDL parsing")
-def test_fetch_view(cursor, test_db, marked_for_cleanup):
-    view = res.View(
-        name="VIEW_EXAMPLE",
-        as_=f"""
-        SELECT 1 as id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE
-        """,
-        columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
-        comment="View for testing",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    cursor.execute(view.create_sql(if_not_exists=True))
-    marked_for_cleanup.append(view)
+# @pytest.mark.skip(reason="Requires view DDL parsing")
+# def test_fetch_view(cursor, test_db, marked_for_cleanup):
+#     view = res.View(
+#         name="VIEW_EXAMPLE",
+#         as_=f"""
+#         SELECT 1 as id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE
+#         """,
+#         columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
+#         comment="View for testing",
+#         owner=TEST_ROLE,
+#         database=test_db,
+#         schema="PUBLIC",
+#     )
+#     cursor.execute(view.create_sql(if_not_exists=True))
+#     marked_for_cleanup.append(view)
 
-    result = safe_fetch(cursor, view.urn)
-    assert result is not None
-    result = data_provider.remove_none_values(result)
-    assert result == data_provider.remove_none_values(view.to_dict())
+#     result = safe_fetch(cursor, view.urn)
+#     assert result is not None
+#     result = data_provider.remove_none_values(result)
+#     assert result == data_provider.remove_none_values(view.to_dict())
 
 
 @pytest.mark.enterprise
 def test_fetch_tag(cursor, test_db, marked_for_cleanup):
     tag = res.Tag(
-        name="TAG_EXAMPLE",
+        name="TAG_EXAMPLE_WITH_ALLOWED_VALUES",
         database=test_db,
         schema="PUBLIC",
         comment="Tag for testing",
         allowed_values=["SOME_VALUE"],
+    )
+    cursor.execute(tag.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(tag)
+
+    result = safe_fetch(cursor, tag.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(tag.to_dict())
+
+    tag = res.Tag(
+        name="TAG_EXAMPLE",
+        database=test_db,
+        schema="PUBLIC",
+        comment="Tag for testing",
     )
     cursor.execute(tag.create_sql(if_not_exists=True))
     marked_for_cleanup.append(tag)
@@ -700,6 +717,7 @@ def test_fetch_packages_policy(cursor, suffix, marked_for_cleanup):
     _assert_resource_dicts_eq_ignore_nulls(result, packages_policy.to_dict())
 
 
+@pytest.mark.enterprise
 def test_fetch_aggregation_policy(cursor, suffix, test_db, marked_for_cleanup):
     aggregation_policy = res.AggregationPolicy(
         name=f"AGGREGATION_POLICY_EXAMPLE_{suffix}",
@@ -846,3 +864,22 @@ def test_fetch_api_authentication_security_integration(cursor, suffix, marked_fo
         result,
         security_integration.to_dict(),
     )
+
+
+def test_fetch_table_stream(cursor, suffix, marked_for_cleanup):
+    stream = res.TableStream(
+        name=f"SOME_TABLE_STREAM_{suffix}",
+        on_table="STATIC_DATABASE.PUBLIC.STATIC_TABLE",
+        copy_grants=None,
+        before=None,
+        append_only=False,
+        show_initial_rows=None,
+        comment=None,
+        owner=TEST_ROLE,
+    )
+    cursor.execute(stream.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(stream)
+
+    result = safe_fetch(cursor, stream.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.TableStream.spec, result, stream.to_dict())
