@@ -28,7 +28,7 @@ class Database(ResourceNameTrait, Resource, ResourceContainer):
         Represents a database in Snowflake.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-database.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-database
 
     Fields:
         name (string, required): The name of the database.

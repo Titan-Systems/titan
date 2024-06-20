@@ -5,7 +5,7 @@ description: >-
 
 # TableStream
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-stream.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-stream)
 
 Represents a stream on a table in Snowflake, which allows for change data capture on the table.
 

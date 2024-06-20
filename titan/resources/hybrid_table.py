@@ -38,7 +38,7 @@ class HybridTable(ResourceNameTrait, Resource):
         A hybrid table is a Snowflake table type that is optimized for hybrid transactional and operational workloads that require low latency and high throughput on small random point reads and writes.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-hybrid-table.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-hybrid-table
 
     Fields:
         name (string, required): The name of the hybrid table.

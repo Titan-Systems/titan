@@ -206,7 +206,7 @@ class SecurePath:
         import stat
 
         owner_permissions = (
-            # https://docs.python.org/3/library/stat.html
+            # https://docs.python.org/3/library/stat
             stat.S_IRUSR  # readable by owner
             | stat.S_IWUSR  # writeable by owner
             | stat.S_IXUSR  # executable by owner

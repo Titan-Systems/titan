@@ -5,7 +5,7 @@ description: >-
 
 # S3StorageIntegration
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-storage-integration.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-storage-integration)
 
 Manages the integration of Snowflake with S3 storage.
 

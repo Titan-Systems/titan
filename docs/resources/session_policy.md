@@ -5,7 +5,7 @@ description: >-
 
 # SessionPolicy
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-session-policy.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-session-policy)
 
 Manages session policies in Snowflake, which define timeout settings for user sessions to enhance security.
 

@@ -35,7 +35,7 @@ class SessionPolicy(ResourceNameTrait, Resource):
         Manages session policies in Snowflake, which define timeout settings for user sessions to enhance security.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-session-policy.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-session-policy
 
     Fields:
         name (string, required): The name of the session policy.

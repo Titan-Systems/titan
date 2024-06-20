@@ -47,7 +47,7 @@ class PythonStoredProcedure(ResourceNameTrait, Resource):
         Represents a Python stored procedure in Snowflake, allowing for the execution of Python code within the Snowflake environment.
 
     Snowflake Docs:
-    https://docs.snowflake.com/en/sql-reference/sql/create-procedure.html
+    https://docs.snowflake.com/en/sql-reference/sql/create-procedure
 
     Fields:
         name (str, required): The name of the procedure.

@@ -5,7 +5,7 @@ description: >-
 
 # SnowflakePartnerOAuthSecurityIntegration
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-security-integration.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-security-integration)
 
 A security integration in Snowflake designed to manage external OAuth clients for authentication purposes.
 This integration supports specific OAuth clients such as Looker, Tableau Desktop, and Tableau Server.

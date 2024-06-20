@@ -5,7 +5,7 @@ description: >-
 
 # APIIntegration
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-api-integration.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-api-integration)
 
 Manages API integrations in Snowflake, allowing external services to interact with Snowflake resources securely.
 This class supports creating, replacing, and checking the existence of API integrations with various configurations.

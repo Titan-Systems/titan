@@ -57,7 +57,7 @@ class SnowflakePartnerOAuthSecurityIntegration(ResourceNameTrait, Resource):
         This integration supports specific OAuth clients such as Looker, Tableau Desktop, and Tableau Server.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-security-integration.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-security-integration
 
     Fields:
         name (string, required): The name of the security integration.
@@ -156,7 +156,7 @@ class SnowservicesOAuthSecurityIntegration(ResourceNameTrait, Resource):
         Manages OAuth security integrations for Snowservices in Snowflake, allowing external authentication mechanisms.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-security-integration.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-security-integration
 
     Fields:
         name (string, required): The name of the security integration.

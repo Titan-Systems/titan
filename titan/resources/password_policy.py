@@ -37,7 +37,7 @@ class PasswordPolicy(ResourceNameTrait, Resource):
         Defines the rules and constraints for creating and managing passwords within the system, ensuring they meet specific security standards.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-password-policy.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-password-policy
 
     Fields:
         name (string, required): The name of the password policy.

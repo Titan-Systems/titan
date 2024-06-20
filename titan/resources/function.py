@@ -168,7 +168,7 @@ class PythonUDF(ResourceNameTrait, Resource):
         These functions can be used to perform operations that are not available as standard SQL functions.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-function.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-function
 
     Fields:
         name (string, required): The name of the function.

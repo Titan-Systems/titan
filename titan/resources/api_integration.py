@@ -37,7 +37,7 @@ class APIIntegration(ResourceNameTrait, Resource):
         This class supports creating, replacing, and checking the existence of API integrations with various configurations.
 
     Snowflake Docs:
-        https://docs.snowflake.com/en/sql-reference/sql/create-api-integration.html
+        https://docs.snowflake.com/en/sql-reference/sql/create-api-integration
 
     Fields:
         name (string, required): The unique name of the API integration.

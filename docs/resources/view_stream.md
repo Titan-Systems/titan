@@ -5,7 +5,7 @@ description: >-
 
 # ViewStream
 
-[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-stream.html)
+[Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-stream)
 
 Represents a stream on a view in Snowflake, allowing for real-time data processing and querying.
 This stream can be configured with various options such as time travel, append-only mode, and initial row visibility.
