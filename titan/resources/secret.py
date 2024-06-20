@@ -313,6 +313,15 @@ class OAuthSecret(ResourceNameTrait, Resource):
             owner=owner,
         )
 
+    def to_dict(self):
+        data = super().to_dict()
+        if data["oauth_scopes"]:
+            data.pop("oauth_refresh_token")
+            data.pop("oauth_refresh_token_expiry_time")
+        else:
+            data.pop("oauth_scopes")
+        return data
+
 
 SecretMap = {
     SecretType.PASSWORD: PasswordSecret,

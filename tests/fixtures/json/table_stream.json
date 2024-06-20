@@ -1,10 +1,10 @@
 {
     "name": "SOME_TABLE_STREAM",
-    "on_table": "STATIC_TABLE",
+    "on_table": "STATIC_DATABASE.PUBLIC.STATIC_TABLE",
     "owner": "SYSADMIN",
     "copy_grants": null,
     "at": {
-        "stream": "STATIC_STREAM"
+        "stream": "STATIC_DATABASE.PUBLIC.STATIC_STREAM"
     },
     "before": null,
     "append_only": null,

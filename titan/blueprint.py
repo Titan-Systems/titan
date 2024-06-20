@@ -168,7 +168,7 @@ def plan_sql(plan: Plan):
         if change.action == Action.ADD:
             sql_commands.append(lifecycle.create_resource(change.urn, change.after, props))
         elif change.action == Action.CHANGE:
-            sql_commands.append(lifecycle.update_resource(change.urn, change.delta, props))
+            sql_commands.append(lifecycle.update_resource(change.urn, change.delta))
         elif change.action == Action.REMOVE:
             sql_commands.append(lifecycle.drop_resource(change.urn, change.before))
     return sql_commands
