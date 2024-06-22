@@ -13,6 +13,19 @@ Titan Core is for:
 * Teams seeking to replace Terraform for Snowflake-related tasks.
 
 
+## Key Features
+
+ * **Declarative** » Generates the right SQL to make your config and account match
+
+ * **Comprehensive** » Nearly every Snowflake resource is supported
+
+ * **Pythonic** » Written in Python so you can use it with your existing Python workflow
+
+ * **Fast** » Titan Core runs in seconds, even with complex environments
+
+ * **SQL** » The only tool that allows you to write Python, YAML, or SQL
+ 
+
 ## Contents
 
 [Getting Started](sections/getting\_started.md): Installation and initial setup guide.

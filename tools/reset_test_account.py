@@ -13,14 +13,14 @@ connection_params = {
 }
 
 
-def load_and_run_config(conn, file, run_mode, valid_resource_types):
+def load_and_run_config(conn, file, run_mode, allowlist):
     config_path = os.path.join(os.path.dirname(__file__), file)
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     bp = Blueprint(
         name="reset-test-account",
         run_mode=run_mode,
-        valid_resource_types=valid_resource_types,
+        allowlist=allowlist,
         resources=collect_resources_from_config(config),
     )
     plan = bp.plan(conn)
@@ -42,7 +42,7 @@ def main():
     load_and_run_config(
         conn,
         "test_account.yml",
-        "FULLY-MANAGED",
+        "SYNC-ALL",
         [
             "compute pool",
             "database",
@@ -63,7 +63,7 @@ def main():
     load_and_run_config(
         conn,
         "test_account_enterprise.yml",
-        "FULLY-MANAGED",
+        "SYNC",
         ["tag"],
     )
 

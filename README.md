@@ -71,7 +71,6 @@ warehouse = Warehouse(
 )
 
 usage_grant = Grant(priv="usage", to=role, on=warehouse)
-operate_grant = Grant(priv="operate", to=role, on=warehouse)
 
 # Titan compares your config to a Snowflake account. Create a Snowflake 
 # connection to allow Titan to connect to your account.
@@ -91,7 +90,6 @@ bp = Blueprint(resources=[
     role,
     warehouse,
     usage_grant,
-    operate_grant,
 ])
 
 # Blueprint works like Terraform. Calling plan(...) will compare your config
@@ -125,14 +123,6 @@ print_plan(plan) # =>
   + to           = TRANSFORMER
   ...
 }
-
-+ urn::ABCD123:grant/TRANSFORMER?priv=OPERATE&on=warehouse/TRANSFORMING {
-  + priv         = "OPERATE"
-  + on           = "transforming"
-  + on_type      = "WAREHOUSE"
-  + to           = TRANSFORMER
-  ...
-}
 """
 
 # Calling apply(...) will convert your plan into the right set of SQL commands
@@ -145,7 +135,6 @@ bp.apply(session, plan) # =>
 [TITAN_USER:USERADMIN] > CREATE ROLE TRANSFORMER
 [TITAN_USER:USERADMIN] > USE ROLE SYSADMIN
 [TITAN_USER:SYSADMIN]  > GRANT USAGE ON WAREHOUSE transforming TO TRANSFORMER
-[TITAN_USER:SYSADMIN]  > GRANT OPERATE ON WAREHOUSE transforming TO TRANSFORMER
 """
 ```
 
@@ -201,9 +190,6 @@ grants:
   - to_role: transformer
     priv: usage
     on_warehouse: transforming
-  - to_role: transformer
-    priv: operate
-    on_warehouse: transforming
 EOF
 
 # Set connection variables
@@ -216,6 +202,45 @@ python -m titan plan --config titan.yml
 
 # Apply the config
 python -m titan apply --config titan.yml
+```
+
+### Using the GitHub Action
+The Titan Core GitHub Action allows you to automate the deployment of Snowflake resources using a git-based workflow.
+
+### GitHub Action Example
+
+```yaml
+# .github/workflows/titan.yml
+name: Titan Snowflake
+on:
+  push:
+    branches: ["main"]
+    # The directory in your repo where titan configs live.
+    paths:
+    - 'envs/prod/**'
+
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Snowflake with Titan
+
+    # The Github environment to use
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy with Titan
+        id: titan-core-action
+        uses: Titan-Systems/titan-core-action@main
+        with:
+          resource-path: envs/prod
+          valid-resource-types: database,user,warehouse,role
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
 ```
 
 ## Titan Core Limitations
