@@ -188,7 +188,7 @@ def test_blueprint_missing_database(cursor):
 def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     cursor.execute(f"GRANT USAGE ON DATABASE {test_db} TO ROLE {role.name}")
     session = cursor.connection
-    all_grant = res.Grant(priv="ALL", on_database=test_db, to=role)
+    all_grant = res.Grant(priv="ALL", on_database=test_db, to=role, owner=TEST_ROLE)
     blueprint = Blueprint(name="blueprint", resources=[all_grant])
     plan = blueprint.plan(session)
     assert len(plan) == 1
@@ -203,8 +203,8 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
         resources=[
             res.Schema(name="INFORMATION_SCHEMA", database=test_db),
         ],
-        run_mode="fully-managed",
-        valid_resource_types=[ResourceType.SCHEMA],
+        run_mode="sync-all",
+        allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
     assert len(plan) == 0
@@ -215,8 +215,8 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
             res.Schema(name="ABSENT", database=test_db),
             res.Schema(name="INFORMATION_SCHEMA", database=test_db),
         ],
-        run_mode="fully-managed",
-        valid_resource_types=[ResourceType.SCHEMA],
+        run_mode="sync-all",
+        allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
     assert len(plan) == 1
@@ -230,8 +230,8 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
             res.Schema(name="PRESENT", database=test_db),
             res.Schema(name="INFORMATION_SCHEMA", database=test_db),
         ],
-        run_mode="fully-managed",
-        valid_resource_types=[ResourceType.SCHEMA],
+        run_mode="sync-all",
+        allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
     assert len(plan) == 0
@@ -239,8 +239,8 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
     blueprint = Blueprint(
         name="blueprint",
         resources=[res.Schema(name="INFORMATION_SCHEMA", database=test_db)],
-        run_mode="fully-managed",
-        valid_resource_types=[ResourceType.SCHEMA],
+        run_mode="sync-all",
+        allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
     assert len(plan) == 1

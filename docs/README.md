@@ -1,8 +1,10 @@
-# Overview
+# `titan core` - Snowflake infrastructure as code
 
-`titan core` is an infrastructure-as-code tool built for Snowflake. It allows you to declaratively define and manage Snowflake resources. It can be used to provision and manage Snowflake environments, automate deployments, and handles role-based access control (RBAC).
+Titan Core helps you provision, deploy, and secure resources in Snowflake. It replaces tools like Terraform, Schemachange, or Permifrost.
 
-`titan core` is for:
+Deploy any Snowflake resource, including users, roles, schemas, databases, integrations, pipes, stages, functions, stored procedures, and more. Convert adhoc, bug-prone SQL management scripts into simple, repeatable configuration.
+
+Titan Core is for:
 
 * DevOps engineers looking to automate and manage Snowflake infrastructure.
 * Analytics engineers working with dbt who want to manage Snowflake resources without macros.
@@ -10,14 +12,23 @@
 * Organizations that prefer a git-based workflow for infrastructure management.
 * Teams seeking to replace Terraform for Snowflake-related tasks.
 
-## Installation
 
-### Resources
+## Key Features
 
-[Getting Started](sections/getting\_started.md): Installation and initial setup guide.
+ * **Declarative** » Generates the right SQL to make your config and account match
 
-* [Python Library](use-titan-core-with-python.md)
-* [Command Line](titan-core-cli.md)
+ * **Comprehensive** » Nearly every Snowflake resource is supported
+
+ * **Pythonic** » Written in Python so you can use it with your existing Python workflow
+
+ * **Fast** » Titan Core runs in seconds, even with complex environments
+
+ * **SQL** » The only tool that allows you to write Python, YAML, or SQL
+ 
+
+## Contents
+
+* [Getting Started](getting-started.md): Installation and initial setup guide.
+* [Blueprint](blueprint.md): Customize and control how resources are deployed to Snowflake
 * [GitHub Action](titan-core-github-action.md) - For git-based workflows, including dbt.
 
-[Vignettes](sections/vignettes.md): In-depth tutorials and best practices.

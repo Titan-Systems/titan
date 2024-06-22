@@ -35,7 +35,7 @@ def titan_cli():
     "--run_mode", type=click.Choice(["CREATE-OR-UPDATE"]), default="CREATE-OR-UPDATE", help="Run mode for the plan."
 )
 def plan(config_file, json_output, output_file, run_mode):
-    """Generate an execution plan based on your configuration and environment."""
+    """Generate an execution plan based on your configuration"""
     config = load_config(config_file)
     plan_obj = blueprint_plan(config, run_mode)
     output = None
@@ -59,7 +59,7 @@ def plan(config_file, json_output, output_file, run_mode):
 )
 @click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes.")
 def apply(config_file, plan_file, run_mode, dry_run):
-    """Apply a plan to Titan resources."""
+    """Apply a plan to Titan resources"""
     if config_file and plan_file:
         raise click.UsageError("Cannot specify both --config and --plan.")
     if not config_file and not plan_file:
@@ -78,7 +78,7 @@ def apply(config_file, plan_file, run_mode, dry_run):
 @click.option("--out", type=str, help="Output filename for the exported data.")
 @click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Specify the output format.")
 def export(resource, out, format):
-    """Export Titan resources."""
+    """Export Titan resources"""
     # Implementation for exporting resources
     resource_type = ResourceType(resource)
     resources = export_resources(resource_type)

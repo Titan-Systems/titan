@@ -1,28 +1,66 @@
-# `titan[core]` - Snowflake infrastructure as code
+# `titan core` - Snowflake infrastructure as code
 
-<div align="center">
+<!-- <div align="center">
     <img src="./images/github-explainer.png" style="padding-bottom: 20px; width: 830px;"/>
-</div>
+</div> -->
 
-Titan Core helps you provision, deploy, and secure resources in Snowflake. It replaces infrastructure tools like Terraform or Schemachange.
+Titan Core helps you provision, deploy, and secure resources in Snowflake. It replaces tools like Terraform, Schemachange, or Permifrost.
 
-Define any Snowflake resource, including users, roles, schemas, databases, integrations, pipes, stages, functions, and stored procedures, using declarative Python.
+Deploy any Snowflake resource, including users, roles, schemas, databases, integrations, pipes, stages, functions, stored procedures, and more. Convert adhoc, bug-prone SQL management scripts into simple, repeatable configuration.
+
+Titan Core is for:
+
+* DevOps engineers looking to automate and manage Snowflake infrastructure.
+* Analytics engineers working with dbt who want to manage Snowflake resources without macros.
+* Data engineers needing a reliable tool for deploying and managing Snowflake resources.
+* Organizations that prefer a git-based workflow for infrastructure management.
+* Teams seeking to replace Terraform for Snowflake-related tasks.
 
 
-# Installation
+## Key Features
 
-If you want to run custom Titan code or use Titan on the command line, you can use the Titan Core Python API.
+ * **Declarative** » Generates the right SQL to make your config and account match
 
-```bash
-python -m pip install git+https://github.com/Titan-Systems/titan.git
+ * **Comprehensive** » Nearly every Snowflake resource is supported
+
+ * **Pythonic** » Written in Python so you can use it with your existing Python workflow
+
+ * **Fast** » Titan Core runs in seconds, even with complex environments
+
+ * **SQL** » The only tool that allows you to write Python, YAML, or SQL
+ 
+
+## Documentation
+
+You can find comprehensive [Titan Core documentation on GitBook](https://titan-core.gitbook.io/titan-core).
+
+## Getting Started
+
+If you're new, the best place to start is with the Python package.
+
+### Python + CLI Installation
+
+### Install from PyPi
+coming soon
+
+### Install from source
+
+```sh
+python -m venv .venv
+source .venv/bin/activate
+pip install git+https://github.com/Titan-Systems/titan.git
 ```
 
-### Usage
-
-Define resource configurations by instantiating Python objects.
+### Using the Python package
 
 ```Python
+import os
+import snowflake.connector
+
+from titan.blueprint import Blueprint, print_plan
 from titan.resources import Grant, Role, Warehouse
+
+# Configure resources by instantiating Python objects.
 
 role = Role(name="transformer")
 
@@ -32,90 +70,223 @@ warehouse = Warehouse(
     auto_suspend=60,
 )
 
-grants = [
-    Grant(priv="usage", to=role, on=warehouse),
-    Grant(priv="operate", to=role, on=warehouse),
-]
-```
+usage_grant = Grant(priv="usage", to=role, on=warehouse)
 
-Use Blueprint to apply those changes to your Snowflake account. Blueprint works similar to Terraform - add resources, call `plan(...)` to see what changes will be applied, and then call `apply(...)` to run the changes.
+# Titan compares your config to a Snowflake account. Create a Snowflake 
+# connection to allow Titan to connect to your account.
 
-```Python
-from titan import Blueprint, print_plan
+connection_params = {
+    "account": os.environ["SNOWFLAKE_ACCOUNT"],
+    "user": os.environ["SNOWFLAKE_USER"],
+    "password": os.environ["SNOWFLAKE_PASSWORD"],
+    "role": "SYSADMIN",
+}
+session = snowflake.connector.connect(**connection_params)
 
-bp = Blueprint()
-bp.add(
+# Create a Blueprint and pass your resources into it. A Blueprint helps you
+# validate and deploy a set of resources.
+
+bp = Blueprint(resources=[
     role,
     warehouse,
-    *grants,
-)
+    usage_grant,
+])
+
+# Blueprint works like Terraform. Calling plan(...) will compare your config
+# to the state of your Snowflake account and return a list of changes.
+
 plan = bp.plan(session)
 print_plan(plan) # =>
 """
-account:ABC123
+» titan[core]
+» Plan: 4 to add, 0 to change, 0 to destroy.
 
-  » role.transformer will be created
++ urn::ABCD123:warehouse/transforming {
+  + name                                = "transforming"
+  + owner                               = "SYSADMIN"
+  + warehouse_type                      = "STANDARD"
+  + warehouse_size                      = "LARGE"
+  ...
+}
 
-  + role "urn::ABC123:role/transformer" {
-     + name  = "transformer"
-     + owner = "SYSADMIN"
-    }
++ urn::ABCD123:role/transformer {
+  + name    = "transformer"
+  + owner   = "USERADMIN"
+  + tags    = None
+  + comment = None
+}
 
-  + warehouse "urn::ABC123:warehouse/transforming" {
-     + name           = "transforming"
-     + owner          = "SYSADMIN"
-     + warehouse_type = "STANDARD"
-     + warehouse_size = "LARGE"
-     + auto_suspend   = 60
-    }
-
-  + grant "urn::ABC123:grant/..." {
-     + priv = "USAGE"
-     + on   = warehouse "transforming"
-     + to   = role "transformer
-    }
-
-  + grant "urn::ABC123:grant/..." {
-     + priv = "OPERATE"
-     + on   = warehouse "transforming"
-     + to   = role "transformer
-    }
++ urn::ABCD123:grant/TRANSFORMER?priv=USAGE&on=warehouse/TRANSFORMING {
+  + priv         = "USAGE"
+  + on           = "transforming"
+  + on_type      = "WAREHOUSE"
+  + to           = TRANSFORMER
+  ...
+}
 """
-bp.apply(session, plan)
+
+# Calling apply(...) will convert your plan into the right set of SQL commands
+# and run them against your Snowflake account.
+bp.apply(session, plan) # =>
+"""
+[TITAN_USER:SYSADMIN]  > USE SECONDARY ROLES ALL
+[TITAN_USER:SYSADMIN]  > CREATE WAREHOUSE TRANSFORMING warehouse_type = STANDARD ...
+[TITAN_USER:SYSADMIN]  > USE ROLE USERADMIN
+[TITAN_USER:USERADMIN] > CREATE ROLE TRANSFORMER
+[TITAN_USER:USERADMIN] > USE ROLE SYSADMIN
+[TITAN_USER:SYSADMIN]  > GRANT USAGE ON WAREHOUSE transforming TO TRANSFORMER
+"""
 ```
 
-# `titan[core]` vs others
+### Using the CLI
 
-| Feature/Capability                      | Titan Core     | Terraform      | Schemachange   |
-|-----------------------------------------|----------------|----------------|----------------|
-| Plan and Execute Changes                | ✅             | ✅              | ❌             |
-| Declarative Configuration               | ✅             | ✅              | ❌             |
-| Python-Based Definitions                | ✅             | w/ CDKTF        | ❌             |
-| SQL Support                             | ✅             | ❌              | ✅             |
-| Multi-Role Support                      | ✅             | ❌              | N/A            |
-| No State File Dependency                | ✅             | ❌              | ✅             |
-| Checks for Required Privileges          | ✅             | ❌              | ❌             |
-| Infrastructure Visualization            | WIP            | ✅              | ❌             |
+You can use the CLI to generate a plan, apply a plan, or export resources. To use the CLI, install the Python package and call `python -m titan` from the command line.
+
+The CLI allows you to `plan` and `apply` a Titan Core YAML config. You can specify a single input file or a directory of configs.
+
+In addition to `plan` and `apply`, the CLI also allows you to `export` resources. This makes it easy to generate a config for an existing Snowflake environment.
+
+To connect with Snowflake, the CLI uses environment variables. These environment variables are supported:
+
+* `SNOWFLAKE_ACCOUNT`
+* `SNOWFLAKE_USER`
+* `SNOWFLAKE_PASSWORD`
+* `SNOWFLAKE_DATABASE`
+* `SNOWFLAKE_SCHEMA`
+* `SNOWFLAKE_ROLE`
+* `SNOWFLAKE_WAREHOUSE`
+* `SNOWFLAKE_MFA_PASSCODE`
+
+### CLI Example
+
+```sh
+# Show the help message
+python -m titan --help
+
+# Usage: python -m titan [OPTIONS] COMMAND [ARGS]...
+# 
+#   titan[core] helps you manage your Snowflake environment.
+# 
+# Options:
+#   --help  Show this message and exit.
+# 
+# Commands:
+#   apply   Apply a plan to Titan resources
+#   export  Export Titan resources
+#   plan    Generate an execution plan based on your configuration
+
+# The CLI uses YAML config. This command creates a sample config file.
+
+cat <<EOF > titan.yml
+roles:
+  - name: transformer
+
+warehouses:
+  - name: transforming
+    warehouse_size: LARGE
+    auto_suspend: 60
+
+grants:
+  - to_role: transformer
+    priv: usage
+    on_warehouse: transforming
+EOF
+
+# Set connection variables
+export SNOWFLAKE_ACCOUNT="my-account"
+export SNOWFLAKE_USER="my-user"
+export SNOWFLAKE_PASSWORD="my-password"
+
+# Generate a plan
+python -m titan plan --config titan.yml
+
+# Apply the config
+python -m titan apply --config titan.yml
+```
+
+### Using the GitHub Action
+The Titan Core GitHub Action allows you to automate the deployment of Snowflake resources using a git-based workflow.
+
+### GitHub Action Example
+
+```yaml
+# .github/workflows/titan.yml
+name: Titan Snowflake
+on:
+  push:
+    branches: ["main"]
+    # The directory in your repo where titan configs live.
+    paths:
+    - 'envs/prod/**'
 
 
-## `titan[core]` vs Terraform
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Snowflake with Titan
+
+    # The Github environment to use
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy with Titan
+        id: titan-core-action
+        uses: Titan-Systems/titan-core-action@main
+        with:
+          resource-path: envs/prod
+          valid-resource-types: database,user,warehouse,role
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+```
+
+## Titan Core Limitations
+
+ - **Titan Core uses names as unique identifiers**. Renaming a resource will create a new one.
+ - Titan Core is not an ORM. It's not built to replace tools like SQLAlchemy.
+ - Titan Core is under active development. Some resources are not yet supported.
+
+
+## `titan core` vs other tools
+
+| Feature                                 | Titan Core | Terraform | Schemachange |  Permifrost |
+|-----------------------------------------|------------|-----------|--------------| ------------|
+| Plan and Execute Changes                | ✅         | ✅        | ❌            | ✅          |
+| Declarative Config                      | ✅         | ✅        | ❌            | ✅          |
+| Python-Based Definitions                | ✅         | w/ CDKTF  | ❌            | ❌          |
+| SQL Support                             | ✅         | ❌        | ✅            | ❌          |
+| Dynamic Role Switching                  | ✅         | ❌        | N/A           | ❌          |
+| No State File Dependency                | ✅         | ❌        | ✅            | ✅          |
+
+
+### `titan core` vs Terraform
 Terraform is an infrastructure-as-code tool using the HCL config language.
 
-The Snowflake provider for Terraform is limited to **1 role per provider**. This limitation is at odds with Snowflake's design, which is built to use multiple roles. This mismatch forces you into a complex multi-provider setup which can result in drift, permission errors, and broken plans.
+The [Snowflake provider for Terraform](https://github.com/Snowflake-Labs/terraform-provider-snowflake) is limited to **1 role per provider**. This limitation is at odds with Snowflake's design, which is built to use multiple roles. This mismatch forces you into a complex multi-provider setup which can result in drift, permission errors, and broken plans.
 
-Titan Core streamlines this with upfront privileges checks to ensure that plans can be applied. When privileges are missing, Titan tells you exactly what to grant. This speeds up development cycles and helps eliminate the use of `ACCOUNTADMIN`.
+Titan Core streamlines this with **dynamic role switching**. Titan Core automatically detects which role is needed for a given change, and switches to that role before making it. This speeds up development cycles and helps eliminate the use of `ACCOUNTADMIN`.
 
-Titan also doesn't use a state file, which provides more accurate plans and eliminates state mismatch issues.
-
-
-## `titan[core]` vs Schemachange
-Schemachange is a database migration tool that uses SQL scripts to deploy resources to different environments. As an imperative migration tool, it requires developers to write code for each step, demanding a deep understanding of the database's current state and the exact commands needed for updates. If environments change, your Schemachange scripts may need significant adjustments.
-
-Titan Core simplifies this process with a declarative Python approach. It allows you to define what your environment should look like, without specifying the detailed steps to get there. This is less error-prone and more flexible to changes. Titan Core manages a broader range of Snowflake resources, providing a more integrated and streamlined experience, especially in dynamic and complex data environments.
+Titan Core doesn't use a state file. This provides more accurate plans and eliminates issues with stale state.
 
 
+### `titan core` vs Schemachange
+[Schemachange](https://github.com/Snowflake-Labs/schemachange) is a database migration tool based on Flyway. It uses SQL scripts to deploy resources to different environments.
 
-# Resource support
+Schemachange is an imperative migration tool. For developers, that means you must know Snowflake's current state and the exact SQL commands needed to update it to the desired state. If environments get changed outside of the tool, your migration scripts may need significant adjustments.
+
+Titan Core simplifies this with a declarative approach. With Titan Core, just define what an environment should look like, you don't need to know the detailed steps or SQL commands needed to get there.
+
+Declarative config is less error-prone and more scalable, especially in dynamic and complex data environments.
+
+### `titan core` vs Permifrost
+[Permifrost](https://gitlab.com/gitlab-data/permifrost/) is an access-management tool for Snowflake. It helps you automate the creation of users, roles, and grants. Permifrost only manages permissions, it doesn't manage any other aspect of your Snowflake account.
+
+Permifrost can be very slow. Running simple Permifrost configs can take minutes to run. Titan Core is designed to run in seconds, even with complex environments.
+
+## Resource support
 
 ### Legend
 
@@ -124,7 +295,7 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 - ❌ Not Yet Supported
 
 
-| Name                          | Titan Core |
+| Name                          | Supported |
 |-------------------------------|-----------|
 | **Account Resources**         |           |
 | API Integration               | ✅         |
@@ -227,79 +398,15 @@ Titan Core simplifies this process with a declarative Python approach. It allows
 | ↳ SQL                         | ❌         |
 | View                          | ✅         |
 
+## License
+
+This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details
 
 
-## Examples
+## Contributing
 
-Use Titan to create a starter dbt project.
+Contributions are welcome! Titan Core does not require a contributor license agreement.
 
-```Python
+## The End
 
-import os
-import snowflake.connector
-
-from titan import Blueprint
-from titan.resources import Database, Warehouse, Role, User, RoleGrant
-
-connection_params = {
-    "account": os.environ["SNOWFLAKE_ACCOUNT"],
-    "user": os.environ["SNOWFLAKE_USER"],
-    "password": os.environ["SNOWFLAKE_PASSWORD"],
-}
-
-
-def dbt():
-    # Databases
-    raw_db = Database(name="RAW")
-    analytics_db = Database(name="ANALYTICS")
-
-    # Warehouses
-    loading_wh = Warehouse(name="LOADING")
-    transforming_wh = Warehouse(name="TRANSFORMING")
-    reporting_wh = Warehouse(
-        name="REPORTING",
-        warehouse_size="SMALL",
-        auto_suspend=60,
-    )
-
-    # Roles
-    loader = Role(name="LOADER")
-    transformer = Role(name="TRANSFORMER")
-    reporter = Role(name="REPORTER")
-
-    # Users
-    user = User(name="TEEJ", must_change_password=False, default_role=reporter.name)
-
-    # GRANTS
-    user_grant = RoleGrant(role=reporter, to_user=user)
-    sysadmin_grants = [
-        RoleGrant(role=loader, to_role="SYSADMIN"),
-        RoleGrant(role=transformer, to_role="SYSADMIN"),
-        RoleGrant(role=reporter, to_role="SYSADMIN"),
-    ]
-
-    return (
-        raw_db,
-        analytics_db,
-        loading_wh,
-        transforming_wh,
-        reporting_wh,
-        loader,
-        transformer,
-        reporter,
-        user,
-        user_grant,
-        *sysadmin_grants,
-    )
-
-
-if __name__ == "__main__":
-    bp = Blueprint(name="dbt-quickstart")
-    bp.add(*dbt())
-    session = snowflake.connector.connect(**connection_params)
-    plan = bp.plan(session)
-    
-    # Update Snowflake to match blueprint
-    bp.apply(session, plan)
-
-```
+If you got this far, don't forget to star this repo.

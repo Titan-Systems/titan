@@ -31,7 +31,6 @@ def test_example(example, cursor, marked_for_cleanup):
         name="test-example",
         resources=resources,
         dry_run=False,
-        allow_role_switching=True,
         ignore_ownership=False,
     )
     plan = blueprint.plan(cursor.connection)

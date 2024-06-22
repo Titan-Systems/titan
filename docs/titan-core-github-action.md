@@ -1,4 +1,4 @@
-# `titan[core]` GitHub Action
+# `titan core` GitHub Action
 
 ## Installation
 
@@ -17,12 +17,12 @@ To add the Titan Core GitHub Action to your repository, follow these steps:
           - name: Checkout code
             uses: actions/checkout@v2
 
-          - name: Run Titan Core Action
-            uses: Titan-Systems/titan-core-action@v1
+          - name: Deploy to Snowflake with Titan
+            uses: Titan-Systems/titan-core-action@main
             with:
               run-mode: 'create-or-update'
               resource-path: './resources'
-              valid-resource-types: 'table,view'
+              allowlist: 'warehouse,role,grant'
               dry-run: 'false'
             env:
               SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -39,43 +39,62 @@ To add the Titan Core GitHub Action to your repository, follow these steps:
     - `SNOWFLAKE_ROLE`
     - `SNOWFLAKE_WAREHOUSE`
 
-## Usage
+3. Create a `resources` directory in your repository with your Snowflake resources.
 
-The Titan Core GitHub Action allows you to manage Snowflake resources using GitOps principles. Configure the action by setting the following inputs:
-
-- `run-mode`: Operation mode (e.g., `create-or-update`, `fully-managed`).
-- `resource-path`: Path to your resource configuration files.
-- `valid-resource-types`: Comma-separated list of resource types to manage.
-- `dry-run`: Set to `true` for a dry run (no changes made).
-
-## Examples
-
-### Example 1: Basic Setup
-
-This example demonstrates a basic setup to manage tables and views.
-
-```yaml
-name: Basic Titan Core Workflow
-on: [push]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Run Titan Core Action
-        uses: Titan-Systems/titan-core-action@v1
-        with:
-          run-mode: 'create-or-update'
-          resource-path: './resources'
-          valid-resource-types: 'table,view'
-          dry-run: 'false'
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+```YAML
+# resources/warehouses.yml
+warehouses:
+  - name: loading
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
+  - name: transforming
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
+  - name: reporting
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
 ```
+
+```YAML
+# resources/rbac.yml
+# Specify roles
+roles:
+  - name: loader
+    comment: "Owns the tables in your raw database, and connects to the loading warehouse."
+  - name: transformer
+    comment: "Has query permissions on tables in raw database and owns tables in the analytics database. This is for dbt developers and scheduled jobs."
+  - name: reporter
+    comment: "Has permissions on the analytics database only. This role is for data consumers, such as analysts and BI tools. These users will not have permissions to read data from the raw database."
+
+# Permissions
+grants:
+  - to_role: loader
+    priv: usage
+    on_warehouse: loading
+  - to_role: transformer
+    priv: usage
+    on_warehouse: transforming
+  - to_role: reporter
+    priv: usage
+    on_warehouse: reporting
+  - to_role: reporter
+    priv: usage
+    on_database: analytics
+
+# Grant all roles to SYSADMIN
+role_grants:
+  - role: loader
+    roles:
+      - SYSADMIN
+  - role: transformer
+    roles:
+      - SYSADMIN
+  - role: reporter
+    roles:
+      - SYSADMIN
+```
+
+4. Commit and push your changes.

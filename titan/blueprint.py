@@ -2,41 +2,38 @@ import json
 import logging
 
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import Optional, Union
 from queue import Queue
 
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .builtins import SYSTEM_DATABASES, SYSTEM_ROLES
-from .client import ALREADY_EXISTS_ERR, INVALID_GRANT_ERR, DOES_NOT_EXIST_ERR, execute, reset_cache
+from .builtins import SYSTEM_ROLES
+from .client import (
+    ALREADY_EXISTS_ERR,
+    INVALID_GRANT_ERR,
+    DOES_NOT_EXIST_ERR,
+    execute,
+    reset_cache,
+)
 from .diff import diff, Action
 from .enums import ResourceType, ParseableEnum
-from .logical_grant import And, LogicalGrant, Or
 from .identifiers import URN, FQN, resource_label_for_type
-from .parse import parse_URN, parse_identifier
-from .privs import (
-    CREATE_PRIV_FOR_RESOURCE_TYPE,
-    GlobalPriv,
-    DatabasePriv,
-    RolePriv,
-    SchemaPriv,
-    priv_for_principal,
-    is_ownership_priv,
-)
-from .resources import Account, Database, Schema, Grant
+from .resources import Account, Database, Schema
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
 from .resource_name import ResourceName
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
-Manifest = dict[URN, dict]
-State = dict[URN, dict]
-
-# class MissingPrivilegeException(Exception):
-#     pass
-
+SYNC_MODE_BLOCKLIST = [
+    ResourceType.FUTURE_GRANT,
+    ResourceType.GRANT,
+    ResourceType.GRANT_ON_ALL,
+    ResourceType.ROLE,
+    ResourceType.USER,
+    ResourceType.TABLE,
+]
 
 class MissingResourceException(Exception):
     pass
@@ -47,7 +44,9 @@ class MarkedForReplacementException(Exception):
 
 class RunMode(ParseableEnum):
     CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
-    FULLY_MANAGED = "FULLY-MANAGED"
+    # FULLY_MANAGED = "FULLY-MANAGED"
+    SYNC = "SYNC"
+    SYNC_ALL = "SYNC-ALL"
 
 
 @dataclass
@@ -67,7 +66,8 @@ class ResourceChange:
             "delta": self.delta,
         }
 
-
+Manifest = dict[URN, dict]
+State = dict[URN, dict]
 Plan = list[ResourceChange]
 
 def dump_plan(plan: Plan, format: str = "json"):
@@ -136,6 +136,8 @@ def dump_plan(plan: Plan, format: str = "json"):
             key_lengths = [len(key) for key in change.delta.keys()]
             max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
             for key, value in change.delta.items():
+                if key.startswith("_"):
+                    continue
                 new_value = _render_value(value)
                 before_value = ""
                 if key in change.before:
@@ -152,16 +154,7 @@ def print_plan(plan: Plan):
     print(dump_plan(plan, format="text"))
 
 
-def plan_sql(plan: Plan):
-    """
-    Generate SQL commands based on the plan provided.
-
-    Args:
-    plan (Plan): The plan containing changes to be applied to the database.
-
-    Returns:
-    List[str]: A list of SQL commands to be executed.
-    """
+def plan_sql(plan: Plan) -> list[str]:
     sql_commands = []
     for change in plan:
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
@@ -217,158 +210,6 @@ def _walk(resource: Resource):
             yield from _walk(item)
 
 
-def _collect_required_privs(session_ctx: dict, plan: Plan) -> list:
-    """
-    For each action in the plan, generate a
-    """
-    required_priv_list = []
-
-    account_urn = URN.from_session_ctx(session_ctx)
-
-    for change in plan:
-        resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
-        # privs = []
-        privs = And()
-        if change.action == Action.ADD:
-            # Special cases
-
-            # GRANT ROLE
-            # For example, to create a RoleGrant you need OWNERSHIP on the role.
-            if change.urn.resource_type == ResourceType.ROLE_GRANT:
-                role_urn = URN(
-                    resource_type=ResourceType.ROLE,
-                    fqn=FQN(change.urn.fqn.name),
-                    account_locator=session_ctx["account_locator"],
-                )
-                privs = privs & (
-                    LogicalGrant(role_urn, RolePriv.OWNERSHIP) | LogicalGrant(account_urn, GlobalPriv.MANAGE_GRANTS)
-                )
-
-            if isinstance(resource_cls.scope, DatabaseScope):
-                privs = privs & (
-                    LogicalGrant(change.urn.database(), DatabasePriv.USAGE)
-                    | LogicalGrant(change.urn.database(), DatabasePriv.OWNERSHIP)
-                )
-            elif isinstance(resource_cls.scope, SchemaScope):
-                privs = (
-                    privs
-                    & (
-                        LogicalGrant(change.urn.database(), DatabasePriv.USAGE)
-                        | LogicalGrant(change.urn.database(), DatabasePriv.OWNERSHIP)
-                    )
-                    & (
-                        LogicalGrant(change.urn.schema(), SchemaPriv.USAGE)
-                        | LogicalGrant(change.urn.schema(), SchemaPriv.OWNERSHIP)
-                    )
-                )
-
-            create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(change.urn.resource_type)
-            if create_priv:
-                if isinstance(create_priv, GlobalPriv):
-                    principal = account_urn
-                elif isinstance(create_priv, DatabasePriv):
-                    principal = change.urn.database()
-                elif isinstance(create_priv, SchemaPriv):
-                    principal = change.urn.schema()
-                else:
-                    raise Exception(f"Unsupported privilege type {type(create_priv)}")
-                privs = privs & LogicalGrant(principal, create_priv)
-
-        required_priv_list.append(privs)
-
-    return required_priv_list
-
-
-def _collect_available_privs(session_ctx: dict, session, plan: Plan, usable_roles: list[str]) -> dict:
-    """
-    The `priv_map` dictionary structure:
-    {
-        "SOME_ROLE": {
-            "urn::ABC123:database/SOMEDB": {
-                privilege1,
-                privilege2,
-                ...
-            },
-            ...
-        },
-        ...
-    }
-    """
-    priv_map = {}
-
-    def _add(role, principal, priv):
-        if role not in priv_map:
-            priv_map[role] = {}
-        if principal not in priv_map[role]:
-            priv_map[role][principal] = set()
-        priv_map[role][principal].add(priv)
-
-    def _contains(role, principal, priv):
-        if role not in priv_map:
-            return False
-        if principal not in priv_map[role]:
-            return False
-        return priv in priv_map[role][principal]
-
-    account_urn = URN.from_session_ctx(session_ctx)
-
-    for role in usable_roles:
-        priv_map[role] = {}
-
-        if role.startswith("SNOWFLAKE.LOCAL") or role.endswith(".ALL_ENDPOINTS_USAGE"):
-            continue
-
-        # Existing privilege grants
-        role_grants = data_provider.fetch_role_grants(session, role)
-        if role_grants:
-            for principal, grant_list in role_grants.items():
-                for grant in grant_list:
-                    try:
-                        priv = priv_for_principal(parse_URN(principal), grant["priv"])
-                        _add(role, principal, priv)
-                    except ValueError:
-                        # Priv not recognized by Titan
-                        pass
-
-        # Implied privilege grants in the context of our plan
-        for change in plan:
-
-            # If we plan to add a new resource and we have the privs to create it, we can assume
-            # that we have the OWNERSHIP priv on that resource
-            if change.action == Action.ADD:
-                resource_cls = Resource.resolve_resource_cls(change.urn.resource_type, change.after)
-                create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE.get(change.urn.resource_type)
-                if create_priv is None:
-                    continue
-
-                if isinstance(resource_cls.scope, AccountScope):
-                    parent_urn = account_urn
-                elif isinstance(resource_cls.scope, DatabaseScope):
-                    parent_urn = change.urn.database()
-                elif isinstance(resource_cls.scope, SchemaScope):
-                    parent_urn = change.urn.schema()
-                else:
-                    raise Exception(f"Unsupported resource type {type(resource_cls)}")
-                if _contains(role, str(parent_urn), create_priv):
-                    ownership_priv = priv_for_principal(change.urn, "OWNERSHIP")
-                    _add(role, str(parent_urn), ownership_priv)
-                    if change.urn.resource_type == ResourceType.DATABASE and change.urn.fqn.name not in SYSTEM_DATABASES:
-                        public_schema = URN(
-                            account_locator=account_urn.account_locator,
-                            resource_type=ResourceType.SCHEMA,
-                            fqn=FQN(name="PUBLIC", database=change.urn.fqn.name),
-                        )
-                        information_schema = URN(
-                            account_locator=account_urn.account_locator,
-                            resource_type=ResourceType.SCHEMA,
-                            fqn=FQN(name="INFORMATION_SCHEMA", database=change.urn.fqn.name),
-                        )
-                        _add(role, str(public_schema), priv_for_principal(public_schema, "OWNERSHIP"))
-                        _add(role, str(information_schema), priv_for_principal(information_schema, "OWNERSHIP"))
-
-    return priv_map
-
-
 def _raise_if_plan_would_drop_session_user(session_ctx: dict, plan: Plan):
     for change in plan:
         if change.urn.resource_type == ResourceType.USER and change.action == Action.REMOVE:
@@ -376,60 +217,60 @@ def _raise_if_plan_would_drop_session_user(session_ctx: dict, plan: Plan):
                 raise Exception("Plan would drop the current session user, which is not allowed")
 
 
-# TODO
-def _raise_if_missing_privs(required: list, available: dict):
-    return
-    missing = []
-    for expr in required:
-        pass
-
-    if missing:
-        raise MissingPrivilegeException(f"Missing privileges")  #  for {principal}: {required_privs}
-
-    # for principal, privs in required.items():
-    #     required_privs = privs.copy()
-    #     for priv_map in available.values():
-    #         if principal in priv_map:
-    #             # If OWNERSHIP in priv_map[principal], we can assume we pass requirements
-    #             for priv in priv_map[principal]:
-    #                 if is_ownership_priv(priv):
-    #                     required_privs = set()
-    #                     break
-    #             required_privs -= priv_map[principal]
-    #     if required_privs:
-    #         raise MissingPrivilegeException(f"Missing privileges for {principal}: {required_privs}")
-
 
 class Blueprint:
+
     def __init__(
         self,
         name: str = None,
-        account: Union[None, str, Account] = None,
-        database: Union[None, str, Database] = None,
-        schema: Union[None, str, Schema] = None,
-        resources: List[Resource] = None,
+        resources: list[Resource] = None,
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
-        allow_role_switching: bool = True,
-        ignore_ownership: bool = True,
-        valid_resource_types: List[ResourceType] = None,
+        allowlist: list[ResourceType] = None,
+        # account: Union[None, str, Account] = None,
+        # database: Union[None, str, Database] = None,
+        # schema: Union[None, str, Schema] = None,
+        # allow_role_switching: bool = True,
+        # ignore_ownership: bool = True,
+        # valid_resource_types: List[ResourceType] = None,
+        **kwargs
     ) -> None:
-        # TODO: input validation
+        
+        account = kwargs.pop("account", None)
+        database = kwargs.pop("database", None)
+        schema = kwargs.pop("schema", None)
+        allow_role_switching = kwargs.pop("allow_role_switching", None)
+        ignore_ownership = kwargs.pop("ignore_ownership", None)
+        valid_resource_types = kwargs.pop("valid_resource_types", None)
 
-        if not allow_role_switching:
-            raise Exception("Role switching must be allowed in this version of Titan")
+        if account is not None:
+            logger.warning("account is deprecated, use add instead")
+        if database is not None:
+            logger.warning("database is deprecated, use add instead")
+        if schema is not None:
+            logger.warning("schema is deprecated, use add instead")
+        if allow_role_switching is not None:
+            raise Exception("Role switching must be allowed")
+        if ignore_ownership is not None:
+            logger.warning("ignore_ownership is deprecated")
+        if valid_resource_types is not None:
+            logger.warning("valid_resource_types is deprecated")
+            allowlist = valid_resource_types
+
         
         self._finalized = False
-        self._staged: List[Resource] = []
+        self._staged: list[Resource] = []
         self._root: Account = None
         self._account_locator: str = None
         self._run_mode: RunMode = RunMode(run_mode)
         self._dry_run: bool = dry_run
-        self._allow_role_switching: bool = allow_role_switching
         self._ignore_ownership: bool = ignore_ownership
-        self._valid_resource_types: List[ResourceType] = [ResourceType(v) for v in valid_resource_types or []]
+        self._allowlist: list[ResourceType] = [ResourceType(v) for v in allowlist or []]
 
-        if ResourceType.USER in self._valid_resource_types and self._run_mode != RunMode.CREATE_OR_UPDATE:
+        if self._run_mode == RunMode.SYNC_ALL:
+            raise Exception("Sync All mode is not supported yet")
+
+        if ResourceType.USER in self._allowlist and self._run_mode != RunMode.CREATE_OR_UPDATE:
             raise Exception("User resource type is not allowed in this version of Titan")
 
         self.name = name
@@ -466,13 +307,16 @@ class Blueprint:
                         exceptions.append(
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
                         )
-        # else:
-        #     raise Exception(f"Unsupported run mode {self._run_mode}")
+
+        if self._run_mode == RunMode.SYNC:
+            for change in plan:
+                if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
+                    exceptions.append(f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})")
 
         # Valid Resource Types exceptions
-        if self._valid_resource_types:
+        if self._allowlist:
             for change in plan:
-                if change.urn.resource_type not in self._valid_resource_types:
+                if change.urn.resource_type not in self._allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
         if exceptions:
@@ -555,18 +399,21 @@ class Blueprint:
             else:
                 normalized = resource_cls.defaults() | data
             return normalized
+        
+        if self._run_mode == RunMode.SYNC:
+            raise Exception("Sync mode is not supported yet")
 
-        if self._run_mode == RunMode.FULLY_MANAGED:
+        if self._run_mode == RunMode.SYNC_ALL:
             """
-            In fully managed mode, the remote state is not just the resources that were added to the blueprint, 
+            In sync-all mode, the remote state is not just the resources that were added to the blueprint, 
             but all resources that exist in Snowflake. This is limited by a few things:
-            - valid_resource_types limits the scope of what resources types are allowed in a blueprint
+            - allowlist limits the scope of what resources types are allowed in a blueprint
             - if database or schema is set, the blueprint only looks at that database or schema
             """
-            if len(self._valid_resource_types) == 0:
-                raise Exception("Fully managed mode with all resources is not supported yet")
+            if len(self._allowlist) == 0:
+                raise Exception("Sync All mode must specify an allowlist")
             
-            for resource_type in self._valid_resource_types:
+            for resource_type in self._allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     urn = URN(resource_type=resource_type, fqn=fqn, account_locator=self._account_locator)
                     data = data_provider.fetch_resource(session, urn)
@@ -583,9 +430,6 @@ class Blueprint:
             if data is not None:
                 normalized_data = _normalize(urn, data)
                 state[urn] = normalized_data
-
-        # for urn_str in manifest_urns:
-        #     raise Exception(f"Resource {urn_str} not found in manifest")
 
         # check for existence of resource refs
         for parent, reference in manifest["_refs"]:
@@ -723,7 +567,7 @@ class Blueprint:
 
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                if resource.implicit and self._run_mode != RunMode.FULLY_MANAGED:
+                if resource.implicit and self._run_mode not in (RunMode.SYNC_ALL, RunMode.SYNC):
                     continue
 
             urn = URN(
@@ -839,7 +683,6 @@ class Blueprint:
     def _compile_plan_to_sql(self, session_ctx, plan: Plan):
         action_queue = []
         default_role = session_ctx["role"]
-        # usable_roles = session_ctx["available_roles"] if self._allow_role_switching else [session_ctx["role"]]
 
         def _queue_change(change: ResourceChange):
             """
@@ -892,8 +735,7 @@ class Blueprint:
             action_queue.append(action)
             action_queue.extend(after_action)
 
-        if self._allow_role_switching:
-            action_queue.append("USE SECONDARY ROLES ALL")
+        action_queue.append("USE SECONDARY ROLES ALL")
         for change in plan:
             _queue_change(change)
         return action_queue
