@@ -28,10 +28,7 @@ Titan Core is for:
 
 ## Contents
 
-[Getting Started](sections/getting\_started.md): Installation and initial setup guide.
-
-* [Python Library](use-titan-core-with-python.md)
-* [Command Line](titan-core-cli.md)
+* [Getting Started](getting-started.md): Installation and initial setup guide.
+* [Blueprint](blueprint.md): Customize and control how resources are deployed to Snowflake
 * [GitHub Action](titan-core-github-action.md) - For git-based workflows, including dbt.
 
-[Vignettes](sections/vignettes.md): In-depth tutorials and best practices.
