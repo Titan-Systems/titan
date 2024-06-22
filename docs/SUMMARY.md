@@ -1,6 +1,9 @@
 # Table of contents
 
 * [Overview](README.md)
+* [Getting Started](getting-started.md)
+* [Blueprint](blueprint.md)
+* [GitHub Action](titan-core-github-action.md)
 
 ## Resources
 
