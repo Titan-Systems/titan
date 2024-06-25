@@ -55,6 +55,7 @@ jobs:
           make install-dev
       - name: Build and upload to PyPI
         run: |
+          source ./.venv/bin/activate
           make submit
         env:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
