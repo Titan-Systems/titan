@@ -32,3 +32,9 @@ docs:
 
 coverage: clean
 	python tools/check_resource_coverage.py
+
+package: clean
+	python -m build
+
+submit: package
+	python -m twine upload dist/*

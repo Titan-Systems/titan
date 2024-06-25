@@ -1,4 +1,4 @@
-name: Test and Lint Python Package
+name: Run Tests
 
 on:
   push:
