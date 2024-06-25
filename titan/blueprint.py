@@ -35,8 +35,10 @@ SYNC_MODE_BLOCKLIST = [
     ResourceType.TABLE,
 ]
 
+
 class MissingResourceException(Exception):
     pass
+
 
 class MarkedForReplacementException(Exception):
     pass
@@ -66,9 +68,11 @@ class ResourceChange:
             "delta": self.delta,
         }
 
+
 Manifest = dict[URN, dict]
 State = dict[URN, dict]
 Plan = list[ResourceChange]
+
 
 def dump_plan(plan: Plan, format: str = "json"):
     if format == "json":
@@ -110,7 +114,7 @@ def dump_plan(plan: Plan, format: str = "json"):
             if isinstance(value, str):
                 return f'"{value}"'
             return str(value)
-        
+
         # green_start = "\033[36m"
         # color_end = "\033[0m"
 
@@ -149,6 +153,7 @@ def dump_plan(plan: Plan, format: str = "json"):
         return output
     else:
         raise Exception(f"Unsupported format {format}")
+
 
 def print_plan(plan: Plan):
     print(dump_plan(plan, format="text"))
@@ -217,7 +222,6 @@ def _raise_if_plan_would_drop_session_user(session_ctx: dict, plan: Plan):
                 raise Exception("Plan would drop the current session user, which is not allowed")
 
 
-
 class Blueprint:
 
     def __init__(
@@ -233,9 +237,9 @@ class Blueprint:
         # allow_role_switching: bool = True,
         # ignore_ownership: bool = True,
         # valid_resource_types: List[ResourceType] = None,
-        **kwargs
+        **kwargs,
     ) -> None:
-        
+
         account = kwargs.pop("account", None)
         database = kwargs.pop("database", None)
         schema = kwargs.pop("schema", None)
@@ -257,7 +261,6 @@ class Blueprint:
             logger.warning("valid_resource_types is deprecated")
             allowlist = valid_resource_types
 
-        
         self._finalized = False
         self._staged: list[Resource] = []
         self._root: Account = None
@@ -311,7 +314,9 @@ class Blueprint:
         if self._run_mode == RunMode.SYNC:
             for change in plan:
                 if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
-                    exceptions.append(f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})")
+                    exceptions.append(
+                        f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})"
+                    )
 
         # Valid Resource Types exceptions
         if self._allowlist:
@@ -374,7 +379,7 @@ class Blueprint:
         # for change in changes:
         #     if change.action == Action.ADD and change.after.get("owner") in SYSTEM_ROLES:
         #         changes.append(ResourceChange(action=Action.ADD, urn=change.urn, before={}, after=after, delta=after))
-        
+
         # Generate a list of all URNs
         resource_set = set(urns + list(remote_state.keys()))
         for ref in refs:
@@ -387,7 +392,7 @@ class Blueprint:
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
         state: State = {}
 
-        manifest_urns : set[URN] = set(manifest["_urns"].copy())
+        manifest_urns: set[URN] = set(manifest["_urns"].copy())
 
         def _normalize(urn: URN, data: dict) -> dict:
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
@@ -399,20 +404,20 @@ class Blueprint:
             else:
                 normalized = resource_cls.defaults() | data
             return normalized
-        
+
         if self._run_mode == RunMode.SYNC:
             raise Exception("Sync mode is not supported yet")
 
         if self._run_mode == RunMode.SYNC_ALL:
             """
-            In sync-all mode, the remote state is not just the resources that were added to the blueprint, 
+            In sync-all mode, the remote state is not just the resources that were added to the blueprint,
             but all resources that exist in Snowflake. This is limited by a few things:
             - allowlist limits the scope of what resources types are allowed in a blueprint
             - if database or schema is set, the blueprint only looks at that database or schema
             """
             if len(self._allowlist) == 0:
                 raise Exception("Sync All mode must specify an allowlist")
-            
+
             for resource_type in self._allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     urn = URN(resource_type=resource_type, fqn=fqn, account_locator=self._account_locator)
@@ -435,15 +440,16 @@ class Blueprint:
         for parent, reference in manifest["_refs"]:
             if reference in manifest:
                 continue
-            
-            
+
             try:
                 data = data_provider.fetch_resource(session, reference)
             except Exception as e:
                 data = None
             if data is None:
                 logger.error(manifest)
-                raise MissingResourceException(f"Resource {reference} required by {parent} not found or failed to fetch")
+                raise MissingResourceException(
+                    f"Resource {reference} required by {parent} not found or failed to fetch"
+                )
 
         return state
 
@@ -506,10 +512,10 @@ class Blueprint:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
                 schema_pointer = resource.container
-                
+
                 # We have a schema-scoped resource (eg a view) that has a resource pointer for the schema. The job is to connect
                 # that resource into the tree
-                # 
+                #
                 # If the schema pointer has no database, assume it lives in the only database we have
                 if schema_pointer.container is None:
                     if len(databases) == 1:
@@ -533,7 +539,7 @@ class Blueprint:
             for ref in resource.refs:
                 if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
                     resource.container.add(ref)
-                
+
         for database in databases:
             merge_schemas = []
             public_schema = None
@@ -547,7 +553,7 @@ class Blueprint:
                         information_schema = schema
                 elif schema.name in ("PUBLIC", "INFORMATION_SCHEMA"):
                     merge_schemas.append(schema)
-            
+
             for schema in merge_schemas:
                 database.remove(schema)
                 schema_items = schema.items()
@@ -655,7 +661,7 @@ class Blueprint:
         session_ctx = data_provider.fetch_session(session)
 
         _raise_if_plan_would_drop_session_user(session_ctx, plan)
-    
+
         # required_privs = _collect_required_privs(session_ctx, plan)
         # available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
         # _raise_if_missing_privs(required_privs, available_privs)
@@ -679,7 +685,7 @@ class Blueprint:
                 else:
                     raise err
         return actions_taken
-    
+
     def _compile_plan_to_sql(self, session_ctx, plan: Plan):
         action_queue = []
         default_role = session_ctx["role"]
@@ -705,7 +711,7 @@ class Blueprint:
             For those reasons, we generally don't have to worry about the current role as long as we have activated secondary roles.
             The exception is when creating new resources
             """
-            
+
             before_action = []
             action = None
             after_action = []
@@ -718,13 +724,15 @@ class Blueprint:
                         before_action.append(f"USE ROLE {change.after['owner']}")
                     else:
                         before_action.append(f"USE ROLE {default_role}")
-                        after_action.append(f"GRANT OWNERSHIP ON {change.urn.resource_type} {change.urn.fqn} TO {change.after['owner']}")
+                        after_action.append(
+                            f"GRANT OWNERSHIP ON {change.urn.resource_type} {change.urn.fqn} TO {change.after['owner']}"
+                        )
                 elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
                     # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
                     before_action.append(f"USE ROLE SECURITYADMIN")
                 else:
                     before_action.append(f"USE ROLE {default_role}")
-                
+
                 action = lifecycle.create_resource(change.urn, change.after, props)
             elif change.action == Action.CHANGE:
                 action = lifecycle.update_resource(change.urn, change.delta)
@@ -740,7 +748,7 @@ class Blueprint:
             _queue_change(change)
         return action_queue
 
-    def destroy(self, session, manifest: Manifest=None):
+    def destroy(self, session, manifest: Manifest = None):
         session_ctx = data_provider.fetch_session(session)
         manifest = manifest or self.generate_manifest(session_ctx)
         for urn, data in manifest.items():
