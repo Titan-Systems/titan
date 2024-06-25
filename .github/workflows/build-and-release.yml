@@ -35,20 +35,8 @@ jobs:
         login: titan-systems-bot
         token: "${{ secrets.BOT_TOKEN }}"
 
-  create-tag:
-    needs: bump-version
-    runs-on: ubuntu-20.04
-    steps:
-      - name: actions/checkout
-        uses: actions/checkout@v4
-      - name: Create Tag
-        run: |
-          new_version=$(grep '# version' version.md | cut -d ' ' -f3)
-          git tag v$new_version
-          git push origin v$new_version
-
   build-and-upload:
-    needs: create-tag
+    needs: bump-version
     runs-on: ubuntu-20.04
     steps:
       - name: actions/checkout
