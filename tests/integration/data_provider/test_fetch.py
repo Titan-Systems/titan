@@ -187,10 +187,38 @@ def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
     assert result is not None
     _assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
 
+    external_stage = res.ExternalStage(
+        name="EXTERNAL_STAGE_EXAMPLE_WITH_DIRECTORY",
+        url="s3://titan-snowflake/",
+        owner=TEST_ROLE,
+        database=test_db,
+        schema="PUBLIC",
+        directory={"enable": True},
+    )
+    cursor.execute(external_stage.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(external_stage)
+
+    result = safe_fetch(cursor, external_stage.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
+
 
 def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
     internal_stage = res.InternalStage(
         name="INTERNAL_STAGE_EXAMPLE",
+        owner=TEST_ROLE,
+        database=test_db,
+        schema="PUBLIC",
+    )
+    cursor.execute(internal_stage.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(internal_stage)
+
+    result = safe_fetch(cursor, internal_stage.urn)
+    assert result is not None
+    _assert_resource_dicts_eq_ignore_nulls(result, internal_stage.to_dict())
+
+    internal_stage = res.InternalStage(
+        name="INTERNAL_STAGE_EXAMPLE_WITH_DIRECTORY",
         directory={"enable": True},
         owner=TEST_ROLE,
         database=test_db,

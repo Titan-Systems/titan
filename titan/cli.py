@@ -22,7 +22,7 @@ def load_plan(plan_file):
 
 @click.group()
 def titan_cli():
-    """titan[core] helps you manage your Snowflake environment."""
+    """titan core helps you manage your Snowflake environment."""
     pass
 
 

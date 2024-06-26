@@ -122,7 +122,7 @@ def dump_plan(plan: Plan, format: str = "json"):
         change_count = len([change for change in plan if change.action == Action.CHANGE])
         remove_count = len([change for change in plan if change.action == Action.REMOVE])
 
-        output += "\n» titan[core]\n"
+        output += "\n» titan core\n"
         output += f"» Plan: {add_count} to add, {change_count} to change, {remove_count} to destroy.\n\n"
 
         for change in plan:
@@ -271,7 +271,7 @@ class Blueprint:
         self._allowlist: list[ResourceType] = [ResourceType(v) for v in allowlist or []]
 
         if self._run_mode == RunMode.SYNC_ALL:
-            raise Exception("Sync All mode is not supported yet")
+            logger.warning("Sync All mode is dangerous, please use with caution")
 
         if ResourceType.USER in self._allowlist and self._run_mode != RunMode.CREATE_OR_UPDATE:
             raise Exception("User resource type is not allowed in this version of Titan")

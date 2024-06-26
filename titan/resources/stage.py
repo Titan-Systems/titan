@@ -74,23 +74,55 @@ class _InternalStage(ResourceSpec):
                 raise ValueError("When specifying encryption, 'type' is required")
             if self.encryption["type"] not in [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE]:
                 raise ValueError("Encryption 'type' must be SNOWFLAKE_FULL or SNOWFLAKE_SSE for InternalStage")
+        if self.directory is None:
+            self.directory = {"enable": False}
 
 
 class InternalStage(ResourceNameTrait, Resource):
     """
-    -- Internal stage
-    CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <internal_stage_name>
-        internalStageParams
-        directoryTableParams
-        [ COMMENT = '<string_literal>' ]
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+    Description:
+        Represents an internal stage in Snowflake, which is a named location used to store data files
+        that will be loaded into or unloaded from Snowflake tables.
 
-    internalStageParams ::=
-      [ ENCRYPTION = (TYPE = 'SNOWFLAKE_FULL' | TYPE = 'SNOWFLAKE_SSE') ]
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-stage.html
 
-    directoryTableParams (for internal stages) ::=
-      [ DIRECTORY = ( ENABLE = { TRUE | FALSE }
-                      [ REFRESH_ON_CREATE =  { TRUE | FALSE } ] ) ]
+    Fields:
+        name (string, required): The name of the internal stage.
+        owner (string or Role): The owner role of the internal stage. Defaults to "SYSADMIN".
+        encryption (dict): A dictionary specifying encryption settings.
+        directory (dict): A dictionary specifying directory usage settings.
+        tags (dict): A dictionary of tags associated with the internal stage.
+        comment (string): A comment for the internal stage.
+
+    Python:
+
+        ```python
+        internal_stage = InternalStage(
+            name="some_internal_stage",
+            owner="SYSADMIN",
+            encryption={"type": "SNOWFLAKE_SSE"},
+            directory={"enable": True},
+            tags={"department": "finance"},
+            comment="Data loading stage"
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        stages:
+          - name: some_internal_stage
+            type: internal
+            owner: SYSADMIN
+            encryption:
+              type: SNOWFLAKE_SSE
+            directory:
+              enable: true
+            tags:
+              department: finance
+            comment: Data loading stage
+        ```
     """
 
     resource_type = ResourceType.STAGE
@@ -100,7 +132,11 @@ class InternalStage(ResourceNameTrait, Resource):
             Props(type=EnumProp("type", [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE], quoted=True)),
         ),
         directory=PropSet(
-            "directory", Props(enable=BoolProp("ENABLE"), refresh_on_create=BoolProp("REFRESH_ON_CREATE"))
+            "directory",
+            Props(
+                enable=BoolProp("ENABLE"),
+                refresh_on_create=BoolProp("REFRESH_ON_CREATE"),
+            ),
         ),
         comment=StringProp("comment"),
         tags=TagsProp(),
@@ -152,57 +188,50 @@ class _ExternalStage(ResourceSpec):
             raise ValueError(
                 f"Invalid encryption type: {self.encryption.get('type')}. Must be one of {valid_encryption_types}."
             )
+        if self.directory is None:
+            self.directory = {"enable": False}
 
 
 class ExternalStage(ResourceNameTrait, Resource):
     """
-    -- External stage
-    CREATE [ OR REPLACE ] [ { TEMP | TEMPORARY } ] STAGE [ IF NOT EXISTS ] <external_stage_name>
-        externalStageParams
-        directoryTableParams
-        [ COMMENT = '<string_literal>' ]
-        [ [ WITH ] TAG ( <tag_name> = '<tag_value>' [ , <tag_name> = '<tag_value>' , ... ] ) ]
+    Description:
+        Manages external stages in Snowflake, which are used to reference external storage locations.
 
-    externalStageParams (for Amazon S3) ::=
-        URL = { 's3://<bucket>[/<path>/]' | 's3gov://<bucket>[/<path>/]' }
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-stage
 
-        [ { STORAGE_INTEGRATION = <integration_name> } | { CREDENTIALS = ( {  { AWS_KEY_ID = '<string>' AWS_SECRET_KEY = '<string>' [ AWS_TOKEN = '<string>' ] } | AWS_ROLE = '<string>'  } ) } ]
-        [ ENCRYPTION = ( [ TYPE = 'AWS_CSE' ] [ MASTER_KEY = '<string>' ] |
-                        [ TYPE = 'AWS_SSE_S3' ] |
-                        [ TYPE = 'AWS_SSE_KMS' [ KMS_KEY_ID = '<string>' ] ] |
-                        [ TYPE = 'NONE' ] ) ]
+    Fields:
+        name (string, required): The name of the external stage.
+        url (string, required): The URL pointing to the external storage location.
+        owner (string or Role): The owner role of the external stage. Defaults to "SYSADMIN".
+        storage_integration (string): The name of the storage integration used with this stage.
+        credentials (dict): The credentials for accessing the external storage, if required.
+        encryption (dict): The encryption settings used for data stored in the external location.
+        directory (dict): Settings related to directory handling in the external storage.
+        tags (dict): Tags associated with the external stage.
+        comment (string): A comment about the external stage.
 
-    externalStageParams (for Google Cloud Storage) ::=
-        URL = 'gcs://<bucket>[/<path>/]'
-        [ STORAGE_INTEGRATION = <integration_name> ]
-        [ ENCRYPTION = ( [ TYPE = 'GCS_SSE_KMS' ] [ KMS_KEY_ID = '<string>' ] | [ TYPE = 'NONE' ] ) ]
+    Python:
 
-    externalStageParams (for Microsoft Azure) ::=
-        URL = 'azure://<account>.blob.core.windows.net/<container>[/<path>/]'
-        [ { STORAGE_INTEGRATION = <integration_name> } | { CREDENTIALS = ( [ AZURE_SAS_TOKEN = '<string>' ] ) } ]
-        [ ENCRYPTION = ( [ TYPE = 'AZURE_CSE' ] [ MASTER_KEY = '<string>' ] | [ TYPE = 'NONE' ] ) ]
+        ```python
+        external_stage = ExternalStage(
+            name="some_external_stage",
+            url="https://example.com/storage",
+            owner="SYSADMIN",
+            storage_integration="some_integration"
+        )
+        ```
 
-    externalStageParams (for Amazon S3-compatible Storage) ::=
-        URL = 's3compat://{bucket}[/{path}/]'
-        ENDPOINT = '<s3_api_compatible_endpoint>'
-        [ { CREDENTIALS = ( AWS_KEY_ID = '<string>' AWS_SECRET_KEY = '<string>' ) } ]
+    Yaml:
 
-    directoryTableParams (for Amazon S3) ::=
-        [ DIRECTORY = ( ENABLE = { TRUE | FALSE }
-                        [ REFRESH_ON_CREATE =  { TRUE | FALSE } ]
-                        [ AUTO_REFRESH = { TRUE | FALSE } ] ) ]
-
-    directoryTableParams (for Google Cloud Storage) ::=
-        [ DIRECTORY = ( ENABLE = { TRUE | FALSE }
-                        [ AUTO_REFRESH = { TRUE | FALSE } ]
-                        [ REFRESH_ON_CREATE =  { TRUE | FALSE } ]
-                        [ NOTIFICATION_INTEGRATION = '<notification_integration_name>' ] ) ]
-
-    directoryTableParams (for Microsoft Azure) ::=
-        [ DIRECTORY = ( ENABLE = { TRUE | FALSE }
-                        [ REFRESH_ON_CREATE =  { TRUE | FALSE } ]
-                        [ AUTO_REFRESH = { TRUE | FALSE } ]
-                        [ NOTIFICATION_INTEGRATION = '<notification_integration_name>' ] ) ]
+        ```yaml
+        stages:
+          - name: some_external_stage
+            type: external
+            url: https://example.com/storage
+            owner: SYSADMIN
+            storage_integration: some_integration
+        ```
     """
 
     resource_type = ResourceType.STAGE
