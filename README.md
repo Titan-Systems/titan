@@ -98,7 +98,7 @@ bp = Blueprint(resources=[
 plan = bp.plan(session)
 print_plan(plan) # =>
 """
-» titan[core]
+» titan core
 » Plan: 4 to add, 0 to change, 0 to destroy.
 
 + urn::ABCD123:warehouse/transforming {
@@ -165,7 +165,7 @@ python -m titan --help
 
 # Usage: python -m titan [OPTIONS] COMMAND [ARGS]...
 # 
-#   titan[core] helps you manage your Snowflake environment.
+#   titan core helps you manage your Snowflake environment.
 # 
 # Options:
 #   --help  Show this message and exit.

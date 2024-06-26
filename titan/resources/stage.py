@@ -74,6 +74,8 @@ class _InternalStage(ResourceSpec):
                 raise ValueError("When specifying encryption, 'type' is required")
             if self.encryption["type"] not in [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE]:
                 raise ValueError("Encryption 'type' must be SNOWFLAKE_FULL or SNOWFLAKE_SSE for InternalStage")
+        if self.directory is None:
+            self.directory = {"enable": False}
 
 
 class InternalStage(ResourceNameTrait, Resource):
@@ -100,7 +102,11 @@ class InternalStage(ResourceNameTrait, Resource):
             Props(type=EnumProp("type", [EncryptionType.SNOWFLAKE_FULL, EncryptionType.SNOWFLAKE_SSE], quoted=True)),
         ),
         directory=PropSet(
-            "directory", Props(enable=BoolProp("ENABLE"), refresh_on_create=BoolProp("REFRESH_ON_CREATE"))
+            "directory",
+            Props(
+                enable=BoolProp("ENABLE"),
+                refresh_on_create=BoolProp("REFRESH_ON_CREATE"),
+            ),
         ),
         comment=StringProp("comment"),
         tags=TagsProp(),
@@ -152,6 +158,8 @@ class _ExternalStage(ResourceSpec):
             raise ValueError(
                 f"Invalid encryption type: {self.encryption.get('type')}. Must be one of {valid_encryption_types}."
             )
+        if self.directory is None:
+            self.directory = {"enable": False}
 
 
 class ExternalStage(ResourceNameTrait, Resource):
