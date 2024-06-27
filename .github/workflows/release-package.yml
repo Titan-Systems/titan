@@ -1,0 +1,36 @@
+name: Build and release package to PyPi
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      PYPI_USERNAME:
+        required: true
+      PYPI_PASSWORD:
+        required: true
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: actions/checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Create a virtual environment
+        run: |
+          python -m venv .venv
+      - name: Install dependencies
+        run: |
+          source ./.venv/bin/activate
+          python -m pip install --upgrade pip
+          make install-dev
+      - name: Build and upload to PyPI
+        run: |
+          source ./.venv/bin/activate
+          make submit
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
