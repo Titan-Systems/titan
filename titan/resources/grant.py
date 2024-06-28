@@ -3,16 +3,16 @@ from typing import Any, Union
 
 from inflection import singularize
 
+from ..enums import ParseableEnum, ResourceType
+from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
+from ..parse import _parse_grant, format_collection_string
+from ..privs import GLOBAL_PRIV_DEFAULT_OWNERS, GlobalPriv, _all_privs_for_resource_type
+from ..props import FlagProp, IdentifierProp, Props
+from ..resource_name import ResourceName
+from ..scope import AccountScope
 from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
-from ..enums import ParseableEnum, ResourceType
-from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
-from ..parse import _parse_grant
-from ..privs import GlobalPriv, GLOBAL_PRIV_DEFAULT_OWNERS, _all_privs_for_resource_type
-from ..props import Props, FlagProp, IdentifierProp
-from ..resource_name import ResourceName
-from ..scope import AccountScope
 
 # TODO: Should Grant objects verify grant types in advance?
 
@@ -304,7 +304,7 @@ class FutureGrant(Resource):
                         granted_in_ref = arg
                     else:
                         on_stmt, in_stmt = keyword.split("_in_")
-                        on_type = ResourceType(singularize(on_stmt[10:]))
+                        on_type = resource_type_for_label(singularize(on_stmt[10:]))
                         in_type = ResourceType(in_stmt)
                         in_name = arg
                         granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
@@ -356,11 +356,12 @@ def future_grant_fqn(data: _FutureGrant):
     in_type = resource_label_for_type(data.in_type)
     in_name = data.in_name
     on_type = resource_label_for_type(data.on_type).upper()
+    collection = format_collection_string({"in_name": in_name, "in_type": in_type, "on_type": on_type})
     return FQN(
         name=data.to.name,
         params={
             "priv": data.priv,
-            "on": f"{in_type}/{in_name}.<{on_type}>",
+            "on": f"{in_type}/{collection}",
         },
     )
 

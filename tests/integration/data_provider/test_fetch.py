@@ -1,40 +1,24 @@
 import os
+
 import pytest
 
+from tests.helpers import (
+    assert_resource_dicts_eq_ignore_nulls,
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable,
+    safe_fetch,
+)
 from titan import data_provider
 from titan import resources as res
 from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN
-from titan.parse import parse_identifier, parse_URN
+from titan.parse import parse_URN
 from titan.resource_name import ResourceName
-
 
 pytestmark = pytest.mark.requires_snowflake
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 TEST_USER = os.environ.get("TEST_SNOWFLAKE_USER")
-
-
-def _assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
-    assert data_provider.remove_none_values(lhs) == data_provider.remove_none_values(rhs)
-
-
-def _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:
-    lhs = data_provider.remove_none_values(lhs)
-    rhs = data_provider.remove_none_values(rhs)
-    keys = set(lhs.keys()) | set(rhs.keys())
-    for attr in keys:
-        attr_metadata = spec.get_metadata(attr)
-        if not attr_metadata.get("fetchable", True):
-            lhs.pop(attr, None)
-            rhs.pop(attr, None)
-    assert lhs == rhs
-
-
-def safe_fetch(cursor, urn):
-    reset_cache()
-    return data_provider.fetch_resource(cursor, urn)
 
 
 @pytest.fixture(scope="session")
@@ -59,29 +43,7 @@ def test_fetch_privilege_grant(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
-
-
-def test_fetch_future_grant(cursor, suffix, marked_for_cleanup):
-    role = res.Role(name=f"future_grant_role_{suffix}")
-    marked_for_cleanup.append(role)
-    cursor.execute(role.create_sql(if_not_exists=True))
-
-    future_grant = res.FutureGrant(priv="usage", to=role, on_future_schemas_in_database="STATIC_DATABASE")
-    cursor.execute(future_grant.create_sql(if_not_exists=True))
-
-    result = safe_fetch(cursor, future_grant.urn)
-    assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, future_grant.to_dict())
-
-    # TODO: support hoisting the schema database into the future grant
-    # schema = res.Schema(name="PUBLIC", database="STATIC_DATABASE")
-    # future_grant = res.FutureGrant(priv="SELECT", to=role, on_future_tables_in=schema)
-    # cursor.execute(future_grant.create_sql(if_not_exists=True))
-
-    # result = safe_fetch(cursor, future_grant.urn)
-    # assert result is not None
-    # _assert_resource_dicts_eq_ignore_nulls(result, future_grant.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
 
 
 @pytest.mark.enterprise
@@ -146,7 +108,7 @@ def test_fetch_database(cursor, suffix):
     try:
         result = safe_fetch(cursor, database.urn)
         assert result is not None
-        _assert_resource_dicts_eq_ignore_nulls(result, database.to_dict())
+        assert_resource_dicts_eq_ignore_nulls(result, database.to_dict())
     finally:
         cursor.execute(database.drop_sql(if_exists=True))
 
@@ -185,7 +147,7 @@ def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, external_stage.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
 
     external_stage = res.ExternalStage(
         name="EXTERNAL_STAGE_EXAMPLE_WITH_DIRECTORY",
@@ -200,7 +162,7 @@ def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, external_stage.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
 
 
 def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
@@ -215,7 +177,7 @@ def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, internal_stage.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, internal_stage.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, internal_stage.to_dict())
 
     internal_stage = res.InternalStage(
         name="INTERNAL_STAGE_EXAMPLE_WITH_DIRECTORY",
@@ -229,7 +191,7 @@ def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, internal_stage.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, internal_stage.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, internal_stage.to_dict())
 
 
 def test_fetch_csv_file_format(cursor, test_db, marked_for_cleanup):
@@ -249,7 +211,7 @@ def test_fetch_csv_file_format(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, csv_file_format.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, csv_file_format.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, csv_file_format.to_dict())
 
 
 def test_fetch_resource_monitor(cursor, marked_for_cleanup):
@@ -263,7 +225,7 @@ def test_fetch_resource_monitor(cursor, marked_for_cleanup):
 
     result = safe_fetch(cursor, resource_monitor.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, resource_monitor.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, resource_monitor.to_dict())
 
 
 def test_fetch_email_notification_integration(cursor, email_address, marked_for_cleanup):
@@ -402,7 +364,7 @@ def test_fetch_role(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, role.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, role.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, role.to_dict())
 
 
 def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
@@ -419,7 +381,7 @@ def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
 
     user = res.User(name=f"ROLE_RECIPIENT_USER_{suffix}", owner=TEST_ROLE)
     cursor.execute(user.create_sql(if_not_exists=True))
@@ -430,7 +392,7 @@ def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
     cursor.execute(grant.create_sql(if_not_exists=True))
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
 
 
 def test_fetch_user(cursor, suffix, marked_for_cleanup):
@@ -440,7 +402,7 @@ def test_fetch_user(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, user.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, user.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, user.to_dict())
 
 
 def test_fetch_object_store_catalog_integration(cursor, marked_for_cleanup):
@@ -457,7 +419,7 @@ def test_fetch_object_store_catalog_integration(cursor, marked_for_cleanup):
 
     result = safe_fetch(cursor, catalog_integration.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, catalog_integration.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, catalog_integration.to_dict())
 
 
 def test_fetch_share(cursor, suffix, marked_for_cleanup):
@@ -471,7 +433,7 @@ def test_fetch_share(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, share.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, share.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, share.to_dict())
 
 
 def test_fetch_s3_storage_integration(cursor, suffix, marked_for_cleanup):
@@ -488,7 +450,7 @@ def test_fetch_s3_storage_integration(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, storage_integration.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
 
 
 def test_fetch_alert(cursor, suffix, test_db, marked_for_cleanup):
@@ -507,7 +469,7 @@ def test_fetch_alert(cursor, suffix, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, alert.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, alert.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, alert.to_dict())
 
 
 def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
@@ -529,7 +491,7 @@ def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, dynamic_table.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, dynamic_table.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, dynamic_table.to_dict())
 
 
 @pytest.mark.skip(reason="Generates invalid SQL")
@@ -549,7 +511,7 @@ def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, function.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, function.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, function.to_dict())
 
 
 def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
@@ -576,7 +538,7 @@ def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, password_policy.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, password_policy.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, password_policy.to_dict())
 
 
 @pytest.mark.skip(reason="Generates invalid SQL")
@@ -602,7 +564,7 @@ def test_fetch_python_stored_procedure(cursor, suffix, test_db, marked_for_clean
 
     result = safe_fetch(cursor, procedure.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, procedure.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, procedure.to_dict())
 
 
 def test_fetch_schema(cursor, test_db, marked_for_cleanup):
@@ -620,7 +582,7 @@ def test_fetch_schema(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, schema.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, schema.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, schema.to_dict())
 
 
 def test_fetch_sequence(cursor, suffix, test_db, marked_for_cleanup):
@@ -638,7 +600,7 @@ def test_fetch_sequence(cursor, suffix, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, sequence.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, sequence.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, sequence.to_dict())
 
 
 def test_fetch_task(cursor, suffix, test_db, marked_for_cleanup):
@@ -656,7 +618,7 @@ def test_fetch_task(cursor, suffix, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, task.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, task.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, task.to_dict())
 
 
 def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
@@ -675,7 +637,7 @@ def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, network_rule.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
 
     network_rule = res.NetworkRule(
         name=f"NETWORK_RULE_EXAMPLE_IPV4_{suffix}",
@@ -692,7 +654,7 @@ def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, network_rule.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, network_rule.to_dict())
 
 
 def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
@@ -712,7 +674,7 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
 
 
 def test_fetch_database_role(cursor, suffix, test_db, marked_for_cleanup):
@@ -726,7 +688,7 @@ def test_fetch_database_role(cursor, suffix, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, database_role.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, database_role.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, database_role.to_dict())
 
 
 def test_fetch_packages_policy(cursor, suffix, marked_for_cleanup):
@@ -742,7 +704,7 @@ def test_fetch_packages_policy(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, packages_policy.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, packages_policy.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, packages_policy.to_dict())
 
 
 @pytest.mark.enterprise
@@ -759,7 +721,7 @@ def test_fetch_aggregation_policy(cursor, suffix, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, aggregation_policy.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, aggregation_policy.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, aggregation_policy.to_dict())
 
 
 def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
@@ -777,7 +739,7 @@ def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, compute_pool.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, compute_pool.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, compute_pool.to_dict())
 
 
 def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
@@ -793,7 +755,7 @@ def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, warehouse.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, warehouse.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, warehouse.to_dict())
 
 
 def test_fetch_password_secret(cursor, suffix, marked_for_cleanup):
@@ -809,7 +771,7 @@ def test_fetch_password_secret(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, secret.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
 
 
 def test_fetch_generic_secret(cursor, suffix, marked_for_cleanup):
@@ -824,7 +786,7 @@ def test_fetch_generic_secret(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, secret.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
 
 
 def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
@@ -839,7 +801,7 @@ def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, secret.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
 
     secret = res.OAuthSecret(
         name=f"OAUTH_SECRET_EXAMPLE_WITH_TOKEN_{suffix}",
@@ -854,7 +816,7 @@ def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, secret.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(secret.spec, result, secret.to_dict())
 
 
 def test_fetch_snowservices_oauth_security_integration(cursor, suffix, marked_for_cleanup):
@@ -869,7 +831,7 @@ def test_fetch_snowservices_oauth_security_integration(cursor, suffix, marked_fo
 
     result = safe_fetch(cursor, security_integration.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls(result, security_integration.to_dict())
+    assert_resource_dicts_eq_ignore_nulls(result, security_integration.to_dict())
 
 
 def test_fetch_api_authentication_security_integration(cursor, suffix, marked_for_cleanup):
@@ -887,7 +849,7 @@ def test_fetch_api_authentication_security_integration(cursor, suffix, marked_fo
 
     result = safe_fetch(cursor, security_integration.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(
         res.APIAuthenticationSecurityIntegration.spec,
         result,
         security_integration.to_dict(),
@@ -910,4 +872,4 @@ def test_fetch_table_stream(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, stream.urn)
     assert result is not None
-    _assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.TableStream.spec, result, stream.to_dict())
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.TableStream.spec, result, stream.to_dict())

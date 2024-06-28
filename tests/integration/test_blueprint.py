@@ -2,13 +2,12 @@ import os
 
 import pytest
 
+from tests.helpers import get_json_fixtures
 from titan import data_provider
 from titan import resources as res
-from titan.enums import ResourceType
 from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
-
-from tests.helpers import get_json_fixtures
+from titan.enums import ResourceType
 
 JSON_FIXTURES = list(get_json_fixtures())
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
@@ -251,15 +250,15 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
 def test_blueprint_quoted_references(cursor):
     session = cursor.connection
 
-    cursor.execute(f'CREATE USER IF NOT EXISTS "info@applytitan.com"')
-    cursor.execute(f'GRANT ROLE STATIC_ROLE TO USER "info@applytitan.com"')
+    cursor.execute('CREATE USER IF NOT EXISTS "info@applytitan.com"')
+    cursor.execute('GRANT ROLE STATIC_ROLE TO USER "info@applytitan.com"')
 
     blueprint = Blueprint(
         name="test_quoted_references",
         resources=[res.RoleGrant(role="STATIC_ROLE", to_user="info@applytitan.com")],
     )
     plan = blueprint.plan(session)
-    cursor.execute(f'DROP USER IF EXISTS "info@applytitan.com"')
+    cursor.execute('DROP USER IF EXISTS "info@applytitan.com"')
 
     assert len(plan) == 0
 
@@ -284,3 +283,12 @@ def test_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cleanup):
     bp.apply(session, plan)
     plan = bp.plan(session)
     assert len(plan) == 0
+
+
+def test_blueprint_with_nested_database(cursor):
+    session = cursor.connection
+    bp = Blueprint(name="failing-reference")
+    schema = res.Schema(name="static_database.public")
+    bp.add(res.FutureGrant(priv="SELECT", on_future_views_in=schema, to="STATIC_ROLE"))
+    plan = bp.plan(session)
+    assert len(plan) == 1

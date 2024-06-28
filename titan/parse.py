@@ -1,12 +1,11 @@
 import re
-
-from typing import List, Dict, Callable, Union
+from typing import Callable, Dict, Union
 
 import pyparsing as pp
 
 from .enums import ResourceType, Scope
 from .identifiers import FQN, URN, resource_type_for_label
-from .parse_primitives import Identifier, FullyQualifiedIdentifier
+from .parse_primitives import FullyQualifiedIdentifier, Identifier
 from .scope import DatabaseScope, SchemaScope
 
 Keyword = pp.CaselessKeyword
@@ -689,9 +688,23 @@ def _parse_copy_into(sql: str):
         raise Exception(f"Failed to parse COPY INTO statement: {err}")
 
 
-def parse_future_grant_on(on_str: str):
-    # f"{in_type}/{in_name}.<{on_type}>",
-    in_type, in_name = on_str.split("/")
-    in_name, on_type = in_name.split(".")
-    on_type = on_type.strip("<>")
-    return (in_type, in_name, on_type)
+def parse_collection_string(collection: str):
+    parts = collection.split(".")
+    if len(parts) == 2 and parts[1].startswith("<") and parts[1].endswith(">"):
+        return {
+            "in_name": parts[0],
+            "in_type": "database",
+            "on_type": parts[1].strip("<>"),
+        }
+    elif len(parts) == 3 and parts[2].startswith("<") and parts[2].endswith(">"):
+        return {
+            "in_name": f"{parts[0]}.{parts[1]}",
+            "in_type": "schema",
+            "on_type": parts[2].strip("<>"),
+        }
+    else:
+        raise ValueError("Invalid collection string format")
+
+
+def format_collection_string(collection: dict):
+    return f"{collection['in_name']}.<{collection['on_type']}>"

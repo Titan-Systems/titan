@@ -1,35 +1,33 @@
 import datetime
 import json
-import pytz
 import sys
-
 from collections import defaultdict
 from functools import cache
 from typing import Optional
 
+import pytz
 from inflection import pluralize
-
 from snowflake.connector.errors import ProgrammingError
 
 from .builtins import (
     SYSTEM_DATABASES,
     SYSTEM_ROLES,
-    SYSTEM_USERS,
     SYSTEM_SCHEMAS,
     SYSTEM_SECURITY_INTEGRATIONS,
+    SYSTEM_USERS,
 )
-from .client import execute, OBJECT_DOES_NOT_EXIST_ERR, DOES_NOT_EXIST_ERR, UNSUPPORTED_FEATURE
+from .client import DOES_NOT_EXIST_ERR, OBJECT_DOES_NOT_EXIST_ERR, UNSUPPORTED_FEATURE, execute
 from .enums import ResourceType, WarehouseSize
-from .identifiers import URN, FQN, resource_type_for_label
+from .identifiers import FQN, URN, resource_type_for_label
 from .parse import (
     FullyQualifiedIdentifier,
-    _parse_dynamic_table_text,
     _parse_column,
-    parse_identifier,
+    _parse_dynamic_table_text,
+    parse_collection_string,
     parse_function_name,
+    parse_identifier,
 )
 from .resource_name import ResourceName, attribute_is_resource_name
-
 
 __this__ = sys.modules[__name__]
 
@@ -686,8 +684,8 @@ def fetch_future_grant(session, fqn: FQN):
             return None
         raise
 
-    in_type, name = fqn.params["on"].split("/")
-    in_name = name.split(".")[0]
+    _, collection_str = fqn.params["on"].split("/")
+    collection = parse_collection_string(collection_str)
 
     # If the resource we want to grant on isn't fully qualified in the FQN for the future grant, this filter step will fail.
     # For example:
@@ -699,10 +697,12 @@ def fetch_future_grant(session, fqn: FQN):
     # Whereas in SHOW FUTURE GRANTS
     # - name: 'TEST_DB_RUN_CBDBE971.PUBLIC.<TABLE>'
 
+    # 'STATIC_DATABASE.<TABLE>'
+
     grants = _filter_result(
         show_result,
         privilege=fqn.params["priv"],
-        name=name,
+        name=collection_str,
         grant_to="ROLE",
         grantee_name=fqn.name,
     )
@@ -716,9 +716,9 @@ def fetch_future_grant(session, fqn: FQN):
 
     return {
         "priv": data["privilege"],
-        "on_type": data["grant_on"],
-        "in_type": in_type.upper(),
-        "in_name": in_name,
+        "on_type": str(resource_type_for_label(data["grant_on"])),
+        "in_type": collection["in_type"].upper(),
+        "in_name": collection["in_name"],
         "to": data["grantee_name"],
         "grant_option": data["grant_option"] == "true",
     }

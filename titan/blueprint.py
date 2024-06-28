@@ -1,9 +1,8 @@
 import json
 import logging
-
 from dataclasses import dataclass
-from typing import Optional, Union
 from queue import Queue
+from typing import Optional
 
 import snowflake.connector
 
@@ -11,17 +10,17 @@ from . import data_provider, lifecycle
 from .builtins import SYSTEM_ROLES
 from .client import (
     ALREADY_EXISTS_ERR,
-    INVALID_GRANT_ERR,
     DOES_NOT_EXIST_ERR,
+    INVALID_GRANT_ERR,
     execute,
     reset_cache,
 )
-from .diff import diff, Action
-from .enums import ResourceType, ParseableEnum
-from .identifiers import URN, FQN, resource_label_for_type
+from .diff import Action, diff
+from .enums import ParseableEnum, ResourceType
+from .identifiers import FQN, URN, resource_label_for_type
+from .resource_name import ResourceName
 from .resources import Account, Database, Schema
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
-from .resource_name import ResourceName
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
@@ -46,7 +45,6 @@ class MarkedForReplacementException(Exception):
 
 class RunMode(ParseableEnum):
     CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
-    # FULLY_MANAGED = "FULLY-MANAGED"
     SYNC = "SYNC"
     SYNC_ALL = "SYNC-ALL"
 
@@ -400,7 +398,6 @@ class Blueprint:
                 normalized = data
             elif isinstance(data, list):
                 raise Exception(f"Fetching list of {urn.resource_type} is not supported yet")
-                normalized = [resource_cls.defaults() | d for d in data]
             else:
                 normalized = resource_cls.defaults() | data
             return normalized
@@ -443,7 +440,7 @@ class Blueprint:
 
             try:
                 data = data_provider.fetch_resource(session, reference)
-            except Exception as e:
+            except Exception:
                 data = None
             if data is None:
                 logger.error(manifest)
@@ -587,29 +584,11 @@ class Blueprint:
             if isinstance(resource, ResourcePointer):
                 data["_pointer"] = True
 
-            # manifest_key = str(urn)
-
-            #### Special Cases
-            if resource.resource_type == ResourceType.FUTURE_GRANT:
-                # Role up FUTURE GRANTS on the same role/target to a single entry
-                # TODO: support grant option, use a single character prefix on the priv
-                if urn not in manifest:
-                    manifest[urn] = {}
-                on_type = data["on_type"].lower()
-                if on_type not in manifest[urn]:
-                    manifest[urn][on_type] = []
-                if data["priv"] in manifest[urn][on_type]:
-                    # raise Exception(f"Duplicate resource {urn} with conflicting data")
+            if urn in manifest:
+                if data != manifest[urn]:
+                    logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {data}")
                     continue
-                manifest[urn][on_type].append(data["priv"])
-
-            #### Normal Case
-            else:
-                if urn in manifest:
-                    if data != manifest[urn]:
-                        # raise Exception(f"Duplicate resource {urn} with conflicting data")
-                        continue
-                manifest[urn] = data
+            manifest[urn] = data
 
             urns.append(urn)
 
