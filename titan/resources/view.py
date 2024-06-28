@@ -21,13 +21,13 @@ from ..props import (
 class _View(ResourceSpec):
     name: ResourceName
     owner: Role = "SYSADMIN"
-    secure: bool = None
+    secure: bool = False
     volatile: bool = None
     recursive: bool = None
     columns: list[dict] = None
     tags: dict[str, str] = None
-    change_tracking: bool = None
-    copy_grants: bool = None
+    change_tracking: bool = False
+    copy_grants: bool = field(default_factory=False, metadata={"fetchable": False})
     comment: str = None
     # TODO: remove this if parsing is feasible
     as_: str = field(default_factory=None, metadata={"fetchable": False})
@@ -101,13 +101,13 @@ class View(ResourceNameTrait, Resource):
         self,
         name: str,
         owner: str = "SYSADMIN",
-        secure: bool = None,
+        secure: bool = False,
         volatile: bool = None,
         recursive: bool = None,
         columns: list[dict] = None,
         tags: dict[str, str] = None,
-        change_tracking: bool = None,
-        copy_grants: bool = None,
+        change_tracking: bool = False,
+        copy_grants: bool = False,
         comment: str = None,
         as_: str = None,
         **kwargs,

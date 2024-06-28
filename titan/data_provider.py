@@ -271,22 +271,52 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     return ownership_grant[0]["grantee_name"]
 
 
-def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True):
+def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list[dict]:
     try:
-        if fqn.database is None and fqn.schema is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'", cacheable=cacheable)
-        elif fqn.database is None:
-            return execute(session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}", cacheable=cacheable)
-        elif fqn.schema is None:
-            return execute(
-                session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}", cacheable=cacheable
+
+        initial_fetch = execute(session, f"SHOW {type_str}", cacheable=cacheable)
+        if len(initial_fetch) == 0:
+            return []
+        elif len(initial_fetch) < 1000:
+            container_kwargs = {}
+            show_columns = initial_fetch[0].keys()
+            if "database" in show_columns:
+                container_kwargs["database"] = fqn.database
+            elif "database_name" in show_columns:
+                container_kwargs["database_name"] = fqn.database
+
+            if "schema" in show_columns:
+                container_kwargs["schema"] = fqn.schema
+            elif "schema_name" in show_columns:
+                container_kwargs["schema_name"] = fqn.schema
+            filtered_fetch = _filter_result(
+                initial_fetch,
+                name=fqn.name,
+                **container_kwargs,
+                # database=fqn.database,
+                # schema=fqn.schema,
             )
+            return filtered_fetch
         else:
-            return execute(
-                session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=cacheable
-            )
+
+            if fqn.database is None and fqn.schema is None:
+                return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'", cacheable=cacheable)
+            elif fqn.database is None:
+                return execute(
+                    session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}", cacheable=cacheable
+                )
+            elif fqn.schema is None:
+                return execute(
+                    session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}", cacheable=cacheable
+                )
+            else:
+                return execute(
+                    session,
+                    f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}",
+                    cacheable=cacheable,
+                )
     except ProgrammingError as err:
-        if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
+        if err.errno == OBJECT_DOES_NOT_EXIST_ERR or err.errno == DOES_NOT_EXIST_ERR:
             return []
         else:
             raise
@@ -805,7 +835,8 @@ def fetch_image_repository(session, fqn: FQN):
 
 
 def fetch_materialized_view(session, fqn: FQN):
-    show_result = execute(session, f"SHOW MATERIALIZED VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    # show_result = execute(session, f"SHOW MATERIALIZED VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+    show_result = _show_resources(session, "MATERIALIZED VIEWS", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -1066,7 +1097,8 @@ def fetch_schema(session, fqn: FQN):
     if fqn.database is None:
         raise Exception(f"Schema {fqn} is missing a database name")
     try:
-        show_result = execute(session, f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+        # show_result = execute(session, f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
+        show_result = _show_resources(session, "SCHEMAS", fqn)
     except ProgrammingError:
         return None
 
@@ -1078,7 +1110,7 @@ def fetch_schema(session, fqn: FQN):
     data = show_result[0]
 
     options = options_result_to_list(data["options"])
-    show_params_result = execute(session, f"SHOW PARAMETERS IN SCHEMA {fqn}")
+    show_params_result = execute(session, f"SHOW PARAMETERS IN SCHEMA {fqn}", cacheable=True)
     params = params_result_to_dict(show_params_result)
     tags = fetch_resource_tags(session, ResourceType.SCHEMA, fqn)
 
@@ -1151,7 +1183,6 @@ def fetch_security_integration(session, fqn: FQN):
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
 
     if data["type"] == "API_AUTHENTICATION":
-        print("")
         return {
             "name": data["name"],
             "type": data["type"],
@@ -1601,7 +1632,7 @@ def fetch_view(session, fqn: FQN):
 
 def fetch_warehouse(session, fqn: FQN):
     try:
-        show_result = execute(session, f"SHOW WAREHOUSES LIKE '{fqn.name}'")
+        show_result = _show_resources(session, "WAREHOUSES", fqn)
     except ProgrammingError:
         return None
 
@@ -1741,7 +1772,6 @@ def list_stages(session) -> list[FQN]:
         if row["database_name"] in SYSTEM_DATABASES:
             continue
         stages.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
-        print(row)
     return stages
 
 
@@ -1760,13 +1790,19 @@ def list_tables(session) -> list[FQN]:
 
 
 def list_tags(session) -> list[FQN]:
-    show_result = execute(session, "SHOW TAGS")
-    tags = []
-    for row in show_result:
-        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
-            continue
-        tags.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
-    return tags
+    try:
+        show_result = execute(session, "SHOW TAGS")
+        tags = []
+        for row in show_result:
+            if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+                continue
+            tags.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        return tags
+    except ProgrammingError as err:
+        if err.errno == UNSUPPORTED_FEATURE:
+            return []
+        else:
+            raise
 
 
 def list_users(session) -> list[FQN]:

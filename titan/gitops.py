@@ -124,6 +124,7 @@ def collect_resources_from_config(config: dict):
             if cache_pointer in resource_cache:
                 resource._data.on = ResourceName(str(resource_cache[cache_pointer].fqn))
 
+        # TODO: investigate this
         for ref in resource.refs:
             cache_pointer = (ref.resource_type, ResourceName(ref.name))
             if (

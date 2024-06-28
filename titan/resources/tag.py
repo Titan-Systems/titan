@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
 from ..enums import AccountEdition, ResourceType
-from ..scope import SchemaScope
-from ..props import Props, StringProp, StringListProp
+from ..props import Props, StringListProp, StringProp
 from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import Resource, ResourceNameTrait, ResourceSpec
+from .role import Role
 
 
 @dataclass(unsafe_hash=True)

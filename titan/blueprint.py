@@ -264,6 +264,14 @@ class Blueprint:
 
         if self._run_mode == RunMode.SYNC_ALL:
             logger.warning("Sync All mode is dangerous, please use with caution")
+            if len(self._allowlist) == 0:
+                raise Exception("Sync mode must specify an allowlist")
+        elif self._run_mode == RunMode.SYNC:
+            if len(self._allowlist) == 0:
+                raise Exception("Sync mode must specify an allowlist")
+            for resource_type in self._allowlist:
+                if resource_type in SYNC_MODE_BLOCKLIST:
+                    raise Exception(f"Resource type {resource_type} is not allowed in sync mode")
 
         if ResourceType.USER in self._allowlist and self._run_mode != RunMode.CREATE_OR_UPDATE:
             raise Exception("User resource type is not allowed in this version of Titan")
@@ -396,18 +404,15 @@ class Blueprint:
                 normalized = resource_cls.defaults() | data
             return normalized
 
-        if self._run_mode == RunMode.SYNC:
-            raise Exception("Sync mode is not supported yet")
-
-        if self._run_mode == RunMode.SYNC_ALL:
+        if self._run_mode in (RunMode.SYNC, RunMode.SYNC_ALL):
             """
-            In sync-all mode, the remote state is not just the resources that were added to the blueprint,
+            In sync mode, the remote state is not just the resources that were added to the blueprint,
             but all resources that exist in Snowflake. This is limited by a few things:
             - allowlist limits the scope of what resources types are allowed in a blueprint
             - if database or schema is set, the blueprint only looks at that database or schema
             """
             if len(self._allowlist) == 0:
-                raise Exception("Sync All mode must specify an allowlist")
+                raise Exception("Sync mode must specify an allowlist")
 
             for resource_type in self._allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
@@ -432,11 +437,14 @@ class Blueprint:
             if reference in manifest:
                 continue
 
+            is_public_schema = reference.resource_type == ResourceType.SCHEMA and reference.fqn.name == "PUBLIC"
+
             try:
                 data = data_provider.fetch_resource(session, reference)
             except Exception:
                 data = None
-            if data is None:
+
+            if data is None and not is_public_schema:
                 logger.error(manifest)
                 raise MissingResourceException(
                     f"Resource {reference} required by {parent} not found or failed to fetch"
@@ -493,12 +501,16 @@ class Blueprint:
                         db.add(resource)
                         break
 
+        available_scopes = {}
+        for db in databases:
+            for schema in db.items(resource_type=ResourceType.SCHEMA):
+                available_scopes[f"{db.name}.{schema.name}"] = schema
+
         for resource in schema_scoped:
+
             if resource.container is None:
                 if len(databases) == 1:
-                    public_schema: Schema = databases[0].find(resource_type=ResourceType.SCHEMA, name="PUBLIC")
-                    if public_schema:
-                        public_schema.add(resource)
+                    databases[0].public_schema.add(resource)
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
@@ -514,18 +526,12 @@ class Blueprint:
                     else:
                         raise Exception(f"No database for resource {resource} schema={resource.container}")
                 elif isinstance(schema_pointer.container, ResourcePointer):
-                    database_pointer = schema_pointer.container
-                    found = False
-                    for db in databases:
-                        if db.name == database_pointer.name:
-                            for schema in db.items(resource_type=ResourceType.SCHEMA):
-                                if schema.name == schema_pointer.name:
-                                    schema.add(resource)
-                                    found = True
-                                    break
-
-                    if not found:
-                        self._root.add(database_pointer)
+                    expected_scope = f"{schema_pointer.container.name}.{schema_pointer.name}"
+                    if expected_scope in available_scopes:
+                        schema = available_scopes[expected_scope]
+                        schema.add(resource)
+                    else:
+                        self._root.add(schema_pointer.container)
 
             for ref in resource.refs:
                 if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
@@ -536,6 +542,7 @@ class Blueprint:
             public_schema = None
             information_schema = None
             all_schemas = database.items(resource_type=ResourceType.SCHEMA)
+            print("")
             for schema in all_schemas:
                 if schema.implicit:
                     if schema.name == "PUBLIC":
@@ -562,9 +569,11 @@ class Blueprint:
 
         self._finalize(session_context)
 
+        print("")
+
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                if resource.implicit and self._run_mode not in (RunMode.SYNC_ALL, RunMode.SYNC):
+                if resource.implicit:  # and self._run_mode not in (RunMode.SYNC_ALL, RunMode.SYNC):
                     continue
 
             urn = URN(

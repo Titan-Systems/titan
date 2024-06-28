@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec
-from .role import Role
 from ..enums import DataType, ResourceType
-from ..props import FlagProp, Props, StringProp
 from ..parse import _parse_column, _parse_props
+from ..props import FlagProp, Props, StringProp, TagsProp
+from ..resource_tags import ResourceTags
 from ..scope import TableScope
+from .resource import Resource, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
@@ -17,6 +17,7 @@ class _Column(ResourceSpec):
     not_null: bool = False
     constraint: str = None
     default: str = None
+    tags: ResourceTags = None
 
 
 class Column(Resource):
@@ -42,6 +43,7 @@ class Column(Resource):
         collate=StringProp("collate", eq=False),
         comment=StringProp("comment", eq=False),
         not_null=FlagProp("not null"),
+        tags=TagsProp(),
     )
     scope = TableScope()
     spec = _Column
@@ -56,17 +58,19 @@ class Column(Resource):
         not_null: bool = False,
         constraint: str = None,
         default: str = None,
+        tags: dict[str, str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._data: _Column = _Column(
-            name,
-            data_type,
+            name=name,
+            data_type=data_type,
             collate=collate,
             comment=comment,
             not_null=not_null,
             constraint=constraint,
             default=default,
+            tags=tags,
         )
 
     @classmethod

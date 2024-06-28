@@ -42,6 +42,9 @@ materialized_views:
       NULLIF(E:NHP::string,'')::int as NHP
       FROM DOTA.PUBLIC.GAME
       WHERE E:Type = 'DOTA_COMBATLOG_DAMAGE'
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: BUILDINGS
     database: DOTA
@@ -54,6 +57,9 @@ materialized_views:
       E:Units::STRING AS UNIT
       FROM DOTA.PUBLIC.GAME
       WHERE E:Type = 'DOTA_COMBATLOG_TEAM_BUILDING_KILL'
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: CREEP_KILLS
     database: DOTA
@@ -67,6 +73,9 @@ materialized_views:
       FROM DOTA.PUBLIC.GAME
       WHERE E:Type = 'DOTA_COMBATLOG_DEATH'
       GROUP BY 1, 2, 3, 4
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: GOLD
     database: DOTA
@@ -83,6 +92,9 @@ materialized_views:
       E:Y::Double AS Y
       FROM DOTA.PUBLIC.GAME
       WHERE E:Type = 'DOTA_COMBATLOG_GOLD'
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: HERO_DAMAGE
     database: DOTA
@@ -103,6 +115,9 @@ materialized_views:
       WHERE E:Type = 'DOTA_COMBATLOG_DAMAGE'
       AND E:Target LIKE 'npc_dota_hero%'
       AND E:Attacker LIKE 'npc_dota_hero%'
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: HERO_DEATHS
     database: DOTA
@@ -115,6 +130,9 @@ materialized_views:
       WHERE E:Type = 'DOTA_COMBATLOG_DEATH'
       AND E:Target LIKE 'npc_dota_hero%'
       GROUP BY 1, 2
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: HERO_ITEMS
     database: DOTA
@@ -126,6 +144,9 @@ materialized_views:
       E:Value::STRING as item
       FROM DOTA.PUBLIC.GAME
       WHERE E:Type = 'DOTA_COMBATLOG_PURCHASE'
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: HERO_KILLS
     database: DOTA
@@ -138,6 +159,9 @@ materialized_views:
       WHERE E:Type = 'DOTA_COMBATLOG_DEATH'
       AND E:Target LIKE 'npc_dota_hero%'
       GROUP BY 1, 2
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
   - name: XP
     database: DOTA
@@ -154,6 +178,9 @@ materialized_views:
       E:Y::Double AS Y
       FROM DOTA.PUBLIC.GAME
       WHERE E:Type = 'DOTA_COMBATLOG_XP'
+    requires:
+      - name: DOTA.PUBLIC.GAME
+        resource_type: table
 
 file_formats:
   - name: CSV

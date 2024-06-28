@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourceSpec, ResourceNameTrait
-from .role import Role
-from .schema import Schema
 from ..enums import ResourceType
-from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
+from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
 from ..scope import AccountScope
+from .resource import Resource, ResourceContainer, ResourceNameTrait, ResourceSpec
+from .role import Role
+from .schema import Schema
 
 
 @dataclass(unsafe_hash=True)
@@ -156,7 +156,7 @@ class Database(ResourceNameTrait, Resource, ResourceContainer):
         if self._data.name != "SNOWFLAKE":
             self.add(
                 Schema(name="PUBLIC", implicit=True),
-                Schema(name="INFORMATION_SCHEMA", implicit=True),
+                Schema(name="INFORMATION_SCHEMA", implicit=True, owner=""),
             )
         self.requires(self._data.owner)
 
@@ -164,5 +164,9 @@ class Database(ResourceNameTrait, Resource, ResourceContainer):
         return self.items(resource_type=ResourceType.SCHEMA)
 
     @property
-    def public_schema(self):
+    def public_schema(self) -> Schema:
         return self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA)
+
+    @property
+    def information_schema(self) -> Schema:
+        return self.find(name="INFORMATION_SCHEMA", resource_type=ResourceType.SCHEMA)

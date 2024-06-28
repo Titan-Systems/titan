@@ -1,24 +1,24 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait, ResourceName
-from .column import Column
-from .role import Role
-
 # from .stage import InternalStage, copy_options
 from ..enums import ResourceType
 from ..parse import _parse_create_header, _parse_props, _parse_table_schema
-from ..scope import SchemaScope
 from ..props import (
     BoolProp,
     FlagProp,
     IdentifierListProp,
     IntProp,
     Props,
+    QueryProp,
     SchemaProp,
     StringProp,
     TagsProp,
-    QueryProp,
 )
+from ..resource_tags import ResourceTags
+from ..scope import SchemaScope
+from .column import Column
+from .resource import Resource, ResourceName, ResourceNameTrait, ResourceSpec
+from .role import Role
 
 
 @dataclass(unsafe_hash=True)
@@ -36,7 +36,7 @@ class _Table(ResourceSpec):
     default_ddl_collation: str = None
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     row_access_policy: dict[str, list] = None
-    tags: dict[str, str] = None
+    tags: ResourceTags = None
     owner: Role = "SYSADMIN"
     comment: str = None
 

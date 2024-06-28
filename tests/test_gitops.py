@@ -1,11 +1,9 @@
 import pytest
-
 from inflection import pluralize
 
+from tests.helpers import get_json_fixtures
 from titan.gitops import collect_resources_from_config
 from titan.identifiers import resource_label_for_type
-
-from tests.helpers import get_json_fixtures
 
 JSON_FIXTURES = list(get_json_fixtures())
 
@@ -42,9 +40,9 @@ def test_database_config(database_config):
     assert len(resources) == 2
 
 
-# JSON_FIXTURES doesn't include things like role grants yet
-# def test_resource_config(resource_config):
-#     resources = collect_resources_from_config(resource_config)
-#     resource_types = set([resource.resource_type for resource in resources])
-#     expected_resource_types = set([resource_cls.resource_type for resource_cls, _ in JSON_FIXTURES])
-#     assert resource_types == expected_resource_types
+@pytest.mark.skip(reason="JSON_FIXTURES doesn't include things like role grants yet")
+def test_resource_config(resource_config):
+    resources = collect_resources_from_config(resource_config)
+    resource_types = set([resource.resource_type for resource in resources])
+    expected_resource_types = set([resource_cls.resource_type for resource_cls, _ in JSON_FIXTURES])
+    assert resource_types == expected_resource_types

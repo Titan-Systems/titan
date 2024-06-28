@@ -16,6 +16,25 @@ Titan Core is for:
 * Organizations that prefer a git-based workflow for infrastructure management.
 * Teams seeking to replace Terraform for Snowflake-related tasks.
 
+```
+    ╔══════════╗                                           ╔═══════════╗       
+    ║  CONFIG  ║                                           ║ SNOWFLAKE ║       
+    ╚══════════╝                                           ╚═══════════╝       
+ ┏━━━━━━━━━━━┓                                        ┏━━━━━━━━━━━┓            
+┌┫ WAREHOUSE ┣──────┐                                ┌┫ WAREHOUSE ┣───────────┐
+│┗━━━━━━━━━━━┛      │                    ALTER       │┗━━━━━━━━━━━┛           │
+│ name:         ETL │─────┐           ┌─ WAREHOUSE ─▶│ name:         ETL      │
+│ auto_suspend: 60  │     │           │              │ auto_suspend: 300 -> 60│
+└───────────────────┘  ╔══▼═══════════╩═╗            └────────────────────────┘
+                       ║                ║                                      
+                       ║   TITAN CORE   ║                                      
+  ┏━━━━━━┓             ║                ║              ┏━━━━━━┓                
+┌─┫ ROLE ┣──────────┐  ╚══▲═══════════╦═╝            ┌─┫ ROLE ┣───────────────┐
+│ ┗━━━━━━┛          │     │           │              │ ┗━━━━━━┛               │
+│ name: TRANSFORMER │─────┘           └─ CREATE ────▶│ name: TRANSFORMER      │
+└───────────────────┘                    ROLE        └────────────────────────┘
+```
+
 
 ## Key Features
 
@@ -28,7 +47,10 @@ Titan Core is for:
  * **Fast** » Titan Core runs in seconds, even with complex environments
 
  * **SQL** » The only tool that allows you to write Python, YAML, or SQL
- 
+
+## Open Source
+
+This project is licensed under the Apache 2.0 License - see [LICENSE](LICENSE) for details. The source code for Titan Core is available on [Github](https://github.com/Titan-Systems/titan).
 
 ## Documentation
 
@@ -41,14 +63,11 @@ If you're new, the best place to start is with the Python package.
 ### Python + CLI Installation
 
 ### Install from PyPi
-coming soon
-
-### Install from source
 
 ```sh
 python -m venv .venv
 source .venv/bin/activate
-pip install git+https://github.com/Titan-Systems/titan.git
+pip install titan-core
 ```
 
 ### Using the Python package
@@ -397,10 +416,6 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | ↳ Scala                       | ❌         |
 | ↳ SQL                         | ❌         |
 | View                          | ✅         |
-
-## License
-
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details
 
 
 ## Contributing

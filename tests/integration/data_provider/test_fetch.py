@@ -303,26 +303,24 @@ def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
     assert result == data_provider.remove_none_values(pipe.to_dict())
 
 
-# @pytest.mark.skip(reason="Requires view DDL parsing")
-# def test_fetch_view(cursor, test_db, marked_for_cleanup):
-#     view = res.View(
-#         name="VIEW_EXAMPLE",
-#         as_=f"""
-#         SELECT 1 as id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE
-#         """,
-#         columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
-#         comment="View for testing",
-#         owner=TEST_ROLE,
-#         database=test_db,
-#         schema="PUBLIC",
-#     )
-#     cursor.execute(view.create_sql(if_not_exists=True))
-#     marked_for_cleanup.append(view)
+@pytest.mark.skip(reason="Requires view DDL parsing")
+def test_fetch_view(cursor, test_db, marked_for_cleanup):
+    view = res.View(
+        name="VIEW_EXAMPLE",
+        as_="SELECT 1 as id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE",
+        columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
+        comment="View for testing",
+        owner=TEST_ROLE,
+        database=test_db,
+        schema="PUBLIC",
+    )
+    cursor.execute(view.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(view)
 
-#     result = safe_fetch(cursor, view.urn)
-#     assert result is not None
-#     result = data_provider.remove_none_values(result)
-#     assert result == data_provider.remove_none_values(view.to_dict())
+    result = safe_fetch(cursor, view.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(view.to_dict())
 
 
 @pytest.mark.enterprise

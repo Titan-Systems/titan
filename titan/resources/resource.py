@@ -255,21 +255,6 @@ class Resource(metaclass=_Resource):
     def defaults(cls):
         return {f.name: f.default for f in fields(cls.spec)}
 
-    # def __copy__(self):
-    #     cls = self.__class__
-    #     result = cls.__new__(cls)
-    #     result.__dict__.update(self.__dict__)
-    #     return result
-
-    # def __deepcopy__(self, memo):
-    #     cls = self.__class__
-    #     print(f"[DEEPCOPY] >> {cls.__name__}")
-    #     result = cls.__new__(cls)
-    #     memo[id(self)] = result
-    #     for k, v in self.__dict__.items():
-    #         setattr(result, k, deepcopy(v, memo))
-    #     return result
-
     def __repr__(self):  # pragma: no cover
         name = getattr(self._data, "name", None)
         return f"{self.__class__.__name__}({name})"

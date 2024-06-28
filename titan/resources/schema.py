@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec, ResourceNameTrait
-from .role import Role
 from ..builtins import SYSTEM_SCHEMAS
 from ..enums import ResourceType
-from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
+from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
+from ..resource_tags import ResourceTags
 from ..scope import DatabaseScope
+from .resource import Resource, ResourceContainer, ResourceNameTrait, ResourcePointer, ResourceSpec
+from .role import Role
 
 
 @dataclass(unsafe_hash=True)
@@ -17,7 +18,7 @@ class _Schema(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    tags: dict[str, str] = None
+    tags: ResourceTags = None
     owner: Role = "SYSADMIN"
     comment: str = None
 
@@ -134,5 +135,5 @@ class Schema(ResourceNameTrait, Resource, ResourceContainer):
             comment=comment,
         )
         if self._data.tags:
-            for tag_name in self._data.tags.keys():
+            for tag_name in self._data.tags.tag_names():
                 self.requires(ResourcePointer(name=tag_name, resource_type=ResourceType.TAG))

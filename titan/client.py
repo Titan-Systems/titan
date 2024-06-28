@@ -63,24 +63,23 @@ def execute(
         if desired_role == session.role:
             return [[]]
 
+    session_header = f"[{session.user}:{session.role}] > {sql_text}"
+
     if cacheable and session.role in _EXECUTION_CACHE and sql_text in _EXECUTION_CACHE[session.role]:
-        print(f"[{session.user}:{session.role}] >", sql_text, end="")
         result = _EXECUTION_CACHE[session.role][sql_text]
-        print(f"    \033[94m({len(result)} rows, cached)\033[0m", flush=True)
+        logger.warning(f"{session_header}    \033[94m({len(result)} rows, cached)\033[0m")
         return result
 
-    print(f"[{session.user}:{session.role}] >", sql_text, end="")
     start = time.time()
     try:
         result = cur.execute(sql_text).fetchall()
-        print(f"    \033[94m({len(result)} rows, {time.time() - start:.2f}s)\033[0m", flush=True)
+        runtime = time.time() - start
+        logger.warning(f"{session_header}    \033[94m({len(result)} rows, {runtime:.2f}s)\033[0m")
         if cacheable:
             if session.role not in _EXECUTION_CACHE:
                 _EXECUTION_CACHE[session.role] = {}
             _EXECUTION_CACHE[session.role][sql_text] = result
         return result
     except ProgrammingError as err:
-        # if err.errno == ACCESS_CONTROL_ERR:
-        #     raise Exception(f"Access control error: {err.msg}")
-        print(f"    \033[31m(err {err.errno}, {time.time() - start:.2f}s)\033[0m", flush=True)
+        logger.error(f"{session_header}    \033[31m(err {err.errno}, {time.time() - start:.2f}s)\033[0m")
         raise ProgrammingError(f"failed to execute sql, [{sql_text}]", errno=err.errno) from err
