@@ -1,44 +1,22 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
-from ..resource_name import ResourceName
 from ..enums import ParseableEnum, ResourceType
-from ..scope import SchemaScope
 from ..props import (
     EnumProp,
     Props,
-    StringProp,
     StringListProp,
+    StringProp,
 )
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import Resource, ResourceNameTrait, ResourceSpec
+from .role import Role
 
 
 class SecretType(ParseableEnum):
     OAUTH2 = "OAUTH2"
     PASSWORD = "PASSWORD"
     GENERIC_STRING = "GENERIC_STRING"
-
-
-# @dataclass(unsafe_hash=True)
-# class _Secret(ResourceSpec):
-#     name: ResourceName
-#     type: SecretType
-#     api_authentication: str
-#     oauth_scopes: list[str] = None
-#     oauth_refresh_token: str = None
-#     oauth_refresh_token_expiry_time: str = None
-#     username: str = None
-#     password: str = None
-#     secret_string: str = None
-#     comment: str = None
-#     owner: Role = "SYSADMIN"
-
-#     def __post_init__(self):
-#         super().__post_init__()
-#         if self.type == SecretType.OAUTH2 and not self.api_authentication:
-#             raise ValueError("api_authentication must be set when type is OAUTH2")
-#         if self.type != SecretType.OAUTH2 and self.api_authentication:
-#             raise ValueError("api_authentication must not be set when type is not OAUTH2")
 
 
 @dataclass(unsafe_hash=True)
