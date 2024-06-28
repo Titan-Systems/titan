@@ -1,19 +1,33 @@
 import json
-import os
 import logging
+import os
 import re
 
-import titan.resources as resources
-
-from titan.resources import Resource
-from titan.enums import ResourceType
+from titan import data_provider
+from titan.client import reset_cache
 from titan.parse import _split_statements
-
+from titan.resources import Resource
 
 logger = logging.getLogger("titan")
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
 EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "../examples")
+
+
+def assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
+    assert data_provider.remove_none_values(lhs) == data_provider.remove_none_values(rhs)
+
+
+def assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:
+    lhs = data_provider.remove_none_values(lhs)
+    rhs = data_provider.remove_none_values(rhs)
+    keys = set(lhs.keys()) | set(rhs.keys())
+    for attr in keys:
+        attr_metadata = spec.get_metadata(attr)
+        if not attr_metadata.get("fetchable", True):
+            lhs.pop(attr, None)
+            rhs.pop(attr, None)
+    assert lhs == rhs
 
 
 def _get_resource_cls(resource_name):
@@ -88,3 +102,8 @@ def get_examples_yml():
         if file_name.endswith(".yml"):
             with open(os.path.join(EXAMPLES_DIR, file_name), "r") as file:
                 yield (file_name[:-4], file.read())
+
+
+def safe_fetch(cursor, urn):
+    reset_cache()
+    return data_provider.fetch_resource(cursor, urn)
