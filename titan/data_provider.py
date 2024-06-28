@@ -3,7 +3,7 @@ import json
 import sys
 from collections import defaultdict
 from functools import cache
-from typing import Optional
+from typing import Optional, Union
 
 import pytz
 from inflection import pluralize
@@ -32,7 +32,7 @@ from .resource_name import ResourceName, attribute_is_resource_name
 __this__ = sys.modules[__name__]
 
 
-def _quote_identifier(identifier: str) -> str:
+def _quote_identifier(identifier: Union[str, ResourceName]) -> str:
     return str(ResourceName(identifier))
 
 
@@ -138,7 +138,7 @@ def _urn_from_grant(row, session_ctx):
         )
 
 
-def _convert_to_gmt(dt: datetime.datetime, fmt_str: str = "%Y-%m-%d %H:%M:%S") -> str:
+def _convert_to_gmt(dt: datetime.datetime, fmt_str: str = "%Y-%m-%d %H:%M:%S") -> Optional[str]:
     """
     datetime.datetime(2049, 1, 6, 12, 0, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>)
 
@@ -153,7 +153,7 @@ def _convert_to_gmt(dt: datetime.datetime, fmt_str: str = "%Y-%m-%d %H:%M:%S") -
     return dt_gmt.strftime(fmt_str)
 
 
-def _parse_cluster_keys(cluster_keys_str: str) -> list[str]:
+def _parse_cluster_keys(cluster_keys_str: str) -> Optional[list[str]]:
     """
     Assume cluster key statement is in the form of:
         LINEAR(C1, C3)
@@ -220,13 +220,13 @@ def _parse_signature(signature: str) -> list:
     return []
 
 
-def _parse_comma_separated_values(values: str) -> list:
+def _parse_comma_separated_values(values: str) -> Optional[list]:
     if values is None or values == "":
         return None
     return [value.strip(" ") for value in values.split(",")]
 
 
-def _parse_packages(packages_str: str) -> list:
+def _parse_packages(packages_str: str) -> Optional[list]:
     if packages_str is None or packages_str == "":
         return None
     return json.loads(packages_str.replace("'", '"'))
@@ -241,6 +241,8 @@ def params_result_to_dict(params_result):
             typed_value = int(param["value"])
         elif param["type"] == "STRING":
             typed_value = str(param["value"]) if param["value"] else None
+        else:
+            typed_value = param["value"]
         params[param["key"].lower()] = typed_value
     return params
 
@@ -539,7 +541,7 @@ def fetch_database_role(session, fqn: FQN):
     if len(roles) > 1:
         raise Exception(f"Found multiple database roles matching {fqn}")
     data = roles[0]
-    tags = fetch_resource_tags(session, "DATABASE ROLE", fqn)
+    tags = fetch_resource_tags(session, ResourceType.DATABASE_ROLE, fqn)
     return {
         "name": data["name"],
         "owner": data["owner"],
@@ -1008,7 +1010,7 @@ def fetch_role_grants(session, role: str):
 
 def fetch_role(session, fqn: FQN):
     role_name = fqn.name._name if isinstance(fqn.name, ResourceName) else fqn.name
-    show_result = execute(session, f"SHOW ROLES", cacheable=True)
+    show_result = execute(session, "SHOW ROLES", cacheable=True)
 
     roles = _filter_result(show_result, name=role_name)
 
@@ -1117,8 +1119,7 @@ def fetch_secret(session, fqn: FQN):
             "comment": data["comment"] or None,
             "owner": data["owner"],
         }
-    else:
-        data
+    elif data["secret_type"] == "OAUTH2":
         return {
             "name": data["name"],
             "api_authentication": properties["integration_name"],
@@ -1128,11 +1129,12 @@ def fetch_secret(session, fqn: FQN):
             "comment": data["comment"] or None,
             "owner": data["owner"],
         }
+    else:
         raise NotImplementedError(f"Unsupported secret type {data['secret_type']}")
 
 
 def fetch_security_integration(session, fqn: FQN):
-    show_result = execute(session, f"SHOW SECURITY INTEGRATIONS", cacheable=True)
+    show_result = execute(session, "SHOW SECURITY INTEGRATIONS", cacheable=True)
 
     show_result = _filter_result(show_result, name=fqn.name)
 
@@ -1280,8 +1282,8 @@ def fetch_stage(session, fqn: FQN):
         raise Exception(f"Found multiple stages matching {fqn}")
 
     data = stages[0]
-    desc_result = execute(session, f"DESC STAGE {fqn}")
-    properties = _desc_type3_result_to_dict(desc_result, lower_properties=True)
+    # desc_result = execute(session, f"DESC STAGE {fqn}")
+    # properties = _desc_type3_result_to_dict(desc_result, lower_properties=True)
     tags = fetch_resource_tags(session, ResourceType.STAGE, fqn)
 
     if data["type"] == "EXTERNAL":

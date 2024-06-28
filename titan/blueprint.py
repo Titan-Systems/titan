@@ -17,7 +17,7 @@ from .client import (
 )
 from .diff import Action, diff
 from .enums import ParseableEnum, ResourceType
-from .identifiers import FQN, URN, resource_label_for_type
+from .identifiers import URN, resource_label_for_type
 from .resource_name import ResourceName
 from .resources import Account, Database, Schema
 from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
@@ -224,17 +224,11 @@ class Blueprint:
 
     def __init__(
         self,
-        name: str = None,
-        resources: list[Resource] = None,
+        name: Optional[str] = None,
+        resources: Optional[list[Resource]] = None,
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
-        allowlist: list[ResourceType] = None,
-        # account: Union[None, str, Account] = None,
-        # database: Union[None, str, Database] = None,
-        # schema: Union[None, str, Schema] = None,
-        # allow_role_switching: bool = True,
-        # ignore_ownership: bool = True,
-        # valid_resource_types: List[ResourceType] = None,
+        allowlist: Optional[list[ResourceType]] = None,
         **kwargs,
     ) -> None:
 
@@ -708,7 +702,7 @@ class Blueprint:
                         )
                 elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
                     # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
-                    before_action.append(f"USE ROLE SECURITYADMIN")
+                    before_action.append("USE ROLE SECURITYADMIN")
                 else:
                     before_action.append(f"USE ROLE {default_role}")
 
@@ -742,7 +736,7 @@ class Blueprint:
             else:
                 try:
                     execute(session, lifecycle.drop_resource(urn, data))
-                except snowflake.connector.errors.ProgrammingError as err:
+                except snowflake.connector.errors.ProgrammingError:
                     continue
 
     def _add(self, resource: Resource):

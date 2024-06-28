@@ -1,27 +1,25 @@
 import json
 import sys
-
 from abc import ABC
-from typing import Dict
+from typing import Dict, Optional
 
 import pyparsing as pp
 
 from .builder import tidy_sql
 from .enums import DataType
 from .parse import (
-    _parser_has_results_name,
-    _parse_props,
-    _in_parens,
-    Keyword,
+    ANY,
+    ARROW,
+    EQUALS,
+    FullyQualifiedIdentifier,
     Identifier,
+    Keyword,
     Keywords,
     Literals,
-    FullyQualifiedIdentifier,
-    EQUALS,
-    ARROW,
-    ANY,
+    _in_parens,
+    _parse_props,
+    _parser_has_results_name,
 )
-
 
 __this__ = sys.modules[__name__]
 
@@ -83,7 +81,7 @@ class Prop(ABC):
 
 
 class Props:
-    def __init__(self, _name: str = None, _start_token: str = None, **props: Dict[str, Prop]):
+    def __init__(self, _name: Optional[str] = None, _start_token: Optional[str] = None, **props: Prop):
         self.props: Dict[str, Prop] = props
         self.name = _name
         self.start_token = Literals(_start_token) if _start_token else None

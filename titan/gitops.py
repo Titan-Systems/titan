@@ -54,6 +54,8 @@ def resources_from_grants_config(grants_config: list) -> list:
             titan_grant = Grant(**grant)
         elif isinstance(grant, str):
             titan_grant = Grant.from_sql(grant)
+        else:
+            raise Exception(f"Unsupported grant found: {type(grant)}, {grant}")
         resources.append(titan_grant)
     return resources
 

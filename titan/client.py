@@ -2,7 +2,7 @@ import logging
 import os
 import time
 
-from typing import Union
+from typing import Optional, Union
 
 import snowflake.connector
 
@@ -61,7 +61,7 @@ def execute(
     if sql.startswith("USE ROLE"):
         desired_role = sql.split(" ")[-1]
         if desired_role == session.role:
-            return
+            return [[]]
 
     if cacheable and session.role in _EXECUTION_CACHE and sql_text in _EXECUTION_CACHE[session.role]:
         print(f"[{session.user}:{session.role}] >", sql_text, end="")
@@ -69,9 +69,9 @@ def execute(
         print(f"    \033[94m({len(result)} rows, cached)\033[0m", flush=True)
         return result
 
+    print(f"[{session.user}:{session.role}] >", sql_text, end="")
+    start = time.time()
     try:
-        print(f"[{session.user}:{session.role}] >", sql_text, end="")
-        start = time.time()
         result = cur.execute(sql_text).fetchall()
         print(f"    \033[94m({len(result)} rows, {time.time() - start:.2f}s)\033[0m", flush=True)
         if cacheable:

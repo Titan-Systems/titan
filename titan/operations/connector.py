@@ -122,7 +122,7 @@ def connect(
     except ForbiddenError as err:
         raise SnowflakeConnectionError(err)
     except DatabaseError as err:
-        raise InvalidConnectionConfiguration(err.msg)
+        raise InvalidConnectionConfiguration(err.msg or "")
 
 
 class SecurePath:

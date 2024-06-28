@@ -1,20 +1,18 @@
+import difflib
 import sys
 import types
-
-import difflib
-
 from dataclasses import dataclass, fields
-from typing import Any, TypedDict, Type, Union, get_args, get_origin
 from inspect import isclass
 from itertools import chain
+from typing import Any, Type, TypedDict, Union, get_args, get_origin
 
 import pyparsing as pp
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import URN
 from ..lifecycle import create_resource, drop_resource
-from ..props import Props as ResourceProps
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class, parse_identifier
+from ..props import Props as ResourceProps
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
 from ..scope import (
@@ -442,7 +440,7 @@ class ResourceNameTrait:
 
         try:
             fqn = parse_identifier(name, is_db_scoped=isinstance(self.scope, DatabaseScope))
-        except pp.ParseException as err:
+        except pp.ParseException:
             # Allow identifiers that should be quoted, so long as they aren't insane
             if "." in name:
                 raise ValueError(f"Resource name not supported {name}")
