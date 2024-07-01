@@ -1,12 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .resource_monitor import ResourceMonitor
-from .role import Role
 from ..enums import ParseableEnum, ResourceType, WarehouseSize
-from ..resource_name import ResourceName
-from ..scope import AccountScope
-
 from ..props import (
     BoolProp,
     EnumProp,
@@ -16,6 +10,12 @@ from ..props import (
     StringProp,
     TagsProp,
 )
+from ..resource_name import ResourceName
+from ..scope import AccountScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .resource_monitor import ResourceMonitor
+from .role import Role
+from .tag import TaggableResource
 
 
 class WarehouseType(ParseableEnum):
@@ -47,10 +47,9 @@ class _Warehouse(ResourceSpec):
     max_concurrency_level: int = 8
     statement_queued_timeout_in_seconds: int = 0
     statement_timeout_in_seconds: int = 172800
-    tags: dict[str, str] = None
 
 
-class Warehouse(ResourceNameTrait, Resource):
+class Warehouse(NamedResource, TaggableResource, Resource):
     """
     Description:
         A virtual warehouse, often referred to simply as a "warehouse", is a cluster of compute resources in Snowflake. It provides the necessary CPU, memory, and temporary storage to execute SQL SELECT statements, perform DML operations such as INSERT, UPDATE, DELETE, and manage data loading and unloading.
@@ -193,5 +192,5 @@ class Warehouse(ResourceNameTrait, Resource):
             max_concurrency_level=max_concurrency_level,
             statement_queued_timeout_in_seconds=statement_queued_timeout_in_seconds,
             statement_timeout_in_seconds=statement_timeout_in_seconds,
-            tags=tags,
         )
+        self.set_tags(tags)

@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 
-from inflection import camelize
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
@@ -42,7 +41,7 @@ class _EmailNotificationIntegration(ResourceSpec):
             raise ValueError("allowed_recipients can't be empty")
 
 
-class EmailNotificationIntegration(ResourceNameTrait, Resource):
+class EmailNotificationIntegration(NamedResource, Resource):
     """
     Description:
         Manages the configuration for email-based notification integrations within Snowflake. This integration
@@ -125,7 +124,7 @@ class _AWSOutboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class AWSOutboundNotificationIntegration(ResourceNameTrait, Resource):
+class AWSOutboundNotificationIntegration(NamedResource, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -191,7 +190,7 @@ class _GCPOutboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class GCPOutboundNotificationIntegration(ResourceNameTrait, Resource):
+class GCPOutboundNotificationIntegration(NamedResource, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -253,7 +252,7 @@ class _AzureOutboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class AzureOutboundNotificationIntegration(ResourceNameTrait, Resource):
+class AzureOutboundNotificationIntegration(NamedResource, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -318,7 +317,7 @@ class _GCPInboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class GCPInboundNotificationIntegration(ResourceNameTrait, Resource):
+class GCPInboundNotificationIntegration(NamedResource, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>
@@ -377,7 +376,7 @@ class _AzureInboundNotificationIntegration(ResourceSpec):
     comment: str = None
 
 
-class AzureInboundNotificationIntegration(ResourceNameTrait, Resource):
+class AzureInboundNotificationIntegration(NamedResource, Resource):
     """
     CREATE [ OR REPLACE ] NOTIFICATION INTEGRATION [IF NOT EXISTS]
       <name>

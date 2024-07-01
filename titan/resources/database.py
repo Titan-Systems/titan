@@ -3,13 +3,11 @@ from dataclasses import dataclass
 from ..enums import ResourceType
 from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
-
-# from ..resource_tags import ResourceTags
 from ..scope import AccountScope
-from .resource import Resource, ResourceContainer, ResourceNameTrait, ResourceSpec
-from .tag import TaggableResource
+from .resource import Resource, ResourceContainer, NamedResource, ResourceSpec
 from .role import Role
 from .schema import Schema
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -20,11 +18,10 @@ class _Database(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    # tags: ResourceTags = None
     comment: str = None
 
 
-class Database(ResourceNameTrait, TaggableResource, Resource, ResourceContainer):
+class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
     """
     Description:
         Represents a database in Snowflake.

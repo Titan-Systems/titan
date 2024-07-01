@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import BinaryFormat, Compression, FileType, ResourceType
 from ..props import (
@@ -44,7 +44,7 @@ class _CSVFileFormat(ResourceSpec):
     comment: str = None
 
 
-class CSVFileFormat(ResourceNameTrait, Resource):
+class CSVFileFormat(NamedResource, Resource):
     """
     Description:
         Defines the specifications for a CSV file format in Snowflake, including delimiters, encoding, and compression options.

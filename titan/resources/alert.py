@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
-from .warehouse import Warehouse
 from ..enums import ResourceType
+from ..props import AlertConditionProp, Props, QueryProp, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
-
-from ..props import Props, StringProp, QueryProp, AlertConditionProp, TagsProp
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
+from .warehouse import Warehouse
 
 
 @dataclass(unsafe_hash=True)
@@ -19,10 +19,9 @@ class _Alert(ResourceSpec):
     then: str
     owner: Role = "SYSADMIN"
     comment: str = None
-    tags: dict[str, str] = None
 
 
-class Alert(ResourceNameTrait, Resource):
+class Alert(NamedResource, TaggableResource, Resource):
     """
     Description:
         Alerts trigger notifications when certain conditions are met.
@@ -97,6 +96,6 @@ class Alert(ResourceNameTrait, Resource):
             then=then,
             owner=owner,
             comment=comment,
-            tags=tags,
         )
+        self.set_tags(tags)
         self.requires(self._data.warehouse)

@@ -67,7 +67,7 @@ If you're new, the best place to start is with the Python package.
 ```sh
 python -m venv .venv
 source .venv/bin/activate
-pip install titan-core
+python -m pip install titan-core
 ```
 
 ### Using the Python package

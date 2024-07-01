@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, Arg, ResourceNameTrait
+from .resource import Resource, ResourceSpec, Arg, NamedResource
 from .role import Role
 from ..enums import DataType, NullHandling, Volatility, ResourceType
 from ..scope import SchemaScope
@@ -39,7 +39,7 @@ class _ExternalFunction(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class ExternalFunction(ResourceNameTrait, Resource):
+class ExternalFunction(NamedResource, Resource):
     """
     CREATE [ OR REPLACE ] [ SECURE ] EXTERNAL FUNCTION <name> ( [ <arg_name> <arg_data_type> ] [ , ... ] )
       RETURNS <result_data_type>

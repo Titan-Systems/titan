@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .database import Database
 from .role import Role
 from .share import Share
@@ -49,7 +49,7 @@ class _ReplicationGroup(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class ReplicationGroup(ResourceNameTrait, Resource):
+class ReplicationGroup(NamedResource, Resource):
     """
     CREATE REPLICATION GROUP [ IF NOT EXISTS ] <name>
         OBJECT_TYPES = <object_type> [ , <object_type> , ... ]

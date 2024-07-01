@@ -1,10 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
 from ..enums import ParseableEnum, ResourceType
-from ..scope import SchemaScope
-from ..resource_name import ResourceName
 from ..props import (
     BoolProp,
     EnumProp,
@@ -14,6 +10,11 @@ from ..props import (
     StringProp,
     TagsProp,
 )
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
 
 
 class StageType(ParseableEnum):
@@ -62,7 +63,6 @@ class _InternalStage(ResourceSpec):
     type: StageType = StageType.INTERNAL
     encryption: dict[str, EncryptionType] = field(default_factory=None, metadata={"fetchable": False})
     directory: dict[str, bool] = None
-    tags: dict[str, str] = None
     comment: str = None
 
     def __post_init__(self):
@@ -78,7 +78,7 @@ class _InternalStage(ResourceSpec):
             self.directory = {"enable": False}
 
 
-class InternalStage(ResourceNameTrait, Resource):
+class InternalStage(NamedResource, TaggableResource, Resource):
     """
     Description:
         Represents an internal stage in Snowflake, which is a named location used to store data files
@@ -161,9 +161,9 @@ class InternalStage(ResourceNameTrait, Resource):
             owner=owner,
             encryption=encryption,
             directory=directory,
-            tags=tags,
             comment=comment,
         )
+        self.set_tags(tags)
 
 
 @dataclass(unsafe_hash=True)
@@ -176,7 +176,6 @@ class _ExternalStage(ResourceSpec):
     credentials: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
     encryption: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
     directory: dict[str, bool] = None
-    tags: dict[str, str] = None
     comment: str = None
 
     def __post_init__(self):
@@ -192,7 +191,7 @@ class _ExternalStage(ResourceSpec):
             self.directory = {"enable": False}
 
 
-class ExternalStage(ResourceNameTrait, Resource):
+class ExternalStage(NamedResource, TaggableResource, Resource):
     """
     Description:
         Manages external stages in Snowflake, which are used to reference external storage locations.
@@ -295,9 +294,9 @@ class ExternalStage(ResourceNameTrait, Resource):
             credentials=credentials,
             encryption=encryption,
             directory=directory,
-            tags=tags,
             comment=comment,
         )
+        self.set_tags(tags)
 
 
 StageTypeMap = {

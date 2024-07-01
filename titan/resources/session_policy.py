@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
+from .resource import Resource, ResourceSpec, NamedResource
 from ..enums import ResourceType
 from ..scope import SchemaScope
 from ..resource_name import ResourceName
@@ -29,7 +28,7 @@ class _SessionPolicy(ResourceSpec):
             raise ValueError("SESSION_UI_IDLE_TIMEOUT_MINS must be a positive integer.")
 
 
-class SessionPolicy(ResourceNameTrait, Resource):
+class SessionPolicy(NamedResource, Resource):
     """
     Description:
         Manages session policies in Snowflake, which define timeout settings for user sessions to enhance security.

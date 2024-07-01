@@ -4,7 +4,7 @@ import types
 from dataclasses import dataclass, fields
 from inspect import isclass
 from itertools import chain
-from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
+from typing import Any, Type, TypedDict, Union, get_args, get_origin
 
 import pyparsing as pp
 
@@ -415,7 +415,7 @@ class ResourceContainer:
             resource.refs.remove(self)
 
 
-class ResourceNameTrait:
+class NamedResource:
     """
     This class is a mixin that allows resources to be constructed with fully qualified names
     without a bunch of user-land cruft to make it all work. This keeps titan close to the behavior
@@ -467,7 +467,7 @@ class ResourceNameTrait:
         return self.scope.fully_qualified_name(self.container, self.name._name)
 
 
-class ResourcePointer(ResourceNameTrait, Resource, ResourceContainer):
+class ResourcePointer(NamedResource, Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]

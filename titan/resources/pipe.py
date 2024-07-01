@@ -5,10 +5,9 @@
 
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ResourceType
-from ..parse import _parse_copy_into
 from ..props import BoolProp, Props, StringProp, QueryProp
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
@@ -26,7 +25,7 @@ class _Pipe(ResourceSpec):
     comment: str = None
 
 
-class Pipe(ResourceNameTrait, Resource):
+class Pipe(NamedResource, Resource):
     """
     Description:
         Represents a data ingestion pipeline in Snowflake, which automates the loading of data into tables.

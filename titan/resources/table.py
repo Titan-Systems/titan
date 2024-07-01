@@ -9,15 +9,13 @@ from ..props import (
     IdentifierListProp,
     IntProp,
     Props,
-    QueryProp,
     SchemaProp,
     StringProp,
     TagsProp,
 )
-from ..resource_tags import ResourceTags
 from ..scope import SchemaScope
 from .column import Column
-from .resource import Resource, ResourceName, ResourceNameTrait, ResourceSpec
+from .resource import NamedResource, Resource, ResourceName, ResourceSpec
 from .role import Role
 
 
@@ -36,7 +34,6 @@ class _Table(ResourceSpec):
     default_ddl_collation: str = None
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     row_access_policy: dict[str, list] = None
-    tags: ResourceTags = None
     owner: Role = "SYSADMIN"
     comment: str = None
 
@@ -48,7 +45,7 @@ class _Table(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class Table(ResourceNameTrait, Resource):
+class Table(NamedResource, Resource):
     """
     Description:
         A table in Snowflake.
@@ -145,11 +142,11 @@ class Table(ResourceNameTrait, Resource):
             default_ddl_collation=default_ddl_collation,
             copy_grants=copy_grants,
             row_access_policy=row_access_policy,
-            tags=tags,
             owner=owner,
             comment=comment,
         )
         self._table_stage = None
+        self.set_tags(tags)
         # self._table_stage: InternalStage = InternalStage(name=f"@%{self.name}", implicit=True)
         # if self.schema:
         #     self._table_stage.schema = self.schema

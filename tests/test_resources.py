@@ -189,7 +189,7 @@ def test_resource_with_named_nested_dependency():
     1. ExternalAccessIntegration.__init__() is called with
         allowed_network_rules = ["db.sch.some_network_rule"]
 
-    2. ResourceNameTrait __init__() is called, we can ignore this
+    2. NamedResource __init__() is called, we can ignore this
 
     3. Resource __init__() is called, we can ignore this
 
@@ -204,7 +204,7 @@ def test_resource_with_named_nested_dependency():
 
     7. ResourcePointer __init__ is called
 
-    8. ResourceNameTrait __init__() is called for the pointer. This should parse
+    8. NamedResource __init__() is called for the pointer. This should parse
         the fully qualified name and add database/schema kwargs
 
     9. Resource __init__() is called for the pointer. This should receive database/schema

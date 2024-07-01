@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..props import Props, EnumProp, StringProp, BoolProp
@@ -38,7 +38,7 @@ class _GlueCatalogIntegration(ResourceSpec):
             raise ValueError(f"Invalid table format: {self.table_format}")
 
 
-class GlueCatalogIntegration(ResourceNameTrait, Resource):
+class GlueCatalogIntegration(NamedResource, Resource):
     """
     Description:
         Manages the integration of AWS Glue as a catalog in Snowflake, supporting the ICEBERG table format.
@@ -146,7 +146,7 @@ class _ObjectStoreCatalogIntegration(ResourceSpec):
             raise ValueError(f"Invalid table format: {self.table_format}")
 
 
-class ObjectStoreCatalogIntegration(ResourceNameTrait, Resource):
+class ObjectStoreCatalogIntegration(NamedResource, Resource):
     """
     Description:
         Manages the integration of an object store as a catalog in Snowflake, supporting the ICEBERG table format.

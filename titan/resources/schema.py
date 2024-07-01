@@ -4,10 +4,10 @@ from ..builtins import SYSTEM_SCHEMAS
 from ..enums import ResourceType
 from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
-from ..resource_tags import ResourceTags
 from ..scope import DatabaseScope
-from .resource import Resource, ResourceContainer, ResourceNameTrait, ResourcePointer, ResourceSpec
+from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
 from .role import Role
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -18,7 +18,6 @@ class _Schema(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    tags: ResourceTags = None
     owner: Role = "SYSADMIN"
     comment: str = None
 
@@ -30,7 +29,7 @@ class _Schema(ResourceSpec):
             self.data_retention_time_in_days = 1
 
 
-class Schema(ResourceNameTrait, Resource, ResourceContainer):
+class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
     """
     Description:
         Represents a schema in Snowflake, which is a logical grouping of database objects such as tables, views, and stored procedures. Schemas are used to organize and manage such objects within a database.
@@ -123,10 +122,7 @@ class Schema(ResourceNameTrait, Resource, ResourceContainer):
             data_retention_time_in_days=data_retention_time_in_days,
             max_data_extension_time_in_days=max_data_extension_time_in_days,
             default_ddl_collation=default_ddl_collation,
-            tags=tags,
             owner=owner,
             comment=comment,
         )
-        if self._data.tags:
-            for tag_name in self._data.tags.tag_names():
-                self.requires(ResourcePointer(name=tag_name, resource_type=ResourceType.TAG))
+        self.set_tags(tags)

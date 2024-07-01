@@ -1,11 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
 from ..enums import ResourceType
-from ..resource_name import ResourceName
-from ..scope import SchemaScope
-
 from ..props import (
     BoolProp,
     ColumnNamesProp,
@@ -15,6 +10,11 @@ from ..props import (
     StringProp,
     TagsProp,
 )
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -25,7 +25,6 @@ class _View(ResourceSpec):
     volatile: bool = None
     recursive: bool = None
     columns: list[dict] = None
-    tags: dict[str, str] = None
     change_tracking: bool = False
     copy_grants: bool = field(default_factory=False, metadata={"fetchable": False})
     comment: str = None
@@ -38,7 +37,7 @@ class _View(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class View(ResourceNameTrait, Resource):
+class View(NamedResource, TaggableResource, Resource):
     """
     Description:
         Represents a view in Snowflake, which is a virtual table created by a stored query on the data.
@@ -120,9 +119,9 @@ class View(ResourceNameTrait, Resource):
             volatile=volatile,
             recursive=recursive,
             columns=columns,
-            tags=tags,
             change_tracking=change_tracking,
             copy_grants=copy_grants,
             comment=comment,
             as_=as_,
         )
+        self.set_tags(tags)

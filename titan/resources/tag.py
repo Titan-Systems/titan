@@ -7,7 +7,7 @@ from ..props import Props, StringListProp, StringProp
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
 from ..scope import SchemaScope
-from .resource import Resource, ResourcePointer, ResourceNameTrait, ResourceSpec
+from .resource import Resource, NamedResource, ResourceSpec, ResourcePointer
 
 
 @dataclass(unsafe_hash=True)
@@ -17,7 +17,7 @@ class _Tag(ResourceSpec):
     allowed_values: list = None
 
 
-class Tag(ResourceNameTrait, Resource):
+class Tag(NamedResource, Resource):
     """
     Description:
         Represents a tag in Snowflake, which can be used to label various resources for better management and categorization.
@@ -96,7 +96,7 @@ class TagReference(Resource):
         self,
         object_name: str,
         object_domain: ResourceType = None,
-        tags: ResourceTags = None,
+        tags: dict[str, str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -109,6 +109,10 @@ class TagReference(Resource):
     @property
     def fqn(self):
         return tag_reference_fqn(self._data)
+
+
+def tag_reference_fqn(data: _TagReference) -> FQN:
+    return FQN(name=f"{data.object_domain}/{data.object_name}")
 
 
 class TaggableResource:
@@ -128,7 +132,3 @@ class TaggableResource:
         for tag in tags.keys():
             tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
             self._tag_reference.requires(tag_ptr)
-
-
-def tag_reference_fqn(data: _TagReference) -> FQN:
-    return FQN(name=f"{data.object_domain}/{data.object_name}")

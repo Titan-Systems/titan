@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
+from .resource import Resource, ResourceSpec, NamedResource
 from ..enums import ParseableEnum, ResourceType
 from ..resource_name import ResourceName
 from ..scope import AccountScope
@@ -50,7 +49,7 @@ class _SnowflakePartnerOAuthSecurityIntegration(ResourceSpec):
             raise ValueError(f"Invalid OAuth client: {self.oauth_client}")
 
 
-class SnowflakePartnerOAuthSecurityIntegration(ResourceNameTrait, Resource):
+class SnowflakePartnerOAuthSecurityIntegration(NamedResource, Resource):
     """
     Description:
         A security integration in Snowflake designed to manage external OAuth clients for authentication purposes.
@@ -150,7 +149,7 @@ class _SnowservicesOAuthSecurityIntegration(ResourceSpec):
     comment: str = None
 
 
-class SnowservicesOAuthSecurityIntegration(ResourceNameTrait, Resource):
+class SnowservicesOAuthSecurityIntegration(NamedResource, Resource):
     """
     Description:
         Manages OAuth security integrations for Snowservices in Snowflake, allowing external authentication mechanisms.
@@ -226,7 +225,7 @@ class _APIAuthenticationSecurityIntegration(ResourceSpec):
     comment: str = None
 
 
-class APIAuthenticationSecurityIntegration(ResourceNameTrait, Resource):
+class APIAuthenticationSecurityIntegration(NamedResource, Resource):
     """
     Description:
         Manages API authentication security integrations in Snowflake, allowing for secure API access management.

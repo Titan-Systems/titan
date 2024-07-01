@@ -1,11 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
-from .warehouse import Warehouse
 from ..enums import ParseableEnum, ResourceType
-from ..resource_name import ResourceName
-from ..scope import SchemaScope, TableScope
 from ..props import (
     ColumnNamesProp,
     EnumProp,
@@ -15,6 +10,12 @@ from ..props import (
     StringProp,
     TagsProp,
 )
+from ..resource_name import ResourceName
+from ..scope import SchemaScope, TableScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
+from .warehouse import Warehouse
 
 
 class RefreshMode(ParseableEnum):
@@ -67,10 +68,9 @@ class _DynamicTable(ResourceSpec):
     initialize: InitializeBehavior = InitializeBehavior.ON_CREATE
     comment: str = None
     owner: Role = "SYSADMIN"
-    tags: dict[str, str] = None
 
 
-class DynamicTable(ResourceNameTrait, Resource):
+class DynamicTable(NamedResource, TaggableResource, Resource):
     """
     Description:
         Represents a dynamic table in Snowflake, which can be configured to refresh automatically,
@@ -163,5 +163,5 @@ class DynamicTable(ResourceNameTrait, Resource):
             as_=as_,
             comment=comment,
             owner=owner,
-            tags=tags,
         )
+        self.set_tags(tags)
