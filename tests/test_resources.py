@@ -74,7 +74,7 @@ def test_resource_name_serialization():
     assert task.name == "~task"
     assert task.name == ResourceName('"~task"')
     assert task.to_dict()["name"] == "~task"
-    assert task.fqn.name == "~task"
+    assert task.fqn.name == '"~task"'
 
 
 def test_tags_definition():

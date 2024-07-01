@@ -9,7 +9,7 @@ from typing import Any, Type, TypedDict, Union, get_args, get_origin
 import pyparsing as pp
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
-from ..identifiers import URN, resource_label_for_type
+from ..identifiers import FQN, URN, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class, parse_identifier
 from ..props import Props as ResourceProps
@@ -463,7 +463,7 @@ class NamedResource:
         return self._name
 
     @property
-    def fqn(self):
+    def fqn(self) -> FQN:
         return self.scope.fully_qualified_name(self.container, str(self.name))
 
 

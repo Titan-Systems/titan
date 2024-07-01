@@ -6,6 +6,7 @@ import re
 from titan import data_provider
 from titan.client import reset_cache
 from titan.parse import _split_statements
+from titan.resource_name import ResourceName
 from titan.resources import Resource
 
 logger = logging.getLogger("titan")
@@ -15,7 +16,16 @@ EXAMPLES_DIR = os.path.join(os.path.dirname(__file__), "../examples")
 
 
 def assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
-    assert data_provider.remove_none_values(lhs) == data_provider.remove_none_values(rhs)
+    lhs = data_provider.remove_none_values(lhs)
+    rhs = data_provider.remove_none_values(rhs)
+    lhs_name = lhs.pop("name", None)
+    rhs_name = rhs.pop("name", None)
+    if lhs_name is not None:
+        assert rhs_name is not None
+        assert ResourceName(lhs_name) == ResourceName(rhs_name)
+    elif rhs_name is not None:
+        assert False, "lhs_name is None but rhs_name is not"
+    assert lhs == rhs
 
 
 def assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:

@@ -8,7 +8,8 @@
             "comment": null,
             "not_null": false,
             "constraint": null,
-            "default": null
+            "default": null,
+            "tags": null
         },
         {
             "name": "amount",
@@ -17,7 +18,8 @@
             "comment": null,
             "not_null": false,
             "constraint": null,
-            "default": null
+            "default": null,
+            "tags": null
         }
     ],
     "constraints": null,

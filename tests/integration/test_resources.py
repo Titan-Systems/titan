@@ -8,7 +8,7 @@ pytestmark = pytest.mark.requires_snowflake
 
 
 def test_user_name_defaults(cursor, suffix):
-    user_name = f"user{suffix}"
+    user_name = f"user{suffix}_name_defaults"
     user = res.User(name=user_name)
     assert user.name == user_name
     assert user._data.login_name == user_name.upper()
@@ -22,7 +22,7 @@ def test_user_name_defaults(cursor, suffix):
 
 
 def test_user_naked_quoted_name(cursor, suffix):
-    user_name = f"~user{suffix}"
+    user_name = f"~user{suffix}_naked_quoted_name"
     user = res.User(name=user_name)
     assert user.name == user_name
     assert user._data.login_name == user_name.upper()
@@ -36,7 +36,7 @@ def test_user_naked_quoted_name(cursor, suffix):
 
 
 def test_user_quoted_name(cursor, suffix):
-    user_name = f'"user{suffix}"'
+    user_name = f'"user{suffix}_quoted_name"'
     user = res.User(name=user_name)
     assert user.name == user_name
     assert user._data.login_name == ResourceName(user_name)._name.upper()
@@ -50,7 +50,7 @@ def test_user_quoted_name(cursor, suffix):
 
 
 def test_user_name_intentionally_left_blank(cursor, suffix):
-    user_name = f"user{suffix}"
+    user_name = f"user{suffix}_intentionally_left_blank"
     user = res.User(name=user_name, display_name="", login_name="")
     assert user.name == user_name
     assert user._data.login_name == user_name.upper()
