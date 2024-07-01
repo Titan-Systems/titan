@@ -79,12 +79,12 @@ def test_resource_name_serialization():
 
 def test_tags_definition():
     db = res.Database(name="DB", tags={"project": "test_deployment", "priority": "low"})
-    assert db._data.tags is not None
-    assert db._data.tags.to_dict() == {"project": "test_deployment", "priority": "low"}
+    assert db.tags is not None
+    assert db.tags.to_dict() == {"project": "test_deployment", "priority": "low"}
 
     db = res.Database(name="DB", tags=ResourceTags({"project": "test_deployment", "priority": "low"}))
-    assert db._data.tags is not None
-    assert db._data.tags.to_dict() == {"project": "test_deployment", "priority": "low"}
+    assert db.tags is not None
+    assert db.tags.to_dict() == {"project": "test_deployment", "priority": "low"}
 
 
 def test_database_scoped_container_construction():

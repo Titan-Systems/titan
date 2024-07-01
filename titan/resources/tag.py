@@ -110,6 +110,10 @@ class TagReference(Resource):
     def fqn(self):
         return tag_reference_fqn(self._data)
 
+    @property
+    def tags(self) -> Optional[ResourceTags]:
+        return self._data.tags
+
 
 def tag_reference_fqn(data: _TagReference) -> FQN:
     return FQN(name=f"{data.object_domain}/{data.object_name}")
@@ -132,3 +136,7 @@ class TaggableResource:
         for tag in tags.keys():
             tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
             self._tag_reference.requires(tag_ptr)
+
+    @property
+    def tags(self) -> Optional[ResourceTags]:
+        return self._tag_reference.tags if self._tag_reference else None

@@ -54,7 +54,6 @@ def test_blueprint_with_resources():
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
         "max_data_extension_time_in_days": 14,
-        "tags": None,
         "transient": False,
     }
 
@@ -68,7 +67,6 @@ def test_blueprint_with_resources():
         "max_data_extension_time_in_days": 14,
         "name": "SCHEMA",
         "owner": "SYSADMIN",
-        "tags": None,
         "transient": False,
     }
     view_urn = parse_URN("urn::ABCD123:view/DB.SCHEMA.VIEW")
@@ -83,7 +81,6 @@ def test_blueprint_with_resources():
         "owner": "SYSADMIN",
         "recursive": None,
         "secure": False,
-        "tags": None,
         "volatile": None,
     }
     table_urn = parse_URN("urn::ABCD123:table/DB.SCHEMA.TABLE")
@@ -113,7 +110,6 @@ def test_blueprint_with_resources():
         "default_ddl_collation": None,
         "copy_grants": None,
         "row_access_policy": None,
-        "tags": None,
         "comment": None,
     }
     # parse URN is incorrectly stripping the parens. Not sure what the correct behavior should be

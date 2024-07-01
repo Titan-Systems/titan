@@ -29,3 +29,9 @@ class ResourceTags:
 
     def items(self):
         return self.tags.items()
+
+    def keys(self):
+        return self.tags.keys()
+
+    def values(self):
+        return self.tags.values()

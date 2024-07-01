@@ -5,6 +5,5 @@
     "data_retention_time_in_days": 1,
     "max_data_extension_time_in_days": 14,
     "default_ddl_collation": null,
-    "comment": "This is a test database",
-    "tags": null
+    "comment": "This is a test database"
 }

@@ -2,6 +2,5 @@
     "name": "SOMEDBROLE",
     "comment": null,
     "database": "STATIC_DATABASE",
-    "owner": "USERADMIN",
-    "tags": null
+    "owner": "USERADMIN"
 }

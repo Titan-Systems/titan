@@ -30,7 +30,6 @@
     "default_ddl_collation": null,
     "copy_grants": null,
     "row_access_policy": null,
-    "tags": null,
     "owner": "SYSADMIN",
     "comment": null
 }

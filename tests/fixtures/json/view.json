@@ -3,15 +3,14 @@
     "owner": "SYSADMIN",
     "volatile": true,
     "as_": "SELECT id FROM STATIC_DATABASE.public.static_table",
-    "change_tracking": null,
+    "change_tracking": false,
     "columns": [
         {
             "name": "id"
         }
     ],
     "comment": "This is a view",
-    "copy_grants": null,
+    "copy_grants": false,
     "recursive": null,
-    "secure": null,
-    "tags": null
+    "secure": false
 }

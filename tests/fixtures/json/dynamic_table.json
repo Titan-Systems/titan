@@ -12,6 +12,5 @@
     "initialize": "ON_CREATE",
     "as_": "SELECT id FROM static_database.public.static_table",
     "comment": "This is a sample dynamic table",
-    "owner": "SYSADMIN",
-    "tags": null
+    "owner": "SYSADMIN"
 }

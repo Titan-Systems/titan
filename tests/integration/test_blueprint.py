@@ -104,6 +104,14 @@ def test_blueprint_zero_drift_after_apply(cursor, test_db, suffix, marked_for_cl
     # Plan again to verify no changes are detected
     reset_cache()
     blueprint = Blueprint(name="test_zero_drift_after_apply")
+    schema = res.Schema(name=f"zero_drift_schema_{suffix}", database=test_db, owner=TEST_ROLE)
+    tbl = res.Table(
+        name=f"zero_drift_table_{suffix}",
+        database=test_db,
+        schema=schema,
+        columns=[res.Column(name="ID", data_type="NUMBER(38,0)")],
+        owner=TEST_ROLE,
+    )
     blueprint.add(schema, tbl)
     subsequent_changes = blueprint.plan(session)
     assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."

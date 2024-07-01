@@ -577,11 +577,9 @@ def fetch_database_role(session, fqn: FQN):
     if len(roles) > 1:
         raise Exception(f"Found multiple database roles matching {fqn}")
     data = roles[0]
-    tags = fetch_resource_tags(session, ResourceType.DATABASE_ROLE, fqn)
     return {
         "name": data["name"],
         "owner": data["owner"],
-        "tags": tags,
         "database": fqn.database,
         "comment": data["comment"] or None,
     }
@@ -1118,7 +1116,6 @@ def fetch_schema(session, fqn: FQN):
     options = options_result_to_list(data["options"])
     show_params_result = execute(session, f"SHOW PARAMETERS IN SCHEMA {fqn}", cacheable=True)
     params = params_result_to_dict(show_params_result)
-    tags = fetch_resource_tags(session, ResourceType.SCHEMA, fqn)
 
     return {
         "name": data["name"],
@@ -1129,7 +1126,6 @@ def fetch_schema(session, fqn: FQN):
         "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
         "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
-        "tags": tags,
     }
 
 
@@ -1257,8 +1253,6 @@ def fetch_service(session, fqn: FQN):
 
     data = show_result[0]
 
-    tags = fetch_resource_tags(session, ResourceType.SERVICE, fqn)
-
     return {
         "name": fqn.name,
         "compute_pool": data["compute_pool"],
@@ -1267,7 +1261,6 @@ def fetch_service(session, fqn: FQN):
         "min_instances": data["min_instances"],
         "max_instances": data["max_instances"],
         "query_warehouse": data["query_warehouse"],
-        "tags": tags,
         "comment": data["comment"] or None,
         "owner": data["owner"],
     }
@@ -1321,7 +1314,6 @@ def fetch_stage(session, fqn: FQN):
     data = stages[0]
     # desc_result = execute(session, f"DESC STAGE {fqn}")
     # properties = _desc_type3_result_to_dict(desc_result, lower_properties=True)
-    tags = fetch_resource_tags(session, ResourceType.STAGE, fqn)
 
     if data["type"] == "EXTERNAL":
         return {
@@ -1331,7 +1323,6 @@ def fetch_stage(session, fqn: FQN):
             "type": data["type"],
             "storage_integration": data["storage_integration"],
             "directory": {"enable": data["directory_enabled"] == "Y"},
-            "tags": tags,
             "comment": data["comment"] or None,
         }
     elif data["type"] == "INTERNAL":
@@ -1340,7 +1331,6 @@ def fetch_stage(session, fqn: FQN):
             "owner": data["owner"],
             "type": data["type"],
             "directory": {"enable": data["directory_enabled"] == "Y"},
-            "tags": tags,
             "comment": data["comment"] or None,
         }
     else:
@@ -1549,7 +1539,6 @@ def fetch_table(session, fqn: FQN):
     columns = fetch_columns(session, "TABLE", fqn)
 
     data = tables[0]
-    tags = fetch_resource_tags(session, ResourceType.TABLE, fqn)
     show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
     params = params_result_to_dict(show_params_result)
 
@@ -1565,7 +1554,6 @@ def fetch_table(session, fqn: FQN):
         # "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days", None),
         "default_ddl_collation": params.get("default_ddl_collation", None),
         "change_tracking": data["change_tracking"] == "ON",
-        "tags": tags,
     }
 
 
