@@ -70,10 +70,20 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "data_retention_time_in_days": 90,
         "max_data_extension_time_in_days": 14,
         "default_ddl_collation": None,
-        "tags": {"STATIC_DATABASE.PUBLIC.STATIC_TAG": "STATIC_TAG_VALUE"},
         "owner": TEST_ROLE,
         "comment": None,
     }
+    tags = safe_fetch(
+        cursor,
+        URN(
+            resource_type=ResourceType.TAG_REFERENCE,
+            fqn=FQN(name=f"{test_db}.ENTERPRISE_TEST_SCHEMA", params={"domain": "SCHEMA"}),
+            account_locator=account_locator,
+        ),
+    )
+    assert tags is not None
+    assert "STATIC_DATABASE.PUBLIC.STATIC_TAG" in tags
+    assert tags["STATIC_DATABASE.PUBLIC.STATIC_TAG"] == "STATIC_TAG_VALUE"
 
 
 def test_fetch_grant_on_account(cursor, suffix):
@@ -303,26 +313,24 @@ def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
     assert result == data_provider.remove_none_values(pipe.to_dict())
 
 
-# @pytest.mark.skip(reason="Requires view DDL parsing")
-# def test_fetch_view(cursor, test_db, marked_for_cleanup):
-#     view = res.View(
-#         name="VIEW_EXAMPLE",
-#         as_=f"""
-#         SELECT 1 as id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE
-#         """,
-#         columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
-#         comment="View for testing",
-#         owner=TEST_ROLE,
-#         database=test_db,
-#         schema="PUBLIC",
-#     )
-#     cursor.execute(view.create_sql(if_not_exists=True))
-#     marked_for_cleanup.append(view)
+@pytest.mark.skip(reason="Requires view DDL parsing")
+def test_fetch_view(cursor, test_db, marked_for_cleanup):
+    view = res.View(
+        name="VIEW_EXAMPLE",
+        as_="SELECT 1 as id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE",
+        columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
+        comment="View for testing",
+        owner=TEST_ROLE,
+        database=test_db,
+        schema="PUBLIC",
+    )
+    cursor.execute(view.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(view)
 
-#     result = safe_fetch(cursor, view.urn)
-#     assert result is not None
-#     result = data_provider.remove_none_values(result)
-#     assert result == data_provider.remove_none_values(view.to_dict())
+    result = safe_fetch(cursor, view.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    assert result == data_provider.remove_none_values(view.to_dict())
 
 
 @pytest.mark.enterprise

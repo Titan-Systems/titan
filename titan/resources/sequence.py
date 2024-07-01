@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
@@ -18,7 +18,7 @@ class _Sequence(ResourceSpec):
     comment: str = None
 
 
-class Sequence(ResourceNameTrait, Resource):
+class Sequence(NamedResource, Resource):
     """
     Description:
         Manages the creation and configuration of sequences in Snowflake, which are objects that generate numeric values according to a specified sequence.

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Arg, Resource, ResourceSpec, ResourceNameTrait
+from .resource import Arg, Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
@@ -39,7 +39,7 @@ class _JavascriptUDF(ResourceSpec):
     volatility: Volatility = None
 
 
-class JavascriptUDF(ResourceNameTrait, Resource):
+class JavascriptUDF(NamedResource, Resource):
     """
     Description:
         A Javascript user-defined function (UDF) in Snowflake allows you to define a function using the JavaScript programming language.
@@ -161,7 +161,7 @@ class _PythonUDF(ResourceSpec):
     volatility: Volatility = None
 
 
-class PythonUDF(ResourceNameTrait, Resource):
+class PythonUDF(NamedResource, Resource):
     """
     Description:
         A Python user-defined function (UDF) in Snowflake allows users to define their own custom functions in Python.

@@ -20,6 +20,5 @@
     "rsa_public_key": null,
     "rsa_public_key_2": null,
     "comment": null,
-    "network_policy": null,
-    "tags": null
+    "network_policy": null
 }

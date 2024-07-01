@@ -82,6 +82,7 @@ class ResourceType(ParseableEnum):
     STREAM = "STREAM"
     TABLE = "TABLE"
     TAG = "TAG"
+    TAG_REFERENCE = "TAG REFERENCE"
     TASK = "TASK"
     USER = "USER"
     VIEW = "VIEW"

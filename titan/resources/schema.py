@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourcePointer, ResourceSpec, ResourceNameTrait
-from .role import Role
 from ..builtins import SYSTEM_SCHEMAS
 from ..enums import ResourceType
-from ..props import Props, IntProp, StringProp, TagsProp, FlagProp
+from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import DatabaseScope
+from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -17,7 +18,6 @@ class _Schema(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    tags: dict[str, str] = None
     owner: Role = "SYSADMIN"
     comment: str = None
 
@@ -29,7 +29,7 @@ class _Schema(ResourceSpec):
             self.data_retention_time_in_days = 1
 
 
-class Schema(ResourceNameTrait, Resource, ResourceContainer):
+class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
     """
     Description:
         Represents a schema in Snowflake, which is a logical grouping of database objects such as tables, views, and stored procedures. Schemas are used to organize and manage such objects within a database.
@@ -109,13 +109,6 @@ class Schema(ResourceNameTrait, Resource, ResourceContainer):
     ):
         super().__init__(name, **kwargs)
 
-        # TODO:
-        # This is a temporary fix to allow the creation of schemas in the format
-        # `DB.SCHEMA` without having to create the database first.
-        # The plan going forward is to put this behavior into a ResourceNameTrait trait
-        # and have all resources with names inherit from that.
-        # name = self._add_implied_containers(name)
-
         if self._name == "INFORMATION_SCHEMA":
             comment = "Views describing the contents of schemas in this database"
 
@@ -129,10 +122,7 @@ class Schema(ResourceNameTrait, Resource, ResourceContainer):
             data_retention_time_in_days=data_retention_time_in_days,
             max_data_extension_time_in_days=max_data_extension_time_in_days,
             default_ddl_collation=default_ddl_collation,
-            tags=tags,
             owner=owner,
             comment=comment,
         )
-        if self._data.tags:
-            for tag_name in self._data.tags.keys():
-                self.requires(ResourcePointer(name=tag_name, resource_type=ResourceType.TAG))
+        self.set_tags(tags)

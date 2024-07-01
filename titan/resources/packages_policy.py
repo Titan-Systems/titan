@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ResourceType, Language
 from ..scope import SchemaScope
@@ -29,7 +29,7 @@ class _PackagesPolicy(ResourceSpec):
             raise ValueError("Language must be PYTHON")
 
 
-class PackagesPolicy(ResourceNameTrait, Resource):
+class PackagesPolicy(NamedResource, Resource):
     """
     Description:
         A Packages Policy defines a set of rules for allowed and blocked packages

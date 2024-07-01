@@ -7,6 +7,5 @@
     "default_ddl_collation": "en_US",
     "copy_grants": null,
     "comment": "This is an example event table for logging user events.",
-    "tags": null,
     "owner": "SYSADMIN"
 }

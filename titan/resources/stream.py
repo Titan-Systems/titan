@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourcePointer, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourcePointer, ResourceSpec, NamedResource
 from .role import Role
 from .table import Table
 from .view import View
@@ -40,7 +40,7 @@ class _TableStream(ResourceSpec):
             self.before = {k.lower(): v for k, v in self.before.items()}
 
 
-class TableStream(ResourceNameTrait, Resource):
+class TableStream(NamedResource, Resource):
     """
     Description:
         Represents a stream on a table in Snowflake, which allows for change data capture on the table.
@@ -207,7 +207,7 @@ class _StageStream(ResourceSpec):
     comment: str = None
 
 
-class StageStream(ResourceNameTrait, Resource):
+class StageStream(NamedResource, Resource):
     """
     Description:
         Represents a stream on a stage in Snowflake, which allows for capturing data changes on the stage.
@@ -288,7 +288,7 @@ class _ViewStream(ResourceSpec):
     comment: str = None
 
 
-class ViewStream(ResourceNameTrait, Resource):
+class ViewStream(NamedResource, Resource):
     """
     Description:
         Represents a stream on a view in Snowflake, allowing for real-time data processing and querying.

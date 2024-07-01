@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
 from ..enums import ResourceType
-from ..props import Props, BoolProp, IntProp, StringProp, StringListProp, TagsProp
+from ..props import BoolProp, IntProp, Props, StringListProp, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -32,17 +33,16 @@ class _User(ResourceSpec):
     rsa_public_key_2: str = None
     comment: str = None
     network_policy: str = None
-    tags: dict[str, str] = None
 
     def __post_init__(self):
         super().__post_init__()
-        if not self.login_name:
-            self.login_name = str(self.name).upper()
-        if not self.display_name:
-            self.display_name = str(self.name).lower()
+        if self.login_name is None or self.login_name == "":
+            self.login_name = self.name._name.upper()
+        if self.display_name is None:
+            self.display_name = self.name._name
 
 
-class User(ResourceNameTrait, Resource):
+class User(NamedResource, TaggableResource, Resource):
     """
     Description:
         A user in Snowflake.
@@ -174,8 +174,8 @@ class User(ResourceNameTrait, Resource):
             rsa_public_key_2=rsa_public_key_2,
             comment=comment,
             network_policy=network_policy,
-            tags=tags,
         )
+        self.set_tags(tags)
 
     @property
     def owner(self):

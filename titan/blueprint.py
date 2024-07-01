@@ -17,10 +17,11 @@ from .client import (
 )
 from .diff import Action, diff
 from .enums import ParseableEnum, ResourceType
-from .identifiers import FQN, URN, resource_label_for_type
+from .identifiers import URN, resource_label_for_type
 from .resource_name import ResourceName
 from .resources import Account, Database, Schema
-from .resources.resource import Resource, ResourceContainer, ResourcePointer, convert_to_resource
+from .resources.tag import TaggableResource
+from .resources.resource import Resource, ResourceContainer, ResourcePointer
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
@@ -35,11 +36,23 @@ SYNC_MODE_BLOCKLIST = [
 ]
 
 
+class DuplicateResourceException(Exception):
+    pass
+
+
 class MissingResourceException(Exception):
     pass
 
 
 class MarkedForReplacementException(Exception):
+    pass
+
+
+class ResourceInsertionException(Exception):
+    pass
+
+
+class OrphanResourceException(Exception):
     pass
 
 
@@ -185,24 +198,33 @@ def _split_by_scope(
     db_scoped = []
     schema_scoped = []
 
+    seen = set()
+
     def route(resource: Resource):
         """The sorting hat"""
-        if isinstance(resource.scope, OrganizationScope):
-            org_scoped.append(resource)
-        elif isinstance(resource.scope, AccountScope):
-            acct_scoped.append(resource)
-        elif isinstance(resource.scope, DatabaseScope):
-            db_scoped.append(resource)
-        elif isinstance(resource.scope, SchemaScope):
-            schema_scoped.append(resource)
-        else:
-            raise Exception(f"Unsupported resource type {type(resource)}")
 
-    for resource in resources:
-        route(resource)
+        if id(resource) not in seen:
+            if isinstance(resource.scope, OrganizationScope):
+                org_scoped.append(resource)
+            elif isinstance(resource.scope, AccountScope):
+                acct_scoped.append(resource)
+            elif isinstance(resource.scope, DatabaseScope):
+                db_scoped.append(resource)
+            elif isinstance(resource.scope, SchemaScope):
+                schema_scoped.append(resource)
+            else:
+                raise Exception(f"Unsupported resource type {type(resource)}")
+
+        seen.add(id(resource))
         if isinstance(resource, ResourceContainer):
             for item in resource.items():
                 route(item)
+
+    for resource in resources:
+        root = resource
+        while root.container is not None:
+            root = root.container
+        route(root)
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
@@ -220,21 +242,48 @@ def _raise_if_plan_would_drop_session_user(session_ctx: dict, plan: Plan):
                 raise Exception("Plan would drop the current session user, which is not allowed")
 
 
+def _merge_pointers(resources: list[Resource]) -> list[Resource]:
+    namespace = {}
+    resources = sorted(resources, key=lambda resource: isinstance(resource, ResourcePointer))
+
+    def _merge(primary: Resource, secondary: ResourcePointer):
+        if secondary.container is not None:
+            if primary.container is None:
+                raise Exception
+            secondary.container.remove(secondary)
+
+        for item in secondary.items():
+            secondary.remove(item)
+            primary.add(item)
+
+    for resource in resources:
+        if hasattr(resource, "name"):
+            resource_id = (resource.resource_type, resource.name)
+        else:
+            resource_id = str(resource.urn)
+        if isinstance(resource, ResourcePointer):
+            if resource_id in namespace:
+                primary = namespace[resource_id]
+                _merge(primary, resource)
+            else:
+                namespace[resource_id] = resource
+        else:
+            if resource_id in namespace and namespace[resource_id] != resource:
+                raise DuplicateResourceException(f"Duplicate resource found: {resource} and {namespace[resource_id]}")
+            namespace[resource_id] = resource
+
+    return list(namespace.values())
+
+
 class Blueprint:
 
     def __init__(
         self,
-        name: str = None,
-        resources: list[Resource] = None,
+        name: Optional[str] = None,
+        resources: Optional[list[Resource]] = None,
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
-        allowlist: list[ResourceType] = None,
-        # account: Union[None, str, Account] = None,
-        # database: Union[None, str, Database] = None,
-        # schema: Union[None, str, Schema] = None,
-        # allow_role_switching: bool = True,
-        # ignore_ownership: bool = True,
-        # valid_resource_types: List[ResourceType] = None,
+        allowlist: Optional[list[ResourceType]] = None,
         **kwargs,
     ) -> None:
 
@@ -246,11 +295,11 @@ class Blueprint:
         valid_resource_types = kwargs.pop("valid_resource_types", None)
 
         if account is not None:
-            logger.warning("account is deprecated, use add instead")
+            raise Exception("account is deprecated, use add instead")
         if database is not None:
-            logger.warning("database is deprecated, use add instead")
+            raise Exception("database is deprecated, use add instead")
         if schema is not None:
-            logger.warning("schema is deprecated, use add instead")
+            raise Exception("schema is deprecated, use add instead")
         if allow_role_switching is not None:
             raise Exception("Role switching must be allowed")
         if ignore_ownership is not None:
@@ -270,23 +319,21 @@ class Blueprint:
 
         if self._run_mode == RunMode.SYNC_ALL:
             logger.warning("Sync All mode is dangerous, please use with caution")
+            if len(self._allowlist) == 0:
+                raise Exception("Sync mode must specify an allowlist")
+        elif self._run_mode == RunMode.SYNC:
+            if len(self._allowlist) == 0:
+                raise Exception("Sync mode must specify an allowlist")
+            for resource_type in self._allowlist:
+                if resource_type in SYNC_MODE_BLOCKLIST:
+                    raise Exception(f"Resource type {resource_type} is not allowed in sync mode")
 
         if ResourceType.USER in self._allowlist and self._run_mode != RunMode.CREATE_OR_UPDATE:
             raise Exception("User resource type is not allowed in this version of Titan")
 
         self.name = name
-        self.account: Optional[Account] = convert_to_resource(Account, account) if account else None
-        self.database: Optional[Database] = convert_to_resource(Database, database) if database else None
-        self.schema: Optional[Schema] = convert_to_resource(Schema, schema) if schema else None
-
-        if self.account and self.database:
-            self.account.add(self.database)
-
-        if self.database and self.schema:
-            self.database.add(self.schema)
 
         self.add(resources or [])
-        self.add([res for res in [self.account, self.database, self.schema] if res is not None])
 
     def _raise_for_nonconforming_plan(self, plan: Plan):
         exceptions = []
@@ -402,18 +449,15 @@ class Blueprint:
                 normalized = resource_cls.defaults() | data
             return normalized
 
-        if self._run_mode == RunMode.SYNC:
-            raise Exception("Sync mode is not supported yet")
-
-        if self._run_mode == RunMode.SYNC_ALL:
+        if self._run_mode in (RunMode.SYNC, RunMode.SYNC_ALL):
             """
-            In sync-all mode, the remote state is not just the resources that were added to the blueprint,
+            In sync mode, the remote state is not just the resources that were added to the blueprint,
             but all resources that exist in Snowflake. This is limited by a few things:
             - allowlist limits the scope of what resources types are allowed in a blueprint
             - if database or schema is set, the blueprint only looks at that database or schema
             """
             if len(self._allowlist) == 0:
-                raise Exception("Sync All mode must specify an allowlist")
+                raise Exception("Sync mode must specify an allowlist")
 
             for resource_type in self._allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
@@ -438,11 +482,16 @@ class Blueprint:
             if reference in manifest:
                 continue
 
+            is_public_schema = reference.resource_type == ResourceType.SCHEMA and reference.fqn.name == ResourceName(
+                "PUBLIC"
+            )
+
             try:
                 data = data_provider.fetch_resource(session, reference)
             except Exception:
                 data = None
-            if data is None:
+
+            if data is None and not is_public_schema:
                 logger.error(manifest)
                 raise MissingResourceException(
                     f"Resource {reference} required by {parent} not found or failed to fetch"
@@ -461,50 +510,51 @@ class Blueprint:
         org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
         self._staged = None
 
-        if len(org_scoped) > 1:
-            raise Exception("Only one account allowed")
-        elif len(org_scoped) == 1:
-            # If we have a staged account, use it
-            self._root = org_scoped[0]
+        if len(org_scoped) > 0:
+            raise Exception("Blueprint cannot contain an Account resource")
         else:
-            # Otherwise, create a stub account from the session context
+            # Create a stub account from the session context
             self._root = ResourcePointer(name=session_context["account"], resource_type=ResourceType.ACCOUNT)
             self._account_locator = session_context["account_locator"]
-            self.account = self._root
 
+        acct_scoped = _merge_pointers(acct_scoped)
         # Add all databases and other account scoped resources to the root
         for resource in acct_scoped:
             self._root.add(resource)
 
-        # If we haven't specified a database, use the one from the session context
-        if self.database is None and session_context.get("database") is not None:
-            existing_databases = [db.name for db in self._root.items(resource_type=ResourceType.DATABASE)]
-            if session_context["database"] not in existing_databases:
-                self._root.add(ResourcePointer(name=session_context["database"], resource_type=ResourceType.DATABASE))
-
         databases: list[Database] = self._root.items(resource_type=ResourceType.DATABASE)
 
+        # If we haven't specified a database, use the one from the session context
+        if len(databases) == 0 and (len(db_scoped) + len(schema_scoped) > 0):
+            if session_context.get("database") is None:
+                raise OrphanResourceException(
+                    "Blueprint is missing a database but includes resources that require a database or schema"
+                )
+
+            self._root.add(ResourcePointer(name=session_context["database"], resource_type=ResourceType.DATABASE))
+            databases = self._root.items(resource_type=ResourceType.DATABASE)
+
+        # db_scoped = _merge_pointers(db_scoped)
         # Add all schemas and database roles to their respective databases
         for resource in db_scoped:
-            # When the container is present, we SHOULD be looking up the real container and attaching. In other words
-            # this resource could be an island
             if resource.container is None:
                 if len(databases) == 1:
                     databases[0].add(resource)
                 else:
-                    raise Exception(f"Database [{resource.container}] for resource {resource} not found")
-            else:
-                for db in databases:
-                    if db.name == resource.container.name and resource not in db:
-                        db.add(resource)
-                        break
+                    raise OrphanResourceException(f"Resource {resource} has no database")
+
+        available_scopes = {}
+        for database in databases:
+            database_resources = list(database.items())
+            _merge_pointers(database_resources)
+            for schema in database.items(resource_type=ResourceType.SCHEMA):
+                available_scopes[f"{database.name}.{schema.name}"] = schema
 
         for resource in schema_scoped:
+
             if resource.container is None:
                 if len(databases) == 1:
-                    public_schema: Schema = databases[0].find(resource_type=ResourceType.SCHEMA, name="PUBLIC")
-                    if public_schema:
-                        public_schema.add(resource)
+                    databases[0].public_schema.add(resource)
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
@@ -520,46 +570,24 @@ class Blueprint:
                     else:
                         raise Exception(f"No database for resource {resource} schema={resource.container}")
                 elif isinstance(schema_pointer.container, ResourcePointer):
-                    database_pointer = schema_pointer.container
-                    found = False
-                    for db in databases:
-                        if db.name == database_pointer.name:
-                            for schema in db.items(resource_type=ResourceType.SCHEMA):
-                                if schema.name == schema_pointer.name:
-                                    schema.add(resource)
-                                    found = True
-                                    break
-
-                    if not found:
-                        self._root.add(database_pointer)
+                    expected_scope = f"{schema_pointer.container.name}.{schema_pointer.name}"
+                    if expected_scope in available_scopes:
+                        schema = available_scopes[expected_scope]
+                        schema.add(resource)
+                    else:
+                        self._root.add(schema_pointer.container)
 
             for ref in resource.refs:
                 if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
+                    raise Exception
                     resource.container.add(ref)
 
-        for database in databases:
-            merge_schemas = []
-            public_schema = None
-            information_schema = None
-            all_schemas = database.items(resource_type=ResourceType.SCHEMA)
-            for schema in all_schemas:
-                if schema.implicit:
-                    if schema.name == "PUBLIC":
-                        public_schema = schema
-                    elif schema.name == "INFORMATION_SCHEMA":
-                        information_schema = schema
-                elif schema.name in ("PUBLIC", "INFORMATION_SCHEMA"):
-                    merge_schemas.append(schema)
-
-            for schema in merge_schemas:
-                database.remove(schema)
-                schema_items = schema.items()
-                for item in schema_items:
-                    schema.remove(item)
-                    if schema.name == "PUBLIC":
-                        public_schema.add(item)
-                    elif schema.name == "INFORMATION_SCHEMA":
-                        information_schema.add(item)
+    def _create_tag_references(self):
+        for resource in _walk(self._root):
+            if isinstance(resource, TaggableResource):
+                tag_ref = resource.create_tag_reference()
+                if tag_ref:
+                    self._root.add(tag_ref)
 
     def generate_manifest(self, session_context: dict = {}) -> Manifest:
         manifest: Manifest = {}
@@ -568,9 +596,11 @@ class Blueprint:
 
         self._finalize(session_context)
 
+        self._create_tag_references()
+
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                if resource.implicit and self._run_mode not in (RunMode.SYNC_ALL, RunMode.SYNC):
+                if resource.implicit:  # and self._run_mode not in (RunMode.SYNC_ALL, RunMode.SYNC):
                     continue
 
             urn = URN(
@@ -708,7 +738,7 @@ class Blueprint:
                         )
                 elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
                     # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
-                    before_action.append(f"USE ROLE SECURITYADMIN")
+                    before_action.append("USE ROLE SECURITYADMIN")
                 else:
                     before_action.append(f"USE ROLE {default_role}")
 
@@ -716,6 +746,8 @@ class Blueprint:
             elif change.action == Action.CHANGE:
                 action = lifecycle.update_resource(change.urn, change.delta)
             elif change.action == Action.REMOVE:
+                if "owner" in change.before:
+                    before_action.append(f"USE ROLE {change.before['owner']}")
                 action = lifecycle.drop_resource(change.urn, change.before, if_exists=True)
 
             action_queue.extend(before_action)
@@ -742,7 +774,7 @@ class Blueprint:
             else:
                 try:
                     execute(session, lifecycle.drop_resource(urn, data))
-                except snowflake.connector.errors.ProgrammingError as err:
+                except snowflake.connector.errors.ProgrammingError:
                     continue
 
     def _add(self, resource: Resource):

@@ -78,6 +78,7 @@ views:
       - name: id
         data_type: NUMBER(38,0)
     as_: SELECT id FROM STATIC_DATABASE.public.static_table
+    change_tracking: true
     requires:
       - name: static_table
         resource_type: table
@@ -104,7 +105,7 @@ security_integrations:
   - name: STATIC_SECURITY_INTEGRATION
     type: api_authentication
     auth_type: OAUTH2
-    oauth_client_auth_method: client_secret_post
+    oauth_client_auth_method: CLIENT_SECRET_POST
     oauth_client_id: 'sn-oauth-134o9erqfedlc'
     oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
     oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'

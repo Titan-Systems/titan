@@ -12,7 +12,7 @@ coming soon
 ```sh
 python -m venv .venv
 source .venv/bin/activate
-pip install git+https://github.com/Titan-Systems/titan.git
+python -m pip install titan-core
 ```
 
 ### Using the Python package

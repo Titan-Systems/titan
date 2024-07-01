@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ResourceType
 from ..scope import SchemaScope
@@ -31,7 +31,7 @@ class _PasswordPolicy(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class PasswordPolicy(ResourceNameTrait, Resource):
+class PasswordPolicy(NamedResource, Resource):
     """
     Description:
         Defines the rules and constraints for creating and managing passwords within the system, ensuring they meet specific security standards.

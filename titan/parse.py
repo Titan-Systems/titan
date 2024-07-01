@@ -215,12 +215,14 @@ def _parse_role_grant(sql: str):
         raise pp.ParseException("Failed to parse grant") from err
 
 
-def _first_match(parser, text):
+def _first_match(parser, text) -> tuple:
     results = next(parser.scan_string(text), -1)
     if results == -1:
         return (None, None, None)
-    else:
+    elif isinstance(results, tuple):
         return results
+    else:
+        raise Exception(f"Unexpected results type: {type(results)}")
 
 
 def _contains(parser, text):

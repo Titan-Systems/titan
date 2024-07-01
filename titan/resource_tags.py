@@ -18,8 +18,20 @@ class ResourceTags:
     def __getitem__(self, key):
         return self.tags[key]
 
+    def __hash__(self):
+        return hash(frozenset(self.tags.items()))
+
     def to_dict(self):
         return self.tags.copy()
 
-    def __hash__(self):
-        return hash(frozenset(self.tags.items()))
+    def tag_names(self):
+        return self.tags.keys()
+
+    def items(self):
+        return self.tags.items()
+
+    def keys(self):
+        return self.tags.keys()
+
+    def values(self):
+        return self.tags.values()

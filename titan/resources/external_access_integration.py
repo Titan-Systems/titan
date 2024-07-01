@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from ..resource_name import ResourceName
 from .network_rule import NetworkRule
 from .role import Role
@@ -41,7 +41,7 @@ class _ExternalAccessIntegration(ResourceSpec):
                 raise ValueError("allowed_authentication_secrets must not contain 'none' if there are other secrets")
 
 
-class ExternalAccessIntegration(ResourceNameTrait, Resource):
+class ExternalAccessIntegration(NamedResource, Resource):
     """
     Description:
         External Access Integrations enable code within functions and stored procedures to utilize secrets and establish connections with external networks. This resource configures the rules and secrets that can be accessed by such code.

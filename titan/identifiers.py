@@ -28,9 +28,9 @@ def names_are_equal(name1: Union[None, str, ResourceName], name2: Union[None, st
 class FQN:
     def __init__(
         self,
-        name: str,
-        database: Optional[str] = None,
-        schema: Optional[str] = None,
+        name: Union[str, ResourceName],
+        database: Optional[Union[str, ResourceName]] = None,
+        schema: Optional[Union[str, ResourceName]] = None,
         arg_types: Optional[list] = None,
         params: Optional[dict] = None,
     ) -> None:

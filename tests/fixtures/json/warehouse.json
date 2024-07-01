@@ -15,6 +15,5 @@
     "query_acceleration_max_scale_factor": null,
     "max_concurrency_level": 8,
     "statement_queued_timeout_in_seconds": 0,
-    "statement_timeout_in_seconds": 172800,
-    "tags": null
+    "statement_timeout_in_seconds": 172800
 }

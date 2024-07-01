@@ -1,10 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .role import Role
 from ..enums import ResourceType
-from ..scope import SchemaScope
-from ..resource_name import ResourceName
 from ..props import (
     BoolProp,
     FlagProp,
@@ -14,6 +10,11 @@ from ..props import (
     StringProp,
     TagsProp,
 )
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -28,10 +29,9 @@ class _EventTable(ResourceSpec):
     comment: str = None
     # row_access_policy: str = None
     owner: Role = "SYSADMIN"
-    tags: dict[str, str] = None
 
 
-class EventTable(ResourceNameTrait, Resource):
+class EventTable(NamedResource, TaggableResource, Resource):
     """
     Description:
         An event table captures events, including logged messages from functions and procedures.
@@ -124,5 +124,5 @@ class EventTable(ResourceNameTrait, Resource):
             copy_grants=copy_grants,
             comment=comment,
             owner=owner,
-            tags=tags,
         )
+        self.set_tags(tags)

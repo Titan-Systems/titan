@@ -1,13 +1,8 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait, ResourceName
-from .column import Column
-from .role import Role
-
 # from .stage import InternalStage, copy_options
 from ..enums import ResourceType
 from ..parse import _parse_create_header, _parse_props, _parse_table_schema
-from ..scope import SchemaScope
 from ..props import (
     BoolProp,
     FlagProp,
@@ -17,8 +12,12 @@ from ..props import (
     SchemaProp,
     StringProp,
     TagsProp,
-    QueryProp,
 )
+from ..scope import SchemaScope
+from .column import Column
+from .resource import NamedResource, Resource, ResourceName, ResourceSpec
+from .role import Role
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -36,7 +35,6 @@ class _Table(ResourceSpec):
     default_ddl_collation: str = None
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     row_access_policy: dict[str, list] = None
-    tags: dict[str, str] = None
     owner: Role = "SYSADMIN"
     comment: str = None
 
@@ -48,7 +46,7 @@ class _Table(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class Table(ResourceNameTrait, Resource):
+class Table(NamedResource, TaggableResource, Resource):
     """
     Description:
         A table in Snowflake.
@@ -145,11 +143,11 @@ class Table(ResourceNameTrait, Resource):
             default_ddl_collation=default_ddl_collation,
             copy_grants=copy_grants,
             row_access_policy=row_access_policy,
-            tags=tags,
             owner=owner,
             comment=comment,
         )
         self._table_stage = None
+        self.set_tags(tags)
         # self._table_stage: InternalStage = InternalStage(name=f"@%{self.name}", implicit=True)
         # if self.schema:
         #     self._table_stage.schema = self.schema

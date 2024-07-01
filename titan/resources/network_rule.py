@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..resource_name import ResourceName
@@ -44,7 +44,7 @@ class _NetworkRule(ResourceSpec):
             raise ValueError("value_list must have at least one entry")
 
 
-class NetworkRule(ResourceNameTrait, Resource):
+class NetworkRule(NamedResource, Resource):
     """
     Description:
         A Network Rule in Snowflake defines a set of network addresses, such as IP addresses or hostnames,

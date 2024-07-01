@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ResourceType
 from ..resource_name import ResourceName
@@ -10,7 +10,6 @@ from ..enums import AccountEdition
 from ..props import (
     Props,
     QueryProp,
-    StringProp,
 )
 
 
@@ -29,7 +28,7 @@ class _AggregationPolicy(ResourceSpec):
 #   [ COMMENT = '<string_literal>' ]
 
 
-class AggregationPolicy(ResourceNameTrait, Resource):
+class AggregationPolicy(NamedResource, Resource):
     """
     Description:
         Represents an aggregation policy in Snowflake, which defines constraints on aggregation operations.

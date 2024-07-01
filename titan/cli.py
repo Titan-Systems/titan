@@ -87,6 +87,8 @@ def export(resource, out, format):
         output = json.dumps(resources, indent=2)
     elif format == "yml":
         output = yaml.dump(resources)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
 
     if out:
         with open(out, "w") as f:

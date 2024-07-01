@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..resource_name import ResourceName
@@ -30,7 +30,7 @@ class _APIIntegration(ResourceSpec):
     comment: str = None
 
 
-class APIIntegration(ResourceNameTrait, Resource):
+class APIIntegration(NamedResource, Resource):
     """
     Description:
         Manages API integrations in Snowflake, allowing external services to interact with Snowflake resources securely.

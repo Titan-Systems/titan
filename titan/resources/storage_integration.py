@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
@@ -33,7 +33,7 @@ class _S3StorageIntegration(ResourceSpec):
             raise ValueError("Type must be 'EXTERNAL_STAGE' for S3StorageIntegration")
 
 
-class S3StorageIntegration(ResourceNameTrait, Resource):
+class S3StorageIntegration(NamedResource, Resource):
     """
     Description:
         Manages the integration of Snowflake with S3 storage.
@@ -140,7 +140,7 @@ class _GCSStorageIntegration(ResourceSpec):
             raise ValueError("Type must be 'EXTERNAL_STAGE' for GCSStorageIntegration")
 
 
-class GCSStorageIntegration(ResourceNameTrait, Resource):
+class GCSStorageIntegration(NamedResource, Resource):
     """
     Description:
         Manages the integration of Google Cloud Storage (GCS) as an external stage for storing data.
@@ -233,7 +233,7 @@ class _AzureStorageIntegration(ResourceSpec):
             raise ValueError("Type must be 'EXTERNAL_STAGE' for _AzureStorageIntegration")
 
 
-class AzureStorageIntegration(ResourceNameTrait, Resource):
+class AzureStorageIntegration(NamedResource, Resource):
     """
     Description:
         Represents an Azure storage integration in Snowflake, which allows Snowflake to access external cloud storage using Azure credentials.

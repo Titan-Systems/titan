@@ -54,6 +54,8 @@ def resources_from_grants_config(grants_config: list) -> list:
             titan_grant = Grant(**grant)
         elif isinstance(grant, str):
             titan_grant = Grant.from_sql(grant)
+        else:
+            raise Exception(f"Unsupported grant found: {type(grant)}, {grant}")
         resources.append(titan_grant)
     return resources
 
@@ -122,13 +124,14 @@ def collect_resources_from_config(config: dict):
             if cache_pointer in resource_cache:
                 resource._data.on = ResourceName(str(resource_cache[cache_pointer].fqn))
 
-        for ref in resource.refs:
-            cache_pointer = (ref.resource_type, ResourceName(ref.name))
-            if (
-                isinstance(ref, ResourcePointer)
-                and cache_pointer in resource_cache
-                and resource_cache[cache_pointer]._container is not None
-            ):
-                ref._container = resource_cache[cache_pointer]._container
+        # TODO: investigate this
+        # for ref in resource.refs:
+        #     cache_pointer = (ref.resource_type, ResourceName(ref.name))
+        #     if (
+        #         isinstance(ref, ResourcePointer)
+        #         and cache_pointer in resource_cache
+        #         and resource_cache[cache_pointer]._container is not None
+        #     ):
+        #         ref._container = resource_cache[cache_pointer]._container
 
     return resources

@@ -9,7 +9,7 @@ from ..props import (
 )
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
-from .resource import Resource, ResourceNameTrait, ResourceSpec
+from .resource import Resource, NamedResource, ResourceSpec
 from .role import Role
 
 
@@ -29,7 +29,7 @@ class _PasswordSecret(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class PasswordSecret(ResourceNameTrait, Resource):
+class PasswordSecret(NamedResource, Resource):
     """
     Description:
         A Secret defines a set of sensitive data that can be used for authentication or other purposes.
@@ -109,7 +109,7 @@ class _GenericSecret(ResourceSpec):
     owner: Role = "SYSADMIN"
 
 
-class GenericSecret(ResourceNameTrait, Resource):
+class GenericSecret(NamedResource, Resource):
     """
     Description:
         A Secret defines a set of sensitive data that can be used for authentication or other purposes.
@@ -193,7 +193,7 @@ class _OAuthSecret(ResourceSpec):
             raise ValueError("Expiry time must be provided if refresh token is specified.")
 
 
-class OAuthSecret(ResourceNameTrait, Resource):
+class OAuthSecret(NamedResource, Resource):
     """
     Description:
         A Secret defines a set of sensitive data that can be used for authentication or other purposes.

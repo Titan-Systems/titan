@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .resource import Arg, Resource, ResourceSpec, ResourceNameTrait
+from .resource import Arg, Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..scope import SchemaScope
 from ..enums import DataType, ExecutionRights, NullHandling, Language, ResourceType
@@ -41,7 +41,7 @@ class _PythonStoredProcedure(ResourceSpec):
             raise ValueError("packages can't be empty")
 
 
-class PythonStoredProcedure(ResourceNameTrait, Resource):
+class PythonStoredProcedure(NamedResource, Resource):
     """
     Description:
         Represents a Python stored procedure in Snowflake, allowing for the execution of Python code within the Snowflake environment.

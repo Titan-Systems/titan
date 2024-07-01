@@ -1,20 +1,21 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
-from .compute_pool import ComputePool
-from .warehouse import Warehouse
 from ..enums import AccountEdition, ResourceType
+from ..props import (
+    BoolProp,
+    IdentifierListProp,
+    IdentifierProp,
+    IntProp,
+    Props,
+    StringProp,
+    TagsProp,
+)
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
-from ..props import (
-    StringProp,
-    IdentifierProp,
-    BoolProp,
-    IntProp,
-    TagsProp,
-    Props,
-    IdentifierListProp,
-)
+from .compute_pool import ComputePool
+from .resource import NamedResource, Resource, ResourceSpec
+from .tag import TaggableResource
+from .warehouse import Warehouse
 
 
 @dataclass(unsafe_hash=True)
@@ -29,11 +30,10 @@ class _ServiceSpec(ResourceSpec):
     min_instances: int = None
     max_instances: int = None
     query_warehouse: Warehouse = None
-    tags: dict[str, str] = None
     comment: str = None
 
 
-class Service(ResourceNameTrait, Resource):
+class Service(NamedResource, TaggableResource, Resource):
     """
     Description:
         Service is a managed resource in Snowflake that allows users to run instances of their applications
@@ -142,6 +142,6 @@ class Service(ResourceNameTrait, Resource):
             min_instances=min_instances,
             max_instances=max_instances,
             query_warehouse=query_warehouse,
-            tags=tags,
             comment=comment,
         )
+        self.set_tags(tags)

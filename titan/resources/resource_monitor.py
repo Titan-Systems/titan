@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
@@ -42,7 +42,7 @@ class _ResourceMonitor(ResourceSpec):
             raise ValueError("ResourceMonitors can only be created by ACCOUNTADMIN")
 
 
-class ResourceMonitor(ResourceNameTrait, Resource):
+class ResourceMonitor(NamedResource, Resource):
     """
     Description:
         Manages the monitoring of resource usage within an account.

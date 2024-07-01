@@ -31,7 +31,6 @@ setup(
     install_requires=[
         "click>=8.1.7",
         "inflection>=0.5.1",
-        "pygithub==1.55",
         "pyparsing>=3.0.9",
         "pyyaml",
         "snowflake-connector-python>=3.7.0",

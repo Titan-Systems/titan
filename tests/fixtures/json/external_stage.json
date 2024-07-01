@@ -13,6 +13,5 @@
         "enable": true,
         "refresh_on_create": true
     },
-    "tags": null,
     "comment": "This is an example of an external stage"
 }

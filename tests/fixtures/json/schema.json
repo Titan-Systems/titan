@@ -5,7 +5,6 @@
     "data_retention_time_in_days": 1,
     "max_data_extension_time_in_days": 14,
     "default_ddl_collation": null,
-    "tags": null,
     "owner": "SYSADMIN",
     "comment": "This is a schema for testing purposes"
 }

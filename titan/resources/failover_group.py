@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
 from ..enums import ParseableEnum, ResourceType
 from ..scope import AccountScope
@@ -45,7 +45,7 @@ class _FailoverGroup(ResourceSpec):
     owner: Role = "ACCOUNTADMIN"
 
 
-class FailoverGroup(ResourceNameTrait, Resource):
+class FailoverGroup(NamedResource, Resource):
     """
     Description:
         Represents a failover group in Snowflake, which is a collection of databases, shares, and other resources

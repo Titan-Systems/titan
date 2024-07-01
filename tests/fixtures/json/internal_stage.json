@@ -9,6 +9,5 @@
         "enable": true,
         "refresh_on_create": false
     },
-    "tags": null,
     "comment": "This is an example of an internal stage."
 }

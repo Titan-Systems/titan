@@ -1,21 +1,21 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, ResourceNameTrait
+from .resource import Resource, ResourceSpec, NamedResource
 from ..enums import ResourceType
 from ..props import Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope, DatabaseScope
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
 class _Role(ResourceSpec):
     name: ResourceName
     owner: str = "USERADMIN"
-    tags: dict[str, str] = None
     comment: str = None
 
 
-class Role(ResourceNameTrait, Resource):
+class Role(NamedResource, TaggableResource, Resource):
     """
     Description:
         A role in Snowflake defines a set of access controls and permissions.
@@ -69,12 +69,12 @@ class Role(ResourceNameTrait, Resource):
         self._data = _Role(
             name=self._name,
             owner=owner,
-            tags=tags,
             comment=comment,
         )
+        self.set_tags(tags)
 
 
-class DatabaseRole(ResourceNameTrait, Resource):
+class DatabaseRole(NamedResource, TaggableResource, Resource):
     """
     Description:
         A database role in Snowflake is a collection of privileges that can be assigned to users or other roles within a specific database context. It is used to manage access control and permissions at the database level.
@@ -134,9 +134,9 @@ class DatabaseRole(ResourceNameTrait, Resource):
         self._data: _Role = _Role(
             name=self._name,
             owner=owner,
-            tags=tags,
             comment=comment,
         )
+        self.set_tags(tags)
 
     def to_dict(self):
         data = super().to_dict()

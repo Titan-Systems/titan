@@ -2,3 +2,6 @@ users:
   - name: static_user
     email: info@applytitan.com
     comment: This is a static user
+  - name: TITAN_ADMIN
+    default_warehouse: CI
+    default_role: SYSADMIN

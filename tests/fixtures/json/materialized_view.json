@@ -6,7 +6,6 @@
     "cluster_by": [
         "id"
     ],
-    "tags": null,
     "copy_grants": false,
     "secure": false,
     "columns": null
