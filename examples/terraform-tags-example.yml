@@ -4,8 +4,7 @@ databases:
       cost_center: "finance"
     schemas:
       - name: "schema"
-        tags:
-          cost_center: "finance"
+
 tables:
   - name: "TABLE_NAME"
     database: "database"
@@ -27,4 +26,4 @@ tags:
   - name: "cost_center"
     allowed_values: ["finance", "engineering"]
     database: "database"
-    schema: "schema"
+    schema: "public"

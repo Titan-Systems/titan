@@ -41,3 +41,16 @@ class TableScope(ResourceScope):
         #     schema=self.schema_name,
         #     table=self.table_name,
         # )
+
+
+def resource_can_be_contained_in(resource, container):
+    container_type = container.__class__.__name__
+    if container_type == "ResourcePointer":
+        container_type = container.resource_type.value.title()
+    if (
+        (isinstance(resource.scope, AccountScope) and container_type == "Account")
+        or (isinstance(resource.scope, DatabaseScope) and container_type == "Database")
+        or (isinstance(resource.scope, SchemaScope) and container_type == "Schema")
+    ):
+        return True
+    return False

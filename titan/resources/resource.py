@@ -4,12 +4,12 @@ import types
 from dataclasses import dataclass, fields
 from inspect import isclass
 from itertools import chain
-from typing import Any, Type, TypedDict, Union, get_args, get_origin
+from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
 
 import pyparsing as pp
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
-from ..identifiers import URN
+from ..identifiers import URN, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
 from ..parse import _parse_create_header, _parse_props, _resolve_resource_class, parse_identifier
 from ..props import Props as ResourceProps
@@ -21,7 +21,16 @@ from ..scope import (
     OrganizationScope,
     ResourceScope,
     SchemaScope,
+    resource_can_be_contained_in,
 )
+
+
+class WrongContainerException(Exception):
+    pass
+
+
+class ResourceHasContainerException(Exception):
+    pass
 
 
 def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
@@ -167,6 +176,7 @@ class Resource(metaclass=_Resource):
         super().__init__()
         self._data: ResourceSpec = None
         self._container: "ResourceContainer" = None
+        self._dirty = False
         self.implicit = implicit
         self.refs = set()
 
@@ -257,7 +267,8 @@ class Resource(metaclass=_Resource):
 
     def __repr__(self):  # pragma: no cover
         name = getattr(self._data, "name", None)
-        return f"{self.__class__.__name__}({name})"
+        implicit = "~" if self.implicit else ""
+        return f"{self.__class__.__name__}({implicit}{name})"
 
     def __eq__(self, other):
         if not isinstance(other, Resource):
@@ -290,6 +301,8 @@ class Resource(metaclass=_Resource):
                 return {k: _serialize(v) for k, v in value.items()}
             elif isinstance(value, ResourceName):
                 return value._name
+            elif isinstance(value, ResourceTags):
+                return value.tags
             else:
                 return value
 
@@ -343,16 +356,15 @@ class Resource(metaclass=_Resource):
             elif database is not None:
                 database.find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(self)
 
+    def to_pointer(self):
+        return ResourcePointer(
+            name=str(self.fqn),
+            resource_type=self.resource_type,
+        )
+
     @property
     def container(self):
         return self._container
-
-    @property
-    def fqn(self):
-        name = getattr(self._data, "name")
-        if isinstance(name, ResourceName):
-            name = name._name
-        return self.scope.fully_qualified_name(self.container, name)
 
     @property
     def urn(self):
@@ -370,9 +382,10 @@ class ResourceContainer:
         if isinstance(items[0], list):
             items = items[0]
         for item in items:
-
+            if not resource_can_be_contained_in(item, self):
+                raise WrongContainerException(f"{item} cannot be added to {self}")
             if item.container is not None and not isinstance(item.container, ResourcePointer):
-                raise RuntimeError(f"{item} already belongs to a container")
+                raise ResourceHasContainerException(f"{item} already belongs to a container")
             item._container = self
             item.requires(self)
             if item.resource_type not in self._items:
@@ -395,8 +408,10 @@ class ResourceContainer:
 
     def remove(self, resource: Resource):
         if resource.resource_type in self._items:
-            self._items[resource.resource_type].remove(resource)
-            resource._container = None
+            for index, item in enumerate(self._items[resource.resource_type]):
+                if item is resource:
+                    self._items[resource.resource_type].pop(index)
+                    resource._container = None
             resource.refs.remove(self)
 
 
@@ -447,6 +462,10 @@ class ResourceNameTrait:
     def name(self):
         return self._name
 
+    @property
+    def fqn(self):
+        return self.scope.fully_qualified_name(self.container, self.name._name)
+
 
 class ResourcePointer(ResourceNameTrait, Resource, ResourceContainer):
     def __init__(self, name: str, resource_type: ResourceType):
@@ -460,20 +479,11 @@ class ResourcePointer(ResourceNameTrait, Resource, ResourceContainer):
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
             # self.add(ResourcePointer(name="INFORMATION_SCHEMA", resource_type=ResourceType.SCHEMA))
 
-    def __copy__(self):
-        raise Exception
-        return ResourcePointer(self._name, self._resource_type)
-
-    def __deepcopy__(self, memo):
-        raise Exception
-        result = ResourcePointer(self._name, self._resource_type)
-        memo[id(self)] = result
-        return result
-
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
+        resource_label = resource_label_for_type(resource_type).title() if resource_type else "resource"
         name = getattr(self, "name", None)
-        return f"<→{resource_type}:{name}>"
+        return f"{resource_label}(→{name})"
 
     def __eq__(self, other):
         if not isinstance(other, ResourcePointer):

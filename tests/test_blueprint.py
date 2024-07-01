@@ -2,10 +2,11 @@ import pytest
 
 
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, MarkedForReplacementException
+from titan.blueprint import Action, Blueprint, DuplicateResourceException
 from titan.enums import ResourceType
 from titan.identifiers import URN, FQN
 from titan.parse import parse_URN
+from titan.resources.resource import ResourcePointer
 
 
 @pytest.fixture
@@ -40,6 +41,7 @@ def test_blueprint_with_resources():
         handler="main",
         comment="This is a UDF comment",
     )
+    schema.add(udf)
     blueprint = Blueprint(name="blueprint", resources=[db, table, schema, view, udf])
     manifest = blueprint.generate_manifest(session_ctx)
 
@@ -73,14 +75,14 @@ def test_blueprint_with_resources():
     assert view_urn in manifest
     assert manifest[view_urn] == {
         "as_": "SELECT 1",
-        "change_tracking": None,
+        "change_tracking": False,
         "columns": None,
         "comment": None,
-        "copy_grants": None,
+        "copy_grants": False,
         "name": "VIEW",
         "owner": "SYSADMIN",
         "recursive": None,
-        "secure": None,
+        "secure": False,
         "tags": None,
         "volatile": None,
     }
@@ -98,6 +100,7 @@ def test_blueprint_with_resources():
                 "constraint": None,
                 "not_null": False,
                 "default": None,
+                "tags": None,
             }
         ],
         "constraints": None,
@@ -170,12 +173,28 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
 
 
 def test_blueprint_deduplicate_resources(session_ctx, remote_state):
-    blueprint = Blueprint(name="blueprint", resources=[res.Database("DB"), res.Database("DB")])
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            res.Database("DB"),
+            ResourcePointer(name="DB", resource_type=ResourceType.DATABASE),
+        ],
+    )
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
     assert plan[0].action == Action.ADD
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+
+    blueprint = Blueprint(
+        name="blueprint",
+        resources=[
+            res.Database("DB"),
+            res.Database("DB", comment="This is a comment"),
+        ],
+    )
+    with pytest.raises(DuplicateResourceException):
+        blueprint.generate_manifest(session_ctx)
 
     blueprint = Blueprint(
         name="blueprint",
@@ -193,7 +212,7 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
 
 def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
     db = res.Database("DB")
-    public = res.Schema(name="PUBLIC", database=db, comment="this is ignored")
+    public = ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA)
     blueprint = Blueprint(
         name="blueprint",
         resources=[db, public],

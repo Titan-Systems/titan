@@ -3,9 +3,11 @@ from dataclasses import dataclass
 from ..enums import ResourceType
 from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
-from ..resource_tags import ResourceTags
+
+# from ..resource_tags import ResourceTags
 from ..scope import AccountScope
 from .resource import Resource, ResourceContainer, ResourceNameTrait, ResourceSpec
+from .tag import TaggableResource
 from .role import Role
 from .schema import Schema
 
@@ -18,11 +20,11 @@ class _Database(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    tags: ResourceTags = None
+    # tags: ResourceTags = None
     comment: str = None
 
 
-class Database(ResourceNameTrait, Resource, ResourceContainer):
+class Database(ResourceNameTrait, TaggableResource, Resource, ResourceContainer):
     """
     Description:
         Represents a database in Snowflake.
@@ -150,15 +152,14 @@ class Database(ResourceNameTrait, Resource, ResourceContainer):
             data_retention_time_in_days=data_retention_time_in_days,
             max_data_extension_time_in_days=max_data_extension_time_in_days,
             default_ddl_collation=default_ddl_collation,
-            tags=tags,
             comment=comment,
         )
         if self._data.name != "SNOWFLAKE":
             self.add(
                 Schema(name="PUBLIC", implicit=True),
-                Schema(name="INFORMATION_SCHEMA", implicit=True, owner=""),
             )
         self.requires(self._data.owner)
+        self.set_tags(tags)
 
     def schemas(self):
         return self.items(resource_type=ResourceType.SCHEMA)
@@ -166,7 +167,3 @@ class Database(ResourceNameTrait, Resource, ResourceContainer):
     @property
     def public_schema(self) -> Schema:
         return self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA)
-
-    @property
-    def information_schema(self) -> Schema:
-        return self.find(name="INFORMATION_SCHEMA", resource_type=ResourceType.SCHEMA)

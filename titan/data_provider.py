@@ -16,7 +16,13 @@ from .builtins import (
     SYSTEM_SECURITY_INTEGRATIONS,
     SYSTEM_USERS,
 )
-from .client import DOES_NOT_EXIST_ERR, OBJECT_DOES_NOT_EXIST_ERR, UNSUPPORTED_FEATURE, execute
+from .client import (
+    DOES_NOT_EXIST_ERR,
+    INVALID_IDENTIFIER,
+    OBJECT_DOES_NOT_EXIST_ERR,
+    UNSUPPORTED_FEATURE,
+    execute,
+)
 from .enums import ResourceType, WarehouseSize
 from .identifiers import FQN, URN, resource_type_for_label
 from .parse import (
@@ -1561,6 +1567,43 @@ def fetch_table(session, fqn: FQN):
         "change_tracking": data["change_tracking"] == "ON",
         "tags": tags,
     }
+
+
+def fetch_tag_reference(session, fqn: FQN):
+    session_ctx = fetch_session(session)
+    if session_ctx["tag_support"] is False:
+        return None
+
+    resource_type, resource_name = fqn.name.split("/")
+
+    resource_database = None
+    if resource_type == "DATABASE":
+        resource_database = resource_name
+    else:
+        raise NotImplementedError(f"Tagging of {resource_type} is not supported")
+
+    try:
+        tag_refs = execute(
+            session,
+            f"""
+                SELECT *
+                FROM table({resource_database}.information_schema.tag_references(
+                    '{resource_name}', '{str(resource_type)}'
+                ))""",
+        )
+    except ProgrammingError as err:
+        if err.errno == INVALID_IDENTIFIER:
+            return None
+        raise
+
+    if len(tag_refs) == 0:
+        return None
+
+    tag_map = {}
+    for tag_ref in tag_refs:
+        tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
+        tag_map[tag_name] = tag_ref["TAG_VALUE"]
+    return tag_map
 
 
 def fetch_user(session, fqn: FQN) -> Optional[dict]:

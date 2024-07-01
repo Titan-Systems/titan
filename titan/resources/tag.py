@@ -1,11 +1,13 @@
 from dataclasses import dataclass
+from typing import Optional
 
+from ..identifiers import FQN
 from ..enums import AccountEdition, ResourceType
 from ..props import Props, StringListProp, StringProp
 from ..resource_name import ResourceName
+from ..resource_tags import ResourceTags
 from ..scope import SchemaScope
-from .resource import Resource, ResourceNameTrait, ResourceSpec
-from .role import Role
+from .resource import Resource, ResourcePointer, ResourceNameTrait, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
@@ -73,3 +75,60 @@ class Tag(ResourceNameTrait, Resource):
             comment=comment,
             allowed_values=allowed_values,
         )
+
+
+@dataclass(unsafe_hash=True)
+class _TagReference(ResourceSpec):
+    object_name: ResourceName
+    object_domain: str = None
+    tags: ResourceTags = None
+
+
+class TagReference(Resource):
+
+    edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
+    resource_type = ResourceType.TAG_REFERENCE
+    props = Props()
+    scope = SchemaScope()
+    spec = _TagReference
+
+    def __init__(
+        self,
+        object_name: str,
+        object_domain: ResourceType = None,
+        tags: ResourceTags = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self._data: _TagReference = _TagReference(
+            object_name=object_name,
+            object_domain=object_domain,
+            tags=tags,
+        )
+
+    @property
+    def fqn(self):
+        return tag_reference_fqn(self._data)
+
+
+class TaggableResource:
+    def __init__(self, **kwargs):
+        self._tag_reference: Optional[TagReference] = None
+        super().__init__(**kwargs)
+
+    def set_tags(self, tags: dict[str, str]):
+        if tags is None:
+            return
+        self._tag_reference = TagReference(
+            object_name=str(self.fqn),
+            object_domain=self.resource_type,
+            tags=ResourceTags(tags),
+        )
+        self._tag_reference.requires(self)
+        for tag in tags.keys():
+            tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
+            self._tag_reference.requires(tag_ptr)
+
+
+def tag_reference_fqn(data: _TagReference) -> FQN:
+    return FQN(name=f"{data.object_domain}/{data.object_name}")

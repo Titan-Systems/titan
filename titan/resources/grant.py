@@ -24,7 +24,7 @@ class _Grant(ResourceSpec):
     on_type: ResourceType
     to: Role
     grant_option: bool = False
-    owner: Role = None
+    owner: Role = field(default_factory=None, metadata={"fetchable": False})
     _privs: list[str] = field(default_factory=list, metadata={"forces_add": True})
 
     def __post_init__(self):

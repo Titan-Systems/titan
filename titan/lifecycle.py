@@ -155,6 +155,17 @@ def create_table(urn: URN, data: dict, props: Props, if_not_exists: bool = False
     )
 
 
+def create_tag_reference(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    tags_sql = ", ".join([f"{k}='{v}'" for k, v in data["tags"].items()])
+    return tidy_sql(
+        "ALTER",
+        data["object_domain"],
+        data["object_name"],
+        "SET TAG",
+        tags_sql,
+    )
+
+
 def update_resource(urn: URN, data: dict) -> str:
     return getattr(__this__, f"update_{urn.resource_label}", update__default)(urn, data)
 

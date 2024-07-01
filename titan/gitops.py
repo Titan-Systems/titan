@@ -125,13 +125,13 @@ def collect_resources_from_config(config: dict):
                 resource._data.on = ResourceName(str(resource_cache[cache_pointer].fqn))
 
         # TODO: investigate this
-        for ref in resource.refs:
-            cache_pointer = (ref.resource_type, ResourceName(ref.name))
-            if (
-                isinstance(ref, ResourcePointer)
-                and cache_pointer in resource_cache
-                and resource_cache[cache_pointer]._container is not None
-            ):
-                ref._container = resource_cache[cache_pointer]._container
+        # for ref in resource.refs:
+        #     cache_pointer = (ref.resource_type, ResourceName(ref.name))
+        #     if (
+        #         isinstance(ref, ResourcePointer)
+        #         and cache_pointer in resource_cache
+        #         and resource_cache[cache_pointer]._container is not None
+        #     ):
+        #         ref._container = resource_cache[cache_pointer]._container
 
     return resources

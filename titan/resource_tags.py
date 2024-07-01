@@ -26,3 +26,6 @@ class ResourceTags:
 
     def tag_names(self):
         return self.tags.keys()
+
+    def items(self):
+        return self.tags.items()
