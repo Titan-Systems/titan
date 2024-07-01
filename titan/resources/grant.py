@@ -236,7 +236,42 @@ class _FutureGrant(ResourceSpec):
 
 class FutureGrant(Resource):
     """
-    GRANT <privilege> ON FUTURE <on_type> IN <in_type> <in_name> TO <to> [ WITH GRANT OPTION ]
+    Description:
+        Represents a future grant of privileges on a resource to a role in Snowflake.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/grant-privilege
+
+    Fields:
+        priv (string, required): The privilege to grant. Examples include 'SELECT', 'INSERT', 'CREATE TABLE'.
+        on_type (string or ResourceType, required): The type of resource on which the privilege is granted.
+        in_type (string or ResourceType, required): The type of container resource in which the privilege is granted.
+        in_name (string, required): The name of the container resource in which the privilege is granted.
+        to (string or Role, required): The role to which the privileges are granted.
+        grant_option (bool): Specifies whether the grantee can grant the privileges to other roles. Defaults to False.
+
+    Python:
+
+        ```python
+        future_grant = FutureGrant(
+            priv="SELECT",
+            on_type="TABLE",
+            in_type="SCHEMA",
+            in_name="someschema",
+            to="somerole",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        future_grants:
+          - priv: SELECT
+            on_type: TABLE
+            in_type: SCHEMA
+            in_name: someschema
+            to: somerole
+        ```
     """
 
     resource_type = ResourceType.FUTURE_GRANT
@@ -512,7 +547,38 @@ class _RoleGrant(ResourceSpec):
 
 class RoleGrant(Resource):
     """
-    GRANT ROLE <name> TO { ROLE <parent_role_name> | USER <user_name> }
+    Description:
+        Represents a grant of a role to another role or user in Snowflake.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/grant-role
+
+    Fields:
+        role (string or Role, required): The role to be granted.
+        to_role (string or Role): The role to which the role is granted.
+        to_user (string or User): The user to which the role is granted.
+
+    Python:
+
+        ```python
+        # Grant to Role:
+        role_grant = RoleGrant(role="somerole", to_role="someotherrole")
+        role_grant = RoleGrant(role="somerole", to=Role(name="someotherrole"))
+
+        # Grant to User:
+        role_grant = RoleGrant(role="somerole", to_user="someuser")
+        role_grant = RoleGrant(role="somerole", to=User(name="someuser"))
+        ```
+
+    Yaml:
+
+        ```yaml
+        role_grants:
+          - role: somerole
+            to_role: someotherrole
+          - role: somerole
+            to_user: someuser
+        ```
     """
 
     resource_type = ResourceType.ROLE_GRANT
@@ -580,15 +646,6 @@ class RoleGrant(Resource):
         to_user = getattr(self._data, "to_user", "")
         to = to_role or to_user
         return f"RoleGrant(role={role}, to={to})"
-
-    # @property
-    # def fqn(self):
-    #     subject = "user" if self._data.to_user else "role"
-    #     name = self._data.to_user.name if self._data.to_user else self._data.to_role.name
-    #     return FQN(
-    #         name=self._data.role.name,
-    #         params={subject: name},
-    #     )
 
     @property
     def fqn(self):

@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from ..enums import DataType, ResourceType
 from ..parse import _parse_column, _parse_props
 from ..props import FlagProp, Props, StringProp, TagsProp
+from ..resource_tags import ResourceTags
 from ..scope import TableScope
 from .resource import Resource, ResourceSpec
-from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -17,9 +17,10 @@ class _Column(ResourceSpec):
     not_null: bool = False
     constraint: str = None
     default: str = None
+    tags: ResourceTags = None
 
 
-class Column(TaggableResource, Resource):
+class Column(Resource):
     """
     <col_name> <col_type>
       [ COLLATE '<collation_specification>' ]
@@ -69,8 +70,8 @@ class Column(TaggableResource, Resource):
             not_null=not_null,
             constraint=constraint,
             default=default,
+            tags=tags,
         )
-        self.set_tags(tags)
 
     @classmethod
     def from_sql(cls, sql):

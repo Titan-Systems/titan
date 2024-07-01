@@ -17,6 +17,7 @@ from ..scope import SchemaScope
 from .column import Column
 from .resource import NamedResource, Resource, ResourceName, ResourceSpec
 from .role import Role
+from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
@@ -45,7 +46,7 @@ class _Table(ResourceSpec):
             raise ValueError("columns can't be empty")
 
 
-class Table(NamedResource, Resource):
+class Table(NamedResource, TaggableResource, Resource):
     """
     Description:
         A table in Snowflake.
