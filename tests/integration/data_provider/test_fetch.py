@@ -70,10 +70,20 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "data_retention_time_in_days": 90,
         "max_data_extension_time_in_days": 14,
         "default_ddl_collation": None,
-        "tags": {"STATIC_DATABASE.PUBLIC.STATIC_TAG": "STATIC_TAG_VALUE"},
         "owner": TEST_ROLE,
         "comment": None,
     }
+    tags = safe_fetch(
+        cursor,
+        URN(
+            resource_type=ResourceType.TAG_REFERENCE,
+            fqn=FQN(name=f"{test_db}.ENTERPRISE_TEST_SCHEMA", params={"domain": "SCHEMA"}),
+            account_locator=account_locator,
+        ),
+    )
+    assert tags is not None
+    assert "STATIC_DATABASE.PUBLIC.STATIC_TAG" in tags
+    assert tags["STATIC_DATABASE.PUBLIC.STATIC_TAG"] == "STATIC_TAG_VALUE"
 
 
 def test_fetch_grant_on_account(cursor, suffix):

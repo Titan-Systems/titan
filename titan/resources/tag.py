@@ -79,9 +79,9 @@ class Tag(NamedResource, Resource):
 
 @dataclass(unsafe_hash=True)
 class _TagReference(ResourceSpec):
-    object_name: ResourceName
-    object_domain: str = None
-    tags: ResourceTags = None
+    object_name: str
+    object_domain: str
+    tags: ResourceTags
 
 
 class TagReference(Resource):
@@ -95,8 +95,8 @@ class TagReference(Resource):
     def __init__(
         self,
         object_name: str,
-        object_domain: ResourceType = None,
-        tags: dict[str, str] = None,
+        object_domain: ResourceType,
+        tags: dict[str, str],
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -116,27 +116,50 @@ class TagReference(Resource):
 
 
 def tag_reference_fqn(data: _TagReference) -> FQN:
-    return FQN(name=f"{data.object_domain}/{data.object_name}")
+    return FQN(
+        name=data.object_name,
+        params={
+            "domain": data.object_domain,
+        },
+    )
 
 
 class TaggableResource:
     def __init__(self, **kwargs):
-        self._tag_reference: Optional[TagReference] = None
         super().__init__(**kwargs)
+        self._tags: Optional[TagReference] = None
 
     def set_tags(self, tags: dict[str, str]):
         if tags is None:
             return
-        self._tag_reference = TagReference(
+        if self._tags is None:
+            self._tags = ResourceTags(tags)
+        else:
+            raise ValueError("Tags cannot be set on a resource that already has tags")
+        # self._tag_reference = TagReference(
+        #     object_name=str(self.fqn),
+        #     object_domain=self.resource_type,
+        #     tags=ResourceTags(tags),
+        # )
+        # self._tag_reference.requires(self)
+        # for tag in tags.keys():
+        #     tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
+        #     self._tag_reference.requires(tag_ptr)
+
+    def create_tag_reference(self):
+        if self._tags is None:
+            return None
+        ref = TagReference(
             object_name=str(self.fqn),
             object_domain=self.resource_type,
-            tags=ResourceTags(tags),
+            tags=self._tags,
         )
-        self._tag_reference.requires(self)
-        for tag in tags.keys():
+        ref.requires(self)
+        for tag in self._tags.keys():
             tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
-            self._tag_reference.requires(tag_ptr)
+            ref.requires(tag_ptr)
+        return ref
 
     @property
     def tags(self) -> Optional[ResourceTags]:
-        return self._tag_reference.tags if self._tag_reference else None
+        return self._tags

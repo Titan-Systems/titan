@@ -221,8 +221,6 @@ def _split_by_scope(
                 route(item)
 
     for resource in resources:
-        if isinstance(resource, TaggableResource) and resource._tag_reference:
-            route(resource._tag_reference)
         root = resource
         while root.container is not None:
             root = root.container
@@ -581,7 +579,15 @@ class Blueprint:
 
             for ref in resource.refs:
                 if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
+                    raise Exception
                     resource.container.add(ref)
+
+    def _create_tag_references(self):
+        for resource in _walk(self._root):
+            if isinstance(resource, TaggableResource):
+                tag_ref = resource.create_tag_reference()
+                if tag_ref:
+                    self._root.add(tag_ref)
 
     def generate_manifest(self, session_context: dict = {}) -> Manifest:
         manifest: Manifest = {}
@@ -590,7 +596,7 @@ class Blueprint:
 
         self._finalize(session_context)
 
-        print("")
+        self._create_tag_references()
 
         for resource in _walk(self._root):
             if isinstance(resource, Resource):

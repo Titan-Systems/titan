@@ -1565,21 +1565,16 @@ def fetch_tag_reference(session, fqn: FQN):
     if session_ctx["tag_support"] is False:
         return None
 
-    resource_type, resource_name = fqn.name.split("/")
-
-    resource_database = None
-    if resource_type == "DATABASE":
-        resource_database = resource_name
-    else:
-        raise NotImplementedError(f"Tagging of {resource_type} is not supported")
+    object_domain = fqn.params["domain"]
+    resource_fqn = parse_identifier(fqn.name, is_db_scoped=(object_domain == "SCHEMA"))
 
     try:
         tag_refs = execute(
             session,
             f"""
                 SELECT *
-                FROM table({resource_database}.information_schema.tag_references(
-                    '{resource_name}', '{str(resource_type)}'
+                FROM table({resource_fqn.database}.information_schema.tag_references(
+                    '{resource_fqn}', '{object_domain}'
                 ))""",
         )
     except ProgrammingError as err:
