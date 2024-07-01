@@ -36,10 +36,10 @@ class _User(ResourceSpec):
 
     def __post_init__(self):
         super().__post_init__()
-        if not self.login_name:
-            self.login_name = str(self.name).upper()
-        if not self.display_name:
-            self.display_name = str(self.name).lower()
+        if self.login_name is None or self.login_name == "":
+            self.login_name = self.name._name.upper()
+        if self.display_name is None:
+            self.display_name = self.name._name
 
 
 class User(NamedResource, TaggableResource, Resource):

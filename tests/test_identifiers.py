@@ -54,11 +54,15 @@ def test_resource_name():
 
 def test_resource_name_equality():
     rn1 = ResourceName("test")
-    rn2 = ResourceName("test")
+    rn2 = ResourceName("TEST")
     assert rn1 == rn2
 
     rn1 = ResourceName('"test"')
     rn2 = ResourceName('"test"')
+    assert rn1 == rn2
+
+    rn1 = ResourceName("test")
+    rn2 = ResourceName('"TEST"')
     assert rn1 == rn2
 
     rn1 = ResourceName("test")

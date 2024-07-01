@@ -22,6 +22,7 @@ def load_and_run_config(conn, file, run_mode, allowlist):
         run_mode=run_mode,
         allowlist=allowlist,
         resources=collect_resources_from_config(config),
+        dry_run=True,
     )
     plan = bp.plan(conn)
     print_plan(plan)
@@ -36,7 +37,7 @@ def main():
     load_and_run_config(
         conn,
         "test_account_users.yml",
-        "CREATE-OR-UPDATE",
+        "SYNC-ALL",
         ["user"],
     )
     load_and_run_config(

@@ -1,3 +1,4 @@
+import re
 from typing import Union
 
 import pyparsing as pp
@@ -47,8 +48,21 @@ class ResourceName:
             return self._name == other._name
         elif not self._quoted and not other._quoted:
             return self._name.upper() == other._name.upper()
+        elif self._quoted and not other._quoted:
+            return self._name == other._name.upper()
+        elif not self._quoted and other._quoted:
+            return self._name.upper() == other._name
         else:
-            return False
+            raise ValueError("Cannot compare ResourceName with a non-ResourceName")
+
+    @classmethod
+    def from_snowflake_metadata(cls, name: str) -> "ResourceName":
+        if name.startswith('"') and name.endswith('"'):
+            raise RuntimeError(f"{name} is not from snowflake metadata")
+        if re.match(r"^[A-Z_][A-Z0-9_]*$", name):
+            return cls(name)
+        else:
+            return cls(f'"{name}"')
 
     def upper(self):
         return self

@@ -38,8 +38,8 @@ from .resource_name import ResourceName, attribute_is_resource_name
 __this__ = sys.modules[__name__]
 
 
-def _quote_identifier(identifier: Union[str, ResourceName]) -> str:
-    return str(ResourceName(identifier))
+def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
+    return str(ResourceName.from_snowflake_metadata(identifier))
 
 
 def _desc_result_to_dict(desc_result):
@@ -108,7 +108,7 @@ def _filter_result(result, **kwargs):
                 continue
             # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
             if attribute_is_resource_name(key):
-                if ResourceName(row[key]) != ResourceName(value):
+                if ResourceName.from_snowflake_metadata(row[key]) != ResourceName(value):
                     break
             else:
                 if row[key] != value:
@@ -408,7 +408,7 @@ def fetch_aggregation_policy(session, fqn: FQN):
     desc_result = execute(session, f"DESC AGGREGATION POLICY {fqn}")
     properties = desc_result[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "body": properties["body"],
         "owner": data["owner"],
     }
@@ -423,7 +423,7 @@ def fetch_alert(session, fqn: FQN):
         raise Exception(f"Found multiple alerts matching {fqn}")
     data = alerts[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "warehouse": data["warehouse"],
         "schedule": data["schedule"],
         "comment": data["comment"] or None,
@@ -445,7 +445,7 @@ def fetch_api_integration(session, fqn: FQN):
     owner = _fetch_owner(session, "INTEGRATION", fqn)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "api_provider": properties["api_provider"],
         "api_aws_role_arn": properties["api_aws_role_arn"],
         "enabled": properties["enabled"],
@@ -471,7 +471,7 @@ def fetch_catalog_integration(session, fqn: FQN):
 
     if properties["catalog_source"] == "GLUE":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "catalog_source": properties["catalog_source"],
             "catalog_namespace": properties["catalog_namespace"],
             "table_format": properties["table_format"],
@@ -484,7 +484,7 @@ def fetch_catalog_integration(session, fqn: FQN):
         }
     elif properties["catalog_source"] == "OBJECT_STORE":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "catalog_source": properties["catalog_source"],
             "table_format": properties["table_format"],
             "enabled": properties["enabled"],
@@ -528,7 +528,7 @@ def fetch_compute_pool(session, fqn: FQN):
     data = show_result[0]
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "min_nodes": data["min_nodes"],
         "max_nodes": data["max_nodes"],
         "instance_family": data["instance_family"],
@@ -559,7 +559,7 @@ def fetch_database(session, fqn: FQN):
     params = params_result_to_dict(show_params_result)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "data_retention_time_in_days": int(data["retention_time"]),
         "comment": data["comment"] or None,
         "transient": "TRANSIENT" in options,
@@ -578,7 +578,7 @@ def fetch_database_role(session, fqn: FQN):
         raise Exception(f"Found multiple database roles matching {fqn}")
     data = roles[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "database": fqn.database,
         "comment": data["comment"] or None,
@@ -599,7 +599,7 @@ def fetch_dynamic_table(session, fqn: FQN):
     data = show_result[0]
     refresh_mode, initialize, as_ = _parse_dynamic_table_text(data["text"])
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "warehouse": data["warehouse"],
         "refresh_mode": refresh_mode,
@@ -623,7 +623,7 @@ def fetch_event_table(session, fqn: FQN):
 
     data = tables[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "comment": data["comment"] or None,
         "cluster_by": _parse_cluster_keys(data["cluster_by"]),
         "data_retention_time_in_days": int(data["retention_time"]),
@@ -644,7 +644,7 @@ def fetch_file_format(session, fqn: FQN):
 
     return {
         "type": data["type"],
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "field_delimiter": format_options["FIELD_DELIMITER"],
         "skip_header": format_options["SKIP_HEADER"],
@@ -689,7 +689,7 @@ def fetch_function(session, fqn: FQN):
     properties = _desc_result_to_dict(desc_result)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "secure": data["is_secure"] == "Y",
         # "args": data["arguments"],
         "returns": output,
@@ -892,7 +892,7 @@ def fetch_notification_integration(session, fqn: FQN):
     if data["type"] == "EMAIL":
 
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "type": data["type"],
             "enabled": data["enabled"] == "true",
             "allowed_recipients": properties["allowed_recipients"],
@@ -915,7 +915,7 @@ def fetch_packages_policy(session, fqn: FQN):
     properties = desc_result[0]
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "language": properties["language"],
         "allowlist": _parse_packages(properties["allowlist"]),
         "blocklist": _parse_packages(properties["blocklist"]),
@@ -938,7 +938,7 @@ def fetch_password_policy(session, fqn: FQN):
     properties = _desc_result_to_dict(desc_result)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "password_min_length": int(properties["PASSWORD_MIN_LENGTH"]),
         "password_max_length": int(properties["PASSWORD_MAX_LENGTH"]),
         "password_min_upper_case_chars": int(properties["PASSWORD_MIN_UPPER_CASE_CHARS"]),
@@ -967,7 +967,7 @@ def fetch_pipe(session, fqn: FQN):
     # desc_result = execute(session, f"DESC PIPE {fqn}", cacheable=True)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "as_": data["definition"],
         "owner": data["owner"],
         "error_integration": data["error_integration"],
@@ -1057,7 +1057,7 @@ def fetch_role(session, fqn: FQN):
     data = roles[0]
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "comment": data["comment"] or None,
         "owner": data["owner"],
     }
@@ -1078,17 +1078,20 @@ def fetch_role_grant(session, fqn: FQN):
         return None
 
     for data in show_result:
-        if ResourceName(data["granted_to"]) == subject and ResourceName(data["grantee_name"]) == name:
+        if (
+            ResourceName.from_snowflake_metadata(data["granted_to"]) == subject
+            and ResourceName.from_snowflake_metadata(data["grantee_name"]) == name
+        ):
             if data["granted_to"] == "ROLE":
                 return {
-                    "role": _quote_identifier(fqn.name),
-                    "to_role": _quote_identifier(data["grantee_name"]),
+                    "role": fqn.name,
+                    "to_role": _quote_snowflake_identifier(data["grantee_name"]),
                     # "owner": data["granted_by"],
                 }
             elif data["granted_to"] == "USER":
                 return {
-                    "role": _quote_identifier(fqn.name),
-                    "to_user": _quote_identifier(data["grantee_name"]),
+                    "role": fqn.name,
+                    "to_user": _quote_snowflake_identifier(data["grantee_name"]),
                     # "owner": data["granted_by"],
                 }
             else:
@@ -1118,7 +1121,7 @@ def fetch_schema(session, fqn: FQN):
     params = params_result_to_dict(show_params_result)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "transient": "TRANSIENT" in options,
         "owner": data["owner"],
         "managed_access": "MANAGED ACCESS" in options,
@@ -1140,7 +1143,7 @@ def fetch_secret(session, fqn: FQN):
     properties = desc_result[0]
     if data["secret_type"] == "PASSWORD":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "secret_type": data["secret_type"],
             "username": properties["username"],
             "comment": data["comment"] or None,
@@ -1148,14 +1151,14 @@ def fetch_secret(session, fqn: FQN):
         }
     elif data["secret_type"] == "GENERIC_STRING":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "secret_type": data["secret_type"],
             "comment": data["comment"] or None,
             "owner": data["owner"],
         }
     elif data["secret_type"] == "OAUTH2":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "api_authentication": properties["integration_name"],
             "secret_type": data["secret_type"],
             "oauth_scopes": data["oauth_scopes"],
@@ -1186,7 +1189,7 @@ def fetch_security_integration(session, fqn: FQN):
 
     if data["type"] == "API_AUTHENTICATION":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "type": data["type"],
             "auth_type": properties["auth_type"],
             "enabled": data["enabled"] == "true",
@@ -1203,7 +1206,7 @@ def fetch_security_integration(session, fqn: FQN):
         type_, oauth_client = data["type"].split(" - ")
         if oauth_client == "SNOWSERVICES_INGRESS":
             return {
-                "name": data["name"],
+                "name": _quote_snowflake_identifier(data["name"]),
                 "type": type_,
                 "oauth_client": oauth_client,
                 "enabled": data["enabled"] == "true",
@@ -1211,7 +1214,7 @@ def fetch_security_integration(session, fqn: FQN):
     raise Exception(f"Unsupported security integration type {data['type']}")
 
     # return {
-    #     "name": data["name"],
+    #     "name": _quote_snowflake_identifier(data["name"]),
     #     "type": type_,
     #     "enabled": data["enabled"] == "true",
     #     "oauth_client": oauth_client,
@@ -1233,7 +1236,7 @@ def fetch_sequence(session, fqn: FQN):
     data = show_result[0]
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "start": data["next_value"],
         "increment": data["interval"],
@@ -1277,7 +1280,7 @@ def fetch_share(session, fqn: FQN):
 
     data = shares[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "comment": data["comment"] or None,
     }
@@ -1296,7 +1299,7 @@ def fetch_shared_database(session, fqn: FQN):
 
     data = shares[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "from_share": data["origin"],
         "owner": data["owner"],
     }
@@ -1317,7 +1320,7 @@ def fetch_stage(session, fqn: FQN):
 
     if data["type"] == "EXTERNAL":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "url": data["url"],
             "owner": data["owner"],
             "type": data["type"],
@@ -1327,7 +1330,7 @@ def fetch_stage(session, fqn: FQN):
         }
     elif data["type"] == "INTERNAL":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "owner": data["owner"],
             "type": data["type"],
             "directory": {"enable": data["directory_enabled"] == "Y"},
@@ -1355,7 +1358,7 @@ def fetch_storage_integration(session, fqn: FQN):
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "type": data["type"],
         "enabled": data["enabled"] == "true",
         "comment": data["comment"] or None,
@@ -1381,7 +1384,7 @@ def fetch_stream(session, fqn: FQN):
     data = streams[0]
     if data["source_type"] == "Table":
         return {
-            "name": data["name"],
+            "name": _quote_snowflake_identifier(data["name"]),
             "comment": data["comment"] or None,
             "append_only": data["mode"] == "APPEND_ONLY",
             "on_table": data["table_name"],
@@ -1405,7 +1408,7 @@ def fetch_tag(session, fqn: FQN):
         raise Exception(f"Found multiple tags matching {fqn}")
     data = tags[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "comment": data["comment"] or None,
         "allowed_values": json.loads(data["allowed_values"]) if data["allowed_values"] else None,
     }
@@ -1425,7 +1428,7 @@ def fetch_task(session, fqn: FQN):
         raise Exception(f"Failed to fetch task details for {fqn}")
     task_details = task_details_result[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "warehouse": data["warehouse"],
         "schedule": data["schedule"],
         "state": str(data["state"]).upper(),
@@ -1447,7 +1450,7 @@ def fetch_replication_group(session, fqn: FQN):
     show_databases_result = execute(session, f"SHOW DATABASES IN REPLICATION GROUP {fqn.name}")
     databases = [row["name"] for row in show_databases_result]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "object_types": data["object_types"].split(","),
         "allowed_integration_types": (
             None if data["allowed_integration_types"] == "" else data["allowed_integration_types"].split(",")
@@ -1468,7 +1471,7 @@ def fetch_resource_monitor(session, fqn: FQN):
         raise Exception(f"Found multiple resource monitors matching {fqn}")
     data = resource_monitors[0]
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "credit_quota": int(float(data["credit_quota"])) if data["credit_quota"] else None,
         "frequency": data["frequency"],
@@ -1543,7 +1546,7 @@ def fetch_table(session, fqn: FQN):
     params = params_result_to_dict(show_params_result)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "columns": columns,
         "cluster_by": _parse_cluster_keys(data["cluster_by"]),
         "transient": data["kind"] == "TRANSIENT",
@@ -1610,7 +1613,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
     data = users[0]
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "login_name": data["login_name"],
         "display_name": data["display_name"],
         "first_name": data["first_name"] or None,
@@ -1651,7 +1654,7 @@ def fetch_view(session, fqn: FQN):
     columns = fetch_columns(session, "VIEW", fqn)
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "secure": data["is_secure"] == "true",
         "columns": columns,
@@ -1684,7 +1687,7 @@ def fetch_warehouse(session, fqn: FQN):
         query_accel = False
 
     return {
-        "name": data["name"],
+        "name": _quote_snowflake_identifier(data["name"]),
         "owner": data["owner"],
         "warehouse_type": data["type"],
         "warehouse_size": str(WarehouseSize(data["size"])),

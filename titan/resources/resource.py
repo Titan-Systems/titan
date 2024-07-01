@@ -464,7 +464,7 @@ class NamedResource:
 
     @property
     def fqn(self):
-        return self.scope.fully_qualified_name(self.container, self.name._name)
+        return self.scope.fully_qualified_name(self.container, str(self.name))
 
 
 class ResourcePointer(NamedResource, Resource, ResourceContainer):
