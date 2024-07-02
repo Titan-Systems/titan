@@ -358,18 +358,24 @@ def test_blueprint_ownership_sorting():
         parse_URN("urn:::account/SOMEACCT"): {},
     }
     role = res.Role(name="SOME_ROLE")
-    db1 = res.Database(name="DB1")
-    db2 = res.Database(name="DB2", owner=role)
+    db1 = res.Database(name="DB1", owner=role)
 
-    blueprint = Blueprint(resources=[db2, db1, role])
+    blueprint = Blueprint(resources=[db1, role])
     manifest = blueprint.generate_manifest(session_ctx)
-    assert (db2.urn, role.urn) in manifest._refs
+    assert (db1.urn, role.urn) in manifest._refs
 
     plan = blueprint._plan(remote_state, manifest)
-    assert len(plan) == 3
+    assert len(plan) == 2
     assert plan[0].action == Action.ADD
     assert plan[0].urn == parse_URN("urn:::role/SOME_ROLE")
     assert plan[1].action == Action.ADD
     assert plan[1].urn == parse_URN("urn:::database/DB1")
-    assert plan[2].action == Action.ADD
-    assert plan[2].urn == parse_URN("urn:::database/DB2")
+
+    sql = blueprint._compile_plan_to_sql(session_ctx, plan)
+    assert len(sql) == 6
+    assert sql[0] == "USE SECONDARY ROLES ALL"
+    assert sql[1] == "USE ROLE USERADMIN"
+    assert sql[2] == "CREATE ROLE SOME_ROLE"
+    assert sql[3] == "USE ROLE SYSADMIN"
+    assert sql[4] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+    assert sql[5] == "GRANT OWNERSHIP ON DATABASE DB1 TO SOME_ROLE"

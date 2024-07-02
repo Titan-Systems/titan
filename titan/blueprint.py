@@ -372,7 +372,6 @@ class Blueprint:
         self._root: Account = None
         self._run_mode: RunMode = RunMode(run_mode)
         self._dry_run: bool = dry_run
-        self._ignore_ownership: bool = ignore_ownership
         self._allowlist: list[ResourceType] = [ResourceType(v) for v in allowlist or []]
 
         if self._run_mode == RunMode.SYNC_ALL:
@@ -385,9 +384,6 @@ class Blueprint:
             for resource_type in self._allowlist:
                 if resource_type in SYNC_MODE_BLOCKLIST:
                     raise Exception(f"Resource type {resource_type} is not allowed in sync mode")
-
-        # if ResourceType.USER in self._allowlist and self._run_mode != RunMode.CREATE_OR_UPDATE:
-        #     raise Exception("User resource type is not allowed in this version of Titan")
 
         self.name = name
 
@@ -470,8 +466,6 @@ class Blueprint:
                     continue
                 elif change_should_be_ignored:
                     continue
-                elif attr == "owner" and self._ignore_ownership:
-                    raise Exception
                 else:
                     changes.append(ResourceChange(action, urn, before, after, delta))
             elif action == Action.ADD:

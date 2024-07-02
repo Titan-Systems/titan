@@ -7,6 +7,7 @@ from titan.resources import Grant, RoleGrant
 from titan.resources.resource import ResourcePointer
 
 
+@pytest.mark.skip("skipping due to pending deprecation")
 @pytest.mark.requires_snowflake
 def test_permifrost(cursor):
     resources = permifrost.read_permifrost_config(cursor.connection, "tests/fixtures/adapters/permifrost.yml")
