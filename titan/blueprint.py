@@ -6,7 +6,7 @@ from typing import Optional, Generator
 
 import snowflake.connector
 
-from . import data_provider, lifecycle
+from . import data_provider, lifecycle, __version__
 from .builtins import SYSTEM_ROLES
 from .client import (
     ALREADY_EXISTS_ERR,
@@ -190,7 +190,7 @@ def dump_plan(plan: Plan, format: str = "json"):
         change_count = len([change for change in plan if change.action == Action.CHANGE])
         remove_count = len([change for change in plan if change.action == Action.REMOVE])
 
-        output += "\n» titan core\n"
+        output += f"\n» titan core v{__version__}\n"
         output += f"» Plan: {add_count} to add, {change_count} to change, {remove_count} to destroy.\n\n"
 
         for change in plan:
@@ -218,6 +218,7 @@ def dump_plan(plan: Plan, format: str = "json"):
             if change.action != Action.REMOVE:
                 output += "}\n"
             output += "\n"
+
         return output
     else:
         raise Exception(f"Unsupported format {format}")
@@ -523,7 +524,6 @@ class Blueprint:
 
             for resource_type in self._allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
-                    print(">>>", fqn)
                     urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
                     data = data_provider.fetch_resource(session, urn)
                     if data is None:
