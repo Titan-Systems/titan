@@ -2,7 +2,7 @@ import json
 import logging
 from dataclasses import dataclass
 from queue import Queue
-from typing import Optional
+from typing import Optional, Generator
 
 import snowflake.connector
 
@@ -285,7 +285,7 @@ def _split_by_scope(
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
 
-def _walk(resource: Resource):
+def _walk(resource: Resource) -> Generator[Resource, None, None]:
     yield resource
     if isinstance(resource, ResourceContainer):
         for item in resource.items():
@@ -637,7 +637,8 @@ class Blueprint:
                         self._root.add(schema_pointer.container)
 
             for ref in resource.refs:
-                if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
+                resource_and_ref_share_scope = isinstance(ref.scope, resource.scope.__class__)
+                if ref.container is None and resource_and_ref_share_scope:
                     # If a resource requires another, and that secondary resource couldn't be resolved into
                     # an existing scope, then assume it lives in the same container as the original resource
                     resource.container.add(ref)
@@ -649,10 +650,20 @@ class Blueprint:
                 if tag_ref:
                     self._root.add(tag_ref)
 
+    def _create_ownership_refs(self):
+        for resource in _walk(self._root):
+            if isinstance(resource, ResourcePointer):
+                continue
+            if hasattr(resource._data, "owner"):
+                if isinstance(resource._data.owner, str):
+                    raise RuntimeError(f"Owner of {resource} is a string, {resource._data.owner}")
+                resource.requires(resource._data.owner)
+
     def generate_manifest(self, session_ctx: dict = {}) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])
         self._finalize(session_ctx)
         self._create_tag_references()
+        self._create_ownership_refs()
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
                 if resource.implicit:

@@ -155,7 +155,6 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
             self.add(
                 Schema(name="PUBLIC", implicit=True),
             )
-        self.requires(self._data.owner)
         self.set_tags(tags)
 
     def schemas(self):

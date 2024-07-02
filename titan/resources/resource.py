@@ -190,7 +190,7 @@ class Resource(metaclass=_Resource):
         self._dirty = False
         self.lifecycle = LifecycleConfig(**lifecycle) if lifecycle else LifecycleConfig()
         self.implicit = implicit
-        self.refs = set()
+        self.refs: set[Resource] = set()
 
         # Consume resource_type from kwargs if it exists
         resource_type = kwargs.pop("resource_type", None)
@@ -312,7 +312,7 @@ class Resource(metaclass=_Resource):
             elif isinstance(value, dict):
                 return {k: _serialize(v) for k, v in value.items()}
             elif isinstance(value, ResourceName):
-                return value._name
+                return str(value)
             elif isinstance(value, ResourceTags):
                 return value.tags
             else:

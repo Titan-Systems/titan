@@ -345,3 +345,31 @@ def test_blueprint_reference_sorting(session_ctx, remote_state):
     assert plan[1].urn == parse_URN("urn::ABCD123:database/DB2")
     assert plan[2].action == Action.ADD
     assert plan[2].urn == parse_URN("urn::ABCD123:database/DB3")
+
+
+def test_blueprint_ownership_sorting():
+    session_ctx = {
+        "account": "SOMEACCT",
+        "account_locator": "",
+        "role": "SYSADMIN",
+        "available_roles": ["SYSADMIN", "USERADMIN"],
+    }
+    remote_state = {
+        parse_URN("urn:::account/SOMEACCT"): {},
+    }
+    role = res.Role(name="SOME_ROLE")
+    db1 = res.Database(name="DB1")
+    db2 = res.Database(name="DB2", owner=role)
+
+    blueprint = Blueprint(resources=[db2, db1, role])
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert (db2.urn, role.urn) in manifest._refs
+
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 3
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn:::role/SOME_ROLE")
+    assert plan[1].action == Action.ADD
+    assert plan[1].urn == parse_URN("urn:::database/DB1")
+    assert plan[2].action == Action.ADD
+    assert plan[2].urn == parse_URN("urn:::database/DB2")

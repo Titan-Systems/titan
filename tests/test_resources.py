@@ -70,11 +70,25 @@ def test_resource_name_serialization():
     assert task.to_dict()["name"] == "TASK"
     assert task.fqn.name == "TASK"
 
-    task = res.Task(name="~task")
-    assert task.name == "~task"
-    assert task.name == ResourceName('"~task"')
-    assert task.to_dict()["name"] == "~task"
-    assert task.fqn.name == '"~task"'
+
+def test_resource_quoted_name_serialization():
+    name_str_raw = "~task"
+    name_str_quoted = f'"{name_str_raw}"'
+    task = res.Task(name=name_str_raw)
+    assert task.name == name_str_raw
+    assert task.name == ResourceName(name_str_quoted)
+    assert task.to_dict()["name"] == name_str_quoted
+    assert task.fqn.name == name_str_quoted
+
+
+def test_resource_cased_quoted_name_serialization():
+    name_str_raw = "SomeTask"
+    name_str_quoted = f'"{name_str_raw}"'
+    task = res.Task(name=name_str_quoted)
+    assert task.name != name_str_raw
+    assert task.name == name_str_quoted
+    assert task.to_dict()["name"] == name_str_quoted
+    assert task.fqn.name == name_str_quoted
 
 
 def test_tags_definition():

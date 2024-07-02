@@ -1,18 +1,21 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
 from ..enums import ResourceType
 from ..props import Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope, DatabaseScope
+from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
 from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
 class _Role(ResourceSpec):
     name: ResourceName
-    owner: str = "USERADMIN"
+    owner: ResourceName = "USERADMIN"
     comment: str = None
+
+    def __post_init__(self):
+        self.owner = ResourcePointer(self.owner, ResourceType.ROLE)
 
 
 class Role(NamedResource, TaggableResource, Resource):

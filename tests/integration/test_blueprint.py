@@ -309,3 +309,17 @@ def test_blueprint_with_nested_database(cursor):
     bp.add(res.FutureGrant(priv="SELECT", on_future_views_in=schema, to="STATIC_ROLE"))
     plan = bp.plan(session)
     assert len(plan) == 1
+
+
+def test_blueprint_quoted_identifier_drift(cursor, test_db, suffix):
+    session = cursor.connection
+
+    cursor.execute(f'CREATE SCHEMA {test_db}."multiCaseString_{suffix}"')
+
+    blueprint = Blueprint(
+        resources=[res.Schema(name=f'"multiCaseString_{suffix}"', database=test_db, owner=TEST_ROLE)],
+    )
+    plan = blueprint.plan(session)
+    cursor.execute(f'DROP SCHEMA {test_db}."multiCaseString_{suffix}"')
+
+    assert len(plan) == 0
