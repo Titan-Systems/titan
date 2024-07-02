@@ -5,3 +5,11 @@ users:
   - name: TITAN_ADMIN
     default_warehouse: CI
     default_role: SYSADMIN
+    lifecycle:
+      prevent_destroy: true
+      ignore_changes:
+        - email
+        - first_name
+        - last_name
+        - owner
+

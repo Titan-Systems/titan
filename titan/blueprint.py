@@ -48,6 +48,10 @@ class MarkedForReplacementException(Exception):
     pass
 
 
+class NonConformingPlanException(Exception):
+    pass
+
+
 class ResourceInsertionException(Exception):
     pass
 
@@ -80,9 +84,62 @@ class ResourceChange:
         }
 
 
-Manifest = dict[URN, dict]
 State = dict[URN, dict]
 Plan = list[ResourceChange]
+
+
+class Manifest:
+    def __init__(self, account_locator: str = ""):
+        self._account_locator = account_locator
+        self._data: dict[URN, Resource] = {}
+        self._refs = []
+
+    def __getitem__(self, key: URN):
+        if isinstance(key, URN):
+            return self._data[key]
+        else:
+            raise Exception("Manifest keys must be URNs")
+
+    def __contains__(self, key):
+        if isinstance(key, URN):
+            return key in self._data
+        else:
+            raise Exception("Manifest keys must be URNs")
+
+    def add(self, resource: Resource):
+
+        urn = URN.from_resource(
+            account_locator=self._account_locator,
+            resource=resource,
+        )
+
+        # resource_data = resource.to_dict()
+
+        if urn in self._data:
+            # if resource_data != self._data[urn]:
+            logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {resource}")
+            return
+        self._data[urn] = resource
+        for ref in resource.refs:
+            ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
+            self._refs.append((urn, ref_urn))
+
+    def get(self, key: URN, default=None):
+        if isinstance(key, URN):
+            return self._data.get(key, default)
+        else:
+            raise Exception("Manifest keys must be URNs")
+
+    def to_dict(self):
+        return {k: v.to_dict() for k, v in self._data.items()}
+
+    @property
+    def urns(self) -> list[URN]:
+        return list(self._data.keys())
+
+    @property
+    def refs(self):
+        return self._refs
 
 
 def dump_plan(plan: Plan, format: str = "json"):
@@ -303,6 +360,7 @@ class Blueprint:
         if allow_role_switching is not None:
             raise Exception("Role switching must be allowed")
         if ignore_ownership is not None:
+            # TODO: exception
             logger.warning("ignore_ownership is deprecated")
         if valid_resource_types is not None:
             logger.warning("valid_resource_types is deprecated")
@@ -311,7 +369,6 @@ class Blueprint:
         self._finalized = False
         self._staged: list[Resource] = []
         self._root: Account = None
-        self._account_locator: str = None
         self._run_mode: RunMode = RunMode(run_mode)
         self._dry_run: bool = dry_run
         self._ignore_ownership: bool = ignore_ownership
@@ -328,8 +385,8 @@ class Blueprint:
                 if resource_type in SYNC_MODE_BLOCKLIST:
                     raise Exception(f"Resource type {resource_type} is not allowed in sync mode")
 
-        if ResourceType.USER in self._allowlist and self._run_mode != RunMode.CREATE_OR_UPDATE:
-            raise Exception("User resource type is not allowed in this version of Titan")
+        # if ResourceType.USER in self._allowlist and self._run_mode != RunMode.CREATE_OR_UPDATE:
+        #     raise Exception("User resource type is not allowed in this version of Titan")
 
         self.name = name
 
@@ -374,40 +431,46 @@ class Blueprint:
                 exception_block = "\n".join(exceptions[0:5]) + f"\n... and {len(exceptions) - 5} more"
             else:
                 exception_block = "\n".join(exceptions)
-            raise Exception("Non-conforming actions found in plan:\n" + exception_block)
+            raise NonConformingPlanException("Non-conforming actions found in plan:\n" + exception_block)
 
     def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
-        manifest = manifest.copy()
-        refs = manifest.pop("_refs")
-        urns = manifest.pop("_urns")
+        config = manifest.to_dict()
 
         changes: Plan = []
         marked_for_replacement = set()
-        for action, urn, delta in diff(remote_state, manifest):
+        for action, urn, delta in diff(remote_state, config):
             before = remote_state.get(urn, {})
-            after = manifest.get(urn, {})
+            after = config.get(urn, {})
 
             if action == Action.CHANGE:
                 if urn in marked_for_replacement:
                     continue
 
-                resource_cls = Resource.resolve_resource_cls(urn.resource_type, before)
+                resource = manifest[urn]
 
                 # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
                 attr = list(delta.keys())[0]
-                attr_metadata = resource_cls.spec.get_metadata(attr)
-                if attr_metadata.get("triggers_replacement", False):
-                    raise MarkedForReplacementException(f"Resource {urn} is marked for replacement", resource_cls, attr)
+                attr_metadata = resource.spec.get_metadata(attr)
+
+                change_requires_replacement = attr_metadata.get("triggers_replacement", False)
+                change_forces_add = attr_metadata.get("forces_add", False)
+                change_is_fetchable = attr_metadata.get("fetchable", True)
+                change_should_be_ignored = attr in resource.lifecycle.ignore_changes
+
+                if change_requires_replacement:
+                    raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
                     marked_for_replacement.add(urn)
-                elif attr_metadata.get("forces_add", False):
+                elif change_forces_add:
                     changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=delta))
                     continue
-                elif attr_metadata.get("fetchable", True) is False:
+                elif not change_is_fetchable:
                     # drift on fields that aren't fetchable should be ignored
                     # TODO: throw a warning, or have a blueprint runmode that fails on this
                     continue
-                elif attr == "owner" and self._ignore_ownership:
+                elif change_should_be_ignored:
                     continue
+                elif attr == "owner" and self._ignore_ownership:
+                    raise Exception
                 else:
                     changes.append(ResourceChange(action, urn, before, after, delta))
             elif action == Action.ADD:
@@ -426,18 +489,17 @@ class Blueprint:
         #         changes.append(ResourceChange(action=Action.ADD, urn=change.urn, before={}, after=after, delta=after))
 
         # Generate a list of all URNs
-        resource_set = set(urns + list(remote_state.keys()))
-        for ref in refs:
+        resource_set = set(manifest.urns + list(remote_state.keys()))
+        for ref in manifest.refs:
             resource_set.add(ref[0])
             resource_set.add(ref[1])
         # Calculate a topological sort order for the URNs
-        sort_order = topological_sort(resource_set, set(refs))
+        sort_order = topological_sort(resource_set, set(manifest.refs))
         return sorted(changes, key=lambda change: sort_order[change.urn])
 
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
         state: State = {}
-
-        manifest_urns: set[URN] = set(manifest["_urns"].copy())
+        session_ctx = data_provider.fetch_session(session)
 
         def _normalize(urn: URN, data: dict) -> dict:
             resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
@@ -461,24 +523,22 @@ class Blueprint:
 
             for resource_type in self._allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
-                    urn = URN(resource_type=resource_type, fqn=fqn, account_locator=self._account_locator)
+                    print(">>>", fqn)
+                    urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
                     data = data_provider.fetch_resource(session, urn)
-                    if data is not None:
-                        normalized_data = _normalize(urn, data)
-                        state[urn] = normalized_data
+                    if data is None:
+                        raise Exception(f"Resource {urn} not found")
+                    normalized_data = _normalize(urn, data)
+                    state[urn] = normalized_data
 
-        for urn in manifest.keys():
-            if str(urn).startswith("_"):
-                continue
-
-            manifest_urns.remove(urn)
+        for urn in manifest.urns:
             data = data_provider.fetch_resource(session, urn)
             if data is not None:
                 normalized_data = _normalize(urn, data)
                 state[urn] = normalized_data
 
         # check for existence of resource refs
-        for parent, reference in manifest["_refs"]:
+        for parent, reference in manifest.refs:
             if reference in manifest:
                 continue
 
@@ -492,14 +552,14 @@ class Blueprint:
                 data = None
 
             if data is None and not is_public_schema:
-                logger.error(manifest)
+                logger.error(manifest.to_dict())
                 raise MissingResourceException(
                     f"Resource {reference} required by {parent} not found or failed to fetch"
                 )
 
         return state
 
-    def _finalize(self, session_context: dict):
+    def _finalize(self, session_ctx: dict):
         """
         Convert the staged resources into a tree of resources
         """
@@ -514,8 +574,7 @@ class Blueprint:
             raise Exception("Blueprint cannot contain an Account resource")
         else:
             # Create a stub account from the session context
-            self._root = ResourcePointer(name=session_context["account"], resource_type=ResourceType.ACCOUNT)
-            self._account_locator = session_context["account_locator"]
+            self._root = ResourcePointer(name=session_ctx["account"], resource_type=ResourceType.ACCOUNT)
 
         acct_scoped = _merge_pointers(acct_scoped)
         # Add all databases and other account scoped resources to the root
@@ -526,12 +585,12 @@ class Blueprint:
 
         # If we haven't specified a database, use the one from the session context
         if len(databases) == 0 and (len(db_scoped) + len(schema_scoped) > 0):
-            if session_context.get("database") is None:
+            if session_ctx.get("database") is None:
                 raise OrphanResourceException(
                     "Blueprint is missing a database but includes resources that require a database or schema"
                 )
 
-            self._root.add(ResourcePointer(name=session_context["database"], resource_type=ResourceType.DATABASE))
+            self._root.add(ResourcePointer(name=session_ctx["database"], resource_type=ResourceType.DATABASE))
             databases = self._root.items(resource_type=ResourceType.DATABASE)
 
         # db_scoped = _merge_pointers(db_scoped)
@@ -579,7 +638,8 @@ class Blueprint:
 
             for ref in resource.refs:
                 if ref.container is None and isinstance(ref.scope, resource.scope.__class__):
-                    raise Exception
+                    # If a resource requires another, and that secondary resource couldn't be resolved into
+                    # an existing scope, then assume it lives in the same container as the original resource
                     resource.container.add(ref)
 
     def _create_tag_references(self):
@@ -589,44 +649,18 @@ class Blueprint:
                 if tag_ref:
                     self._root.add(tag_ref)
 
-    def generate_manifest(self, session_context: dict = {}) -> Manifest:
-        manifest: Manifest = {}
-        refs = []
-        urns = []
-
-        self._finalize(session_context)
-
+    def generate_manifest(self, session_ctx: dict = {}) -> Manifest:
+        manifest = Manifest(account_locator=session_ctx["account_locator"])
+        self._finalize(session_ctx)
         self._create_tag_references()
-
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                if resource.implicit:  # and self._run_mode not in (RunMode.SYNC_ALL, RunMode.SYNC):
+                if resource.implicit:
                     continue
+                manifest.add(resource)
+            else:
+                raise RuntimeError(f"Unexpected object found in blueprint: {resource}")
 
-            urn = URN(
-                resource_type=resource.resource_type,
-                fqn=resource.fqn,
-                account_locator=self._account_locator,
-            )
-
-            data = resource.to_dict()
-
-            if isinstance(resource, ResourcePointer):
-                data["_pointer"] = True
-
-            if urn in manifest:
-                if data != manifest[urn]:
-                    logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {data}")
-                    continue
-            manifest[urn] = data
-
-            urns.append(urn)
-
-            for ref in resource.refs:
-                ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
-                refs.append((urn, ref_urn))
-        manifest["_refs"] = refs
-        manifest["_urns"] = urns
         return manifest
 
     def plan(self, session) -> Plan:
@@ -651,7 +685,6 @@ class Blueprint:
             plan = self.plan(session)
 
         # TODO: cursor setup, including query tag
-        # TODO: clean up urn vs urn_str madness
 
         """
             At this point, we have a list of actions as a part of the plan. Each action is one of:
@@ -670,10 +703,6 @@ class Blueprint:
         session_ctx = data_provider.fetch_session(session)
 
         _raise_if_plan_would_drop_session_user(session_ctx, plan)
-
-        # required_privs = _collect_required_privs(session_ctx, plan)
-        # available_privs = _collect_available_privs(session_ctx, session, plan, usable_roles)
-        # _raise_if_missing_privs(required_privs, available_privs)
 
         action_queue = self._compile_plan_to_sql(session_ctx, plan)
         actions_taken = []

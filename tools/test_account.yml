@@ -8,6 +8,8 @@ roles:
   - name: ~@#$%^&*()_+
     owner: ACCOUNTADMIN
     comment: This role has some issues
+  - name: '"aCaseWithinACase"'
+    comment: This role must be quoted
 
 databases:
   - name: static_database
@@ -110,4 +112,3 @@ security_integrations:
     oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
     oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'
     enabled: true
-

@@ -1,30 +1,32 @@
 from abc import ABC
+
 from .identifiers import FQN
+from .resource_name import ResourceName
 
 
 class ResourceScope(ABC):
-    def fully_qualified_name(self, container, resource_name: str) -> FQN:
+    def fully_qualified_name(self, container, resource_name: ResourceName) -> FQN:
         raise NotImplementedError
 
 
 class OrganizationScope(ResourceScope):
-    def fully_qualified_name(self, _, resource_name: str) -> FQN:
+    def fully_qualified_name(self, _, resource_name: ResourceName) -> FQN:
         return FQN(name=resource_name)
 
 
 class AccountScope(ResourceScope):
-    def fully_qualified_name(self, _, resource_name: str) -> FQN:
+    def fully_qualified_name(self, _, resource_name: ResourceName) -> FQN:
         return FQN(name=resource_name)
 
 
 class DatabaseScope(ResourceScope):
-    def fully_qualified_name(self, database, resource_name: str) -> FQN:
+    def fully_qualified_name(self, database, resource_name: ResourceName) -> FQN:
         db = database.name if database else None
         return FQN(name=resource_name, database=db)
 
 
 class SchemaScope(ResourceScope):
-    def fully_qualified_name(self, schema, resource_name: str) -> FQN:
+    def fully_qualified_name(self, schema, resource_name: ResourceName) -> FQN:
         db, sch = None, None
         if schema:
             db = schema.container.name if schema.container else None
@@ -33,7 +35,7 @@ class SchemaScope(ResourceScope):
 
 
 class TableScope(ResourceScope):
-    def fully_qualified_name(self, resource_name: str):
+    def fully_qualified_name(self, resource_name: ResourceName):
         raise NotImplementedError
         # return FQN(
         #     name=resource_name.upper(),

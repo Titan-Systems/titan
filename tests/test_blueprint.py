@@ -1,11 +1,10 @@
 import pytest
 
-
 from titan import resources as res
 from titan.blueprint import Action, Blueprint, DuplicateResourceException
 from titan.enums import ResourceType
-from titan.identifiers import URN, FQN
-from titan.parse import parse_URN
+from titan.identifiers import FQN, URN, parse_URN
+from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
 
 
@@ -52,7 +51,7 @@ def test_blueprint_with_database(resource_manifest):
 
     db_urn = parse_URN("urn::ABCD123:database/DB")
     assert db_urn in resource_manifest
-    assert resource_manifest[db_urn] == {
+    assert resource_manifest[db_urn].to_dict() == {
         "name": "DB",
         "owner": "SYSADMIN",
         "comment": None,
@@ -66,7 +65,7 @@ def test_blueprint_with_database(resource_manifest):
 def test_blueprint_with_schema(resource_manifest):
     schema_urn = parse_URN("urn::ABCD123:schema/DB.SCHEMA")
     assert schema_urn in resource_manifest
-    assert resource_manifest[schema_urn] == {
+    assert resource_manifest[schema_urn].to_dict() == {
         "comment": None,
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
@@ -81,7 +80,7 @@ def test_blueprint_with_schema(resource_manifest):
 def test_blueprint_with_view(resource_manifest):
     view_urn = parse_URN("urn::ABCD123:view/DB.SCHEMA.VIEW")
     assert view_urn in resource_manifest
-    assert resource_manifest[view_urn] == {
+    assert resource_manifest[view_urn].to_dict() == {
         "as_": "SELECT 1",
         "change_tracking": False,
         "columns": None,
@@ -98,7 +97,7 @@ def test_blueprint_with_view(resource_manifest):
 def test_blueprint_with_table(resource_manifest):
     table_urn = parse_URN("urn::ABCD123:table/DB.SCHEMA.TABLE")
     assert table_urn in resource_manifest
-    assert resource_manifest[table_urn] == {
+    assert resource_manifest[table_urn].to_dict() == {
         "name": "TABLE",
         "owner": "SYSADMIN",
         "columns": [
@@ -135,12 +134,13 @@ def test_blueprint_with_udf(resource_manifest):
         fqn=FQN(
             database="DB",
             schema="SCHEMA",
-            name="SOMEUDF()",
+            name=ResourceName("SOMEUDF"),
+            arg_types=[],
         ),
         account_locator="ABCD123",
     )
     assert udf_urn in resource_manifest
-    assert resource_manifest[udf_urn] == {
+    assert resource_manifest[udf_urn].to_dict() == {
         "name": "SOMEUDF",
         "owner": "SYSADMIN",
         "returns": "VARCHAR",
@@ -311,3 +311,37 @@ def test_blueprint_polymorphic_resource_resolution(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 9
+
+
+def test_blueprint_scope_sorting(session_ctx, remote_state):
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCHEMA", database=db)
+    view = res.View(name="SOME_VIEW", schema=schema, as_="SELECT 1")
+    blueprint = Blueprint(name="blueprint", resources=[view, schema, db])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 3
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+    assert plan[1].action == Action.ADD
+    assert plan[1].urn == parse_URN("urn::ABCD123:schema/DB.SCHEMA")
+    assert plan[2].action == Action.ADD
+    assert plan[2].urn == parse_URN("urn::ABCD123:view/DB.SCHEMA.SOME_VIEW")
+
+
+def test_blueprint_reference_sorting(session_ctx, remote_state):
+    db1 = res.Database(name="DB1")
+    db2 = res.Database(name="DB2")
+    db2.requires(db1)
+    db3 = res.Database(name="DB3")
+    db3.requires(db2)
+    blueprint = Blueprint(resources=[db3, db1, db2])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 3
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:database/DB1")
+    assert plan[1].action == Action.ADD
+    assert plan[1].urn == parse_URN("urn::ABCD123:database/DB2")
+    assert plan[2].action == Action.ADD
+    assert plan[2].urn == parse_URN("urn::ABCD123:database/DB3")

@@ -24,14 +24,13 @@ from .client import (
     execute,
 )
 from .enums import ResourceType, WarehouseSize
-from .identifiers import FQN, URN, resource_type_for_label
+from .identifiers import FQN, URN, parse_FQN, resource_type_for_label
 from .parse import (
     FullyQualifiedIdentifier,
     _parse_column,
     _parse_dynamic_table_text,
     parse_collection_string,
     parse_function_name,
-    parse_identifier,
 )
 from .resource_name import ResourceName, attribute_is_resource_name
 
@@ -136,7 +135,7 @@ def _urn_from_grant(row, session_ctx):
             fqn = FQN(name=ResourceName(row["name"]))
         else:
             # Scoped resources
-            fqn = parse_identifier(row["name"], is_db_scoped=(granted_on == "schema"))
+            fqn = parse_FQN(row["name"], is_db_scoped=(granted_on == "schema"))
         return URN(
             resource_type=ResourceType(granted_on),
             account_locator=session_ctx["account_locator"],
@@ -187,7 +186,7 @@ def _parse_function_arguments_2023_compat(arguments_str: str) -> tuple:
 
     header, returns = arguments_str.split(" RETURN ")
     header = header.replace("[", "").replace("]", "")
-    identifier = parse_identifier(header)
+    identifier = parse_FQN(header)
     return (identifier, returns)
 
 
@@ -205,7 +204,7 @@ def _parse_function_arguments(arguments_str: str) -> tuple:
     """
 
     header, returns = arguments_str.split(" RETURN ")
-    identifier = parse_identifier(header)
+    identifier = parse_FQN(header)
     return (identifier, returns)
 
 
@@ -299,8 +298,6 @@ def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list
                 initial_fetch,
                 name=fqn.name,
                 **container_kwargs,
-                # database=fqn.database,
-                # schema=fqn.schema,
             )
             return filtered_fetch
         else:
@@ -434,12 +431,12 @@ def fetch_alert(session, fqn: FQN):
 
 
 def fetch_api_integration(session, fqn: FQN):
-    show_result = _show_resources(session, "API INTEGRATIONS", fqn)
-    if len(show_result) == 0:
+    integrations = _show_resources(session, "API INTEGRATIONS", fqn)
+    if len(integrations) == 0:
         return None
-    if len(show_result) > 1:
+    if len(integrations) > 1:
         raise Exception(f"Found multiple api integrations matching {fqn}")
-    data = show_result[0]
+    data = integrations[0]
     desc_result = execute(session, f"DESC API INTEGRATION {fqn}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
     owner = _fetch_owner(session, "INTEGRATION", fqn)
@@ -458,14 +455,14 @@ def fetch_api_integration(session, fqn: FQN):
 
 
 def fetch_catalog_integration(session, fqn: FQN):
-    show_result = execute(session, f"SHOW CATALOG INTEGRATIONS LIKE '{fqn.name}'", cacheable=True)
-    if len(show_result) == 0:
+    integrations = _show_resources(session, "CATALOG INTEGRATIONS", fqn)
+    if len(integrations) == 0:
         return None
-    if len(show_result) > 1:
+    if len(integrations) > 1:
         raise Exception(f"Found multiple catalog integrations matching {fqn}")
 
-    data = show_result[0]
-    desc_result = execute(session, f"DESC CATALOG INTEGRATION {fqn.name}")
+    data = integrations[0]
+    desc_result = execute(session, f"DESC CATALOG INTEGRATION {fqn}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
     owner = _fetch_owner(session, "INTEGRATION", fqn)
 
@@ -539,7 +536,8 @@ def fetch_compute_pool(session, fqn: FQN):
 
 
 def fetch_database(session, fqn: FQN):
-    show_result = execute(session, f"SHOW DATABASES LIKE '{fqn.name}'", cacheable=True)
+    # show_result = execute(session, f"SHOW DATABASES LIKE '{fqn.name}'", cacheable=True)
+    show_result = _show_resources(session, "DATABASES", fqn)
 
     if len(show_result) == 0:
         return None
@@ -1044,10 +1042,7 @@ def fetch_role_grants(session, role: str):
 
 
 def fetch_role(session, fqn: FQN):
-    role_name = fqn.name._name if isinstance(fqn.name, ResourceName) else fqn.name
-    show_result = execute(session, "SHOW ROLES", cacheable=True)
-
-    roles = _filter_result(show_result, name=role_name)
+    roles = _show_resources(session, "ROLES", fqn)
 
     if len(roles) == 0:
         return None
@@ -1566,7 +1561,9 @@ def fetch_tag_reference(session, fqn: FQN):
         return None
 
     object_domain = fqn.params["domain"]
-    resource_fqn = parse_identifier(fqn.name, is_db_scoped=(object_domain == "SCHEMA"))
+    # TODO: this is a hacky fix
+    name = str(fqn).split("?")[0]
+    resource_fqn = parse_FQN(name, is_db_scoped=(object_domain == "SCHEMA"))
 
     try:
         tag_refs = execute(
@@ -1710,25 +1707,35 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
     show_result = execute(session, f"SHOW {resource}")
     resources = []
     for row in show_result:
-        resources.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        resources.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
     return resources
 
 
 def list_compute_pools(session) -> list[FQN]:
     show_result = execute(session, "SHOW COMPUTE POOLS")
-    return [FQN(name=row["name"]) for row in show_result]
+    return [FQN(name=ResourceName.from_snowflake_metadata(row["name"])) for row in show_result]
 
 
 def list_databases(session) -> list[FQN]:
     show_result = execute(session, "SHOW DATABASES")
-    return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_DATABASES]
+    return [
+        FQN(name=ResourceName.from_snowflake_metadata(row["name"]))
+        for row in show_result
+        if row["name"] not in SYSTEM_DATABASES
+    ]
 
 
 def list_grants(session) -> list[FQN]:
     roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
-        role_name = ResourceName(role["name"])
+        role_name = ResourceName.from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
         show_result = execute(session, f"SHOW GRANTS TO ROLE {role_name}")
@@ -1751,14 +1758,18 @@ def list_grants(session) -> list[FQN]:
 
 def list_roles(session) -> list[FQN]:
     show_result = execute(session, "SHOW ROLES")
-    return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_ROLES]
+    return [
+        FQN(name=ResourceName.from_snowflake_metadata(row["name"]))
+        for row in show_result
+        if row["name"] not in SYSTEM_ROLES
+    ]
 
 
 def list_role_grants(session) -> list[FQN]:
     roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
-        role_name = ResourceName(role["name"])
+        role_name = ResourceName.from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
         show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
@@ -1776,7 +1787,7 @@ def list_schemas(session, database=None) -> list[FQN]:
         for row in show_result:
             if row["database_name"] in SYSTEM_DATABASES or row["name"] in SYSTEM_SCHEMAS:
                 continue
-            schemas.append(FQN(database=row["database_name"], name=row["name"]))
+            schemas.append(FQN(database=row["database_name"], name=ResourceName.from_snowflake_metadata(row["name"])))
         return schemas
     except ProgrammingError as err:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
@@ -1790,7 +1801,7 @@ def list_security_integrations(session) -> list[FQN]:
     for row in show_result:
         if row["name"] in SYSTEM_SECURITY_INTEGRATIONS:
             continue
-        integrations.append(FQN(name=row["name"]))
+        integrations.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return integrations
 
 
@@ -1800,7 +1811,13 @@ def list_stages(session) -> list[FQN]:
     for row in show_result:
         if row["database_name"] in SYSTEM_DATABASES:
             continue
-        stages.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        stages.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
     return stages
 
 
@@ -1814,7 +1831,13 @@ def list_tables(session) -> list[FQN]:
     for row in show_result:
         if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
             continue
-        tables.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        tables.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
     return tables
 
 
@@ -1825,7 +1848,13 @@ def list_tags(session) -> list[FQN]:
         for row in show_result:
             if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
                 continue
-            tags.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+            tags.append(
+                FQN(
+                    database=row["database_name"],
+                    schema=row["schema_name"],
+                    name=ResourceName.from_snowflake_metadata(row["name"]),
+                )
+            )
         return tags
     except ProgrammingError as err:
         if err.errno == UNSUPPORTED_FEATURE:
@@ -1840,7 +1869,7 @@ def list_users(session) -> list[FQN]:
     for row in show_result:
         if row["name"] in SYSTEM_USERS:
             continue
-        users.append(FQN(name=row["name"]))
+        users.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return users
 
 
@@ -1850,7 +1879,13 @@ def list_views(session) -> list[FQN]:
     for row in show_result:
         if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
             continue
-        views.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        views.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
     return views
 
 
@@ -1858,7 +1893,7 @@ def list_warehouses(session) -> list[FQN]:
     show_result = execute(session, "SHOW WAREHOUSES")
     warehouses = []
     for row in show_result:
-        warehouses.append(FQN(name=row["name"]))
+        warehouses.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return warehouses
 
 

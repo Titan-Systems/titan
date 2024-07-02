@@ -202,7 +202,7 @@ def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     assert plan[0].action == Action.ADD
 
 
-def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db):
+def test_blueprint_sync_dont_remove_system_schemas(cursor, test_db):
     session = cursor.connection
     blueprint = Blueprint(
         name="blueprint",
@@ -215,6 +215,9 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
     plan = blueprint.plan(session)
     assert len(plan) == 0
 
+
+def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
+    session = cursor.connection
     blueprint = Blueprint(
         name="blueprint",
         resources=[
@@ -229,6 +232,9 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
     assert plan[0].action == Action.ADD
     assert plan[0].urn.fqn.name == "ABSENT"
 
+
+def test_blueprint_sync_plan_matches_remote_state(cursor, test_db):
+    session = cursor.connection
     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
     blueprint = Blueprint(
         name="blueprint",
@@ -242,6 +248,10 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
     plan = blueprint.plan(session)
     assert len(plan) == 0
 
+
+def test_blueprint_sync_remote_state_contains_extra_resource(cursor, test_db):
+    session = cursor.connection
+    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
     blueprint = Blueprint(
         name="blueprint",
         resources=[res.Schema(name="INFORMATION_SCHEMA", database=test_db)],

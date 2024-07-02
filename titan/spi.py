@@ -6,13 +6,12 @@ import sys
 
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
+from . import __version__, lifecycle, resources
 from . import data_provider as dp
-from . import lifecycle, resources, __version__
 from .blueprint import Action, Blueprint
 from .diff import diff
 from .enums import DataType, ResourceType
-from .identifiers import FQN, URN
-from .parse import parse_identifier
+from .identifiers import FQN, URN, parse_FQN
 from .scope import DatabaseScope, SchemaScope
 
 SNOWPARK_TELEMETRY_ID = "titan_titan"
@@ -175,7 +174,7 @@ def _create_or_update_resource(
     config: dict,
     dry_run: bool = False,
 ):
-    fqn = parse_identifier(config["name"], is_db_scoped=(resource_type == ResourceType.SCHEMA))
+    fqn = parse_FQN(config["name"], is_db_scoped=(resource_type == ResourceType.SCHEMA))
 
     resource_cls = resources.Resource.resolve_resource_cls(resource_type)
     session_ctx = dp.fetch_session(sf_session)
@@ -293,7 +292,7 @@ def fetch_schema(sp_session, name: str) -> dict:
     """
     Returns a schema's configuration.
     """
-    fqn = parse_identifier(name, is_db_scoped=True)
+    fqn = parse_FQN(name, is_db_scoped=True)
     if fqn.database is None:
         fqn.database = sp_session.get_current_database()
     return dp.fetch_schema(sp_session.connection, fqn)

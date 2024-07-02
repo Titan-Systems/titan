@@ -45,4 +45,8 @@ def test_create_drop_from_json(resource, test_db, cursor):
         pytest.fail(f"Failed to create resource with sql {create_sql}")
     finally:
         if feature_enabled:
-            cursor.execute(resource.drop_sql(if_exists=True))
+            try:
+                drop_sql = resource.drop_sql(if_exists=True)
+                cursor.execute(drop_sql)
+            except Exception as e:
+                pytest.fail(f"Failed to drop resource with sql {drop_sql}")
