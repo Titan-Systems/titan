@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceContainer, ResourceSpec
 from ..enums import AccountEdition, ResourceType
 from ..props import Props
 from ..scope import OrganizationScope
+from .resource import Resource, ResourceContainer, ResourceSpec, NamedResource
 
 
 @dataclass(unsafe_hash=True)
@@ -15,7 +15,7 @@ class _Account(ResourceSpec):
     comment: str = None
 
 
-class Account(Resource, ResourceContainer):
+class Account(NamedResource, Resource, ResourceContainer):
     """
     CREATE ACCOUNT <name>
         ADMIN_NAME = <string>
@@ -43,9 +43,9 @@ class Account(Resource, ResourceContainer):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(**kwargs)
+        super().__init__(name=name, **kwargs)
         self._data: _Account = _Account(
-            name=name,
+            name=self._name,
             locator=locator,
             edition=edition,
             comment=comment,

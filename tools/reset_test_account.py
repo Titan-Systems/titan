@@ -36,12 +36,6 @@ def main():
 
     load_and_run_config(
         conn,
-        "test_account_users.yml",
-        "SYNC-ALL",
-        ["user"],
-    )
-    load_and_run_config(
-        conn,
         "test_account.yml",
         "SYNC-ALL",
         [
@@ -56,6 +50,7 @@ def main():
             "stage",
             "stream",
             "table",
+            "user",
             "view",
             "warehouse",
         ],

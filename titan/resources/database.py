@@ -4,7 +4,7 @@ from ..enums import ResourceType
 from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
-from .resource import Resource, ResourceContainer, NamedResource, ResourceSpec
+from .resource import NamedResource, Resource, ResourceContainer, ResourcePointer, ResourceSpec
 from .role import Role
 from .schema import Schema
 from .tag import TaggableResource
@@ -154,6 +154,7 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         if self._data.name != "SNOWFLAKE":
             self.add(
                 Schema(name="PUBLIC", implicit=True),
+                # ResourcePointer(resource_type=ResourceType.SCHEMA, name="PUBLIC")
             )
         self.set_tags(tags)
 

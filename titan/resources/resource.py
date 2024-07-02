@@ -144,6 +144,9 @@ class ResourceSpec:
                 new_value = _coerce_resource_field(field_value, f.type)
                 setattr(self, f.name, new_value)
 
+    # def __hash__(self):
+    #     return hash(tuple(sorted(self.__dict__.items())))
+
     @classmethod
     def get_metadata(cls, field_name: str):
         return {f.name: f.metadata for f in fields(cls)}[field_name]
@@ -288,7 +291,7 @@ class Resource(metaclass=_Resource):
         return self._data == other._data
 
     def __hash__(self):
-        return hash(self._data)
+        return hash(URN.from_resource(self, ""))
 
     def to_dict(self):
         serialized = {}

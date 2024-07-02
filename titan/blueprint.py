@@ -327,6 +327,13 @@ def _merge_pointers(resources: list[Resource]) -> list[Resource]:
                 namespace[resource_id] = resource
         else:
             if resource_id in namespace and namespace[resource_id] != resource:
+
+                if resource.implicit or namespace[resource_id].implicit:
+                    primary, secondary = resource, namespace[resource_id]
+                    if namespace[resource_id].implicit:
+                        primary, secondary = secondary, primary
+                    _merge(primary, secondary)
+                    continue
                 raise DuplicateResourceException(f"Duplicate resource found: {resource} and {namespace[resource_id]}")
             namespace[resource_id] = resource
 
@@ -651,7 +658,9 @@ class Blueprint:
             if hasattr(resource._data, "owner"):
                 if isinstance(resource._data.owner, str):
                     raise RuntimeError(f"Owner of {resource} is a string, {resource._data.owner}")
-                resource.requires(resource._data.owner)
+                # Some Snowflake-owned system resources (like INFORMATION_SCHEMA) are owned by blank
+                if resource._data.owner.name != "":
+                    resource.requires(resource._data.owner)
 
     def generate_manifest(self, session_ctx: dict = {}) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])

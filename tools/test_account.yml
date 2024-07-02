@@ -1,3 +1,18 @@
+users:
+  - name: static_user
+    email: info@applytitan.com
+    comment: This is a static user
+  - name: TITAN_ADMIN
+    default_warehouse: CI
+    default_role: SYSADMIN
+    lifecycle:
+      prevent_destroy: true
+      ignore_changes:
+        - email
+        - first_name
+        - last_name
+        - owner
+
 roles:
   - name: CI
     comment: CI role, do not drop
@@ -13,6 +28,8 @@ roles:
 
 databases:
   - name: static_database
+    schemas:
+      - name: public
 
 role_grants:
   - role: CI

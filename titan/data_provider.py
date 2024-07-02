@@ -1323,11 +1323,11 @@ def fetch_stage(session, fqn: FQN):
             "directory": {"enable": data["directory_enabled"] == "Y"},
             "comment": data["comment"] or None,
         }
-    elif data["type"] == "INTERNAL":
+    elif data["type"] in ("INTERNAL", "INTERNAL NO CSE"):
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "owner": data["owner"],
-            "type": data["type"],
+            "type": "INTERNAL",
             "directory": {"enable": data["directory_enabled"] == "Y"},
             "comment": data["comment"] or None,
         }
@@ -1384,6 +1384,21 @@ def fetch_stream(session, fqn: FQN):
             "append_only": data["mode"] == "APPEND_ONLY",
             "on_table": data["table_name"],
             "owner": data["owner"],
+        }
+    elif data["source_type"] == "View":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "comment": data["comment"] or None,
+            "append_only": data["mode"] == "APPEND_ONLY",
+            "on_view": data["table_name"],
+            "owner": data["owner"],
+        }
+    elif data["source_type"] == "Stage":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "on_stage": data["table_name"],
+            "owner": data["owner"],
+            "comment": data["comment"] or None,
         }
     else:
         raise NotImplementedError(f"Unsupported stream source type {data['source_type']}")
@@ -1629,16 +1644,16 @@ def fetch_view(session, fqn: FQN):
     if fqn.schema is None:
         raise Exception(f"View fqn must have a schema {fqn}")
     try:
-        show_result = execute(session, f"SHOW VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+        views = _show_resources(session, "VIEWS", fqn)
     except ProgrammingError:
         return None
 
-    if len(show_result) == 0:
+    if len(views) == 0:
         return None
-    if len(show_result) > 1:
+    if len(views) > 1:
         raise Exception(f"Found multiple views matching {fqn}")
 
-    data = show_result[0]
+    data = views[0]
 
     if data["is_materialized"] == "true":
         return None
@@ -1703,8 +1718,16 @@ def list_resource(session, resource_label: str) -> list[FQN]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
-def list_schema_scoped_resource(session, resource) -> list[FQN]:
+def list_account_scoped_resource(session, resource) -> list[FQN]:
     show_result = execute(session, f"SHOW {resource}")
+    resources = []
+    for row in show_result:
+        resources.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+    return resources
+
+
+def list_schema_scoped_resource(session, resource) -> list[FQN]:
+    show_result = execute(session, f"SHOW {resource} IN ACCOUNT")
     resources = []
     for row in show_result:
         resources.append(
@@ -1715,6 +1738,10 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
             )
         )
     return resources
+
+
+def list_alerts(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "ALERTS")
 
 
 def list_compute_pools(session) -> list[FQN]:
@@ -1729,6 +1756,27 @@ def list_databases(session) -> list[FQN]:
         for row in show_result
         if row["name"] not in SYSTEM_DATABASES
     ]
+
+
+# def list_database_roles(session) -> list[FQN]:
+#     return list_account_scoped_resource(session, "DATABASE ROLES")
+
+
+def list_dynamic_tables(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "DYNAMIC TABLES")
+
+
+# def list_future_grants(session) -> list[FQN]:
+#     grants = []
+#     for role in roles:
+#         role_name = ResourceName.from_snowflake_metadata(role["name"])
+#         if role_name in SYSTEM_ROLES:
+#             continue
+#         show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
+#         for data in show_result:
+#             subject = "user" if data["granted_to"] == "USER" else "role"
+#             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
+#     return grants
 
 
 def list_grants(session) -> list[FQN]:
@@ -1754,6 +1802,14 @@ def list_grants(session) -> list[FQN]:
                 )
             )
     return grants
+
+
+def list_image_repositories(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "IMAGE REPOSITORIES")
+
+
+def list_pipes(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "PIPES")
 
 
 def list_roles(session) -> list[FQN]:
@@ -1785,7 +1841,7 @@ def list_schemas(session, database=None) -> list[FQN]:
         show_result = execute(session, f"SHOW SCHEMAS{db}")
         schemas = []
         for row in show_result:
-            if row["database_name"] in SYSTEM_DATABASES or row["name"] in SYSTEM_SCHEMAS:
+            if row["database_name"] in SYSTEM_DATABASES or row["name"] == "INFORMATION_SCHEMA":
                 continue
             schemas.append(FQN(database=row["database_name"], name=ResourceName.from_snowflake_metadata(row["name"])))
         return schemas
@@ -1806,10 +1862,12 @@ def list_security_integrations(session) -> list[FQN]:
 
 
 def list_stages(session) -> list[FQN]:
-    show_result = execute(session, "SHOW STAGES")
+    show_result = execute(session, "SHOW STAGES IN ACCOUNT")
     stages = []
     for row in show_result:
         if row["database_name"] in SYSTEM_DATABASES:
+            continue
+        if row["type"] not in ("EXTERNAL", "INTERNAL", "INTERNAL NO CSE"):
             continue
         stages.append(
             FQN(
@@ -1821,6 +1879,10 @@ def list_stages(session) -> list[FQN]:
     return stages
 
 
+def list_storage_integrations(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "STORAGE INTEGRATIONS")
+
+
 def list_streams(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "STREAMS")
 
@@ -1829,7 +1891,7 @@ def list_tables(session) -> list[FQN]:
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
     tables = []
     for row in show_result:
-        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] == "INFORMATION_SCHEMA":
             continue
         tables.append(
             FQN(
@@ -1843,10 +1905,10 @@ def list_tables(session) -> list[FQN]:
 
 def list_tags(session) -> list[FQN]:
     try:
-        show_result = execute(session, "SHOW TAGS")
+        show_result = execute(session, "SHOW TAGS IN ACCOUNT")
         tags = []
         for row in show_result:
-            if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+            if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] == "INFORMATION_SCHEMA":
                 continue
             tags.append(
                 FQN(
@@ -1863,6 +1925,10 @@ def list_tags(session) -> list[FQN]:
             raise
 
 
+def list_tasks(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "TASKS")
+
+
 def list_users(session) -> list[FQN]:
     show_result = execute(session, "SHOW USERS")
     users = []
@@ -1874,10 +1940,12 @@ def list_users(session) -> list[FQN]:
 
 
 def list_views(session) -> list[FQN]:
-    show_result = execute(session, "SHOW VIEWS")
+    show_result = execute(session, "SHOW VIEWS IN ACCOUNT")
     views = []
     for row in show_result:
-        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] == "INFORMATION_SCHEMA":
+            continue
+        if row["is_materialized"] == "true":
             continue
         views.append(
             FQN(

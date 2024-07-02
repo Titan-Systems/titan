@@ -6,7 +6,7 @@ from ..enums import AccountEdition, ResourceType
 from ..props import Props, StringListProp, StringProp
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
-from ..scope import SchemaScope
+from ..scope import AccountScope, SchemaScope
 from .resource import Resource, NamedResource, ResourceSpec, ResourcePointer
 
 
@@ -89,7 +89,7 @@ class TagReference(Resource):
     edition = {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
     resource_type = ResourceType.TAG_REFERENCE
     props = Props()
-    scope = SchemaScope()
+    scope = AccountScope()
     spec = _TagReference
 
     def __init__(
@@ -117,7 +117,7 @@ class TagReference(Resource):
 
 def tag_reference_fqn(data: _TagReference) -> FQN:
     return FQN(
-        name=data.object_name,
+        name=ResourceName(data.object_name),
         params={
             "domain": data.object_domain,
         },

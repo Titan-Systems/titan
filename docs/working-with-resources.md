@@ -1,6 +1,6 @@
 # Working with Resources
 
-In the Titan framework, anything in Snowflake that can be created with a `CREATE` statement has a corresponding Python class, such as `Warehouse`, `Database`, `Role`, etc. These resources are effectively just dataclasses, serving as simple wrappers around configuration with built-in type checking.
+In the Titan framework, anything in Snowflake that can be created with a `CREATE` statement has a corresponding Python class, such as `Warehouse`, `Database`, `Role`, etc. These act as simple wrappers around configuration with built-in runtime type checking.
 
 ## Introduction to Resources
 

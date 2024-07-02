@@ -111,9 +111,10 @@ class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
 
         if self._name == "INFORMATION_SCHEMA":
             comment = "Views describing the contents of schemas in this database"
+            owner = ""
 
-        if self._name in SYSTEM_SCHEMAS:
-            self.implicit = True
+        # if self._name in SYSTEM_SCHEMAS:
+        #     self.implicit = True
 
         self._data: _Schema = _Schema(
             name=self._name,

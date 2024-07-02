@@ -2,14 +2,12 @@ import os
 
 import pytest
 
-from tests.helpers import get_json_fixtures
 from titan import data_provider
 from titan import resources as res
 from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
 from titan.enums import ResourceType
 
-JSON_FIXTURES = list(get_json_fixtures())
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 pytestmark = pytest.mark.requires_snowflake
@@ -19,16 +17,6 @@ pytestmark = pytest.mark.requires_snowflake
 def clear_cache():
     reset_cache()
     yield
-
-
-@pytest.fixture(
-    params=JSON_FIXTURES,
-    ids=[resource_cls.__name__ for resource_cls, _ in JSON_FIXTURES],
-    scope="function",
-)
-def resource(request):
-    resource_cls, data = request.param
-    yield resource_cls, data
 
 
 @pytest.fixture(scope="session")

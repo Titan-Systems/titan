@@ -880,3 +880,39 @@ def test_fetch_table_stream(cursor, suffix, marked_for_cleanup):
     result = safe_fetch(cursor, stream.urn)
     assert result is not None
     assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.TableStream.spec, result, stream.to_dict())
+
+
+def test_fetch_view_stream(cursor, suffix, marked_for_cleanup):
+    stream = res.ViewStream(
+        name=f"SOME_VIEW_STREAM_{suffix}",
+        on_view="STATIC_DATABASE.PUBLIC.STATIC_VIEW",
+        copy_grants=None,
+        before=None,
+        append_only=False,
+        show_initial_rows=None,
+        comment=None,
+        owner=TEST_ROLE,
+    )
+    cursor.execute(stream.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(stream)
+
+    result = safe_fetch(cursor, stream.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.ViewStream.spec, result, stream.to_dict())
+
+
+@pytest.mark.skip("Snowflake doesnt return the fully qualified stage name")
+def test_fetch_stage_stream(cursor, suffix, marked_for_cleanup):
+    stream = res.StageStream(
+        name=f"SOME_STAGE_STREAM_{suffix}",
+        on_stage="STATIC_DATABASE.PUBLIC.STATIC_STAGE",
+        copy_grants=None,
+        comment=None,
+        owner=TEST_ROLE,
+    )
+    cursor.execute(stream.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(stream)
+
+    result = safe_fetch(cursor, stream.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.StageStream.spec, result, stream.to_dict())
