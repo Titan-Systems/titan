@@ -278,8 +278,10 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
 
 def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list[dict]:
     try:
-
-        initial_fetch = execute(session, f"SHOW {type_str}", cacheable=cacheable)
+        in_account = " IN ACCOUNT"
+        if "INTEGRATIONS" in type_str:
+            in_account = ""
+        initial_fetch = execute(session, f"SHOW {type_str}{in_account}", cacheable=cacheable)
         if len(initial_fetch) == 0:
             return []
         elif len(initial_fetch) < 1000:
@@ -1859,7 +1861,7 @@ def list_role_grants(session) -> list[FQN]:
 
 
 def list_schemas(session, database=None) -> list[FQN]:
-    db = f" IN DATABASE {database}" if database else ""
+    db = f" IN DATABASE {database}" if database else ""  # IN ACCOUNT
     try:
         show_result = execute(session, f"SHOW SCHEMAS{db}")
         schemas = []

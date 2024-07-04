@@ -10,9 +10,10 @@ class Action(Enum):
 
 
 def eq(lhs, rhs, key):
+    if lhs is None or rhs is None:
+        return lhs == rhs
+
     if attribute_is_resource_name(key):
-        if lhs is None or rhs is None:
-            return lhs == rhs
         return ResourceName(lhs) == ResourceName(rhs)
     elif key == "args":
         # Ignore arg defaults

@@ -203,14 +203,19 @@ def _parse_role_grant(sql: str):
         + Keyword("ROLE").suppress()
         + Identifier("role")
         + TO
-        + pp.MatchFirst([Keyword("ROLE"), Keyword("USER")]).suppress()
-        + Identifier("to_role")
+        + pp.MatchFirst([Keyword("ROLE"), Keyword("USER")])("to_type")
+        + Identifier("to")
     )
     grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
 
     try:
         results = grant.parse_string(sql, parse_all=True)
-        return results.as_dict()
+        results = results.as_dict()
+        return {
+            "role": results["role"],
+            "to_role": results["to"] if results["to_type"] == "ROLE" else None,
+            "to_user": results["to"] if results["to_type"] == "USER" else None,
+        }
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse grant") from err
 

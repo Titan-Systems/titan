@@ -17,12 +17,11 @@ from .client import (
 )
 from .diff import Action, diff
 from .enums import ParseableEnum, ResourceType
-from .identifiers import URN, resource_label_for_type
+from .identifiers import URN, parse_identifier, resource_label_for_type
 from .resource_name import ResourceName
-from .resources import Account, Database, Schema
+from .resources import Account, Database
 from .resources.resource import Resource, ResourceContainer, ResourcePointer
-from .resources.grant import _RoleGrant, role_grant_fqn
-from .resources.tag import TaggableResource
+from .resources.tag import Tag, TaggableResource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
@@ -644,11 +643,41 @@ class Blueprint:
                     resource.container.add(ref)
 
     def _create_tag_references(self):
+        """
+        Tag name resolution in Snowflake is special. Tags can be referenced
+        by name only. If that tag name is unique in the account, the tag will be applied.
+        If the tag name is not unique, the error "does not exist or not authorized" will be raised.
+
+        To emulate this behavior, Blueprint will attempt to look up any referenced tags by name
+        """
+        taggables: list[TaggableResource] = []
+        tags: list[Tag] = []
         for resource in _walk(self._root):
             if isinstance(resource, TaggableResource):
-                tag_ref = resource.create_tag_reference()
-                if tag_ref:
-                    self._root.add(tag_ref)
+                taggables.append(resource)
+            elif isinstance(resource, Tag):
+                tags.append(resource)
+
+        for resource in taggables:
+            new_tags = {}
+            if resource._tags is None:
+                continue
+            for tag_name, tag_value in resource._tags.items():
+                identifier = parse_identifier(tag_name)
+                if "database" in identifier or "schema" in identifier:
+                    new_tags[tag_name] = tag_value
+                else:
+                    for tag in tags:
+                        if tag.name == tag_name:
+                            new_tags[str(tag.fqn)] = tag_value
+                            break
+                    else:
+                        # We couldn't resolve the tag, so just use the tag name as is
+                        new_tags[tag_name] = tag_value
+            resource._tags = new_tags
+            tag_ref = resource.create_tag_reference()
+            if tag_ref:
+                self._root.add(tag_ref)
 
     def _create_ownership_refs(self, session_ctx):
         for resource in _walk(self._root):
