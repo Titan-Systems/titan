@@ -15,22 +15,42 @@ from .resources import (
 
 
 def resources_from_role_grants_config(role_grants_config: list) -> list:
+    if len(role_grants_config) == 0:
+        return []
     resources = []
     for role_grant in role_grants_config:
-        for user in role_grant.get("users", []):
+
+        if "to_role" in role_grant:
             resources.append(
                 RoleGrant(
                     role=role_grant["role"],
-                    to_user=user,
+                    to_role=role_grant["to_role"],
                 )
             )
-        for to_role in role_grant.get("roles", []):
+        elif "to_user" in role_grant:
             resources.append(
                 RoleGrant(
                     role=role_grant["role"],
-                    to_role=to_role,
+                    to_user=role_grant["to_user"],
                 )
             )
+        else:
+            for user in role_grant.get("users", []):
+                resources.append(
+                    RoleGrant(
+                        role=role_grant["role"],
+                        to_user=user,
+                    )
+                )
+            for to_role in role_grant.get("roles", []):
+                resources.append(
+                    RoleGrant(
+                        role=role_grant["role"],
+                        to_role=to_role,
+                    )
+                )
+    if len(resources) == 0:
+        raise ValueError(f"No role grants found in config: {role_grants_config}")
     return resources
 
 

@@ -1,19 +1,20 @@
-import sys
 import os
 import re
+import sys
+
+from inflection import pluralize
 
 import titan
 import titan.data_provider
-
 from titan import Resource
 from titan.identifiers import resource_label_for_type
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
-from tests.helpers import get_json_fixtures, get_sql_fixtures
+from tabulate import SEPARATING_LINE, tabulate
 
-from tabulate import tabulate, SEPARATING_LINE
+from tests.helpers import get_json_fixtures, get_sql_fixtures
 
 CRITICAL = [
     "account",
@@ -38,7 +39,8 @@ docs_path = os.path.join(os.path.dirname(__file__), "..", "docs", "resources")
 DOCS = [f[:-3] for f in os.listdir(docs_path) if f.endswith(".md")]
 
 test_fetch_file = open(
-    os.path.join(os.path.dirname(__file__), "..", "tests", "integration", "data_provider", "test_fetch.py"), "r"
+    os.path.join(os.path.dirname(__file__), "..", "tests", "integration", "data_provider", "test_fetch_resource.py"),
+    "r",
 ).read()
 
 
@@ -79,12 +81,14 @@ def check_resource_coverage():
         "fetch": "fetch",
         "tests": "tests",
         "docs": "docs",
+        "list": "list",
         "stable": "stable",
     }
     audits = []
 
     current_scope = None
     current_data_type = None
+    running_total = 0
     for resource in sorted_resources:
         if resource.scope.__class__ != current_scope:
             # print(">>>", resource.scope.__class__)
@@ -107,7 +111,11 @@ def check_resource_coverage():
         has_fetch = hasattr(titan.data_provider, f"fetch_{resource_label}")
         has_tests = f"test_fetch_{class_label}" in test_fetch_file
         has_docs = class_label in DOCS
+        has_list = hasattr(titan.data_provider, f"list_{pluralize(resource_label)}")
         is_stable = all([has_json, has_sql, has_fetch, has_tests, has_docs])
+
+        if is_stable:
+            running_total += 1
 
         # print(resource_label)
 
@@ -118,9 +126,12 @@ def check_resource_coverage():
             "fetch": "✔" if has_fetch else "-",
             "tests": "✔" if has_tests else "-",
             "docs": "✔" if has_docs else "-",
-            "stable": "✅" if is_stable else "-",
+            "list": "✔" if has_list else "-",
+            "stable": "[✔]" if is_stable else "-",
         }
         audits.append(audit)
+
+    audits.append({"name": "Total", "stable": running_total})
 
     print(tabulate(audits, headers=headers, tablefmt="rounded_grid"))
 

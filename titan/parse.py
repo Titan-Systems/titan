@@ -203,14 +203,19 @@ def _parse_role_grant(sql: str):
         + Keyword("ROLE").suppress()
         + Identifier("role")
         + TO
-        + pp.MatchFirst([Keyword("ROLE"), Keyword("USER")]).suppress()
-        + Identifier("to_role")
+        + pp.MatchFirst([Keyword("ROLE"), Keyword("USER")])("to_type")
+        + Identifier("to")
     )
     grant = grant.ignore(pp.c_style_comment | snowflake_sql_comment)
 
     try:
         results = grant.parse_string(sql, parse_all=True)
-        return results.as_dict()
+        results = results.as_dict()
+        return {
+            "role": results["role"],
+            "to_role": results["to"] if results["to_type"] == "ROLE" else None,
+            "to_user": results["to"] if results["to_type"] == "USER" else None,
+        }
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse grant") from err
 
@@ -562,6 +567,29 @@ def _parse_dynamic_table_text(text: str):
     )
 
 
+def _parse_view_ddl(text: str):
+    """
+    Parse the DDL for a view.
+
+    Example:
+        CREATE VIEW
+            STATIC_DATABASE.PUBLIC.STATIC_VIEW
+            (id)
+            CHANGE_TRACKING = TRUE
+        as
+        SELECT id
+        FROM STATIC_DATABASE.public.static_table
+
+    """
+
+    # Remove newlines
+    text = text.replace("\n", " ")
+
+    # Parse as
+    match_as = re.search(r"\s+AS\s+(.*)$", text, re.IGNORECASE)
+    return match_as.group(1) if match_as else None
+
+
 def parse_function_name(header: str):
     """
     Example:
@@ -573,83 +601,6 @@ def parse_function_name(header: str):
     # Only handling the simple case because adverse cases are likely impossible to parse
     prefix, _, _ = header.partition("(")
     return prefix
-
-
-def parse_identifier(identifier: str, is_db_scoped=False) -> FQN:
-    # TODO: This needs to support periods and question marks in double quoted identifiers
-    scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
-    params = {}
-    if param_str:
-        for param in param_str.split("&"):
-            k, v = param.split("=")
-            params[k] = v
-
-    arg_types = []
-    if "(" in scoped_name:
-        args_start = scoped_name.find("(")
-        scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
-        arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
-
-    try:
-        name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
-    except pp.ParseException:
-        raise pp.ParseException(f"Failed to parse identifier: {identifier}")
-    if len(name_parts) == 1:
-        return FQN(
-            name=name_parts[0],
-            params=params,
-            arg_types=arg_types,
-        )
-    elif len(name_parts) == 2:
-        if is_db_scoped:
-            return FQN(
-                database=name_parts[0],
-                name=name_parts[1],
-                params=params,
-                arg_types=arg_types,
-            )
-        else:
-            return FQN(
-                schema=name_parts[0],
-                name=name_parts[1],
-                params=params,
-                arg_types=arg_types,
-            )
-    elif len(name_parts) == 3:
-        return FQN(
-            database=name_parts[0],
-            schema=name_parts[1],
-            name=name_parts[2],
-            params=params,
-            arg_types=arg_types,
-        )
-    elif len(name_parts) == 4:
-        params["entity"] = name_parts[3]
-        return FQN(
-            database=name_parts[0],
-            schema=name_parts[1],
-            name=name_parts[2],
-            params=params,
-            arg_types=arg_types,
-        )
-    raise Exception(f"Failed to parse identifier: {identifier}")
-
-
-# NOTE: can't put this into identifiers.py:URN because of circular import
-def parse_URN(urn_str: str) -> URN:
-    parts = urn_str.split(":")
-    if len(parts) != 4:
-        raise Exception(f"Invalid URN string: {urn_str}")
-    if parts[0] != "urn":
-        raise Exception(f"Invalid URN string: {urn_str}")
-    resource_label, fqn_str = parts[3].split("/", 1)
-    resource_type = resource_type_for_label(resource_label)
-    fqn = parse_identifier(fqn_str, is_db_scoped=(resource_label == "schema"))
-    return URN(
-        account_locator=parts[2],
-        resource_type=resource_type,
-        fqn=fqn,
-    )
 
 
 def _parse_copy_into(sql: str):

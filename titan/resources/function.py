@@ -1,10 +1,8 @@
 from dataclasses import dataclass
+from typing import Union
 
-from .resource import Arg, Resource, ResourceSpec, NamedResource
-from .role import Role
-from ..resource_name import ResourceName
-from ..scope import SchemaScope
 from ..enums import DataType, Language, NullHandling, ResourceType, Volatility
+from ..identifiers import FQN
 from ..props import (
     ArgsProp,
     EnumFlagProp,
@@ -16,6 +14,10 @@ from ..props import (
     StringListProp,
     StringProp,
 )
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import Arg, NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 @dataclass(unsafe_hash=True)
@@ -139,6 +141,10 @@ class JavascriptUDF(NamedResource, Resource):
             comment=comment,
         )
 
+    @property
+    def fqn(self):
+        return udf_fqn(self)
+
 
 @dataclass(unsafe_hash=True)
 class _PythonUDF(ResourceSpec):
@@ -221,7 +227,7 @@ class PythonUDF(NamedResource, Resource):
             handler: process_data
             args:
               - name: input_data
-                type: string
+                data_type: string
             as_: process_data_function
             comment: This function processes data.
             copy_grants: false
@@ -305,8 +311,18 @@ class PythonUDF(NamedResource, Resource):
 
     @property
     def fqn(self):
-        name = f"{self._data.name}({', '.join([str(arg['data_type']) for arg in self._data.args])})"
-        return self.scope.fully_qualified_name(self._container, name)
+        return udf_fqn(self)
+
+
+def udf_fqn(udf: Union[JavascriptUDF, PythonUDF]):
+    schema = udf.container
+    database = schema.container if schema else None
+    return FQN(
+        name=udf.name,
+        database=database.name if database else None,
+        schema=schema.name if schema else None,
+        arg_types=[str(arg["data_type"]) for arg in udf._data.args],
+    )
 
 
 FunctionMap = {

@@ -19,7 +19,8 @@ def example(request):
     yield yaml.safe_load(example_content)
 
 
-@pytest.mark.skip(reason="skipping for this release")
+# @pytest.mark.skip(reason="skipping for this release")
+@pytest.mark.enterprise
 @pytest.mark.requires_snowflake
 def test_example(example, cursor, marked_for_cleanup):
     cursor.execute("USE WAREHOUSE CI")

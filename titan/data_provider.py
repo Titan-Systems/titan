@@ -12,7 +12,6 @@ from snowflake.connector.errors import ProgrammingError
 from .builtins import (
     SYSTEM_DATABASES,
     SYSTEM_ROLES,
-    SYSTEM_SCHEMAS,
     SYSTEM_SECURITY_INTEGRATIONS,
     SYSTEM_USERS,
 )
@@ -24,14 +23,14 @@ from .client import (
     execute,
 )
 from .enums import ResourceType, WarehouseSize
-from .identifiers import FQN, URN, resource_type_for_label
+from .identifiers import FQN, URN, parse_FQN, resource_type_for_label
 from .parse import (
     FullyQualifiedIdentifier,
     _parse_column,
     _parse_dynamic_table_text,
+    _parse_view_ddl,
     parse_collection_string,
     parse_function_name,
-    parse_identifier,
 )
 from .resource_name import ResourceName, attribute_is_resource_name
 
@@ -136,7 +135,7 @@ def _urn_from_grant(row, session_ctx):
             fqn = FQN(name=ResourceName(row["name"]))
         else:
             # Scoped resources
-            fqn = parse_identifier(row["name"], is_db_scoped=(granted_on == "schema"))
+            fqn = parse_FQN(row["name"], is_db_scoped=(granted_on == "schema"))
         return URN(
             resource_type=ResourceType(granted_on),
             account_locator=session_ctx["account_locator"],
@@ -187,11 +186,11 @@ def _parse_function_arguments_2023_compat(arguments_str: str) -> tuple:
 
     header, returns = arguments_str.split(" RETURN ")
     header = header.replace("[", "").replace("]", "")
-    identifier = parse_identifier(header)
+    identifier = parse_FQN(header)
     return (identifier, returns)
 
 
-def _parse_function_arguments(arguments_str: str) -> tuple:
+def _parse_function_arguments(arguments_str: str) -> tuple[FQN, str]:
     """
     Input
     -----
@@ -205,7 +204,7 @@ def _parse_function_arguments(arguments_str: str) -> tuple:
     """
 
     header, returns = arguments_str.split(" RETURN ")
-    identifier = parse_identifier(header)
+    identifier = parse_FQN(header)
     return (identifier, returns)
 
 
@@ -270,7 +269,7 @@ def remove_none_values(d):
 
 
 def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
-    show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn.name}")
+    show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
     if len(ownership_grant) == 0:
         return None
@@ -279,8 +278,10 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
 
 def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list[dict]:
     try:
-
-        initial_fetch = execute(session, f"SHOW {type_str}", cacheable=cacheable)
+        in_account = " IN ACCOUNT"
+        if "INTEGRATIONS" in type_str:
+            in_account = ""
+        initial_fetch = execute(session, f"SHOW {type_str}{in_account}", cacheable=cacheable)
         if len(initial_fetch) == 0:
             return []
         elif len(initial_fetch) < 1000:
@@ -299,8 +300,6 @@ def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list
                 initial_fetch,
                 name=fqn.name,
                 **container_kwargs,
-                # database=fqn.database,
-                # schema=fqn.schema,
             )
             return filtered_fetch
         else:
@@ -434,12 +433,12 @@ def fetch_alert(session, fqn: FQN):
 
 
 def fetch_api_integration(session, fqn: FQN):
-    show_result = _show_resources(session, "API INTEGRATIONS", fqn)
-    if len(show_result) == 0:
+    integrations = _show_resources(session, "API INTEGRATIONS", fqn)
+    if len(integrations) == 0:
         return None
-    if len(show_result) > 1:
+    if len(integrations) > 1:
         raise Exception(f"Found multiple api integrations matching {fqn}")
-    data = show_result[0]
+    data = integrations[0]
     desc_result = execute(session, f"DESC API INTEGRATION {fqn}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
     owner = _fetch_owner(session, "INTEGRATION", fqn)
@@ -458,14 +457,14 @@ def fetch_api_integration(session, fqn: FQN):
 
 
 def fetch_catalog_integration(session, fqn: FQN):
-    show_result = execute(session, f"SHOW CATALOG INTEGRATIONS LIKE '{fqn.name}'", cacheable=True)
-    if len(show_result) == 0:
+    integrations = _show_resources(session, "CATALOG INTEGRATIONS", fqn)
+    if len(integrations) == 0:
         return None
-    if len(show_result) > 1:
+    if len(integrations) > 1:
         raise Exception(f"Found multiple catalog integrations matching {fqn}")
 
-    data = show_result[0]
-    desc_result = execute(session, f"DESC CATALOG INTEGRATION {fqn.name}")
+    data = integrations[0]
+    desc_result = execute(session, f"DESC CATALOG INTEGRATION {fqn}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
     owner = _fetch_owner(session, "INTEGRATION", fqn)
 
@@ -539,7 +538,8 @@ def fetch_compute_pool(session, fqn: FQN):
 
 
 def fetch_database(session, fqn: FQN):
-    show_result = execute(session, f"SHOW DATABASES LIKE '{fqn.name}'", cacheable=True)
+    # show_result = execute(session, f"SHOW DATABASES LIKE '{fqn.name}'", cacheable=True)
+    show_result = _show_resources(session, "DATABASES", fqn)
 
     if len(show_result) == 0:
         return None
@@ -992,19 +992,21 @@ def fetch_procedure(session, fqn: FQN):
     desc_result = execute(session, f"DESC PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
 
-    show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
-    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    # show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
+    # ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    owner = _fetch_owner(session, "PROCEDURE", fqn)
 
     return {
-        "name": data["name"].lower(),
+        "name": _quote_snowflake_identifier(data["name"]),
         "args": _parse_signature(properties["signature"]),
         "comment": data["description"],
         "execute_as": properties["execute as"],
+        "external_access_integrations": data["external_access_integrations"] or None,
         "handler": properties["handler"],
         "imports": _parse_list_property(properties["imports"]),
         "language": properties["language"],
         "null_handling": properties["null handling"],
-        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
+        "owner": owner,
         "packages": _parse_packages(properties["packages"]),
         "returns": returns,
         "runtime_version": properties["runtime_version"],
@@ -1044,10 +1046,7 @@ def fetch_role_grants(session, role: str):
 
 
 def fetch_role(session, fqn: FQN):
-    role_name = fqn.name._name if isinstance(fqn.name, ResourceName) else fqn.name
-    show_result = execute(session, "SHOW ROLES", cacheable=True)
-
-    roles = _filter_result(show_result, name=role_name)
+    roles = _show_resources(session, "ROLES", fqn)
 
     if len(roles) == 0:
         return None
@@ -1328,11 +1327,11 @@ def fetch_stage(session, fqn: FQN):
             "directory": {"enable": data["directory_enabled"] == "Y"},
             "comment": data["comment"] or None,
         }
-    elif data["type"] == "INTERNAL":
+    elif data["type"] in ("INTERNAL", "INTERNAL NO CSE"):
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "owner": data["owner"],
-            "type": data["type"],
+            "type": "INTERNAL",
             "directory": {"enable": data["directory_enabled"] == "Y"},
             "comment": data["comment"] or None,
         }
@@ -1354,21 +1353,45 @@ def fetch_storage_integration(session, fqn: FQN):
     desc_result = execute(session, f"DESC INTEGRATION {fqn.name}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
 
-    show_grants = execute(session, f"SHOW GRANTS ON INTEGRATION {fqn.name}")
-    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
 
-    return {
-        "name": _quote_snowflake_identifier(data["name"]),
-        "type": data["type"],
-        "enabled": data["enabled"] == "true",
-        "comment": data["comment"] or None,
-        "storage_provider": properties["storage_provider"],
-        "storage_aws_role_arn": properties.get("storage_aws_role_arn"),
-        "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
-        "storage_blocked_locations": properties.get("storage_blocked_locations") or None,
-        "storage_aws_object_acl": properties.get("storage_aws_object_acl"),
-        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
-    }
+    if properties["storage_provider"] == "S3":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "enabled": data["enabled"] == "true",
+            "comment": data["comment"] or None,
+            "owner": owner,
+            "storage_provider": properties["storage_provider"],
+            "storage_aws_role_arn": properties.get("storage_aws_role_arn"),
+            "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
+            "storage_blocked_locations": properties.get("storage_blocked_locations") or None,
+            "storage_aws_object_acl": properties.get("storage_aws_object_acl"),
+        }
+    elif properties["storage_provider"] == "GCS":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "enabled": data["enabled"] == "true",
+            "comment": data["comment"] or None,
+            "owner": owner,
+            "storage_provider": properties["storage_provider"],
+            "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
+            "storage_blocked_locations": properties.get("storage_blocked_locations") or None,
+        }
+    elif properties["storage_provider"] == "AZURE":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "enabled": data["enabled"] == "true",
+            "comment": data["comment"] or None,
+            "owner": owner,
+            "storage_provider": properties["storage_provider"],
+            "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
+            "azure_tenant_id": properties["azure_tenant_id"],
+        }
+    else:
+        raise Exception(f"Unsupported storage provider {properties['storage_provider']}")
 
 
 def fetch_stream(session, fqn: FQN):
@@ -1389,6 +1412,21 @@ def fetch_stream(session, fqn: FQN):
             "append_only": data["mode"] == "APPEND_ONLY",
             "on_table": data["table_name"],
             "owner": data["owner"],
+        }
+    elif data["source_type"] == "View":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "comment": data["comment"] or None,
+            "append_only": data["mode"] == "APPEND_ONLY",
+            "on_view": data["table_name"],
+            "owner": data["owner"],
+        }
+    elif data["source_type"] == "Stage":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "on_stage": data["table_name"],
+            "owner": data["owner"],
+            "comment": data["comment"] or None,
         }
     else:
         raise NotImplementedError(f"Unsupported stream source type {data['source_type']}")
@@ -1566,7 +1604,9 @@ def fetch_tag_reference(session, fqn: FQN):
         return None
 
     object_domain = fqn.params["domain"]
-    resource_fqn = parse_identifier(fqn.name, is_db_scoped=(object_domain == "SCHEMA"))
+    # TODO: this is a hacky fix
+    name = str(fqn).split("?")[0]
+    resource_fqn = parse_FQN(name, is_db_scoped=(object_domain == "SCHEMA"))
 
     try:
         tag_refs = execute(
@@ -1632,16 +1672,16 @@ def fetch_view(session, fqn: FQN):
     if fqn.schema is None:
         raise Exception(f"View fqn must have a schema {fqn}")
     try:
-        show_result = execute(session, f"SHOW VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
+        views = _show_resources(session, "VIEWS", fqn)
     except ProgrammingError:
         return None
 
-    if len(show_result) == 0:
+    if len(views) == 0:
         return None
-    if len(show_result) > 1:
+    if len(views) > 1:
         raise Exception(f"Found multiple views matching {fqn}")
 
-    data = show_result[0]
+    data = views[0]
 
     if data["is_materialized"] == "true":
         return None
@@ -1655,7 +1695,7 @@ def fetch_view(session, fqn: FQN):
         "columns": columns,
         "change_tracking": data["change_tracking"] == "ON",
         "comment": data["comment"] or None,
-        "as_": data["text"],
+        "as_": _parse_view_ddl(data["text"]),
     }
 
 
@@ -1706,29 +1746,93 @@ def list_resource(session, resource_label: str) -> list[FQN]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
-def list_schema_scoped_resource(session, resource) -> list[FQN]:
+def list_account_scoped_resource(session, resource) -> list[FQN]:
     show_result = execute(session, f"SHOW {resource}")
     resources = []
     for row in show_result:
-        resources.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        resources.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return resources
+
+
+def list_schema_scoped_resource(session, resource) -> list[FQN]:
+    show_result = execute(session, f"SHOW {resource} IN ACCOUNT")
+    resources = []
+    for row in show_result:
+        resources.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
+    return resources
+
+
+def list_alerts(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "ALERTS")
+
+
+def list_api_integrations(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "API INTEGRATIONS")
+
+
+def list_catalog_integrations(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "CATALOG INTEGRATIONS")
 
 
 def list_compute_pools(session) -> list[FQN]:
     show_result = execute(session, "SHOW COMPUTE POOLS")
-    return [FQN(name=row["name"]) for row in show_result]
+    return [FQN(name=ResourceName.from_snowflake_metadata(row["name"])) for row in show_result]
 
 
 def list_databases(session) -> list[FQN]:
     show_result = execute(session, "SHOW DATABASES")
-    return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_DATABASES]
+    return [
+        FQN(name=ResourceName.from_snowflake_metadata(row["name"]))
+        for row in show_result
+        if row["name"] not in SYSTEM_DATABASES
+    ]
+
+
+# def list_database_roles(session) -> list[FQN]:
+#     return list_account_scoped_resource(session, "DATABASE ROLES")
+
+
+def list_dynamic_tables(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "DYNAMIC TABLES")
+
+
+# def list_future_grants(session) -> list[FQN]:
+#     grants = []
+#     for role in roles:
+#         role_name = ResourceName.from_snowflake_metadata(role["name"])
+#         if role_name in SYSTEM_ROLES:
+#             continue
+#         show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
+#         for data in show_result:
+#             subject = "user" if data["granted_to"] == "USER" else "role"
+#             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
+#     return grants
+
+
+def list_functions(session) -> list[FQN]:
+    show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT")
+    functions = []
+    for row in show_result:
+        if row["catalog_name"] in SYSTEM_DATABASES:
+            continue
+        fqn, returns = _parse_function_arguments(row["arguments"])
+        fqn.database = row["catalog_name"]
+        fqn.schema = row["schema_name"]
+        functions.append(fqn)
+    return functions
 
 
 def list_grants(session) -> list[FQN]:
     roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
-        role_name = ResourceName(role["name"])
+        role_name = ResourceName.from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
         show_result = execute(session, f"SHOW GRANTS TO ROLE {role_name}")
@@ -1749,19 +1853,36 @@ def list_grants(session) -> list[FQN]:
     return grants
 
 
+def list_image_repositories(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "IMAGE REPOSITORIES")
+
+
+def list_pipes(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "PIPES")
+
+
 def list_roles(session) -> list[FQN]:
     show_result = execute(session, "SHOW ROLES")
-    return [FQN(name=row["name"]) for row in show_result if row["name"] not in SYSTEM_ROLES]
+    return [
+        FQN(name=ResourceName.from_snowflake_metadata(row["name"]))
+        for row in show_result
+        if row["name"] not in SYSTEM_ROLES
+    ]
 
 
 def list_role_grants(session) -> list[FQN]:
     roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
-        role_name = ResourceName(role["name"])
+        role_name = ResourceName.from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
+        try:
+            show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
+        except ProgrammingError as err:
+            if err.errno == DOES_NOT_EXIST_ERR:
+                continue
+            raise
         for data in show_result:
             subject = "user" if data["granted_to"] == "USER" else "role"
             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
@@ -1769,14 +1890,14 @@ def list_role_grants(session) -> list[FQN]:
 
 
 def list_schemas(session, database=None) -> list[FQN]:
-    db = f" IN DATABASE {database}" if database else ""
+    db = f" IN DATABASE {database}" if database else ""  # IN ACCOUNT
     try:
         show_result = execute(session, f"SHOW SCHEMAS{db}")
         schemas = []
         for row in show_result:
-            if row["database_name"] in SYSTEM_DATABASES or row["name"] in SYSTEM_SCHEMAS:
+            if row["database_name"] in SYSTEM_DATABASES or row["name"] == "INFORMATION_SCHEMA":
                 continue
-            schemas.append(FQN(database=row["database_name"], name=row["name"]))
+            schemas.append(FQN(database=row["database_name"], name=ResourceName.from_snowflake_metadata(row["name"])))
         return schemas
     except ProgrammingError as err:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
@@ -1790,18 +1911,40 @@ def list_security_integrations(session) -> list[FQN]:
     for row in show_result:
         if row["name"] in SYSTEM_SECURITY_INTEGRATIONS:
             continue
-        integrations.append(FQN(name=row["name"]))
+        integrations.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return integrations
 
 
+def list_shares(session) -> list[FQN]:
+    show_result = execute(session, "SHOW SHARES")
+    shares = []
+    for row in show_result:
+        if row["kind"] == "INBOUND":
+            continue
+        shares.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+    return shares
+
+
 def list_stages(session) -> list[FQN]:
-    show_result = execute(session, "SHOW STAGES")
+    show_result = execute(session, "SHOW STAGES IN ACCOUNT")
     stages = []
     for row in show_result:
         if row["database_name"] in SYSTEM_DATABASES:
             continue
-        stages.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        if row["type"] not in ("EXTERNAL", "INTERNAL", "INTERNAL NO CSE"):
+            continue
+        stages.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
     return stages
+
+
+def list_storage_integrations(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "STORAGE INTEGRATIONS")
 
 
 def list_streams(session) -> list[FQN]:
@@ -1812,20 +1955,32 @@ def list_tables(session) -> list[FQN]:
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
     tables = []
     for row in show_result:
-        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] == "INFORMATION_SCHEMA":
             continue
-        tables.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        tables.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
     return tables
 
 
 def list_tags(session) -> list[FQN]:
     try:
-        show_result = execute(session, "SHOW TAGS")
+        show_result = execute(session, "SHOW TAGS IN ACCOUNT")
         tags = []
         for row in show_result:
-            if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+            if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] == "INFORMATION_SCHEMA":
                 continue
-            tags.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+            tags.append(
+                FQN(
+                    database=row["database_name"],
+                    schema=row["schema_name"],
+                    name=ResourceName.from_snowflake_metadata(row["name"]),
+                )
+            )
         return tags
     except ProgrammingError as err:
         if err.errno == UNSUPPORTED_FEATURE:
@@ -1834,23 +1989,35 @@ def list_tags(session) -> list[FQN]:
             raise
 
 
+def list_tasks(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "TASKS")
+
+
 def list_users(session) -> list[FQN]:
     show_result = execute(session, "SHOW USERS")
     users = []
     for row in show_result:
         if row["name"] in SYSTEM_USERS:
             continue
-        users.append(FQN(name=row["name"]))
+        users.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return users
 
 
 def list_views(session) -> list[FQN]:
-    show_result = execute(session, "SHOW VIEWS")
+    show_result = execute(session, "SHOW VIEWS IN ACCOUNT")
     views = []
     for row in show_result:
-        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] in SYSTEM_SCHEMAS:
+        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] == "INFORMATION_SCHEMA":
             continue
-        views.append(FQN(database=row["database_name"], schema=row["schema_name"], name=row["name"]))
+        if row["is_materialized"] == "true":
+            continue
+        views.append(
+            FQN(
+                database=row["database_name"],
+                schema=row["schema_name"],
+                name=ResourceName.from_snowflake_metadata(row["name"]),
+            )
+        )
     return views
 
 
@@ -1858,7 +2025,7 @@ def list_warehouses(session) -> list[FQN]:
     show_result = execute(session, "SHOW WAREHOUSES")
     warehouses = []
     for row in show_result:
-        warehouses.append(FQN(name=row["name"]))
+        warehouses.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return warehouses
 
 

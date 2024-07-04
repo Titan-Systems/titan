@@ -68,7 +68,7 @@ def execute(
 
     if cacheable and session.role in _EXECUTION_CACHE and sql_text in _EXECUTION_CACHE[session.role]:
         result = _EXECUTION_CACHE[session.role][sql_text]
-        logger.warning(f"{session_header}    \033[94m({len(result)} rows, cached)\033[0m")
+        # logger.warning(f"{session_header}    \033[94m({len(result)} rows, cached)\033[0m")
         return result
 
     start = time.time()

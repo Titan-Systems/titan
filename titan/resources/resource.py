@@ -1,7 +1,7 @@
 import difflib
 import sys
 import types
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 from inspect import isclass
 from itertools import chain
 from typing import Any, Type, TypedDict, Union, get_args, get_origin
@@ -9,9 +9,9 @@ from typing import Any, Type, TypedDict, Union, get_args, get_origin
 import pyparsing as pp
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
-from ..identifiers import FQN, URN, resource_label_for_type
+from ..identifiers import FQN, URN, parse_identifier, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
-from ..parse import _parse_create_header, _parse_props, _resolve_resource_class, parse_identifier
+from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 from ..props import Props as ResourceProps
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
@@ -58,6 +58,12 @@ class Arg(TypedDict):
 class Returns(TypedDict):
     data_type: DataType
     metadata: str
+
+
+@dataclass
+class LifecycleConfig:
+    ignore_changes: list[str] = field(default_factory=list)
+    prevent_destroy: bool = False
 
 
 def _coerce_resource_field(field_value, field_type):
@@ -130,13 +136,16 @@ def _coerce_resource_field(field_value, field_type):
 @dataclass
 class ResourceSpec:
     def __post_init__(self):
-        for field in fields(self):
-            field_value = getattr(self, field.name)
+        for f in fields(self):
+            field_value = getattr(self, f.name)
             if field_value is None:
                 continue
             else:
-                new_value = _coerce_resource_field(field_value, field.type)
-                setattr(self, field.name, new_value)
+                new_value = _coerce_resource_field(field_value, f.type)
+                setattr(self, f.name, new_value)
+
+    # def __hash__(self):
+    #     return hash(tuple(sorted(self.__dict__.items())))
 
     @classmethod
     def get_metadata(cls, field_name: str):
@@ -172,13 +181,19 @@ class Resource(metaclass=_Resource):
     spec: Type[ResourceSpec]
     serialize_inline: bool = False
 
-    def __init__(self, implicit: bool = False, **kwargs):
+    def __init__(
+        self,
+        implicit: bool = False,
+        lifecycle: dict = None,
+        **kwargs,
+    ):
         super().__init__()
         self._data: ResourceSpec = None
         self._container: "ResourceContainer" = None
-        self._dirty = False
+        self._finalized = False
+        self.lifecycle = LifecycleConfig(**lifecycle) if lifecycle else LifecycleConfig()
         self.implicit = implicit
-        self.refs = set()
+        self.refs: set[Resource] = set()
 
         # Consume resource_type from kwargs if it exists
         resource_type = kwargs.pop("resource_type", None)
@@ -196,7 +211,7 @@ class Resource(metaclass=_Resource):
         if kwargs:
             try:
                 if self.spec:
-                    field_names = [field.name for field in fields(self.spec)]
+                    field_names = [f.name for f in fields(self.spec)]
                     field_names = ", ".join(field_names)
                     raise ValueError(
                         f"Unexpected keyword arguments for {self.__class__.__name__} {kwargs}. Valid field names: {field_names}"
@@ -276,7 +291,7 @@ class Resource(metaclass=_Resource):
         return self._data == other._data
 
     def __hash__(self):
-        return hash(self._data)
+        return hash(URN.from_resource(self, ""))
 
     def to_dict(self):
         serialized = {}
@@ -300,7 +315,7 @@ class Resource(metaclass=_Resource):
             elif isinstance(value, dict):
                 return {k: _serialize(v) for k, v in value.items()}
             elif isinstance(value, ResourceName):
-                return value._name
+                return str(value)
             elif isinstance(value, ResourceTags):
                 return value.tags
             else:
@@ -308,9 +323,9 @@ class Resource(metaclass=_Resource):
 
         # for key, value in asdict(self._data).items():
         #     serialized[key] = _serialize(value)
-        for field in fields(self._data):
-            value = getattr(self._data, field.name)
-            serialized[field.name] = _serialize(value)
+        for f in fields(self._data):
+            value = getattr(self._data, f.name)
+            serialized[f.name] = _serialize(value)
 
         return serialized
 
@@ -326,6 +341,8 @@ class Resource(metaclass=_Resource):
         return drop_resource(self.urn, self.to_dict(), if_exists=if_exists)
 
     def _requires(self, resource: "Resource"):
+        if self._finalized:
+            raise RuntimeError("Cannot modify a finalized resource")
         if isinstance(resource, (Resource, ResourcePointer)):
             self.refs.add(resource)
 
@@ -370,6 +387,10 @@ class Resource(metaclass=_Resource):
     def urn(self):
         return URN.from_resource(self, account_locator="")
 
+    @property
+    def fqn(self) -> FQN:
+        raise NotImplementedError("Subclasses must implement fqn")
+
 
 class ResourceContainer:
     def __init__(self):
@@ -402,7 +423,11 @@ class ResourceContainer:
         for resource in self.items(resource_type):
             if isinstance(resource, ResourcePointer) and resource.name == name:
                 return resource
-            elif isinstance(resource, Resource) and resource._data is not None and resource._data.name == name:
+            elif (
+                isinstance(resource, Resource)
+                and resource._data is not None
+                and getattr(resource._data, "name", None) == name
+            ):
                 return resource
         raise KeyError(f"Resource {resource_type} {name} not found")
 
@@ -439,22 +464,22 @@ class NamedResource:
             return
 
         try:
-            fqn = parse_identifier(name, is_db_scoped=isinstance(self.scope, DatabaseScope))
+            identifier = parse_identifier(name, is_db_scoped=isinstance(self.scope, DatabaseScope))
         except pp.ParseException:
             # Allow identifiers that should be quoted, so long as they aren't insane
             if "." in name:
                 raise ValueError(f"Resource name not supported {name}")
-            fqn = parse_identifier(f'"{name}"', is_db_scoped=isinstance(self.scope, DatabaseScope))
+            identifier = parse_identifier(f'"{name}"', is_db_scoped=isinstance(self.scope, DatabaseScope))
 
-        self._name = ResourceName(fqn.name)
-        if fqn.database and "database" in kwargs:
+        self._name = ResourceName(identifier["name"])
+        if "database" in identifier and "database" in kwargs:
             raise ValueError("Multiple database names found")
-        if fqn.schema and "schema" in kwargs:
+        if "schema" in identifier and "schema" in kwargs:
             raise ValueError("Multiple schema names found")
 
         super().__init__(
-            database=kwargs.pop("database", fqn.database),
-            schema=kwargs.pop("schema", fqn.schema),
+            database=kwargs.pop("database", identifier.get("database")),
+            schema=kwargs.pop("schema", identifier.get("schema")),
             **kwargs,
         )
 
@@ -464,7 +489,7 @@ class NamedResource:
 
     @property
     def fqn(self) -> FQN:
-        return self.scope.fully_qualified_name(self.container, str(self.name))
+        return self.scope.fully_qualified_name(self.container, self.name)
 
 
 class ResourcePointer(NamedResource, Resource, ResourceContainer):
@@ -506,7 +531,10 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
         return self._resource_type
 
     def to_dict(self):
-        return {"name": self.name}
+        return {
+            "_pointer": True,
+            "name": self.name,
+        }
 
 
 def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource, ResourceName]) -> Resource:

@@ -1,8 +1,9 @@
 import pyparsing as pp
 
 from titan import resources as res
+from titan.identifiers import parse_URN
+from titan.parse import FullyQualifiedIdentifier
 from titan.resource_name import ResourceName
-from titan.parse import FullyQualifiedIdentifier, parse_URN
 
 IDENTIFIER_TEST_CASES = [
     ("tbl", ["tbl"]),

@@ -1,3 +1,18 @@
+users:
+  - name: static_user
+    email: info@applytitan.com
+    comment: This is a static user
+  - name: TITAN_ADMIN
+    default_warehouse: CI
+    default_role: SYSADMIN
+    lifecycle:
+      prevent_destroy: true
+      ignore_changes:
+        - email
+        - first_name
+        - last_name
+        - owner
+
 roles:
   - name: CI
     comment: CI role, do not drop
@@ -8,9 +23,13 @@ roles:
   - name: ~@#$%^&*()_+
     owner: ACCOUNTADMIN
     comment: This role has some issues
+  - name: '"aCaseWithinACase"'
+    comment: This role must be quoted
 
 databases:
   - name: static_database
+    schemas:
+      - name: public
 
 role_grants:
   - role: CI
@@ -50,6 +69,9 @@ grants:
 schemas:
   - name: static_schema
     database: static_database
+
+shares:
+  - name: static_share
 
 stages:
   - name: static_stage
@@ -110,4 +132,3 @@ security_integrations:
     oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
     oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'
     enabled: true
-

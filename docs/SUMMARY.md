@@ -2,6 +2,7 @@
 
 * [Overview](README.md)
 * [Getting Started](getting-started.md)
+* [Working With Resources](working-with-resources.md)
 * [Blueprint](blueprint.md)
 * [GitHub Action](titan-core-github-action.md)
 

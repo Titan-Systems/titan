@@ -1,34 +1,16 @@
 from typing import Optional, Union
 
+import pyparsing as pp
+
 from .enums import ResourceType
-
+from .parse_primitives import FullyQualifiedIdentifier
 from .resource_name import ResourceName
-
-
-def _params_to_str(params: dict) -> str:
-    return "&".join([f"{k.lower()}={v}" for k, v in params.items()])
-
-
-def resource_label_for_type(resource_type: ResourceType) -> str:
-    return str(resource_type).replace(" ", "_").lower()
-
-
-def resource_type_for_label(resource_label: str) -> ResourceType:
-    return ResourceType(resource_label.upper().replace("_", " "))
-
-
-def names_are_equal(name1: Union[None, str, ResourceName], name2: Union[None, str, ResourceName]) -> bool:
-    if name1 is None and name2 is None:
-        return True
-    if name1 is None or name2 is None:
-        return False
-    return ResourceName(name1) == ResourceName(name2)
 
 
 class FQN:
     def __init__(
         self,
-        name: Union[str, ResourceName],
+        name: ResourceName,
         database: Optional[Union[str, ResourceName]] = None,
         schema: Optional[Union[str, ResourceName]] = None,
         arg_types: Optional[list] = None,
@@ -37,8 +19,10 @@ class FQN:
         self.name = name
         self.database = database
         self.schema = schema
-        self.arg_types = arg_types or []
+        self.arg_types = arg_types
         self.params = params or {}
+        if not isinstance(name, ResourceName):
+            raise Exception
 
     def __eq__(self, other):
         if not isinstance(other, FQN):
@@ -57,25 +41,28 @@ class FQN:
                 ResourceName(self.name),
                 ResourceName(self.database) if self.database else None,
                 ResourceName(self.schema) if self.schema else None,
-                tuple(self.arg_types),
-                tuple(
-                    self.params.items(),
-                ),
+                tuple(self.arg_types or []),
+                tuple(self.params.items()),
             )
         )
 
     def __str__(self):
         db = f"{ResourceName(self.database)}." if self.database else ""
         schema = f"{ResourceName(self.schema)}." if self.schema else ""
-        arg_types = f"({', '.join(self.arg_types)})" if self.arg_types else ""
+        arg_types = ""
+        if self.arg_types is not None:
+            arg_types = f"({', '.join(map(str, self.arg_types))})"
         params = "?" + _params_to_str(self.params) if self.params else ""
         return f"{db}{schema}{self.name}{arg_types}{params}"
 
     def __repr__(self):  # pragma: no cover
         db = f", db={self.database}" if self.database else ""
         schema = f", schema={self.schema}" if self.schema else ""
-        params = "?" + _params_to_str(self.params) if self.params else ""
-        return f"FQN(name={self.name}{db}{schema}{params})"
+        arg_types = ""
+        if self.arg_types is not None:
+            arg_types = f", args=({', '.join(map(str, self.arg_types))})"
+        params = " ?" + _params_to_str(self.params) if self.params else ""
+        return f"FQN(name={self.name}{db}{schema}{arg_types}{params})"
 
 
 class URN:
@@ -96,7 +83,7 @@ class URN:
                              Fully Qualified Name
     """
 
-    def __init__(self, resource_type: ResourceType, fqn: FQN, account_locator: str) -> None:
+    def __init__(self, resource_type: ResourceType, fqn: FQN, account_locator: str = "") -> None:
         if not isinstance(resource_type, ResourceType):
             raise Exception(f"Invalid resource type: {resource_type}")
         self.resource_type: ResourceType = resource_type
@@ -164,50 +151,153 @@ class URN:
         )
 
 
-class ResourceLocator:
-    """
-    ResourceLocator
+# class ResourceLocator:
+#     """
+#     ResourceLocator
 
-    A simple query language for locating resources within a Snowflake account.
-    """
+#     A simple query language for locating resources within a Snowflake account.
+#     """
 
-    def __init__(self, resource_key: str, locator: str) -> None:
-        self.resource_key = resource_key
-        self.locator = locator
-        self.star = self.locator == "*"
+#     def __init__(self, resource_key: str, locator: str) -> None:
+#         self.resource_key = resource_key
+#         self.locator = locator
+#         self.star = self.locator == "*"
 
-    @classmethod
-    def from_str(cls, resource_str: str) -> "ResourceLocator":
-        """
-        Parse a resource locator string.
+#     @classmethod
+#     def from_str(cls, resource_str: str) -> "ResourceLocator":
+#         """
+#         Parse a resource locator string.
 
-        Usage
-        -----
-        Locate all resources:
-        >>> ResourceLocator.from_str("*")
+#         Usage
+#         -----
+#         Locate all resources:
+#         >>> ResourceLocator.from_str("*")
 
-        Locate a specific resource:
-        >>> ResourceLocator.from_str("database:mydb")
-        >>> ResourceLocator.from_str("schema:mydb.my_schema")
-        >>> ResourceLocator.from_str("table:mydb.my_schema.my_table")
+#         Locate a specific resource:
+#         >>> ResourceLocator.from_str("database:mydb")
+#         >>> ResourceLocator.from_str("schema:mydb.my_schema")
+#         >>> ResourceLocator.from_str("table:mydb.my_schema.my_table")
 
-        Locate all resources of a given type:
-        >>> ResourceLocator.from_str("database:*")
+#         Locate all resources of a given type:
+#         >>> ResourceLocator.from_str("database:*")
 
-        Locate all resources within a given scope:
-        >>> ResourceLocator.from_str("database:mydb.*")
-        """
+#         Locate all resources within a given scope:
+#         >>> ResourceLocator.from_str("database:mydb.*")
+#         """
 
-        if resource_str == "*":
-            return cls(resource_key="account", locator="*")
+#         if resource_str == "*":
+#             return cls(resource_key="account", locator="*")
 
-        parts = resource_str.split(":")
-        if len(parts) != 2:
-            raise Exception(f"Invalid resource locator string: {resource_str}")
-        return cls(resource_key=parts[0], locator=parts[1])
+#         parts = resource_str.split(":")
+#         if len(parts) != 2:
+#             raise Exception(f"Invalid resource locator string: {resource_str}")
+#         return cls(resource_key=parts[0], locator=parts[1])
 
-    def __str__(self):
-        return f"{self.resource_key}:{self.locator}"
+#     def __str__(self):
+#         return f"{self.resource_key}:{self.locator}"
 
-    def __repr__(self):  # pragma: no cover
-        return f"ResourceLocator(resource_key='{self.resource_key}', locator='{self.locator}')"
+#     def __repr__(self):  # pragma: no cover
+#         return f"ResourceLocator(resource_key='{self.resource_key}', locator='{self.locator}')"
+
+
+def parse_identifier(identifier: str, is_db_scoped=False) -> dict:
+    # TODO: This needs to support periods and question marks in double quoted identifiers
+    scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
+    params = {}
+    if param_str:
+        for param in param_str.split("&"):
+            k, v = param.split("=")
+            params[k] = v
+
+    arg_types = None
+    if "(" in scoped_name:
+        args_start = scoped_name.find("(")
+        scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
+        arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
+
+    try:
+        name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
+    except pp.ParseException:
+        raise pp.ParseException(f"Failed to parse identifier: {identifier}")
+    if len(name_parts) == 1:
+        return {
+            "name": name_parts[0],
+            "params": params,
+            "arg_types": arg_types,
+        }
+    elif len(name_parts) == 2:
+        if is_db_scoped:
+            return {
+                "database": name_parts[0],
+                "name": name_parts[1],
+                "params": params,
+                "arg_types": arg_types,
+            }
+        else:
+            return {
+                "schema": name_parts[0],
+                "name": name_parts[1],
+                "params": params,
+                "arg_types": arg_types,
+            }
+    elif len(name_parts) == 3:
+        return {
+            "database": name_parts[0],
+            "schema": name_parts[1],
+            "name": name_parts[2],
+            "params": params,
+            "arg_types": arg_types,
+        }
+    elif len(name_parts) == 4:
+        params["entity"] = name_parts[3]
+        return {
+            "database": name_parts[0],
+            "schema": name_parts[1],
+            "name": name_parts[2],
+            "params": params,
+            "arg_types": arg_types,
+        }
+    raise Exception(f"Failed to parse identifier: {identifier}")
+
+
+def parse_FQN(fqn_str: str, is_db_scoped=False) -> FQN:
+    identifier = parse_identifier(fqn_str, is_db_scoped=is_db_scoped)
+    name = identifier.pop("name")
+    return FQN(name=ResourceName(name), **identifier)
+
+
+# NOTE: can't put this into identifiers.py:URN because of circular import
+def parse_URN(urn_str: str) -> URN:
+    parts = urn_str.split(":")
+    if len(parts) != 4:
+        raise Exception(f"Invalid URN string: {urn_str}")
+    if parts[0] != "urn":
+        raise Exception(f"Invalid URN string: {urn_str}")
+    resource_label, fqn_str = parts[3].split("/", 1)
+    resource_type = resource_type_for_label(resource_label)
+    fqn = parse_FQN(fqn_str, is_db_scoped=(resource_label == "schema"))
+    return URN(
+        account_locator=parts[2],
+        resource_type=resource_type,
+        fqn=fqn,
+    )
+
+
+def _params_to_str(params: dict) -> str:
+    return "&".join([f"{k.lower()}={v}" for k, v in params.items()])
+
+
+def resource_label_for_type(resource_type: ResourceType) -> str:
+    return str(resource_type).replace(" ", "_").lower()
+
+
+def resource_type_for_label(resource_label: str) -> ResourceType:
+    return ResourceType(resource_label.upper().replace("_", " "))
+
+
+def names_are_equal(name1: Union[None, str, ResourceName], name2: Union[None, str, ResourceName]) -> bool:
+    if name1 is None and name2 is None:
+        return True
+    if name1 is None or name2 is None:
+        return False
+    return ResourceName(name1) == ResourceName(name2)

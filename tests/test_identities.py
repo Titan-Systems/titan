@@ -57,8 +57,16 @@ def test_data_identity(resource):
             if "name" in lhs:
                 assert _resource_names_are_eq(lhs.pop("name"), rhs.pop("name"))
             assert lhs == rhs
+    if "args" in serialized:
+        lhs_args = serialized.pop("args", []) or []
+        rhs_args = data.pop("args", []) or []
+        assert len(lhs_args) == len(rhs_args)
+        for lhs, rhs in zip(lhs_args, rhs_args):
+            if "name" in lhs:
+                assert _resource_names_are_eq(lhs.pop("name"), rhs.pop("name"))
+            assert lhs == rhs
     for field in fields(instance._data):
-        if field.name in ["name", "columns"]:
+        if field.name in ["name", "columns", "args"]:
             continue
         if _resource_field_type_is_resource(field):
             assert _resource_names_are_eq(serialized.pop(field.name), data.pop(field.name))

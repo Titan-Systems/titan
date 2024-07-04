@@ -6,6 +6,14 @@ roles:
   - name: reporter
     comment: "Has permissions on the analytics database only. This role is for data consumers, such as analysts and BI tools. These users will not have permissions to read data from the raw database."
 
+role_grants:
+  - role: reporter
+    to_role: sysadmin
+  - role: transformer
+    to_role: sysadmin
+  - role: loader
+    to_role: sysadmin
+
 databases:
   - name: raw
     owner: loader

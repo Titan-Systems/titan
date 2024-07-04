@@ -1,16 +1,14 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourcePointer, ResourceSpec, NamedResource
+from ..enums import ParseableEnum, ResourceType
+from ..props import BoolProp, FlagProp, IdentifierProp, Props, StringProp, TimeTravelProp
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
+
 from .role import Role
 from .table import Table
 from .view import View
-
-# from .external_table import ExternalTable
-# from .stage import Stage
-from ..enums import ParseableEnum, ResourceType
-from ..scope import SchemaScope
-from ..props import BoolProp, FlagProp, IdentifierProp, Props, StringProp, TimeTravelProp
-from ..resource_name import ResourceName
 
 
 class StreamType(ParseableEnum):
@@ -203,7 +201,7 @@ class _StageStream(ResourceSpec):
     name: ResourceName
     on_stage: str
     owner: Role = "SYSADMIN"
-    copy_grants: bool = None
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
 
 
@@ -280,11 +278,11 @@ class _ViewStream(ResourceSpec):
     name: ResourceName
     on_view: View
     owner: Role = "SYSADMIN"
-    copy_grants: bool = None
-    at: dict[str, str] = None
-    before: dict[str, str] = None
-    append_only: bool = None
-    show_initial_rows: bool = None
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    at: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    before: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    append_only: bool = False
+    show_initial_rows: bool = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
 
 

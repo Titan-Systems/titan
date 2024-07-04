@@ -2,14 +2,12 @@ import os
 
 import pytest
 
-from tests.helpers import get_json_fixtures
 from titan import data_provider
 from titan import resources as res
 from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
 from titan.enums import ResourceType
 
-JSON_FIXTURES = list(get_json_fixtures())
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 pytestmark = pytest.mark.requires_snowflake
@@ -19,16 +17,6 @@ pytestmark = pytest.mark.requires_snowflake
 def clear_cache():
     reset_cache()
     yield
-
-
-@pytest.fixture(
-    params=JSON_FIXTURES,
-    ids=[resource_cls.__name__ for resource_cls, _ in JSON_FIXTURES],
-    scope="function",
-)
-def resource(request):
-    resource_cls, data = request.param
-    yield resource_cls, data
 
 
 @pytest.fixture(scope="session")
@@ -72,15 +60,22 @@ def test_plan(cursor, user, role):
 
 def test_blueprint_plan_no_changes(cursor, user, role):
     session = cursor.connection
-    blueprint = Blueprint(name="test_no_changes")
-    # Assuming role_grant already exists in the setup for this test
-    role_grant = res.RoleGrant(role=role, to_user=user)
-    blueprint.add(role_grant)
+
+    def _blueprint():
+        blueprint = Blueprint(name="test_no_changes")
+        # Assuming role_grant already exists in the setup for this test
+        role_grant = res.RoleGrant(role=role, to_user=user)
+        blueprint.add(role_grant)
+        return blueprint
+
+    bp = _blueprint()
     # Apply the initial blueprint to ensure the state is as expected
-    initial_changes = blueprint.plan(session)
-    blueprint.apply(session, initial_changes)
+    initial_changes = bp.plan(session)
+    bp.apply(session, initial_changes)
+
     # Plan again to verify no changes are detected
-    subsequent_changes = blueprint.plan(session)
+    bp = _blueprint()
+    subsequent_changes = bp.plan(session)
     assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."
 
 
@@ -202,7 +197,7 @@ def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     assert plan[0].action == Action.ADD
 
 
-def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db):
+def test_blueprint_sync_dont_remove_system_schemas(cursor, test_db):
     session = cursor.connection
     blueprint = Blueprint(
         name="blueprint",
@@ -215,6 +210,9 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
     plan = blueprint.plan(session)
     assert len(plan) == 0
 
+
+def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
+    session = cursor.connection
     blueprint = Blueprint(
         name="blueprint",
         resources=[
@@ -229,6 +227,9 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
     assert plan[0].action == Action.ADD
     assert plan[0].urn.fqn.name == "ABSENT"
 
+
+def test_blueprint_sync_plan_matches_remote_state(cursor, test_db):
+    session = cursor.connection
     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
     blueprint = Blueprint(
         name="blueprint",
@@ -242,6 +243,10 @@ def test_blueprint_fully_managed_dont_remove_information_schema(cursor, test_db)
     plan = blueprint.plan(session)
     assert len(plan) == 0
 
+
+def test_blueprint_sync_remote_state_contains_extra_resource(cursor, test_db):
+    session = cursor.connection
+    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
     blueprint = Blueprint(
         name="blueprint",
         resources=[res.Schema(name="INFORMATION_SCHEMA", database=test_db)],
@@ -273,20 +278,25 @@ def test_blueprint_quoted_references(cursor):
 def test_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cleanup):
     session = cursor.connection
 
-    bp = Blueprint()
-    role = res.Role(name=f"TITAN_TEST_ROLE_{suffix}")
-    warehouse = res.Warehouse(
-        name=f"TITAN_TEST_WAREHOUSE_{suffix}",
-        warehouse_size="xsmall",
-        auto_suspend=60,
-    )
-    grant = res.Grant(priv="usage", to=role, on=warehouse)
-    marked_for_cleanup.append(role)
-    marked_for_cleanup.append(warehouse)
+    def _blueprint():
+        blueprint = Blueprint()
+        role = res.Role(name=f"TITAN_TEST_ROLE_{suffix}")
+        warehouse = res.Warehouse(
+            name=f"TITAN_TEST_WAREHOUSE_{suffix}",
+            warehouse_size="xsmall",
+            auto_suspend=60,
+        )
+        grant = res.Grant(priv="usage", to=role, on=warehouse)
+        marked_for_cleanup.append(role)
+        marked_for_cleanup.append(warehouse)
+        blueprint.add(role, warehouse, grant)
+        return blueprint
 
-    bp.add(role, warehouse, grant)
+    bp = _blueprint()
     plan = bp.plan(session)
     assert len(plan) == 3
+
+    bp = _blueprint()
     bp.apply(session, plan)
     plan = bp.plan(session)
     assert len(plan) == 0
@@ -299,3 +309,17 @@ def test_blueprint_with_nested_database(cursor):
     bp.add(res.FutureGrant(priv="SELECT", on_future_views_in=schema, to="STATIC_ROLE"))
     plan = bp.plan(session)
     assert len(plan) == 1
+
+
+def test_blueprint_quoted_identifier_drift(cursor, test_db, suffix):
+    session = cursor.connection
+
+    cursor.execute(f'CREATE SCHEMA {test_db}."multiCaseString_{suffix}"')
+
+    blueprint = Blueprint(
+        resources=[res.Schema(name=f'"multiCaseString_{suffix}"', database=test_db, owner=TEST_ROLE)],
+    )
+    plan = blueprint.plan(session)
+    cursor.execute(f'DROP SCHEMA {test_db}."multiCaseString_{suffix}"')
+
+    assert len(plan) == 0

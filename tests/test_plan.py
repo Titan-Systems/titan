@@ -1,90 +1,93 @@
 import pytest
 
-from titan.blueprint import Action, Blueprint, ResourceChange
-from titan.parse import parse_URN
+from titan import resources as res
+from titan.blueprint import Action, Blueprint, NonConformingPlanException, RunMode
+from titan.enums import ResourceType
+from titan.identifiers import parse_URN
 
 
-@pytest.fixture(scope="session")
-def remote_state(removed_db):
-    state = {
-        parse_URN("urn::XYZ123:database/EXISTING_DB"): {
-            "name": "EXISTING_DB",
-            "transient": False,
-            "owner": "SYSADMIN",
-        },
-    }
-    state.update(removed_db)
-    return state
-
-
-@pytest.fixture(scope="session")
-def new_db():
+@pytest.fixture
+def session_ctx() -> dict:
     return {
-        parse_URN("urn::XYZ123:database/NEW_DB"): {
-            "name": "NEW_DB",
-            "transient": False,
-            "owner": "SYSADMIN",
-        }
+        "account": "SOMEACCT",
+        "account_locator": "ABCD123",
+        "role": "SYSADMIN",
+        "available_roles": ["SYSADMIN", "USERADMIN"],
     }
 
 
-@pytest.fixture(scope="session")
-def changed_db():
+@pytest.fixture
+def remote_state() -> dict:
     return {
-        parse_URN("urn::XYZ123:database/EXISTING_DB"): {
-            "name": "EXISTING_DB",
-            "transient": False,
-            "owner": "SYSADMIN",
-            "default_ddl_collation": "UTF8",
-        }
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
     }
 
 
-@pytest.fixture(scope="session")
-def removed_db():
-    return {
-        parse_URN("urn::XYZ123:database/REMOVED_DB"): {
-            "name": "REMOVED_DB",
-            "transient": False,
-            "owner": "SYSADMIN",
-        }
+def test_plan_add_action(session_ctx, remote_state):
+    bp = Blueprint(resources=[res.Database(name="NEW_DATABASE")])
+    manifest = bp.generate_manifest(session_ctx)
+    plan = bp._plan(remote_state, manifest)
+    assert len(plan) == 1
+    change = plan[0]
+    assert change.action == Action.ADD
+    assert change.urn == parse_URN("urn::ABCD123:database/NEW_DATABASE")
+    assert "name" in change.after
+    assert change.after["name"] == "NEW_DATABASE"
+
+
+def test_plan_change_action(session_ctx, remote_state):
+    remote_state[parse_URN("urn::ABCD123:role/EXISTING_ROLE")] = {
+        "name": "EXISTING_ROLE",
+        "comment": "old comment",
+        "owner": "USERADMIN",
     }
+    bp = Blueprint(
+        resources=[
+            res.Role(
+                name="EXISTING_ROLE",
+                comment="new comment",
+            )
+        ]
+    )
+    manifest = bp.generate_manifest(session_ctx)
+    plan = bp._plan(remote_state, manifest)
+    assert len(plan) == 1
+    change = plan[0]
+    assert change.action == Action.CHANGE
+    assert change.urn == parse_URN("urn::ABCD123:role/EXISTING_ROLE")
+    assert "comment" in change.before
+    assert change.before["comment"] == "old comment"
+    assert "comment" in change.after
+    assert change.after["comment"] == "new comment"
 
 
-@pytest.fixture(scope="session")
-def manifest(new_db, changed_db):
-    manifest = {
-        "_urns": [
-            parse_URN("urn::XYZ123:database/EXISTING_DB"),
-            parse_URN("urn::XYZ123:database/NEW_DB"),
-        ],
-        "_refs": [],
+def test_plan_remove_action(session_ctx, remote_state):
+    remote_state[parse_URN("urn::ABCD123:role/REMOVED_ROLE")] = {
+        "name": "REMOVED_ROLE",
+        "comment": "old comment",
+        "owner": "USERADMIN",
     }
-    manifest.update(new_db)
-    manifest.update(changed_db)
-    return manifest
+    bp = Blueprint(run_mode=RunMode.SYNC_ALL, allowlist=[ResourceType.ROLE])
+    manifest = bp.generate_manifest(session_ctx)
+    plan = bp._plan(remote_state, manifest)
+    assert len(plan) == 1
+    change = plan[0]
+    assert change.action == Action.REMOVE
+    assert change.urn == parse_URN("urn::ABCD123:role/REMOVED_ROLE")
 
 
-def test_plan_add_action(remote_state, manifest, new_db):
-    bp = Blueprint()
-    changes = bp._plan(remote_state, manifest)
-    urn, after = new_db.popitem()
-    expected = ResourceChange(Action.ADD, urn, {}, after, after)
-    assert expected in changes
-
-
-def test_plan_change_action(remote_state, manifest, changed_db):
-    bp = Blueprint()
-    changes = bp._plan(remote_state, manifest)
-    urn, data = changed_db.popitem()
-    delta = {"default_ddl_collation": "UTF8"}
-    expected = ResourceChange(Action.CHANGE, urn, remote_state[urn], data, delta)
-    assert expected in changes
-
-
-def test_plan_remove_action(remote_state, manifest, removed_db):
-    bp = Blueprint()
-    changes = bp._plan(remote_state, manifest)
-    urn, _ = removed_db.popitem()
-    expected = ResourceChange(Action.REMOVE, urn, remote_state[urn], {}, {})
-    assert expected in changes
+def test_plan_no_removes_in_run_mode_create_or_update(session_ctx, remote_state):
+    remote_state[parse_URN("urn::ABCD123:role/REMOVED_ROLE")] = {
+        "name": "REMOVED_ROLE",
+        "comment": "old comment",
+        "owner": "USERADMIN",
+    }
+    bp = Blueprint(run_mode=RunMode.CREATE_OR_UPDATE)
+    manifest = bp.generate_manifest(session_ctx)
+    plan = bp._plan(remote_state, manifest)
+    assert len(plan) == 1
+    change = plan[0]
+    assert change.action == Action.REMOVE
+    assert change.urn == parse_URN("urn::ABCD123:role/REMOVED_ROLE")
+    with pytest.raises(NonConformingPlanException):
+        bp._raise_for_nonconforming_plan(plan)

@@ -166,7 +166,7 @@ class InternalStage(NamedResource, TaggableResource, Resource):
         self.set_tags(tags)
 
 
-@dataclass(unsafe_hash=True)
+@dataclass
 class _ExternalStage(ResourceSpec):
     name: ResourceName
     url: str
