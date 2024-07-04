@@ -12,7 +12,6 @@ from snowflake.connector.errors import ProgrammingError
 from .builtins import (
     SYSTEM_DATABASES,
     SYSTEM_ROLES,
-    SYSTEM_SCHEMAS,
     SYSTEM_SECURITY_INTEGRATIONS,
     SYSTEM_USERS,
 )
@@ -29,6 +28,7 @@ from .parse import (
     FullyQualifiedIdentifier,
     _parse_column,
     _parse_dynamic_table_text,
+    _parse_view_ddl,
     parse_collection_string,
     parse_function_name,
 )
@@ -190,7 +190,7 @@ def _parse_function_arguments_2023_compat(arguments_str: str) -> tuple:
     return (identifier, returns)
 
 
-def _parse_function_arguments(arguments_str: str) -> tuple:
+def _parse_function_arguments(arguments_str: str) -> tuple[FQN, str]:
     """
     Input
     -----
@@ -269,7 +269,7 @@ def remove_none_values(d):
 
 
 def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
-    show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn.name}")
+    show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
     if len(ownership_grant) == 0:
         return None
@@ -990,19 +990,21 @@ def fetch_procedure(session, fqn: FQN):
     desc_result = execute(session, f"DESC PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
 
-    show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
-    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    # show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
+    # ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    owner = _fetch_owner(session, "PROCEDURE", fqn)
 
     return {
-        "name": data["name"].lower(),
+        "name": _quote_snowflake_identifier(data["name"]),
         "args": _parse_signature(properties["signature"]),
         "comment": data["description"],
         "execute_as": properties["execute as"],
+        "external_access_integrations": data["external_access_integrations"] or None,
         "handler": properties["handler"],
         "imports": _parse_list_property(properties["imports"]),
         "language": properties["language"],
         "null_handling": properties["null handling"],
-        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
+        "owner": owner,
         "packages": _parse_packages(properties["packages"]),
         "returns": returns,
         "runtime_version": properties["runtime_version"],
@@ -1667,7 +1669,7 @@ def fetch_view(session, fqn: FQN):
         "columns": columns,
         "change_tracking": data["change_tracking"] == "ON",
         "comment": data["comment"] or None,
-        "as_": data["text"],
+        "as_": _parse_view_ddl(data["text"]),
     }
 
 
@@ -1744,6 +1746,14 @@ def list_alerts(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "ALERTS")
 
 
+def list_api_integrations(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "API INTEGRATIONS")
+
+
+def list_catalog_integrations(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "CATALOG INTEGRATIONS")
+
+
 def list_compute_pools(session) -> list[FQN]:
     show_result = execute(session, "SHOW COMPUTE POOLS")
     return [FQN(name=ResourceName.from_snowflake_metadata(row["name"])) for row in show_result]
@@ -1777,6 +1787,19 @@ def list_dynamic_tables(session) -> list[FQN]:
 #             subject = "user" if data["granted_to"] == "USER" else "role"
 #             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
 #     return grants
+
+
+def list_functions(session) -> list[FQN]:
+    show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT")
+    functions = []
+    for row in show_result:
+        if row["catalog_name"] in SYSTEM_DATABASES:
+            continue
+        fqn, returns = _parse_function_arguments(row["arguments"])
+        fqn.database = row["catalog_name"]
+        fqn.schema = row["schema_name"]
+        functions.append(fqn)
+    return functions
 
 
 def list_grants(session) -> list[FQN]:
@@ -1859,6 +1882,16 @@ def list_security_integrations(session) -> list[FQN]:
             continue
         integrations.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return integrations
+
+
+def list_shares(session) -> list[FQN]:
+    show_result = execute(session, "SHOW SHARES")
+    shares = []
+    for row in show_result:
+        if row["kind"] == "INBOUND":
+            continue
+        shares.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+    return shares
 
 
 def list_stages(session) -> list[FQN]:

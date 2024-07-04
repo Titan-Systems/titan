@@ -2,11 +2,11 @@ import json
 import logging
 from dataclasses import dataclass
 from queue import Queue
-from typing import Optional, Generator
+from typing import Generator, Optional, Union
 
 import snowflake.connector
 
-from . import data_provider, lifecycle, __version__
+from . import __version__, data_provider, lifecycle
 from .builtins import SYSTEM_ROLES
 from .client import (
     ALREADY_EXISTS_ERR,
@@ -20,8 +20,9 @@ from .enums import ParseableEnum, ResourceType
 from .identifiers import URN, resource_label_for_type
 from .resource_name import ResourceName
 from .resources import Account, Database, Schema
-from .resources.tag import TaggableResource
 from .resources.resource import Resource, ResourceContainer, ResourcePointer
+from .resources.grant import _RoleGrant, role_grant_fqn
+from .resources.tag import TaggableResource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
@@ -560,31 +561,30 @@ class Blueprint:
 
         return state
 
-    def _finalize(self, session_ctx: dict):
+    def _build_resource_graph(self, session_ctx: dict):
         """
         Convert the staged resources into a tree of resources
         """
-        if self._finalized:
-            return
-        self._finalized = True
-
         org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
         self._staged = None
 
+        # Create root node of the resource graph
         if len(org_scoped) > 0:
             raise Exception("Blueprint cannot contain an Account resource")
         else:
-            # Create a stub account from the session context
             self._root = ResourcePointer(name=session_ctx["account"], resource_type=ResourceType.ACCOUNT)
 
+        # Merge account scoped pointers into their proper resource
         acct_scoped = _merge_pointers(acct_scoped)
+
         # Add all databases and other account scoped resources to the root
         for resource in acct_scoped:
             self._root.add(resource)
 
-        databases: list[Database] = self._root.items(resource_type=ResourceType.DATABASE)
+        # List all databases connected to root
+        databases: list[Union[Database, ResourcePointer]] = self._root.items(resource_type=ResourceType.DATABASE)
 
-        # If we haven't specified a database, use the one from the session context
+        # If the user didn't stage a database, create one from session context
         if len(databases) == 0 and (len(db_scoped) + len(schema_scoped) > 0):
             if session_ctx.get("database") is None:
                 raise OrphanResourceException(
@@ -594,8 +594,7 @@ class Blueprint:
             self._root.add(ResourcePointer(name=session_ctx["database"], resource_type=ResourceType.DATABASE))
             databases = self._root.items(resource_type=ResourceType.DATABASE)
 
-        # db_scoped = _merge_pointers(db_scoped)
-        # Add all schemas and database roles to their respective databases
+        # Attach parentless schemas to the default database, if there is one
         for resource in db_scoped:
             if resource.container is None:
                 if len(databases) == 1:
@@ -651,22 +650,58 @@ class Blueprint:
                 if tag_ref:
                     self._root.add(tag_ref)
 
-    def _create_ownership_refs(self):
+    def _create_ownership_refs(self, session_ctx):
         for resource in _walk(self._root):
             if isinstance(resource, ResourcePointer):
                 continue
             if hasattr(resource._data, "owner"):
+
+                # Misconfigured resource, owner should always be a Role
                 if isinstance(resource._data.owner, str):
                     raise RuntimeError(f"Owner of {resource} is a string, {resource._data.owner}")
-                # Some Snowflake-owned system resources (like INFORMATION_SCHEMA) are owned by blank
-                if resource._data.owner.name != "":
-                    resource.requires(resource._data.owner)
+
+                # Skip Snowflake-owned system resources (like INFORMATION_SCHEMA) that are owned by blank
+                if resource._data.owner.name == "":
+                    continue
+
+                # Create the ownership ref
+                resource.requires(resource._data.owner)
+
+                # If the resource owner is a custom role, the current connection must have access to it
+                if resource._data.owner.name not in session_ctx["available_roles"]:
+                    for role_grant in self._root.items(ResourceType.ROLE_GRANT):
+                        if role_grant.role.name != resource._data.owner.name:
+                            continue
+                        if role_grant._data.to_role is None:
+                            continue
+                        if role_grant.to.name not in session_ctx["available_roles"]:
+                            continue
+                        resource.requires(role_grant)
+                        break
+                    else:
+                        raise RuntimeError(
+                            f"Blueprint resource {resource} owner {resource._data.owner} must be granted to the current session"
+                        )
+
+    def _create_grandparent_refs(self):
+        for resource in _walk(self._root):
+            if isinstance(resource.scope, SchemaScope):
+                resource.requires(resource.container.container)
+
+    def _finalize(self, session_ctx):
+        if self._finalized:
+            raise RuntimeError("Blueprint already finalized")
+        self._finalized = True
+        self._build_resource_graph(session_ctx)
+        self._create_tag_references()
+        self._create_ownership_refs(session_ctx)
+        self._create_grandparent_refs()
+        for resource in _walk(self._root):
+            resource._finalized = True
 
     def generate_manifest(self, session_ctx: dict = {}) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])
         self._finalize(session_ctx)
-        self._create_tag_references()
-        self._create_ownership_refs()
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
                 if resource.implicit:
@@ -734,6 +769,8 @@ class Blueprint:
                     logger.error(f"Invalid grant: {sql}, skipping...")
                 elif err.errno == DOES_NOT_EXIST_ERR and sql.startswith("REVOKE"):
                     logger.error(f"Resource does not exist: {sql}, skipping...")
+                elif err.errno == DOES_NOT_EXIST_ERR and sql.startswith("DROP"):
+                    logger.error(f"Resource does not exist: {sql}, skipping...")
                 else:
                     raise err
         return actions_taken
@@ -790,7 +827,20 @@ class Blueprint:
                 action = lifecycle.update_resource(change.urn, change.delta)
             elif change.action == Action.REMOVE:
                 if "owner" in change.before:
-                    before_action.append(f"USE ROLE {change.before['owner']}")
+                    if change.before["owner"] in SYSTEM_ROLES:
+                        before_action.append(f"USE ROLE {change.before['owner']}")
+                    elif change.urn.resource_type in (
+                        ResourceType.GRANT,
+                        ResourceType.FUTURE_GRANT,
+                        ResourceType.ROLE_GRANT,
+                    ):
+                        before_action.append("USE ROLE SECURITYADMIN")
+                    else:
+                        before_action.append(f"USE ROLE {default_role}")
+
+                        before_action.append(
+                            f"GRANT OWNERSHIP ON {change.urn.resource_type} {change.urn.fqn} TO {default_role}"
+                        )
                 action = lifecycle.drop_resource(change.urn, change.before, if_exists=True)
 
             action_queue.extend(before_action)
@@ -802,29 +852,29 @@ class Blueprint:
             _queue_change(change)
         return action_queue
 
-    def destroy(self, session, manifest: Manifest = None):
-        session_ctx = data_provider.fetch_session(session)
-        manifest = manifest or self.generate_manifest(session_ctx)
-        for urn, data in manifest.items():
-            if str(urn).startswith("_"):
-                continue
+    # def destroy(self, session, manifest: Manifest = None):
+    #     session_ctx = data_provider.fetch_session(session)
+    #     manifest = manifest or self.generate_manifest(session_ctx)
+    #     for urn, data in manifest.items():
 
-            if isinstance(data, dict) and data.get("_pointer"):
-                continue
-            if urn.resource_type == ResourceType.GRANT:
-                for grant in data:
-                    execute(session, lifecycle.drop_resource(urn, grant))
-            else:
-                try:
-                    execute(session, lifecycle.drop_resource(urn, data))
-                except snowflake.connector.errors.ProgrammingError:
-                    continue
+    #         if isinstance(data, dict) and data.get("_pointer"):
+    #             continue
+    #         if urn.resource_type == ResourceType.GRANT:
+    #             for grant in data:
+    #                 execute(session, lifecycle.drop_resource(urn, grant))
+    #         else:
+    #             try:
+    #                 execute(session, lifecycle.drop_resource(urn, data))
+    #             except snowflake.connector.errors.ProgrammingError:
+    #                 continue
 
     def _add(self, resource: Resource):
         if self._finalized:
             raise Exception("Cannot add resources to a finalized blueprint")
         if not isinstance(resource, Resource):
             raise Exception(f"Expected a Resource, got {type(resource)} -> {resource}")
+        if resource._finalized:
+            raise Exception("Cannot add a finalized resource to a blueprint")
         self._staged.append(resource)
 
     def add(self, *resources):

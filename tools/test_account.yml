@@ -70,6 +70,9 @@ schemas:
   - name: static_schema
     database: static_database
 
+shares:
+  - name: static_share
+
 stages:
   - name: static_stage
     type: INTERNAL

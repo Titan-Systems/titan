@@ -49,8 +49,8 @@ def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     name = f"{db}{schema}{data['name']}"
     return tidy_sql(
         "CREATE",
-        "IF NOT EXISTS" if if_not_exists else "",
         urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
         name,
         props.render(data),
     )
@@ -245,6 +245,16 @@ def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
     )
 
 
+def drop_database(urn: URN, data: dict, if_exists: bool) -> str:
+    return tidy_sql(
+        "DROP",
+        urn.resource_type,
+        "IF EXISTS" if if_exists else "",
+        urn.fqn,
+        "RESTRICT",
+    )
+
+
 def drop_function(urn: URN, data: dict, if_exists: bool) -> str:
     return tidy_sql(
         "DROP",
@@ -294,6 +304,16 @@ def drop_grant_on_all(urn: URN, data: dict, **kwargs):
         "IN",
         data["in_type"],
         data["in_name"],
+    )
+
+
+def drop_procedure(urn: URN, data: dict, if_exists: bool) -> str:
+    return tidy_sql(
+        "DROP",
+        urn.resource_type,
+        "IF EXISTS" if if_exists else "",
+        urn.fqn,
+        # data["returns"],
     )
 
 

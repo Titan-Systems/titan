@@ -28,6 +28,16 @@ def assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
     assert lhs == rhs
 
 
+def strip_nones_and_unfetchable(spec, data):
+    data = data_provider.remove_none_values(data)
+    keys = set(data.keys())
+    for attr in keys:
+        attr_metadata = spec.get_metadata(attr)
+        if not attr_metadata.get("fetchable", True):
+            data.pop(attr, None)
+    return data
+
+
 def assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:
     lhs = data_provider.remove_none_values(lhs)
     rhs = data_provider.remove_none_values(rhs)

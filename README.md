@@ -402,9 +402,9 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | ↳ SQL                         | ❌         |
 | Stream                        |            |
 | ↳ External Table              | ❌         |
-| ↳ Stage                       | 🚧         |
-| ↳ Table                       | 🚧         |
-| ↳ View                        | 🚧         |
+| ↳ Stage                       | ✅         |
+| ↳ Table                       | ✅         |
+| ↳ View                        | ✅         |
 | Streamlit                     | ❌         |
 | Table                         | 🚧         |
 | Tag                           | ✅         |

@@ -127,7 +127,7 @@ def tag_reference_fqn(data: _TagReference) -> FQN:
 class TaggableResource:
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._tags: Optional[TagReference] = None
+        self._tags: Optional[ResourceTags] = None
 
     def set_tags(self, tags: dict[str, str]):
         if tags is None:
@@ -136,15 +136,6 @@ class TaggableResource:
             self._tags = ResourceTags(tags)
         else:
             raise ValueError("Tags cannot be set on a resource that already has tags")
-        # self._tag_reference = TagReference(
-        #     object_name=str(self.fqn),
-        #     object_domain=self.resource_type,
-        #     tags=ResourceTags(tags),
-        # )
-        # self._tag_reference.requires(self)
-        # for tag in tags.keys():
-        #     tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
-        #     self._tag_reference.requires(tag_ptr)
 
     def create_tag_reference(self):
         if self._tags is None:

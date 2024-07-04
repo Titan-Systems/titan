@@ -227,7 +227,7 @@ class PythonUDF(NamedResource, Resource):
             handler: process_data
             args:
               - name: input_data
-                type: string
+                data_type: string
             as_: process_data_function
             comment: This function processes data.
             copy_grants: false
@@ -321,7 +321,7 @@ def udf_fqn(udf: Union[JavascriptUDF, PythonUDF]):
         name=udf.name,
         database=database.name if database else None,
         schema=schema.name if schema else None,
-        arg_types=[arg["data_type"] for arg in udf._data.args],
+        arg_types=[str(arg["data_type"]) for arg in udf._data.args],
     )
 
 

@@ -1,5 +1,5 @@
 {
     "role": "STATIC_ROLE",
-    "to_role": "SYSADMIN",
-    "to_user": null
+    "to_role": null,
+    "to_user": "STATIC_USER"
 }

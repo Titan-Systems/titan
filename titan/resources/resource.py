@@ -190,7 +190,7 @@ class Resource(metaclass=_Resource):
         super().__init__()
         self._data: ResourceSpec = None
         self._container: "ResourceContainer" = None
-        self._dirty = False
+        self._finalized = False
         self.lifecycle = LifecycleConfig(**lifecycle) if lifecycle else LifecycleConfig()
         self.implicit = implicit
         self.refs: set[Resource] = set()
@@ -341,6 +341,8 @@ class Resource(metaclass=_Resource):
         return drop_resource(self.urn, self.to_dict(), if_exists=if_exists)
 
     def _requires(self, resource: "Resource"):
+        if self._finalized:
+            raise RuntimeError("Cannot modify a finalized resource")
         if isinstance(resource, (Resource, ResourcePointer)):
             self.refs.add(resource)
 
@@ -385,6 +387,10 @@ class Resource(metaclass=_Resource):
     def urn(self):
         return URN.from_resource(self, account_locator="")
 
+    @property
+    def fqn(self) -> FQN:
+        raise NotImplementedError("Subclasses must implement fqn")
+
 
 class ResourceContainer:
     def __init__(self):
@@ -417,7 +423,11 @@ class ResourceContainer:
         for resource in self.items(resource_type):
             if isinstance(resource, ResourcePointer) and resource.name == name:
                 return resource
-            elif isinstance(resource, Resource) and resource._data is not None and resource._data.name == name:
+            elif (
+                isinstance(resource, Resource)
+                and resource._data is not None
+                and getattr(resource._data, "name", None) == name
+            ):
                 return resource
         raise KeyError(f"Resource {resource_type} {name} not found")
 

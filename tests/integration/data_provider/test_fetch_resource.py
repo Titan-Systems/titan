@@ -6,6 +6,7 @@ from tests.helpers import (
     assert_resource_dicts_eq_ignore_nulls,
     assert_resource_dicts_eq_ignore_nulls_and_unfetchable,
     safe_fetch,
+    strip_nones_and_unfetchable,
 )
 from titan import data_provider
 from titan import resources as res
@@ -312,7 +313,6 @@ def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
     assert result == data_provider.remove_none_values(pipe.to_dict())
 
 
-@pytest.mark.skip(reason="Requires view DDL parsing")
 def test_fetch_view(cursor, test_db, marked_for_cleanup):
     view = res.View(
         name="VIEW_EXAMPLE",
@@ -329,7 +329,7 @@ def test_fetch_view(cursor, test_db, marked_for_cleanup):
     result = safe_fetch(cursor, view.urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
-    assert result == data_provider.remove_none_values(view.to_dict())
+    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.View.spec, result, view.to_dict())
 
 
 @pytest.mark.enterprise
@@ -548,7 +548,6 @@ def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
     assert_resource_dicts_eq_ignore_nulls(result, password_policy.to_dict())
 
 
-@pytest.mark.skip(reason="Generates invalid SQL")
 def test_fetch_python_stored_procedure(cursor, suffix, test_db, marked_for_cleanup):
     procedure = res.PythonStoredProcedure(
         name=f"somesproc_{suffix}",
@@ -565,13 +564,16 @@ def test_fetch_python_stored_procedure(cursor, suffix, test_db, marked_for_clean
         owner=TEST_ROLE,
         database=test_db,
         schema="PUBLIC",
+        as_="def main(arg1): return 42",
     )
     cursor.execute(procedure.create_sql())
     marked_for_cleanup.append(procedure)
 
     result = safe_fetch(cursor, procedure.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, procedure.to_dict())
+    result = strip_nones_and_unfetchable(res.PythonStoredProcedure.spec, result)
+    data = strip_nones_and_unfetchable(res.PythonStoredProcedure.spec, procedure.to_dict())
+    assert result == data
 
 
 def test_fetch_schema(cursor, test_db, marked_for_cleanup):

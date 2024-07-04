@@ -1,10 +1,7 @@
 from dataclasses import dataclass, field
 
-from .resource import Arg, Resource, ResourceSpec, NamedResource
-from .role import Role
-from ..scope import SchemaScope
-from ..enums import DataType, ExecutionRights, NullHandling, Language, ResourceType
-from ..resource_name import ResourceName
+from ..enums import DataType, ExecutionRights, Language, NullHandling, ResourceType
+from ..identifiers import FQN
 from ..props import (
     ArgsProp,
     EnumProp,
@@ -14,6 +11,10 @@ from ..props import (
     StringListProp,
     StringProp,
 )
+from ..resource_name import ResourceName
+from ..scope import SchemaScope
+from .resource import Arg, NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 @dataclass(unsafe_hash=True)
@@ -27,7 +28,7 @@ class _PythonStoredProcedure(ResourceSpec):
     language: Language = Language.PYTHON
     as_: str = None
     comment: str = "user-defined procedure"
-    copy_grants: bool = False
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     execute_as: ExecutionRights = ExecutionRights.OWNER
     external_access_integrations: list = None
     imports: list = field(default_factory=None, metadata={"triggers_replacement": True})
@@ -174,8 +175,18 @@ class PythonStoredProcedure(NamedResource, Resource):
 
     @property
     def fqn(self):
-        name = f"{self._data.name}({', '.join([str(arg['data_type']) for arg in self._data.args])})"
-        return self.scope.fully_qualified_name(self._container, name)
+        return sproc_fqn(self)
+
+
+def sproc_fqn(sproc: PythonStoredProcedure):
+    schema = sproc.container
+    database = schema.container if schema else None
+    return FQN(
+        name=sproc.name,
+        database=database.name if database else None,
+        schema=schema.name if schema else None,
+        arg_types=[str(arg["data_type"]) for arg in sproc._data.args],
+    )
 
 
 ProcedureMap = {

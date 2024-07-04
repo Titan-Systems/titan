@@ -60,15 +60,22 @@ def test_plan(cursor, user, role):
 
 def test_blueprint_plan_no_changes(cursor, user, role):
     session = cursor.connection
-    blueprint = Blueprint(name="test_no_changes")
-    # Assuming role_grant already exists in the setup for this test
-    role_grant = res.RoleGrant(role=role, to_user=user)
-    blueprint.add(role_grant)
+
+    def _blueprint():
+        blueprint = Blueprint(name="test_no_changes")
+        # Assuming role_grant already exists in the setup for this test
+        role_grant = res.RoleGrant(role=role, to_user=user)
+        blueprint.add(role_grant)
+        return blueprint
+
+    bp = _blueprint()
     # Apply the initial blueprint to ensure the state is as expected
-    initial_changes = blueprint.plan(session)
-    blueprint.apply(session, initial_changes)
+    initial_changes = bp.plan(session)
+    bp.apply(session, initial_changes)
+
     # Plan again to verify no changes are detected
-    subsequent_changes = blueprint.plan(session)
+    bp = _blueprint()
+    subsequent_changes = bp.plan(session)
     assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."
 
 
@@ -271,20 +278,25 @@ def test_blueprint_quoted_references(cursor):
 def test_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cleanup):
     session = cursor.connection
 
-    bp = Blueprint()
-    role = res.Role(name=f"TITAN_TEST_ROLE_{suffix}")
-    warehouse = res.Warehouse(
-        name=f"TITAN_TEST_WAREHOUSE_{suffix}",
-        warehouse_size="xsmall",
-        auto_suspend=60,
-    )
-    grant = res.Grant(priv="usage", to=role, on=warehouse)
-    marked_for_cleanup.append(role)
-    marked_for_cleanup.append(warehouse)
+    def _blueprint():
+        blueprint = Blueprint()
+        role = res.Role(name=f"TITAN_TEST_ROLE_{suffix}")
+        warehouse = res.Warehouse(
+            name=f"TITAN_TEST_WAREHOUSE_{suffix}",
+            warehouse_size="xsmall",
+            auto_suspend=60,
+        )
+        grant = res.Grant(priv="usage", to=role, on=warehouse)
+        marked_for_cleanup.append(role)
+        marked_for_cleanup.append(warehouse)
+        blueprint.add(role, warehouse, grant)
+        return blueprint
 
-    bp.add(role, warehouse, grant)
+    bp = _blueprint()
     plan = bp.plan(session)
     assert len(plan) == 3
+
+    bp = _blueprint()
     bp.apply(session, plan)
     plan = bp.plan(session)
     assert len(plan) == 0

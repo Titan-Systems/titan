@@ -49,15 +49,20 @@ class FQN:
     def __str__(self):
         db = f"{ResourceName(self.database)}." if self.database else ""
         schema = f"{ResourceName(self.schema)}." if self.schema else ""
-        arg_types = f"({', '.join(self.arg_types)})" if self.arg_types is not None else ""
+        arg_types = ""
+        if self.arg_types is not None:
+            arg_types = f"({', '.join(map(str, self.arg_types))})"
         params = "?" + _params_to_str(self.params) if self.params else ""
         return f"{db}{schema}{self.name}{arg_types}{params}"
 
     def __repr__(self):  # pragma: no cover
         db = f", db={self.database}" if self.database else ""
         schema = f", schema={self.schema}" if self.schema else ""
+        arg_types = ""
+        if self.arg_types is not None:
+            arg_types = f", args=({', '.join(map(str, self.arg_types))})"
         params = " ?" + _params_to_str(self.params) if self.params else ""
-        return f"FQN(name={self.name}{db}{schema}{params})"
+        return f"FQN(name={self.name}{db}{schema}{arg_types}{params})"
 
 
 class URN:

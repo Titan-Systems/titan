@@ -1,3 +1,5 @@
+import copy
+
 import pytest
 
 from titan import resources as res
@@ -27,7 +29,12 @@ def remote_state() -> dict:
 
 @pytest.fixture
 def resource_manifest():
-    session_ctx = {"account": "SOMEACCT", "account_locator": "ABCD123"}
+    session_ctx = {
+        "account": "SOMEACCT",
+        "account_locator": "ABCD123",
+        "current_role": "SYSADMIN",
+        "available_roles": ["SYSADMIN", "USERADMIN"],
+    }
     db = res.Database(name="DB")
     schema = res.Schema(name="SCHEMA", database=db)
     table = res.Table(name="TABLE", columns=[{"name": "ID", "data_type": "INT"}])
@@ -162,6 +169,8 @@ def test_blueprint_with_udf(resource_manifest):
 
 
 def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
+    session_ctx = copy.deepcopy(session_ctx)
+    session_ctx["available_roles"] = ["SYSADMIN", "USERADMIN", "SOME_ROLE"]
     role = res.Role("SOME_ROLE")
     db = res.Database("DB", owner=role)
     blueprint = Blueprint(name="blueprint", resources=[db, role])
@@ -182,6 +191,14 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert changes[3] == "USE ROLE SYSADMIN"
     assert changes[4] == "CREATE DATABASE DB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
     assert changes[5] == "GRANT OWNERSHIP ON DATABASE DB TO SOME_ROLE"
+
+
+def test_blueprint_resource_owned_by_plan_role_without_grant(session_ctx):
+    role = res.Role("SOME_ROLE")
+    db = res.Database("DB", owner=role)
+    blueprint = Blueprint(name="blueprint", resources=[db, role])
+    with pytest.raises(RuntimeError):
+        blueprint.generate_manifest(session_ctx)
 
 
 def test_blueprint_deduplicate_resources(session_ctx, remote_state):
@@ -250,14 +267,21 @@ def test_blueprint_implied_container_tree(session_ctx, remote_state):
 
 def test_blueprint_chained_ownership(session_ctx, remote_state):
     role = res.Role("SOME_ROLE")
+    role_grant = res.RoleGrant(role=role, to_role="SYSADMIN")
     db = res.Database("DB", owner=role)
     schema = res.Schema("SCHEMA", database=db, owner=role)
-    blueprint = Blueprint(name="blueprint", resources=[db, schema])
+    blueprint = Blueprint(name="blueprint", resources=[db, schema, role_grant, role])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
-    # assert len(plan) == 1
-    # assert plan[0].action == Action.ADD
-    # assert plan[0].urn.fqn.name == "func"
+    assert len(plan) == 4
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
+    assert plan[1].action == Action.ADD
+    assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
+    assert plan[2].action == Action.ADD
+    assert plan[2].urn == parse_URN("urn::ABCD123:database/DB")
+    assert plan[3].action == Action.ADD
+    assert plan[3].urn == parse_URN("urn::ABCD123:schema/DB.SCHEMA")
 
 
 def test_blueprint_polymorphic_resource_resolution(session_ctx, remote_state):
@@ -358,24 +382,29 @@ def test_blueprint_ownership_sorting():
         parse_URN("urn:::account/SOMEACCT"): {},
     }
     role = res.Role(name="SOME_ROLE")
+    role_grant = res.RoleGrant(role=role, to_role="SYSADMIN")
     db1 = res.Database(name="DB1", owner=role)
 
-    blueprint = Blueprint(resources=[db1, role])
+    blueprint = Blueprint(resources=[db1, role_grant, role])
     manifest = blueprint.generate_manifest(session_ctx)
     assert (db1.urn, role.urn) in manifest._refs
 
     plan = blueprint._plan(remote_state, manifest)
-    assert len(plan) == 2
+    assert len(plan) == 3
     assert plan[0].action == Action.ADD
     assert plan[0].urn == parse_URN("urn:::role/SOME_ROLE")
     assert plan[1].action == Action.ADD
-    assert plan[1].urn == parse_URN("urn:::database/DB1")
+    assert plan[1].urn == parse_URN("urn:::role_grant/SOME_ROLE?role=SYSADMIN")
+    assert plan[2].action == Action.ADD
+    assert plan[2].urn == parse_URN("urn:::database/DB1")
 
     sql = blueprint._compile_plan_to_sql(session_ctx, plan)
-    assert len(sql) == 6
+    assert len(sql) == 8
     assert sql[0] == "USE SECONDARY ROLES ALL"
     assert sql[1] == "USE ROLE USERADMIN"
     assert sql[2] == "CREATE ROLE SOME_ROLE"
-    assert sql[3] == "USE ROLE SYSADMIN"
-    assert sql[4] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    assert sql[5] == "GRANT OWNERSHIP ON DATABASE DB1 TO SOME_ROLE"
+    assert sql[3] == "USE ROLE SECURITYADMIN"
+    assert sql[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
+    assert sql[5] == "USE ROLE SYSADMIN"
+    assert sql[6] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+    assert sql[7] == "GRANT OWNERSHIP ON DATABASE DB1 TO SOME_ROLE"

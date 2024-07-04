@@ -47,6 +47,7 @@ def main():
             "role",
             "schema",
             "security integration",
+            "share",
             "stage",
             "stream",
             "table",

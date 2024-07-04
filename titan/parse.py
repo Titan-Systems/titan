@@ -562,6 +562,29 @@ def _parse_dynamic_table_text(text: str):
     )
 
 
+def _parse_view_ddl(text: str):
+    """
+    Parse the DDL for a view.
+
+    Example:
+        CREATE VIEW
+            STATIC_DATABASE.PUBLIC.STATIC_VIEW
+            (id)
+            CHANGE_TRACKING = TRUE
+        as
+        SELECT id
+        FROM STATIC_DATABASE.public.static_table
+
+    """
+
+    # Remove newlines
+    text = text.replace("\n", " ")
+
+    # Parse as
+    match_as = re.search(r"\s+AS\s+(.*)$", text, re.IGNORECASE)
+    return match_as.group(1) if match_as else None
+
+
 def parse_function_name(header: str):
     """
     Example:

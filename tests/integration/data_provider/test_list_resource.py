@@ -1,6 +1,7 @@
 import os
 
 import pytest
+from inflection import pluralize
 
 from tests.helpers import get_json_fixtures
 from titan import data_provider
@@ -23,7 +24,10 @@ JSON_FIXTURES = list(get_json_fixtures())
 )
 def resource(request, suffix):
     resource_cls, data = request.param
-    data["name"] += f"_{suffix}_list_resources"
+    if "name" in data:
+        data["name"] += f"_{suffix}_list_resources"
+    if "login_name" in data:
+        data["login_name"] += f"_{suffix}_list_resources"
     res = resource_cls(**data)
 
     yield res
@@ -42,11 +46,12 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
         list_resources_database.add(resource)
     elif isinstance(resource.scope, SchemaScope):
         list_resources_database.public_schema.add(resource)
+
+    if not hasattr(data_provider, f"list_{pluralize(resource_label_for_type(resource.resource_type))}"):
+        pytest.skip(f"{resource.resource_type} is not supported")
+
     cursor.execute(resource.create_sql(if_not_exists=True))
     marked_for_cleanup.append(resource)
-    try:
-        list_resources = data_provider.list_resource(cursor, resource_label_for_type(resource.resource_type))
-        assert len(list_resources) > 0
-        assert resource.fqn in list_resources
-    except AttributeError:
-        pytest.skip(f"{resource.resource_type} is not supported")
+    list_resources = data_provider.list_resource(cursor, resource_label_for_type(resource.resource_type))
+    assert len(list_resources) > 0
+    assert resource.fqn in list_resources
