@@ -319,7 +319,7 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | **Account Resources**         |           |
 | API Integration               | ✅         |
 | Catalog Integration           |           |
-| ↳ Glue                        | 🚧         |
+| ↳ Glue                        | ✅         |
 | ↳ Object Store                | ✅         |
 | Compute Pool                  | ✅         |
 | Connection                    | ❌         |
@@ -349,9 +349,9 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | ↳ SCIM                        | ❌         |
 | Share                         | ✅         |
 | Storage Integration           |           |
-| ↳ AWS                         | 🚧         |
-| ↳ Azure                       | 🚧         |
-| ↳ GCS                         | 🚧         |
+| ↳ AWS                         | ✅         |
+| ↳ Azure                       | ✅         |
+| ↳ GCS                         | ✅         |
 | User                          | ✅         |
 | Warehouse                     | ✅         |
 |                               |            |

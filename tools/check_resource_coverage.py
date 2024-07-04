@@ -79,9 +79,9 @@ def check_resource_coverage():
         "json": "json",
         "sql": "sql",
         "fetch": "fetch",
-        "list": "list",
         "tests": "tests",
         "docs": "docs",
+        "list": "list",
         "stable": "stable",
     }
     audits = []
@@ -109,10 +109,10 @@ def check_resource_coverage():
         has_json = resource in JSON_FIXTURES
         has_sql = resource in SQL_FIXTURES
         has_fetch = hasattr(titan.data_provider, f"fetch_{resource_label}")
-        has_list = hasattr(titan.data_provider, f"list_{pluralize(resource_label)}")
         has_tests = f"test_fetch_{class_label}" in test_fetch_file
         has_docs = class_label in DOCS
-        is_stable = all([has_json, has_sql, has_fetch, has_list, has_tests, has_docs])
+        has_list = hasattr(titan.data_provider, f"list_{pluralize(resource_label)}")
+        is_stable = all([has_json, has_sql, has_fetch, has_tests, has_docs])
 
         if is_stable:
             running_total += 1
@@ -124,10 +124,10 @@ def check_resource_coverage():
             "json": "✔" if has_json else "-",
             "sql": "✔" if has_sql else "-",
             "fetch": "✔" if has_fetch else "-",
-            "list": "✔" if has_list else "-",
             "tests": "✔" if has_tests else "-",
             "docs": "✔" if has_docs else "-",
-            "stable": "✅" if is_stable else "-",
+            "list": "✔" if has_list else "-",
+            "stable": "[✔]" if is_stable else "-",
         }
         audits.append(audit)
 

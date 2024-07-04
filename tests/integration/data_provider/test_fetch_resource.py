@@ -412,6 +412,26 @@ def test_fetch_user(cursor, suffix, marked_for_cleanup):
     assert_resource_dicts_eq_ignore_nulls(result, user.to_dict())
 
 
+def test_fetch_glue_catalog_integration(cursor, marked_for_cleanup):
+    catalog_integration = res.GlueCatalogIntegration(
+        name="some_catalog_integration",
+        table_format="ICEBERG",
+        glue_aws_role_arn="arn:aws:iam::123456789012:role/SnowflakeAccess",
+        glue_catalog_id="123456789012",
+        catalog_namespace="some_namespace",
+        enabled=True,
+        glue_region="us-west-2",
+        comment="Integration for AWS Glue with Snowflake.",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(catalog_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(catalog_integration)
+
+    result = safe_fetch(cursor, catalog_integration.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls(result, catalog_integration.to_dict())
+
+
 def test_fetch_object_store_catalog_integration(cursor, marked_for_cleanup):
     catalog_integration = res.ObjectStoreCatalogIntegration(
         name="OBJECT_STORE_CATALOG_INTEGRATION_EXAMPLE",
@@ -450,6 +470,40 @@ def test_fetch_s3_storage_integration(cursor, suffix, marked_for_cleanup):
         storage_aws_role_arn="arn:aws:iam::001234567890:role/myrole",
         enabled=True,
         storage_allowed_locations=["s3://mybucket1/path1/", "s3://mybucket2/path2/"],
+        owner=TEST_ROLE,
+    )
+    cursor.execute(storage_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(storage_integration)
+
+    result = safe_fetch(cursor, storage_integration.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
+
+
+def test_fetch_gcs_storage_integration(cursor, suffix, marked_for_cleanup):
+    storage_integration = res.GCSStorageIntegration(
+        name=f"GCS_STORAGE_INTEGRATION_EXAMPLE_{suffix}",
+        enabled=True,
+        storage_allowed_locations=["gcs://mybucket1/path1/", "gcs://mybucket2/path2/"],
+        owner=TEST_ROLE,
+    )
+    cursor.execute(storage_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(storage_integration)
+
+    result = safe_fetch(cursor, storage_integration.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
+
+
+def test_fetch_azure_storage_integration(cursor, suffix, marked_for_cleanup):
+    storage_integration = res.AzureStorageIntegration(
+        name=f"AZURE_STORAGE_INTEGRATION_EXAMPLE_{suffix}",
+        enabled=True,
+        azure_tenant_id="a123b4c5-1234-123a-a12b-1a23b45678c9",
+        storage_allowed_locations=[
+            "azure://myaccount.blob.core.windows.net/mycontainer/path1/",
+            "azure://myaccount.blob.core.windows.net/mycontainer/path2/",
+        ],
         owner=TEST_ROLE,
     )
     cursor.execute(storage_integration.create_sql(if_not_exists=True))

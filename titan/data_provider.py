@@ -1353,21 +1353,45 @@ def fetch_storage_integration(session, fqn: FQN):
     desc_result = execute(session, f"DESC INTEGRATION {fqn.name}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
 
-    show_grants = execute(session, f"SHOW GRANTS ON INTEGRATION {fqn.name}")
-    ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
 
-    return {
-        "name": _quote_snowflake_identifier(data["name"]),
-        "type": data["type"],
-        "enabled": data["enabled"] == "true",
-        "comment": data["comment"] or None,
-        "storage_provider": properties["storage_provider"],
-        "storage_aws_role_arn": properties.get("storage_aws_role_arn"),
-        "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
-        "storage_blocked_locations": properties.get("storage_blocked_locations") or None,
-        "storage_aws_object_acl": properties.get("storage_aws_object_acl"),
-        "owner": ownership_grant[0]["grantee_name"] if len(ownership_grant) > 0 else None,
-    }
+    if properties["storage_provider"] == "S3":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "enabled": data["enabled"] == "true",
+            "comment": data["comment"] or None,
+            "owner": owner,
+            "storage_provider": properties["storage_provider"],
+            "storage_aws_role_arn": properties.get("storage_aws_role_arn"),
+            "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
+            "storage_blocked_locations": properties.get("storage_blocked_locations") or None,
+            "storage_aws_object_acl": properties.get("storage_aws_object_acl"),
+        }
+    elif properties["storage_provider"] == "GCS":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "enabled": data["enabled"] == "true",
+            "comment": data["comment"] or None,
+            "owner": owner,
+            "storage_provider": properties["storage_provider"],
+            "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
+            "storage_blocked_locations": properties.get("storage_blocked_locations") or None,
+        }
+    elif properties["storage_provider"] == "AZURE":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "enabled": data["enabled"] == "true",
+            "comment": data["comment"] or None,
+            "owner": owner,
+            "storage_provider": properties["storage_provider"],
+            "storage_allowed_locations": properties.get("storage_allowed_locations") or None,
+            "azure_tenant_id": properties["azure_tenant_id"],
+        }
+    else:
+        raise Exception(f"Unsupported storage provider {properties['storage_provider']}")
 
 
 def fetch_stream(session, fqn: FQN):
