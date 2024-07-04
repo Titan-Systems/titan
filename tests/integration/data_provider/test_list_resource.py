@@ -1,13 +1,15 @@
 import os
 
 import pytest
+import snowflake.connector.errors
 from inflection import pluralize
 
 from tests.helpers import get_json_fixtures
 from titan import data_provider
+from titan.client import UNSUPPORTED_FEATURE
 from titan.identifiers import resource_label_for_type
 from titan.resources import Database
-from titan.scope import AccountScope, DatabaseScope, SchemaScope
+from titan.scope import DatabaseScope, SchemaScope
 
 pytestmark = pytest.mark.requires_snowflake
 
@@ -50,7 +52,13 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
     if not hasattr(data_provider, f"list_{pluralize(resource_label_for_type(resource.resource_type))}"):
         pytest.skip(f"{resource.resource_type} is not supported")
 
-    cursor.execute(resource.create_sql(if_not_exists=True))
+    try:
+        cursor.execute(resource.create_sql(if_not_exists=True))
+    except snowflake.connector.errors.ProgrammingError as err:
+        if err.errno == UNSUPPORTED_FEATURE:
+            pytest.skip(f"{resource.resource_type} is not supported")
+        else:
+            raise
     marked_for_cleanup.append(resource)
     list_resources = data_provider.list_resource(cursor, resource_label_for_type(resource.resource_type))
     assert len(list_resources) > 0

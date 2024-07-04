@@ -1853,7 +1853,12 @@ def list_role_grants(session) -> list[FQN]:
         role_name = ResourceName.from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
+        try:
+            show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
+        except ProgrammingError as err:
+            if err.errno == DOES_NOT_EXIST_ERR:
+                continue
+            raise
         for data in show_result:
             subject = "user" if data["granted_to"] == "USER" else "role"
             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
