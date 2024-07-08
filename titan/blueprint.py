@@ -6,7 +6,7 @@ from typing import Generator, Optional, Union
 
 import snowflake.connector
 
-from . import __version__, data_provider, lifecycle
+from . import data_provider, lifecycle
 from .builtins import SYSTEM_ROLES
 from .client import (
     ALREADY_EXISTS_ERR,
@@ -190,7 +190,7 @@ def dump_plan(plan: Plan, format: str = "json"):
         change_count = len([change for change in plan if change.action == Action.CHANGE])
         remove_count = len([change for change in plan if change.action == Action.REMOVE])
 
-        output += f"\n» titan core v{__version__}\n"
+        output += "\n» titan core\n"
         output += f"» Plan: {add_count} to add, {change_count} to change, {remove_count} to destroy.\n\n"
 
         for change in plan:

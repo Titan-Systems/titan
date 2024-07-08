@@ -6,7 +6,7 @@ import sys
 
 from snowflake.snowpark.exceptions import SnowparkSQLException
 
-from . import __version__, lifecycle, resources
+from . import lifecycle, resources
 from . import data_provider as dp
 from .blueprint import Action, Blueprint
 from .diff import diff
