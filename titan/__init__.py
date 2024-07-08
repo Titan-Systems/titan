@@ -1,6 +1,6 @@
 import logging.config
 
-__version__ = open("version.md", encoding="utf-8").read().split(" ")[2]
+# __version__ = open("version.md", encoding="utf-8").read().split(" ")[2]
 
 from .blueprint import Blueprint
 from .resources import *
