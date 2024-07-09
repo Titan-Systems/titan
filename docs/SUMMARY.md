@@ -12,6 +12,7 @@
 * [APIIntegration](resources/api_integration.md)
 * [AggregationPolicy](resources/aggregation_policy.md)
 * [Alert](resources/alert.md)
+* [AuthenticationPolicy](resources/authentication_policy.md)
 * [AzureStorageIntegration](resources/azure_storage_integration.md)
 * [ComputePool](resources/compute_pool.md)
 * [Database](resources/database.md)
