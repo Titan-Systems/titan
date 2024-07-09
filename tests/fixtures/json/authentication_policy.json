@@ -6,7 +6,13 @@
     "comment": "Auth policy that only allows access through the web interface",
     "owner": "SECURITYADMIN",
     "mfa_enrollment": "OPTIONAL",
-    "security_integrations": null,
-    "authentication_methods": null,
-    "mfa_authentication_methods": null
+    "security_integrations": [
+        "ALL"
+    ],
+    "authentication_methods": [
+        "ALL"
+    ],
+    "mfa_authentication_methods": [
+        "PASSWORD"
+    ]
 }
