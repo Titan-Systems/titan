@@ -1,9 +1,8 @@
-from .resource import Resource
-
 from .account import Account
 from .aggregation_policy import AggregationPolicy
 from .alert import Alert
 from .api_integration import APIIntegration
+from .authentication_policy import AuthenticationPolicy
 from .catalog_integration import GlueCatalogIntegration, ObjectStoreCatalogIntegration
 from .column import Column
 from .compute_pool import ComputePool
@@ -15,25 +14,44 @@ from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
 from .file_format import CSVFileFormat
 from .function import JavascriptUDF, PythonUDF
-from .grant import GrantOnAll, FutureGrant, Grant, RoleGrant
+from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
 from .image_repository import ImageRepository
 from .materialized_view import MaterializedView
 from .network_rule import NetworkRule
+from .notification_integration import (
+    AWSOutboundNotificationIntegration,
+    AzureInboundNotificationIntegration,
+    AzureOutboundNotificationIntegration,
+    EmailNotificationIntegration,
+    GCPInboundNotificationIntegration,
+    GCPOutboundNotificationIntegration,
+)
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
 from .pipe import Pipe
 from .procedure import PythonStoredProcedure
 from .replication_group import ReplicationGroup
+from .resource import Resource
 from .resource_monitor import ResourceMonitor
-from .role import Role, DatabaseRole
+from .role import DatabaseRole, Role
 from .schema import Schema
-from .secret import PasswordSecret, GenericSecret, OAuthSecret
+from .secret import GenericSecret, OAuthSecret, PasswordSecret
+from .security_integration import (
+    APIAuthenticationSecurityIntegration,
+    SnowflakePartnerOAuthSecurityIntegration,
+    SnowservicesOAuthSecurityIntegration,
+)
 from .sequence import Sequence
 from .service import Service
 from .share import Share
-from .stage import InternalStage, ExternalStage
-from .stream import TableStream, ViewStream, StageStream  # ExternalTableStream
+from .stage import ExternalStage, InternalStage
+from .storage_integration import (
+    AzureStorageIntegration,
+    GCSStorageIntegration,
+    S3StorageIntegration,
+)
+from .stream import StageStream, TableStream, ViewStream  # ExternalTableStream
 from .table import Table  # , CreateTableAsSelect
 from .tag import Tag
 from .task import Task
@@ -41,34 +59,13 @@ from .user import User
 from .view import View
 from .warehouse import Warehouse
 
-from .notification_integration import (
-    EmailNotificationIntegration,
-    AWSOutboundNotificationIntegration,
-    GCPOutboundNotificationIntegration,
-    AzureOutboundNotificationIntegration,
-    GCPInboundNotificationIntegration,
-    AzureInboundNotificationIntegration,
-)
-
-from .security_integration import (
-    APIAuthenticationSecurityIntegration,
-    SnowflakePartnerOAuthSecurityIntegration,
-    SnowservicesOAuthSecurityIntegration,
-)
-
-from .storage_integration import (
-    S3StorageIntegration,
-    GCSStorageIntegration,
-    AzureStorageIntegration,
-)
-
-
 __all__ = [
     "Account",
     "AggregationPolicy",
     "Alert",
-    "APIIntegration",
     "APIAuthenticationSecurityIntegration",
+    "APIIntegration",
+    "AuthenticationPolicy",
     "AWSOutboundNotificationIntegration",
     "AzureInboundNotificationIntegration",
     "AzureOutboundNotificationIntegration",

@@ -41,8 +41,14 @@ def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
     return str(ResourceName.from_snowflake_metadata(identifier))
 
 
-def _desc_result_to_dict(desc_result):
-    return dict([(row["property"], row["value"]) for row in desc_result])
+def _desc_result_to_dict(desc_result, lower_properties=False):
+    result = {}
+    for row in desc_result:
+        property = row["property"]
+        if lower_properties:
+            property = property.lower()
+        result[property] = row["value"]
+    return result
 
 
 def _desc_type2_result_to_dict(desc_result, lower_properties=False):
@@ -453,6 +459,28 @@ def fetch_api_integration(session, fqn: FQN):
         "api_key": properties["api_key"],
         "owner": owner,
         "comment": data["comment"] or None,
+    }
+
+
+def fetch_authentication_policy(session, fqn: FQN):
+    policies = _show_resources(session, "AUTHENTICATION POLICIES", fqn)
+    if len(policies) == 0:
+        return None
+    if len(policies) > 1:
+        raise Exception(f"Found multiple authentication policies matching {fqn}")
+    data = policies[0]
+    desc_result = execute(session, f"DESC AUTHENTICATION POLICY {fqn}")
+    properties = _desc_result_to_dict(desc_result, lower_properties=True)
+
+    return {
+        "name": _quote_snowflake_identifier(data["name"]),
+        "authentication_methods": _parse_list_property(properties["authentication_methods"]),
+        "mfa_authentication_methods": _parse_list_property(properties["mfa_authentication_methods"]),
+        "mfa_enrollment": properties["mfa_enrollment"],
+        "client_types": _parse_list_property(properties["client_types"]),
+        "security_integrations": _parse_list_property(properties["security_integrations"]),
+        "comment": data["comment"] or None,
+        "owner": data["owner"],
     }
 
 
@@ -1741,6 +1769,8 @@ def fetch_warehouse(session, fqn: FQN):
 
 ################ List functions
 
+######## List helpers
+
 
 def list_resource(session, resource_label: str) -> list[FQN]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
@@ -1768,12 +1798,19 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
     return resources
 
 
+######## List functions by resource
+
+
 def list_alerts(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "ALERTS")
 
 
 def list_api_integrations(session) -> list[FQN]:
     return list_account_scoped_resource(session, "API INTEGRATIONS")
+
+
+def list_authentication_policies(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "AUTHENTICATION POLICIES")
 
 
 def list_catalog_integrations(session) -> list[FQN]:

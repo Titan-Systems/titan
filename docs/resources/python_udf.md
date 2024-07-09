@@ -47,7 +47,7 @@ python_udfs:
     handler: process_data
     args:
       - name: input_data
-        type: string
+        data_type: string
     as_: process_data_function
     comment: This function processes data.
     copy_grants: false

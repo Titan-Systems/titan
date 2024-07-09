@@ -53,7 +53,8 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
         pytest.skip(f"{resource.resource_type} is not supported")
 
     try:
-        cursor.execute(resource.create_sql(if_not_exists=True))
+        create_sql = resource.create_sql(if_not_exists=True)
+        cursor.execute(create_sql)
     except snowflake.connector.errors.ProgrammingError as err:
         if err.errno == UNSUPPORTED_FEATURE:
             pytest.skip(f"{resource.resource_type} is not supported")
