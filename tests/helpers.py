@@ -39,14 +39,8 @@ def strip_nones_and_unfetchable(spec, data):
 
 
 def assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:
-    lhs = data_provider.remove_none_values(lhs)
-    rhs = data_provider.remove_none_values(rhs)
-    keys = set(lhs.keys()) | set(rhs.keys())
-    for attr in keys:
-        attr_metadata = spec.get_metadata(attr)
-        if not attr_metadata.get("fetchable", True):
-            lhs.pop(attr, None)
-            rhs.pop(attr, None)
+    lhs = strip_nones_and_unfetchable(spec, lhs)
+    rhs = strip_nones_and_unfetchable(spec, rhs)
     assert lhs == rhs
 
 

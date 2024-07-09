@@ -972,3 +972,22 @@ def test_fetch_stage_stream(cursor, suffix, marked_for_cleanup):
     result = safe_fetch(cursor, stream.urn)
     assert result is not None
     assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.StageStream.spec, result, stream.to_dict())
+
+
+def test_fetch_authentication_policies(cursor, suffix, marked_for_cleanup):
+    policy = res.AuthenticationPolicy(
+        name=f"SOME_AUTHENTICATION_POLICY_{suffix}",
+        mfa_authentication_methods=["PASSWORD", "SAML"],
+        mfa_enrollment="REQUIRED",
+        client_types=["SNOWFLAKE_UI"],
+        comment="Authentication policy for testing",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(policy.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(policy)
+
+    result = safe_fetch(cursor, policy.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, result)
+    data = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, policy.to_dict())
+    assert result == data
