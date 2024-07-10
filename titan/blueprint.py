@@ -20,9 +20,9 @@ from .identifiers import URN, parse_identifier, resource_label_for_type
 from .privs import CREATE_PRIV_FOR_RESOURCE_TYPE, PRIVS_FOR_RESOURCE_TYPE, GrantedPrivilege, is_ownership_priv
 from .resource_name import ResourceName
 from .resources import Account, Database
-from .resources.resource import Resource, ResourceContainer, ResourcePointer
+from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer
 from .resources.tag import Tag, TaggableResource
-from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
+from .scope import ResourceScope, AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
@@ -866,30 +866,42 @@ def execution_role_for_change(
         ResourceType.ROLE_GRANT,
     )
 
+    change_is_a_tag_reference = change.urn.resource_type == ResourceType.TAG_REFERENCE
+
     if change_is_a_grant:
         if "SECURITYADMIN" in usable_roles:
             return "SECURITYADMIN"
         else:
             # Find a role that has MANAGE GRANTS, preferring the default role
             raise Exception("SECURITYADMIN is required to perform this action")
+    elif change_is_a_tag_reference:
+        # There are two ways you can create a tag reference:
+        # 1. You have the global APPLY TAGS priv on the account (given to ACCOUNTADMIN by default)
+        # 2. You have APPLY privilege on the TAG object AND you have ownership of the tagged object
+        if "ACCOUNTADMIN" in usable_roles:
+            return "ACCOUNTADMIN"
+        else:
+            # TODO: find a role that has the APPLY TAGS global priv
+            raise Exception("ACCOUNTADMIN is required to perform this action")
 
     change_owner = owner_for_change(change)
 
-    # See if change has an owner
     if change_owner:
-        # Check if we can use that role
-        if change_owner in usable_roles:
+        # If we can use the owner of the change, use that
+        if change_owner in usable_roles and role_can_execute_change(change_owner, change, role_privileges):
+            return change_owner
 
-            # Check if that owner can execute the change
-            if role_can_execute_change(change_owner, change, role_privileges):
-                return change_owner
-            else:
-                raise MissingPrivilegeException(
-                    f"Owner {change_owner} does not have the required privileges to execute {change.action} on {change.urn}"
-                )
+        # See if there's another role we can use to execute the change
+        alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
+        if alternate_role:
+            return alternate_role
+        # This change cannot be executed
+        raise MissingPrivilegeException(
+            f"Owner {change_owner} does not have the required privileges to execute {change.action} on {change.urn}"
+        )
 
-        else:
-            raise Exception(f"Owner {change_owner} is not available")
+        # else:
+        #     raise Exception(f"Owner {change_owner} is not available")
 
     # If not, find a role that can execute the change, preferring the default role
     # If you can't find a role that can execute the change, raise an exception
@@ -898,7 +910,11 @@ def execution_role_for_change(
 
 
 # NOTE: this is in a hot loop and maybe should be cached
-def role_can_execute_change(role: str, change: ResourceChange, role_privileges: dict[str, list[GrantedPrivilege]]):
+def role_can_execute_change(
+    role: str,
+    change: ResourceChange,
+    role_privileges: dict[str, list[GrantedPrivilege]],
+):
 
     # Assume ACCOUNTADMIN can do anything
     if role == "ACCOUNTADMIN":
@@ -913,24 +929,48 @@ def role_can_execute_change(role: str, change: ResourceChange, role_privileges: 
         # For most resources, to add it you need the CREATE PRIV on the resource container
         # For some resources like grants, you need the special MANAGE GRANTS priv
         # There may be other cases but I don't remember them right now
-        required_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
         for granted_priv in role_privileges[role]:
-
-            # TODO: refactor this
-            if change.urn.resource_type == ResourceType.DATABASE:
-                principal = str(change.urn.account_locator)
-            else:
-                principal = str(change.urn.database().fqn)
-
-            granted_priv_satisfies_requirement = granted_priv.on == principal and (
-                granted_priv.privilege == required_priv or is_ownership_priv(granted_priv.privilege)
-            )
-            if granted_priv_satisfies_requirement:
+            if granted_priv_allows_change(granted_priv, change):
                 return True
 
         return False
     else:
         raise NotImplementedError
+
+
+def find_role_to_execute_change(
+    change: ResourceChange,
+    usable_roles: list[str],
+    default_role: str,
+    role_privileges: dict[str, list[GrantedPrivilege]],
+):
+    # Check default role first
+    sorted_roles = sorted(usable_roles, key=lambda role: (role != default_role))
+    for role in sorted_roles:
+        if role_can_execute_change(role, change, role_privileges):
+            return role
+    return None
+
+
+def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceChange):
+    scope = RESOURCE_SCOPES[change.urn.resource_type]
+
+    create_priv = None
+    if change.urn.resource_type in CREATE_PRIV_FOR_RESOURCE_TYPE:
+        create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
+
+    if isinstance(scope, AccountScope):
+        change_container = str(change.urn.account_locator)
+    elif isinstance(scope, DatabaseScope):
+        change_container = str(change.urn.database().fqn)
+    elif isinstance(scope, SchemaScope):
+        change_container = str(change.urn.schema().fqn)
+    else:
+        raise Exception
+
+    return granted_priv.on == change_container and (
+        is_ownership_priv(granted_priv.privilege) or granted_priv.privilege == create_priv
+    )
 
 
 def sql_commands_for_change(
@@ -1057,13 +1097,25 @@ def compile_plan_to_sql(session_ctx, plan: Plan):
             elif "owner" in change.after:
                 # When creating any other resource type, creating implies ownership
                 ownership_priv = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]("OWNERSHIP")
-                role_privileges[str(change.after["owner"])].append(
+                owner_role = str(change.after["owner"])
+                if owner_role not in role_privileges:
+                    role_privileges[owner_role] = []
+                role_privileges[owner_role].append(
                     GrantedPrivilege.from_grant(
                         privilege=ownership_priv,
                         granted_on=change.urn.resource_type,
                         name=str(change.urn.fqn),
                     )
                 )
+                # Special case for databases: if you create a database you own the public schema
+                if change.urn.resource_type == ResourceType.DATABASE:
+                    role_privileges[owner_role].append(
+                        GrantedPrivilege.from_grant(
+                            privilege=PRIVS_FOR_RESOURCE_TYPE[ResourceType.SCHEMA]("OWNERSHIP"),
+                            granted_on=ResourceType.SCHEMA,
+                            name=str(change.urn.fqn) + ".PUBLIC",
+                        )
+                    )
     return sql_commands
 
 

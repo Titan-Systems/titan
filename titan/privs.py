@@ -175,6 +175,14 @@ class IntegrationPriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
+class MaterializedViewPriv(ParseableEnum):
+    ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    OWNERSHIP = "OWNERSHIP"
+    REFERENCES = "REFERENCES"
+    SELECT = "SELECT"
+
+
 class NetworkRulePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
@@ -347,7 +355,9 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.EXTERNAL_FUNCTION: FunctionPriv,
     ResourceType.FAILOVER_GROUP: FailoverGroupPriv,
+    ResourceType.FILE_FORMAT: FileFormatPriv,
     ResourceType.FUNCTION: FunctionPriv,
+    ResourceType.MATERIALIZED_VIEW: MaterializedViewPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
     ResourceType.PACKAGES_POLICY: PackagesPolicyPriv,
     ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
@@ -386,8 +396,10 @@ CREATE_PRIV_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: AccountPriv.CREATE_INTEGRATION,
     ResourceType.EXTERNAL_FUNCTION: SchemaPriv.CREATE_FUNCTION,
     ResourceType.FAILOVER_GROUP: AccountPriv.CREATE_FAILOVER_GROUP,
+    ResourceType.FILE_FORMAT: SchemaPriv.CREATE_FILE_FORMAT,
     ResourceType.FUNCTION: SchemaPriv.CREATE_FUNCTION,
     # ResourceType.GRANT: AccountPriv.CREATE_GRANT,
+    ResourceType.MATERIALIZED_VIEW: SchemaPriv.CREATE_MATERIALIZED_VIEW,
     ResourceType.NETWORK_RULE: SchemaPriv.CREATE_NETWORK_RULE,
     ResourceType.PACKAGES_POLICY: SchemaPriv.CREATE_PACKAGES_POLICY,
     ResourceType.PASSWORD_POLICY: SchemaPriv.CREATE_PASSWORD_POLICY,
