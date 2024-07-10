@@ -17,7 +17,13 @@ from .client import (
 from .diff import Action, diff
 from .enums import ParseableEnum, ResourceType
 from .identifiers import URN, parse_identifier, resource_label_for_type
-from .privs import CREATE_PRIV_FOR_RESOURCE_TYPE, PRIVS_FOR_RESOURCE_TYPE, GrantedPrivilege, is_ownership_priv
+from .privs import (
+    CREATE_PRIV_FOR_RESOURCE_TYPE,
+    PRIVS_FOR_RESOURCE_TYPE,
+    AccountPriv,
+    GrantedPrivilege,
+    is_ownership_priv,
+)
 from .resource_name import ResourceName
 from .resources import Account, Database
 from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer
@@ -196,10 +202,11 @@ def dump_plan(plan: Plan, format: str = "json"):
 
         add_count = len([change for change in plan if change.action == Action.ADD])
         change_count = len([change for change in plan if change.action == Action.CHANGE])
+        transfer_count = len([change for change in plan if change.action == Action.TRANSFER])
         remove_count = len([change for change in plan if change.action == Action.REMOVE])
 
         output += "\n» titan core\n"
-        output += f"» Plan: {add_count} to add, {change_count} to change, {remove_count} to destroy.\n\n"
+        output += f"» Plan: {add_count} to add, {change_count} to change, {transfer_count} to transfer, {remove_count} to destroy.\n\n"
 
         for change in plan:
             action_marker = ""
@@ -213,8 +220,6 @@ def dump_plan(plan: Plan, format: str = "json"):
             if change.action != Action.REMOVE:
                 output += " {"
             output += "\n"
-            if change.action == Action.TRANSFER:
-                logger.info("transfer")
             key_lengths = [len(key) for key in change.delta.keys()]
             max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
             for key, value in change.delta.items():
@@ -485,7 +490,7 @@ class Blueprint:
             elif action == Action.REMOVE:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
             elif action == Action.TRANSFER:
-                changes.append(ResourceChange(action=action, urn=urn, before=before, after=after, delta={}))
+                changes.append(ResourceChange(action=action, urn=urn, before=before, after=after, delta=delta))
 
         for urn in marked_for_replacement:
             raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
@@ -849,16 +854,18 @@ def owner_for_change(change: ResourceChange):
         return change.before["owner"]
     elif change.action == Action.REMOVE and "owner" in change.before:
         return change.before["owner"]
+    elif change.action == Action.TRANSFER and "owner" in change.before:
+        return change.before["owner"]
     else:
         return None
 
 
-def execution_role_for_change(
+def execution_strategy_for_change(
     change: ResourceChange,
     usable_roles: list[str],
     default_role: str,
     role_privileges: dict[str, list[dict]],
-):
+) -> tuple[str, bool]:
 
     change_is_a_grant = change.urn.resource_type in (
         ResourceType.GRANT,
@@ -870,43 +877,40 @@ def execution_role_for_change(
 
     if change_is_a_grant:
         if "SECURITYADMIN" in usable_roles:
-            return "SECURITYADMIN"
-        else:
-            # Find a role that has MANAGE GRANTS, preferring the default role
-            raise Exception("SECURITYADMIN is required to perform this action")
+            return "SECURITYADMIN", False
+        alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
+        if alternate_role:
+            return alternate_role, False
+        raise MissingPrivilegeException(f"{change} requires a role with MANAGE GRANTS privilege")
+
     elif change_is_a_tag_reference:
         # There are two ways you can create a tag reference:
         # 1. You have the global APPLY TAGS priv on the account (given to ACCOUNTADMIN by default)
         # 2. You have APPLY privilege on the TAG object AND you have ownership of the tagged object
         if "ACCOUNTADMIN" in usable_roles:
-            return "ACCOUNTADMIN"
-        else:
-            # TODO: find a role that has the APPLY TAGS global priv
-            raise Exception("ACCOUNTADMIN is required to perform this action")
+            return "ACCOUNTADMIN", False
+        alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
+        if alternate_role:
+            return alternate_role, False
+        raise MissingPrivilegeException(f"{change} requires a role with APPLY TAGS privilege")
 
     change_owner = owner_for_change(change)
 
     if change_owner:
         # If we can use the owner of the change, use that
         if change_owner in usable_roles and role_can_execute_change(change_owner, change, role_privileges):
-            return change_owner
+            return change_owner, False
 
-        # See if there's another role we can use to execute the change
+        # See if there is another role we can use to execute the change
         alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
         if alternate_role:
-            return alternate_role
+            return alternate_role, True
         # This change cannot be executed
         raise MissingPrivilegeException(
             f"Owner {change_owner} does not have the required privileges to execute {change.action} on {change.urn}"
         )
 
-        # else:
-        #     raise Exception(f"Owner {change_owner} is not available")
-
-    # If not, find a role that can execute the change, preferring the default role
-    # If you can't find a role that can execute the change, raise an exception
-
-    raise NotImplementedError
+    raise NotImplementedError(change)
 
 
 # NOTE: this is in a hot loop and maybe should be cached
@@ -925,17 +929,11 @@ def role_can_execute_change(
     if len(role_privileges[role]) == 0:
         return False
 
-    if change.action == Action.ADD:
-        # For most resources, to add it you need the CREATE PRIV on the resource container
-        # For some resources like grants, you need the special MANAGE GRANTS priv
-        # There may be other cases but I don't remember them right now
-        for granted_priv in role_privileges[role]:
-            if granted_priv_allows_change(granted_priv, change):
-                return True
+    for granted_priv in role_privileges[role]:
+        if granted_priv_allows_change(granted_priv, change):
+            return True
 
-        return False
-    else:
-        raise NotImplementedError
+    return False
 
 
 def find_role_to_execute_change(
@@ -953,11 +951,11 @@ def find_role_to_execute_change(
 
 
 def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceChange):
-    scope = RESOURCE_SCOPES[change.urn.resource_type]
 
-    create_priv = None
-    if change.urn.resource_type in CREATE_PRIV_FOR_RESOURCE_TYPE:
-        create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
+    if change.action not in (Action.ADD,):
+        raise NotImplementedError
+
+    scope = RESOURCE_SCOPES[change.urn.resource_type]
 
     if isinstance(scope, AccountScope):
         change_container = str(change.urn.account_locator)
@@ -968,9 +966,29 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
     else:
         raise Exception
 
-    return granted_priv.on == change_container and (
-        is_ownership_priv(granted_priv.privilege) or granted_priv.privilege == create_priv
-    )
+    if change.action == Action.ADD:
+
+        # if resource is a grant, check for MANAGE GRANTS
+        if change.urn.resource_type in (ResourceType.GRANT, ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
+            if granted_priv.privilege == AccountPriv.MANAGE_GRANTS:
+                return True
+
+        # If resource is a tag reference, check for APPLY TAGS
+        elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
+            if granted_priv.privilege == AccountPriv.APPLY_TAG:
+                return True
+
+        # If we own the resource container, we can always perform ADD
+        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == change_container:
+            return True
+
+        # If we don't own the container, we need the CREATE privilege for the resource on the container
+        create_priv = None
+        if change.urn.resource_type in CREATE_PRIV_FOR_RESOURCE_TYPE:
+            create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
+
+        if granted_priv.privilege == create_priv and granted_priv.on == change_container:
+            return True
 
 
 def sql_commands_for_change(
@@ -1004,56 +1022,23 @@ def sql_commands_for_change(
     change_cmd = None
     after_change_cmd = []
 
-    # change_is_a_grant = change.urn.resource_type in (
-    #     ResourceType.GRANT,
-    #     ResourceType.FUTURE_GRANT,
-    #     ResourceType.ROLE_GRANT,
-    # )
-    execution_role = execution_role_for_change(change, usable_roles, default_role, role_privileges)
+    execution_role, transfer_owner = execution_strategy_for_change(change, usable_roles, default_role, role_privileges)
     before_change_cmd.append(f"USE ROLE {execution_role}")
 
     if change.action == Action.ADD:
-
-        # TODO: In the event we are using a custom role, we need to be sure
-        # that the custom role is capable of performing the add action.
-        # If that role is not able to, we need to fall back to the default role + grant ownership
-        # approach
-
-        # if "owner" in change.after:
-        #     if change.after["owner"] in usable_roles:
-        #         before_action.append(f"USE ROLE {change.after['owner']}")
-        #     else:
-        #         before_action.append(f"USE ROLE {default_role}")
-        #         after_action.append(
-        #             lifecycle.transfer_resource(
-        #                 change.urn,
-        #                 owner=change.after["owner"],
-        #                 copy_current_grants=True,
-        #             )
-        #         )
-        # elif change_is_a_grant:
-        #     # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
-        #     before_action.append("USE ROLE SECURITYADMIN")
-        # else:
-        #     before_action.append(f"USE ROLE {default_role}")
-
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
         change_cmd = lifecycle.create_resource(change.urn, change.after, props)
+        if transfer_owner:
+            after_change_cmd.append(
+                lifecycle.transfer_resource(
+                    change.urn,
+                    owner=change.after["owner"],
+                    copy_current_grants=True,
+                )
+            )
     elif change.action == Action.CHANGE:
         change_cmd = lifecycle.update_resource(change.urn, change.delta)
     elif change.action == Action.REMOVE:
-        # if "owner" in change.before:
-
-        #     owner_role_is_available = change.before["owner"] in usable_roles
-
-        #     if owner_role_is_available:
-        #         before_action.append(f"USE ROLE {change.before['owner']}")
-        #     elif change_is_a_grant:
-        #         before_action.append("USE ROLE SECURITYADMIN")
-        #     else:
-        #         raise Exception(f"Cannot drop resource {change.urn} owned by {change.before['owner']}")
-        # else:
-        #     before_action.append(f"USE ROLE {default_role}")
         change_cmd = lifecycle.drop_resource(
             change.urn,
             change.before,
@@ -1092,8 +1077,17 @@ def compile_plan_to_sql(session_ctx, plan: Plan):
                 if change.after["to_role"] in usable_roles:
                     usable_roles.append(change.after["role"])
             elif change.urn.resource_type == ResourceType.GRANT:
-                # TODO: update state
-                pass
+                grantee_role = change.after["to"]
+                if grantee_role not in role_privileges:
+                    role_privileges[grantee_role] = []
+                for priv in change.after["_privs"]:
+                    role_privileges[grantee_role].append(
+                        GrantedPrivilege.from_grant(
+                            privilege=priv,
+                            granted_on=change.after["on_type"],
+                            name=change.after["on"],
+                        )
+                    )
             elif "owner" in change.after:
                 # When creating any other resource type, creating implies ownership
                 ownership_priv = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]("OWNERSHIP")

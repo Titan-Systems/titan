@@ -388,12 +388,12 @@ def fetch_session(session):
             continue
 
         role_privileges[role] = []
-        grants = execute(session, f"SHOW GRANTS TO ROLE {role}")
+        grants = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
         for grant in grants:
             try:
                 granted_priv = GrantedPrivilege.from_grant(
                     privilege=grant["privilege"],
-                    granted_on=grant["granted_on"],
+                    granted_on=grant["granted_on"].replace("_", " "),
                     name=grant["name"],
                 )
                 role_privileges[role].append(granted_priv)
@@ -1500,6 +1500,7 @@ def fetch_tag(session, fqn: FQN):
     data = tags[0]
     return {
         "name": _quote_snowflake_identifier(data["name"]),
+        "owner": data["owner"],
         "comment": data["comment"] or None,
         "allowed_values": json.loads(data["allowed_values"]) if data["allowed_values"] else None,
     }

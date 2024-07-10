@@ -342,6 +342,7 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
         schema="PUBLIC",
         comment="Tag for testing",
         allowed_values=["SOME_VALUE"],
+        owner=TEST_ROLE,
     )
     cursor.execute(tag.create_sql(if_not_exists=True))
     marked_for_cleanup.append(tag)
@@ -356,6 +357,7 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
         comment="Tag for testing",
+        owner=TEST_ROLE,
     )
     cursor.execute(tag.create_sql(if_not_exists=True))
     marked_for_cleanup.append(tag)

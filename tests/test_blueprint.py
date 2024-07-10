@@ -1,4 +1,4 @@
-import copy
+import os
 
 import pytest
 
@@ -6,9 +6,11 @@ from titan import resources as res
 from titan.blueprint import Action, Blueprint, DuplicateResourceException, InvalidOwnerException, compile_plan_to_sql
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN, parse_URN
+from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
-from titan.privs import GrantedPrivilege, AccountPriv
+
+TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 
 @pytest.fixture
@@ -197,13 +199,15 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     ]
 
     changes = compile_plan_to_sql(session_ctx, plan)
-    assert len(changes) == 6
+    assert len(changes) == 8
     assert changes[0] == "USE SECONDARY ROLES ALL"
     assert changes[1] == "USE ROLE USERADMIN"
     assert changes[2] == "CREATE ROLE SOME_ROLE"
-    assert changes[3] == "USE ROLE SYSADMIN"
-    assert changes[4] == "CREATE DATABASE DB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    assert changes[5] == "GRANT OWNERSHIP ON DATABASE DB TO SOME_ROLE"
+    assert changes[3] == "USE ROLE SECURITYADMIN"
+    assert changes[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
+    assert changes[5] == f"USE ROLE {TEST_ROLE}"
+    assert changes[6] == "CREATE DATABASE DB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+    assert changes[7] == "GRANT OWNERSHIP ON DATABASE DB TO ROLE SOME_ROLE COPY CURRENT GRANTS"
 
 
 def test_blueprint_resource_owned_by_plan_role_without_grant(session_ctx):
@@ -409,6 +413,6 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert sql[2] == "CREATE ROLE SOME_ROLE"
     assert sql[3] == "USE ROLE SECURITYADMIN"
     assert sql[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
-    assert sql[5] == "USE ROLE SYSADMIN"
+    assert sql[5] == f"USE ROLE {TEST_ROLE}"
     assert sql[6] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    assert sql[7] == "GRANT OWNERSHIP ON DATABASE DB1 TO SOME_ROLE"
+    assert sql[7] == "GRANT OWNERSHIP ON DATABASE DB1 TO ROLE SOME_ROLE COPY CURRENT GRANTS"

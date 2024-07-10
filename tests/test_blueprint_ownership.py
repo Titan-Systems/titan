@@ -1,10 +1,11 @@
 import pytest
 
 from titan import resources as res
-from titan.blueprint import Blueprint, Action, InvalidOwnerException, MissingPrivilegeException, compile_plan_to_sql
+from titan.blueprint import Action, Blueprint, InvalidOwnerException, MissingPrivilegeException, compile_plan_to_sql
 from titan.identifiers import parse_URN
+from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
-from titan.privs import GrantedPrivilege, AccountPriv
+from titan.resources.tag import tag_reference_for_resource
 
 
 @pytest.fixture
@@ -138,7 +139,7 @@ def test_resource_has_custom_role_owner_with_create_priv(session_ctx, remote_sta
     assert sql_commands[2].startswith("CREATE WAREHOUSE TEST_WAREHOUSE")
 
 
-def test_resource_has_custom_role_owner_without_create_priv(session_ctx, remote_state):
+def test_resource_is_transferred_to_custom_role_owner(session_ctx, remote_state):
     session_ctx = session_ctx.copy()
     session_ctx["available_roles"].append(ResourceName("test_role"))
 
@@ -150,5 +151,93 @@ def test_resource_has_custom_role_owner_without_create_priv(session_ctx, remote_
     assert plan[0].action == Action.ADD
     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
 
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+    assert sql_commands[0] == "USE SECONDARY ROLES ALL"
+    assert sql_commands[1] == "USE ROLE ACCOUNTADMIN"
+    assert sql_commands[2].startswith("CREATE WAREHOUSE TEST_WAREHOUSE")
+    assert sql_commands[3] == "GRANT OWNERSHIP ON WAREHOUSE TEST_WAREHOUSE TO ROLE TEST_ROLE COPY CURRENT GRANTS"
+
+
+def test_resource_cant_be_created(remote_state):
+    session_ctx = {
+        "account": "SOMEACCT",
+        "account_locator": "ABCD123",
+        "role": "TEST_ROLE",
+        "available_roles": [
+            "TEST_ROLE",
+        ],
+        "role_privileges": {},
+    }
+    warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
+    blueprint = Blueprint(resources=[warehouse])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
+
     with pytest.raises(MissingPrivilegeException):
         compile_plan_to_sql(session_ctx, plan)
+
+
+def test_grant_with_grant_admin_custom_role(remote_state):
+    session_ctx = {
+        "account": "SOMEACCT",
+        "account_locator": "ABCD123",
+        "role": "GRANT_ADMIN",
+        "available_roles": [
+            "GRANT_ADMIN",
+        ],
+        "role_privileges": {
+            "GRANT_ADMIN": [
+                GrantedPrivilege(privilege=AccountPriv.MANAGE_GRANTS, on="ABCD123"),
+            ]
+        },
+    }
+
+    grant = res.RoleGrant(role="GRANT_ADMIN", to_role="SYSADMIN")
+    blueprint = Blueprint(resources=[grant])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:role_grant/GRANT_ADMIN?role=SYSADMIN")
+    compile_plan_to_sql(session_ctx, plan)
+
+
+def test_tag_reference_with_tag_admin_custom_role():
+    session_ctx = {
+        "account": "SOMEACCT",
+        "account_locator": "ABCD123",
+        "role": "TAG_ADMIN",
+        "available_roles": [
+            "TAG_ADMIN",
+        ],
+        "role_privileges": {
+            "TAG_ADMIN": [
+                GrantedPrivilege(privilege=AccountPriv.APPLY_TAG, on="ABCD123"),
+            ]
+        },
+        "tags": ["tags.tags.cost_center"],
+    }
+
+    remote_state = {
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+    }
+
+    tag_reference = res.TagReference(
+        object_name="SOME_ROLE",
+        object_domain="ROLE",
+        tags={"tags.tags.cost_center": "finance"},
+    )
+    blueprint = Blueprint(resources=[tag_reference])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert plan[0].action == Action.ADD
+    assert plan[0].urn == parse_URN("urn::ABCD123:tag_reference/SOME_ROLE?domain=ROLE")
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+    assert len(sql_commands) == 3
+    assert sql_commands[0] == "USE SECONDARY ROLES ALL"
+    assert sql_commands[1] == "USE ROLE TAG_ADMIN"
+    assert sql_commands[2] == "ALTER ROLE SOME_ROLE SET TAG tags.tags.cost_center='finance'"

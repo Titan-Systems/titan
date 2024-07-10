@@ -23,7 +23,7 @@ from .role import Role
 @dataclass(unsafe_hash=True)
 class _JavascriptUDF(ResourceSpec):
     name: ResourceName
-    returns: DataType
+    returns: str
     as_: str
     language: Language = Language.JAVASCRIPT
     args: list[Arg] = None
@@ -101,7 +101,8 @@ class JavascriptUDF(NamedResource, Resource):
         # Specifies to retain the access privileges from the original function when a new
         # function is created using CREATE OR REPLACE FUNCTION.
         # copy_grants=FlagProp("copy_grants"),
-        returns=EnumProp("returns", DataType, eq=False),
+        # returns=EnumProp("returns", DataType, eq=False),
+        returns=ReturnsProp("returns", eq=False),
         # not_null=BoolProp("not_null"),
         language=EnumProp("language", [Language.JAVASCRIPT], eq=False),
         null_handling=EnumFlagProp(NullHandling),
@@ -149,7 +150,7 @@ class JavascriptUDF(NamedResource, Resource):
 @dataclass(unsafe_hash=True)
 class _PythonUDF(ResourceSpec):
     name: ResourceName
-    returns: DataType
+    returns: str
     runtime_version: str
     handler: str
     args: list[Arg]
