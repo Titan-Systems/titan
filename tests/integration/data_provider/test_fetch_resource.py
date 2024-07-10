@@ -558,7 +558,7 @@ def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
 @pytest.mark.skip(reason="Generates invalid SQL")
 def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
     function = res.JavascriptUDF(
-        name="SOMEFUNC",
+        name="SOME_JAVASCRIPT_UDF",
         returns="FLOAT",
         volatility="VOLATILE",
         as_="return 42;",
@@ -577,7 +577,7 @@ def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
 
 def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
     password_policy = res.PasswordPolicy(
-        name="SOMEPOLICY",
+        name="SOME_PASSWORD_POLICY",
         password_min_length=12,
         password_max_length=24,
         password_min_upper_case_chars=2,

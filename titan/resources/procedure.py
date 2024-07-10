@@ -100,7 +100,7 @@ class PythonStoredProcedure(NamedResource, Resource):
             packages:
             - snowflake-snowpark-python
             handler: process_data
-            as: "def process_data(): return 'Hello, World!'"
+            as_: "def process_data(): return 'Hello, World!'"
             comment: "A simple procedure"
             copy_grants: false
             execute_as: CALLER

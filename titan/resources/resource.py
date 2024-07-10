@@ -67,18 +67,24 @@ class LifecycleConfig:
 
 
 def _coerce_resource_field(field_value, field_type):
+
+    # No type checking or coercion for Any
     if field_type == Any:
+        return field_value
+    elif field_type == str:
+        if not isinstance(field_value, str):
+            raise TypeError
         return field_value
 
     # Recursively traverse lists and dicts
     if get_origin(field_type) == list:
         if not isinstance(field_value, list):
-            raise Exception
+            raise TypeError
         list_element_type = get_args(field_type) or (str,)
         return [_coerce_resource_field(v, field_type=list_element_type[0]) for v in field_value]
     elif get_origin(field_type) == dict:
         if not isinstance(field_value, dict):
-            raise Exception
+            raise TypeError
         dict_types = get_args(field_type)
         if len(dict_types) < 2:
             raise RuntimeError(f"Unexpected field type {field_type}")
@@ -141,11 +147,14 @@ class ResourceSpec:
             if field_value is None:
                 continue
             else:
-                new_value = _coerce_resource_field(field_value, f.type)
-                setattr(self, f.name, new_value)
-
-    # def __hash__(self):
-    #     return hash(tuple(sorted(self.__dict__.items())))
+                try:
+                    new_value = _coerce_resource_field(field_value, f.type)
+                    setattr(self, f.name, new_value)
+                except TypeError as err:
+                    human_readable_classname = self.__class__.__name__[1:]
+                    raise TypeError(
+                        f"Expected {human_readable_classname}.{f.name} to be {f.type}, got {repr(field_value)} instead"
+                    ) from err
 
     @classmethod
     def get_metadata(cls, field_name: str):

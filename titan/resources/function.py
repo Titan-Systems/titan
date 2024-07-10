@@ -23,7 +23,7 @@ from .role import Role
 @dataclass(unsafe_hash=True)
 class _JavascriptUDF(ResourceSpec):
     name: ResourceName
-    returns: str
+    returns: DataType
     as_: str
     language: Language = Language.JAVASCRIPT
     args: list[Arg] = None
@@ -115,7 +115,7 @@ class JavascriptUDF(NamedResource, Resource):
     def __init__(
         self,
         name: str,
-        returns: DataType,
+        returns: str,
         as_: str,
         copy_grants: bool = False,
         owner: str = "SYSADMIN",
@@ -149,7 +149,7 @@ class JavascriptUDF(NamedResource, Resource):
 @dataclass(unsafe_hash=True)
 class _PythonUDF(ResourceSpec):
     name: ResourceName
-    returns: str
+    returns: DataType
     runtime_version: str
     handler: str
     args: list[Arg]

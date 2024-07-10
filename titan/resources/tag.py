@@ -80,7 +80,7 @@ class Tag(NamedResource, Resource):
 @dataclass(unsafe_hash=True)
 class _TagReference(ResourceSpec):
     object_name: str
-    object_domain: str
+    object_domain: ResourceType
     tags: ResourceTags
 
 
@@ -95,7 +95,7 @@ class TagReference(Resource):
     def __init__(
         self,
         object_name: str,
-        object_domain: ResourceType,
+        object_domain: str,
         tags: dict[str, str],
         **kwargs,
     ):
