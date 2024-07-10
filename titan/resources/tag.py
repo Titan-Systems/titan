@@ -1,18 +1,22 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from ..identifiers import FQN
 from ..enums import AccountEdition, ResourceType
+from ..identifiers import FQN
 from ..props import Props, StringListProp, StringProp
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
 from ..scope import AccountScope, SchemaScope
-from .resource import Resource, NamedResource, ResourceSpec, ResourcePointer
+from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
+
+if TYPE_CHECKING:
+    from .role import Role
 
 
 @dataclass(unsafe_hash=True)
 class _Tag(ResourceSpec):
     name: ResourceName
+    owner: "Role" = "SYSADMIN"
     comment: str = None
     allowed_values: list = None
 
@@ -65,6 +69,7 @@ class Tag(NamedResource, Resource):
     def __init__(
         self,
         name: str,
+        owner: str = "SYSADMIN",
         comment: str = None,
         allowed_values: list = None,
         **kwargs,
@@ -72,6 +77,7 @@ class Tag(NamedResource, Resource):
         super().__init__(name, **kwargs)
         self._data: _Tag = _Tag(
             name=self._name,
+            owner=owner,
             comment=comment,
             allowed_values=allowed_values,
         )

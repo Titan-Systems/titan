@@ -1,7 +1,7 @@
 import datetime
+import logging
 import json
 import sys
-from collections import defaultdict
 from functools import cache
 from typing import Optional, Union
 
@@ -25,16 +25,17 @@ from .client import (
 from .enums import ResourceType, WarehouseSize
 from .identifiers import FQN, URN, parse_FQN, resource_type_for_label
 from .parse import (
-    FullyQualifiedIdentifier,
     _parse_column,
     _parse_dynamic_table_text,
     _parse_view_ddl,
     parse_collection_string,
-    parse_function_name,
 )
+from .privs import GrantedPrivilege
 from .resource_name import ResourceName, attribute_is_resource_name
 
 __this__ = sys.modules[__name__]
+
+logger = logging.getLogger("titan")
 
 
 def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
@@ -123,30 +124,30 @@ def _filter_result(result, **kwargs):
     return filtered
 
 
-def _urn_from_grant(row, session_ctx):
-    account_scoped_resources = {"user", "role", "warehouse", "database", "task"}
-    granted_on = row["granted_on"].lower()
-    if granted_on == "account":
-        return URN.from_session_ctx(session_ctx)
-    else:
-        if granted_on == "procedure" or granted_on == "function":
-            # This needs a special function because Snowflake gives an incorrect FQN for functions/sprocs
-            # eg. TITAN_DEV.PUBLIC."FETCH_DATABASE(NAME VARCHAR):OBJECT"
-            # The correct FQN is TITAN_DEV.PUBLIC."FETCH_DATABASE"(VARCHAR)
-            id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
-            name = parse_function_name(id_parts[-1])
-            fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
-        elif granted_on in account_scoped_resources:
-            # This is probably all account-scoped resources
-            fqn = FQN(name=ResourceName(row["name"]))
-        else:
-            # Scoped resources
-            fqn = parse_FQN(row["name"], is_db_scoped=(granted_on == "schema"))
-        return URN(
-            resource_type=ResourceType(granted_on),
-            account_locator=session_ctx["account_locator"],
-            fqn=fqn,
-        )
+# def _urn_from_grant(row, session_ctx):
+#     account_scoped_resources = {"user", "role", "warehouse", "database", "task"}
+#     granted_on = row["granted_on"].lower()
+#     if granted_on == "account":
+#         return URN.from_session_ctx(session_ctx)
+#     else:
+#         if granted_on == "procedure" or granted_on == "function":
+#             # This needs a special function because Snowflake gives an incorrect FQN for functions/sprocs
+#             # eg. TITAN_DEV.PUBLIC."FETCH_DATABASE(NAME VARCHAR):OBJECT"
+#             # The correct FQN is TITAN_DEV.PUBLIC."FETCH_DATABASE"(VARCHAR)
+#             id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
+#             name = parse_function_name(id_parts[-1])
+#             fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
+#         elif granted_on in account_scoped_resources:
+#             # This is probably all account-scoped resources
+#             fqn = FQN(name=ResourceName(row["name"]))
+#         else:
+#             # Scoped resources
+#             fqn = parse_FQN(row["name"], is_db_scoped=(granted_on == "schema"))
+#         return URN(
+#             resource_type=ResourceType(granted_on),
+#             account_locator=session_ctx["account_locator"],
+#             fqn=fqn,
+#         )
 
 
 def _convert_to_gmt(dt: datetime.datetime, fmt_str: str = "%Y-%m-%d %H:%M:%S") -> Optional[str]:
@@ -377,10 +378,33 @@ def fetch_session(session):
         else:
             raise
 
+    available_roles = [ResourceName(name=role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
+
+    role_privileges = {}
+    for role in available_roles:
+
+        # Adds 30+s of latency and we can infer what privs are available
+        if role == "ACCOUNTADMIN" or role.startswith("SNOWFLAKE."):
+            continue
+
+        role_privileges[role] = []
+        grants = execute(session, f"SHOW GRANTS TO ROLE {role}")
+        for grant in grants:
+            try:
+                granted_priv = GrantedPrivilege.from_grant(
+                    privilege=grant["privilege"],
+                    granted_on=grant["granted_on"],
+                    name=grant["name"],
+                )
+                role_privileges[role].append(granted_priv)
+            except ValueError as err:
+                logger.warning(f"Privileges for type: {grant['granted_on']} not currently supported: {err}")
+                continue
+
     return {
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
         "account": session_obj["ACCOUNT"],
-        "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
+        "available_roles": available_roles,
         "database": session_obj["DATABASE"],
         "role": session_obj["ROLE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
@@ -390,6 +414,7 @@ def fetch_session(session):
         "user": session_obj["USER"],
         "version": session_obj["VERSION"],
         "warehouse": session_obj["WAREHOUSE"],
+        "role_privileges": role_privileges,
     }
 
 
@@ -1043,34 +1068,34 @@ def fetch_procedure(session, fqn: FQN):
     }
 
 
-def fetch_role_grants(session, role: str):
-    if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
-        return {}
-    try:
-        show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
-    except ProgrammingError as err:
-        if err.errno == DOES_NOT_EXIST_ERR:
-            return None
-        raise
-    session_ctx = fetch_session(session)
+# def fetch_role_grants(session, role: str):
+#     if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
+#         return {}
+#     try:
+#         show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
+#     except ProgrammingError as err:
+#         if err.errno == DOES_NOT_EXIST_ERR:
+#             return None
+#         raise
+#     session_ctx = fetch_session(session)
 
-    priv_map = defaultdict(list)
+#     priv_map = defaultdict(list)
 
-    for row in show_result:
-        try:
-            urn = _urn_from_grant(row, session_ctx)
-        except ValueError:
-            # Grant for a Snowflake resource type that Titan doesn't support yet
-            continue
-        priv_map[str(urn)].append(
-            {
-                "priv": row["privilege"],
-                "grant_option": row["grant_option"] == "true",
-                "owner": row["granted_by"],
-            }
-        )
+#     for row in show_result:
+#         try:
+#             urn = _urn_from_grant(row, session_ctx)
+#         except ValueError:
+#             # Grant for a Snowflake resource type that Titan doesn't support yet
+#             continue
+#         priv_map[str(urn)].append(
+#             {
+#                 "priv": row["privilege"],
+#                 "grant_option": row["grant_option"] == "true",
+#                 "owner": row["granted_by"],
+#             }
+#         )
 
-    return dict(priv_map)
+#     return dict(priv_map)
 
 
 def fetch_role(session, fqn: FQN):

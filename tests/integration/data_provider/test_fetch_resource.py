@@ -124,24 +124,26 @@ def test_fetch_database(cursor, suffix):
 
 
 def test_fetch_grant_all_on_resource(cursor):
-    cursor.execute(f"GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE STATIC_ROLE")
-    grant_all_urn = parse_URN(f"urn:::grant/STATIC_ROLE?priv=ALL&on=warehouse/STATIC_WAREHOUSE")
+    cursor.execute("GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE STATIC_ROLE")
+    grant_all_urn = parse_URN("urn:::grant/STATIC_ROLE?priv=ALL&on=warehouse/STATIC_WAREHOUSE")
+    try:
+        grant = safe_fetch(cursor, grant_all_urn)
+        assert grant is not None
+        assert grant["priv"] == "ALL"
+        assert grant["on_type"] == "WAREHOUSE"
+        assert grant["on"] == "STATIC_WAREHOUSE"
+        assert grant["to"] == "STATIC_ROLE"
+        assert grant["owner"] == "SYSADMIN"
+        assert grant["grant_option"] is False
+        assert grant["_privs"] == ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"]
 
-    grant = safe_fetch(cursor, grant_all_urn)
-    assert grant is not None
-    assert grant["priv"] == "ALL"
-    assert grant["on_type"] == "WAREHOUSE"
-    assert grant["on"] == "STATIC_WAREHOUSE"
-    assert grant["to"] == "STATIC_ROLE"
-    assert grant["owner"] == "SYSADMIN"
-    assert grant["grant_option"] is False
-    assert grant["_privs"] == ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"]
+        cursor.execute("REVOKE MODIFY ON WAREHOUSE STATIC_WAREHOUSE FROM ROLE STATIC_ROLE")
 
-    cursor.execute(f"REVOKE MODIFY ON WAREHOUSE STATIC_WAREHOUSE FROM ROLE STATIC_ROLE")
-
-    grant = safe_fetch(cursor, grant_all_urn)
-    assert grant is not None
-    assert "MODIFY" not in grant["_privs"]
+        grant = safe_fetch(cursor, grant_all_urn)
+        assert grant is not None
+        assert "MODIFY" not in grant["_privs"]
+    finally:
+        cursor.execute("REVOKE ALL ON WAREHOUSE STATIC_WAREHOUSE FROM ROLE STATIC_ROLE")
 
 
 def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):

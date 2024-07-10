@@ -1,17 +1,36 @@
-from .helpers import listify
+from dataclasses import dataclass
+
 from .enums import ParseableEnum, ResourceType
-from .identifiers import URN
+
+# from .identifiers import URN
+# from .resource_name import ResourceName
 
 
-class Privs:
-    def __init__(self, create=None, read=None, write=None, delete=None):
-        self.create = listify(create)
-        self.read = listify(read)
-        self.write = listify(write)
-        self.delete = listify(delete)
+# @dataclass
+# class GrantedPrivilege:
+#     privilege: str
+#     granted_on: ResourceType
+#     name: ResourceName
 
 
-class GlobalPriv(ParseableEnum):
+class Priv(ParseableEnum):
+    pass
+
+
+@dataclass
+class GrantedPrivilege:
+    privilege: Priv
+    on: str  # probably should be FQN
+
+    @classmethod
+    def from_grant(cls, privilege: str, granted_on: str, name: str):
+        resource_type = ResourceType(granted_on)
+        priv_type = PRIVS_FOR_RESOURCE_TYPE[resource_type]
+        priv = priv_type(privilege)
+        return cls(privilege=priv, on=name)
+
+
+class AccountPriv(Priv):
     ALL = "ALL"
     APPLY_AUTHENTICATION_POLICY = "APPLY AUTHENTICATION POLICY"
     APPLY_MASKING_POLICY = "APPLY MASKING POLICY"
@@ -64,40 +83,40 @@ class GlobalPriv(ParseableEnum):
 
 
 GLOBAL_PRIV_DEFAULT_OWNERS = {
-    GlobalPriv.APPLY_MASKING_POLICY: "ACCOUNTADMIN",
-    GlobalPriv.APPLY_PASSWORD_POLICY: "SECURITYADMIN",
-    # GlobalPriv.APPLY_ROW_ACCESS_POLICY: "SECURITYADMIN",
-    GlobalPriv.APPLY_SESSION_POLICY: "SECURITYADMIN",
-    # GlobalPriv.APPLY_TAG: "ACCOUNTADMIN",
-    GlobalPriv.ATTACH_POLICY: "SECURITYADMIN",
-    GlobalPriv.AUDIT: "ACCOUNTADMIN",
-    GlobalPriv.CREATE_ACCOUNT: "ACCOUNTADMIN",
-    GlobalPriv.CREATE_DATA_EXCHANGE_LISTING: "ACCOUNTADMIN",
-    GlobalPriv.CREATE_DATABASE: "SYSADMIN",
-    GlobalPriv.CREATE_FAILOVER_GROUP: "ACCOUNTADMIN",
-    GlobalPriv.CREATE_INTEGRATION: "ACCOUNTADMIN",
-    GlobalPriv.CREATE_NETWORK_POLICY: "SECURITYADMIN",
-    GlobalPriv.CREATE_REPLICATION_GROUP: "ACCOUNTADMIN",
-    GlobalPriv.CREATE_ROLE: "USERADMIN",
-    GlobalPriv.CREATE_SHARE: "ACCOUNTADMIN",
-    GlobalPriv.CREATE_USER: "USERADMIN",
-    GlobalPriv.CREATE_WAREHOUSE: "SYSADMIN",
-    GlobalPriv.EXECUTE_ALERT: "ACCOUNTADMIN",
-    GlobalPriv.EXECUTE_TASK: "ACCOUNTADMIN",
-    GlobalPriv.IMPORT_SHARE: "ACCOUNTADMIN",
-    GlobalPriv.MANAGE_ACCOUNT_SUPPORT_CASES: "ACCOUNTADMIN",
-    GlobalPriv.MANAGE_GRANTS: "SECURITYADMIN",
-    GlobalPriv.MANAGE_WAREHOUSES: "ACCOUNTADMIN",
-    # GlobalPriv.MODIFY_LOG_LEVEL: "ACCOUNTADMIN",
-    # GlobalPriv.MODIFY_SESSION_LOG_LEVEL: "ACCOUNTADMIN",
-    # GlobalPriv.MODIFY_SESSION_TRACE_LEVEL: "ACCOUNTADMIN",
-    # GlobalPriv.MODIFY_TRACE_LEVEL: "ACCOUNTADMIN",
-    GlobalPriv.MONITOR: "ACCOUNTADMIN",
-    GlobalPriv.MONITOR_EXECUTION: "ACCOUNTADMIN",
-    GlobalPriv.MONITOR_SECURITY: "ACCOUNTADMIN",
-    GlobalPriv.MONITOR_USAGE: "ACCOUNTADMIN",
-    GlobalPriv.OVERRIDE_SHARE_RESTRICTIONS: "ACCOUNTADMIN",
-    GlobalPriv.RESOLVE_ALL: "ACCOUNTADMIN",
+    AccountPriv.APPLY_MASKING_POLICY: "ACCOUNTADMIN",
+    AccountPriv.APPLY_PASSWORD_POLICY: "SECURITYADMIN",
+    # AccountPriv.APPLY_ROW_ACCESS_POLICY: "SECURITYADMIN",
+    AccountPriv.APPLY_SESSION_POLICY: "SECURITYADMIN",
+    # AccountPriv.APPLY_TAG: "ACCOUNTADMIN",
+    AccountPriv.ATTACH_POLICY: "SECURITYADMIN",
+    AccountPriv.AUDIT: "ACCOUNTADMIN",
+    AccountPriv.CREATE_ACCOUNT: "ACCOUNTADMIN",
+    AccountPriv.CREATE_DATA_EXCHANGE_LISTING: "ACCOUNTADMIN",
+    AccountPriv.CREATE_DATABASE: "SYSADMIN",
+    AccountPriv.CREATE_FAILOVER_GROUP: "ACCOUNTADMIN",
+    AccountPriv.CREATE_INTEGRATION: "ACCOUNTADMIN",
+    AccountPriv.CREATE_NETWORK_POLICY: "SECURITYADMIN",
+    AccountPriv.CREATE_REPLICATION_GROUP: "ACCOUNTADMIN",
+    AccountPriv.CREATE_ROLE: "USERADMIN",
+    AccountPriv.CREATE_SHARE: "ACCOUNTADMIN",
+    AccountPriv.CREATE_USER: "USERADMIN",
+    AccountPriv.CREATE_WAREHOUSE: "SYSADMIN",
+    AccountPriv.EXECUTE_ALERT: "ACCOUNTADMIN",
+    AccountPriv.EXECUTE_TASK: "ACCOUNTADMIN",
+    AccountPriv.IMPORT_SHARE: "ACCOUNTADMIN",
+    AccountPriv.MANAGE_ACCOUNT_SUPPORT_CASES: "ACCOUNTADMIN",
+    AccountPriv.MANAGE_GRANTS: "SECURITYADMIN",
+    AccountPriv.MANAGE_WAREHOUSES: "ACCOUNTADMIN",
+    # AccountPriv.MODIFY_LOG_LEVEL: "ACCOUNTADMIN",
+    # AccountPriv.MODIFY_SESSION_LOG_LEVEL: "ACCOUNTADMIN",
+    # AccountPriv.MODIFY_SESSION_TRACE_LEVEL: "ACCOUNTADMIN",
+    # AccountPriv.MODIFY_TRACE_LEVEL: "ACCOUNTADMIN",
+    AccountPriv.MONITOR: "ACCOUNTADMIN",
+    AccountPriv.MONITOR_EXECUTION: "ACCOUNTADMIN",
+    AccountPriv.MONITOR_SECURITY: "ACCOUNTADMIN",
+    AccountPriv.MONITOR_USAGE: "ACCOUNTADMIN",
+    AccountPriv.OVERRIDE_SHARE_RESTRICTIONS: "ACCOUNTADMIN",
+    AccountPriv.RESOLVE_ALL: "ACCOUNTADMIN",
 }
 
 
@@ -319,7 +338,7 @@ class WarehousePriv(ParseableEnum):
 
 
 PRIVS_FOR_RESOURCE_TYPE = {
-    ResourceType.ACCOUNT: GlobalPriv,
+    ResourceType.ACCOUNT: AccountPriv,
     ResourceType.ALERT: AlertPriv,
     ResourceType.API_INTEGRATION: IntegrationPriv,
     ResourceType.DATABASE: DatabasePriv,
@@ -350,33 +369,33 @@ PRIVS_FOR_RESOURCE_TYPE = {
 }
 
 
-def priv_for_principal(principal: URN, priv: str):
-    if principal.resource_type not in PRIVS_FOR_RESOURCE_TYPE:
-        # raise Exception(f"Unsupported resource type: {principal.resource_type}")
-        return None
-    return PRIVS_FOR_RESOURCE_TYPE[principal.resource_type](priv)
+# def priv_for_principal(principal: URN, priv: str):
+#     if principal.resource_type not in PRIVS_FOR_RESOURCE_TYPE:
+#         # raise Exception(f"Unsupported resource type: {principal.resource_type}")
+#         return None
+#     return PRIVS_FOR_RESOURCE_TYPE[principal.resource_type](priv)
 
 
-CREATE_PRIV_FOR_RESOURCE_TYPE = {
-    ResourceType.ACCOUNT: GlobalPriv.CREATE_ACCOUNT,
+CREATE_PRIV_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {
+    ResourceType.ACCOUNT: AccountPriv.CREATE_ACCOUNT,
     ResourceType.ALERT: SchemaPriv.CREATE_ALERT,
-    ResourceType.API_INTEGRATION: GlobalPriv.CREATE_API_INTEGRATION,
-    ResourceType.DATABASE: GlobalPriv.CREATE_DATABASE,
+    ResourceType.API_INTEGRATION: AccountPriv.CREATE_API_INTEGRATION,
+    ResourceType.DATABASE: AccountPriv.CREATE_DATABASE,
     ResourceType.DYNAMIC_TABLE: SchemaPriv.CREATE_DYNAMIC_TABLE,
     ResourceType.EVENT_TABLE: SchemaPriv.CREATE_TABLE,
-    ResourceType.EXTERNAL_ACCESS_INTEGRATION: GlobalPriv.CREATE_INTEGRATION,
+    ResourceType.EXTERNAL_ACCESS_INTEGRATION: AccountPriv.CREATE_INTEGRATION,
     ResourceType.EXTERNAL_FUNCTION: SchemaPriv.CREATE_FUNCTION,
-    ResourceType.FAILOVER_GROUP: GlobalPriv.CREATE_FAILOVER_GROUP,
+    ResourceType.FAILOVER_GROUP: AccountPriv.CREATE_FAILOVER_GROUP,
     ResourceType.FUNCTION: SchemaPriv.CREATE_FUNCTION,
-    # ResourceType.GRANT: GlobalPriv.CREATE_GRANT,
+    # ResourceType.GRANT: AccountPriv.CREATE_GRANT,
     ResourceType.NETWORK_RULE: SchemaPriv.CREATE_NETWORK_RULE,
     ResourceType.PACKAGES_POLICY: SchemaPriv.CREATE_PACKAGES_POLICY,
     ResourceType.PASSWORD_POLICY: SchemaPriv.CREATE_PASSWORD_POLICY,
     ResourceType.PIPE: SchemaPriv.CREATE_PIPE,
     ResourceType.PROCEDURE: SchemaPriv.CREATE_PROCEDURE,
-    # ResourceType.RESOURCE_MONITOR: GlobalPriv.CREATE_RESOURCE_MONITOR, # only ACCOUNTADMIN
-    ResourceType.REPLICATION_GROUP: GlobalPriv.CREATE_REPLICATION_GROUP,
-    ResourceType.ROLE: GlobalPriv.CREATE_ROLE,
+    # ResourceType.RESOURCE_MONITOR: AccountPriv.CREATE_RESOURCE_MONITOR, # only ACCOUNTADMIN
+    ResourceType.REPLICATION_GROUP: AccountPriv.CREATE_REPLICATION_GROUP,
+    ResourceType.ROLE: AccountPriv.CREATE_ROLE,
     # ResourceType.ROLE_GRANT: RolePriv.OWNERSHIP,
     ResourceType.SCHEMA: DatabasePriv.CREATE_SCHEMA,
     ResourceType.SECRET: SchemaPriv.CREATE_SECRET,
@@ -386,9 +405,9 @@ CREATE_PRIV_FOR_RESOURCE_TYPE = {
     ResourceType.TABLE: SchemaPriv.CREATE_TABLE,
     ResourceType.TAG: SchemaPriv.CREATE_TAG,
     ResourceType.TASK: SchemaPriv.CREATE_TASK,
-    ResourceType.USER: GlobalPriv.CREATE_USER,
+    ResourceType.USER: AccountPriv.CREATE_USER,
     ResourceType.VIEW: SchemaPriv.CREATE_VIEW,
-    ResourceType.WAREHOUSE: GlobalPriv.CREATE_WAREHOUSE,
+    ResourceType.WAREHOUSE: AccountPriv.CREATE_WAREHOUSE,
 }
 
 

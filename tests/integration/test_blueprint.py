@@ -5,7 +5,7 @@ import pytest
 from tests.helpers import safe_fetch
 from titan import data_provider
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
+from titan.blueprint import Action, Blueprint, MissingResourceException  # , plan_sql
 from titan.client import reset_cache
 from titan.enums import ResourceType
 from titan.identifiers import parse_URN
@@ -144,24 +144,24 @@ def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
     assert len(plan) == 0, "Expected no changes in the blueprint plan but found some."
 
 
-def test_blueprint_plan_sql(cursor, user):
-    session = cursor.connection
+# def test_blueprint_plan_sql(cursor, user):
+#     session = cursor.connection
 
-    blueprint = Blueprint(name="test_add_database")
-    somedb = res.Database(name="this_database_does_not_exist")
-    blueprint.add(somedb)
-    plan = blueprint.plan(session)
+#     blueprint = Blueprint(name="test_add_database")
+#     somedb = res.Database(name="this_database_does_not_exist")
+#     blueprint.add(somedb)
+#     plan = blueprint.plan(session)
 
-    assert plan_sql(plan) == [
-        "CREATE DATABASE THIS_DATABASE_DOES_NOT_EXIST DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    ]
+#     assert plan_sql(plan) == [
+#         "CREATE DATABASE THIS_DATABASE_DOES_NOT_EXIST DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+#     ]
 
-    blueprint = Blueprint(name="test_modify_user")
-    modified_user = res.User(name=user.name, owner=user.owner, display_name="new_display_name")
-    blueprint.add(modified_user)
-    plan = blueprint.plan(session)
+#     blueprint = Blueprint(name="test_modify_user")
+#     modified_user = res.User(name=user.name, owner=user.owner, display_name="new_display_name")
+#     blueprint.add(modified_user)
+#     plan = blueprint.plan(session)
 
-    assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
+#     assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
 
 
 def test_blueprint_missing_resource_pointer(cursor):

@@ -174,7 +174,7 @@ class Warehouse(NamedResource, TaggableResource, Resource):
         **kwargs,
     ):
         super().__init__(name, **kwargs)
-        self._data = _Warehouse(
+        self._data: _Warehouse = _Warehouse(
             name=self._name,
             owner=owner,
             warehouse_type=warehouse_type,

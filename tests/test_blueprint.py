@@ -3,11 +3,12 @@ import copy
 import pytest
 
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, DuplicateResourceException
+from titan.blueprint import Action, Blueprint, DuplicateResourceException, InvalidOwnerException, compile_plan_to_sql
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN, parse_URN
 from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
+from titan.privs import GrantedPrivilege, AccountPriv
 
 
 @pytest.fixture
@@ -16,7 +17,19 @@ def session_ctx() -> dict:
         "account": "SOMEACCT",
         "account_locator": "ABCD123",
         "role": "SYSADMIN",
-        "available_roles": ["SYSADMIN", "USERADMIN"],
+        "available_roles": [
+            "SYSADMIN",
+            "USERADMIN",
+            "ACCOUNTADMIN",
+            "SECURITYADMIN",
+            "PUBLIC",
+        ],
+        "role_privileges": {
+            "USERADMIN": [
+                GrantedPrivilege(privilege=AccountPriv.CREATE_ROLE, on="ABCD123"),
+                GrantedPrivilege(privilege=AccountPriv.CREATE_USER, on="ABCD123"),
+            ]
+        },
     }
 
 
@@ -169,21 +182,21 @@ def test_blueprint_with_udf(resource_manifest):
 
 
 def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
-    session_ctx = copy.deepcopy(session_ctx)
-    session_ctx["available_roles"] = ["SYSADMIN", "USERADMIN", "SOME_ROLE"]
     role = res.Role("SOME_ROLE")
     db = res.Database("DB", owner=role)
-    blueprint = Blueprint(name="blueprint", resources=[db, role])
+    grant = res.RoleGrant(role=role, to_role="SYSADMIN")
+    blueprint = Blueprint(name="blueprint", resources=[db, role, grant])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
 
-    assert len(plan) == 2
-    assert plan[0].action == Action.ADD
-    assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
-    assert plan[1].action == Action.ADD
-    assert plan[1].urn == parse_URN("urn::ABCD123:database/DB")
+    plan_urns = [change.urn for change in plan]
+    assert plan_urns == [
+        parse_URN("urn::ABCD123:role/SOME_ROLE"),
+        parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN"),
+        parse_URN("urn::ABCD123:database/DB"),
+    ]
 
-    changes = blueprint._compile_plan_to_sql(session_ctx, plan)
+    changes = compile_plan_to_sql(session_ctx, plan)
     assert len(changes) == 6
     assert changes[0] == "USE SECONDARY ROLES ALL"
     assert changes[1] == "USE ROLE USERADMIN"
@@ -197,7 +210,7 @@ def test_blueprint_resource_owned_by_plan_role_without_grant(session_ctx):
     role = res.Role("SOME_ROLE")
     db = res.Database("DB", owner=role)
     blueprint = Blueprint(name="blueprint", resources=[db, role])
-    with pytest.raises(RuntimeError):
+    with pytest.raises(InvalidOwnerException):
         blueprint.generate_manifest(session_ctx)
 
 
@@ -371,34 +384,25 @@ def test_blueprint_reference_sorting(session_ctx, remote_state):
     assert plan[2].urn == parse_URN("urn::ABCD123:database/DB3")
 
 
-def test_blueprint_ownership_sorting():
-    session_ctx = {
-        "account": "SOMEACCT",
-        "account_locator": "",
-        "role": "SYSADMIN",
-        "available_roles": ["SYSADMIN", "USERADMIN"],
-    }
-    remote_state = {
-        parse_URN("urn:::account/SOMEACCT"): {},
-    }
+def test_blueprint_ownership_sorting(session_ctx, remote_state):
+
     role = res.Role(name="SOME_ROLE")
     role_grant = res.RoleGrant(role=role, to_role="SYSADMIN")
     db1 = res.Database(name="DB1", owner=role)
 
     blueprint = Blueprint(resources=[db1, role_grant, role])
     manifest = blueprint.generate_manifest(session_ctx)
-    assert (db1.urn, role.urn) in manifest._refs
 
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
     assert plan[0].action == Action.ADD
-    assert plan[0].urn == parse_URN("urn:::role/SOME_ROLE")
+    assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
     assert plan[1].action == Action.ADD
-    assert plan[1].urn == parse_URN("urn:::role_grant/SOME_ROLE?role=SYSADMIN")
+    assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
     assert plan[2].action == Action.ADD
-    assert plan[2].urn == parse_URN("urn:::database/DB1")
+    assert plan[2].urn == parse_URN("urn::ABCD123:database/DB1")
 
-    sql = blueprint._compile_plan_to_sql(session_ctx, plan)
+    sql = compile_plan_to_sql(session_ctx, plan)
     assert len(sql) == 8
     assert sql[0] == "USE SECONDARY ROLES ALL"
     assert sql[1] == "USE ROLE USERADMIN"

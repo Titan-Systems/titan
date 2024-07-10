@@ -178,7 +178,7 @@ def update__default(urn: URN, data: dict) -> str:
     elif attr == "name":
         return tidy_sql("ALTER", urn.resource_type, urn.fqn, "RENAME TO", new_value)
     elif attr == "owner":
-        return tidy_sql("GRANT OWNERSHIP ON", urn.resource_type, urn.fqn, "TO ROLE", new_value)
+        raise NotImplementedError
     else:
         new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
         return tidy_sql(
@@ -280,9 +280,8 @@ def drop_future_grant(urn: URN, data: dict, **kwargs):
 
 
 def drop_grant(urn: URN, data: dict, **kwargs):
-    # FIXME
     if data["priv"] == "OWNERSHIP":
-        return "select 1"
+        raise NotImplementedError
     return tidy_sql(
         "REVOKE",
         data["priv"],
@@ -324,4 +323,35 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
         "FROM",
         "ROLE" if data.get("to_role") else "USER",
         ResourceName(data["to_role"] if data.get("to_role") else data["to_user"]),
+    )
+
+
+def transfer_resource(
+    urn: URN,
+    owner=str,
+    copy_current_grants: bool = False,
+    revoke_current_grants: bool = False,
+) -> str:
+    return getattr(__this__, f"transfer_{urn.resource_label}", transfer__default)(
+        urn,
+        owner,
+        copy_current_grants,
+        revoke_current_grants,
+    )
+
+
+def transfer__default(
+    urn: URN,
+    owner: str,
+    copy_current_grants: bool = False,
+    revoke_current_grants: bool = False,
+) -> str:
+    return tidy_sql(
+        "GRANT OWNERSHIP ON",
+        urn.resource_type,
+        urn.fqn,
+        "TO ROLE",
+        owner,
+        "REVOKE CURRENT GRANTS" if revoke_current_grants else "",
+        "COPY CURRENT GRANTS" if copy_current_grants else "",
     )

@@ -118,20 +118,6 @@ class URN:
     def from_resource(cls, resource, account_locator: str = ""):
         return cls(resource_type=resource.resource_type, fqn=resource.fqn, account_locator=account_locator)
 
-    # @classmethod
-    # def from_locator(cls, locator: "ResourceLocator"):
-    #     if locator.star:
-    #         raise Exception("Cannot create URN from a wildcard locator")
-    #     return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
-
-    @classmethod
-    def from_session_ctx(cls, session_ctx):
-        return cls(
-            resource_type=ResourceType.ACCOUNT,
-            fqn=FQN(name=session_ctx["account"]),
-            account_locator=session_ctx["account_locator"],
-        )
-
     def database(self):
         if not self.fqn.database:
             raise Exception(f"URN does not have a database: {self}")

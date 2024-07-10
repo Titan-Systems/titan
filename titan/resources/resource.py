@@ -99,6 +99,15 @@ def _coerce_resource_field(field_value, field_type):
                 return _coerce_resource_field(field_value, field_type=expected_type)
         raise RuntimeError(f"Unexpected field type {field_type}")
 
+    if isinstance(field_type, str):
+        # Special case for Tag owner which has the type "Role" due to a circular import issue
+        for subclass in Resource.__subclasses__():
+            if subclass.__name__ == field_type:
+                field_type = subclass
+                break
+        else:
+            raise RuntimeError(f"Class for type {field_type} not found")
+
     if not isclass(field_type):
         # If we want to support quoted type annotations, this is the place to do it.
         # eg owner "Role" = "SYSADMIN"

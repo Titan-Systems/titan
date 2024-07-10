@@ -7,7 +7,6 @@ from typing import Generator, Optional, Union
 import snowflake.connector
 
 from . import data_provider, lifecycle
-from .builtins import SYSTEM_ROLES
 from .client import (
     ALREADY_EXISTS_ERR,
     DOES_NOT_EXIST_ERR,
@@ -18,6 +17,7 @@ from .client import (
 from .diff import Action, diff
 from .enums import ParseableEnum, ResourceType
 from .identifiers import URN, parse_identifier, resource_label_for_type
+from .privs import CREATE_PRIV_FOR_RESOURCE_TYPE, PRIVS_FOR_RESOURCE_TYPE, GrantedPrivilege, is_ownership_priv
 from .resource_name import ResourceName
 from .resources import Account, Database
 from .resources.resource import Resource, ResourceContainer, ResourcePointer
@@ -44,6 +44,10 @@ class MissingResourceException(Exception):
     pass
 
 
+class MissingPrivilegeException(Exception):
+    pass
+
+
 class MarkedForReplacementException(Exception):
     pass
 
@@ -57,6 +61,10 @@ class ResourceInsertionException(Exception):
 
 
 class OrphanResourceException(Exception):
+    pass
+
+
+class InvalidOwnerException(Exception):
     pass
 
 
@@ -197,7 +205,7 @@ def dump_plan(plan: Plan, format: str = "json"):
             action_marker = ""
             if change.action == Action.ADD:
                 action_marker = "+"
-            elif change.action == Action.CHANGE:
+            elif change.action in (Action.CHANGE, Action.TRANSFER):
                 action_marker = "~"
             elif change.action == Action.REMOVE:
                 action_marker = "-"
@@ -205,6 +213,8 @@ def dump_plan(plan: Plan, format: str = "json"):
             if change.action != Action.REMOVE:
                 output += " {"
             output += "\n"
+            if change.action == Action.TRANSFER:
+                logger.info("transfer")
             key_lengths = [len(key) for key in change.delta.keys()]
             max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
             for key, value in change.delta.items():
@@ -228,17 +238,17 @@ def print_plan(plan: Plan):
     print(dump_plan(plan, format="text"))
 
 
-def plan_sql(plan: Plan) -> list[str]:
-    sql_commands = []
-    for change in plan:
-        props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-        if change.action == Action.ADD:
-            sql_commands.append(lifecycle.create_resource(change.urn, change.after, props))
-        elif change.action == Action.CHANGE:
-            sql_commands.append(lifecycle.update_resource(change.urn, change.delta))
-        elif change.action == Action.REMOVE:
-            sql_commands.append(lifecycle.drop_resource(change.urn, change.before))
-    return sql_commands
+# def plan_sql(plan: Plan) -> list[str]:
+#     sql_commands = []
+#     for change in plan:
+#         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+#         if change.action == Action.ADD:
+#             sql_commands.append(lifecycle.create_resource(change.urn, change.after, props))
+#         elif change.action == Action.CHANGE:
+#             sql_commands.append(lifecycle.update_resource(change.urn, change.delta))
+#         elif change.action == Action.REMOVE:
+#             sql_commands.append(lifecycle.drop_resource(change.urn, change.before))
+#     return sql_commands
 
 
 def print_diffs(diffs):
@@ -407,12 +417,7 @@ class Blueprint:
                         f"Create-or-update mode does not allow resources to be removed (ref: {change.urn})"
                     )
                 if change.action == Action.CHANGE:
-                    if "owner" in change.delta:
-                        change_debug = f"{change.before['owner']} => {change.delta['owner']}"
-                        exceptions.append(
-                            f"Create-or-update mode does not allow ownership changes (resource: {change.urn}, owner: {change_debug})"
-                        )
-                    elif "name" in change.delta:
+                    if "name" in change.delta:
                         exceptions.append(
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
                         )
@@ -479,16 +484,13 @@ class Blueprint:
                 changes.append(ResourceChange(action=action, urn=urn, before={}, after=after, delta=delta))
             elif action == Action.REMOVE:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
+            elif action == Action.TRANSFER:
+                changes.append(ResourceChange(action=action, urn=urn, before=before, after=after, delta={}))
 
         for urn in marked_for_replacement:
             raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
             # changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
             # changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
-
-        # # Handle account role ownership by creating an ownership grant
-        # for change in changes:
-        #     if change.action == Action.ADD and change.after.get("owner") in SYSTEM_ROLES:
-        #         changes.append(ResourceChange(action=Action.ADD, urn=change.urn, before={}, after=after, delta=after))
 
         # Generate a list of all URNs
         resource_set = set(manifest.urns + list(remote_state.keys()))
@@ -696,7 +698,8 @@ class Blueprint:
                 # Create the ownership ref
                 resource.requires(resource._data.owner)
 
-                # If the resource owner is a custom role, the current connection must have access to it
+                # If the resource owner is a custom role, either it must already exist and be in available_roles
+                # or we must plan to grant it to the current session
                 if resource._data.owner.name not in session_ctx["available_roles"]:
                     for role_grant in self._root.items(ResourceType.ROLE_GRANT):
                         if role_grant.role.name != resource._data.owner.name:
@@ -708,7 +711,7 @@ class Blueprint:
                         resource.requires(role_grant)
                         break
                     else:
-                        raise RuntimeError(
+                        raise InvalidOwnerException(
                             f"Blueprint resource {resource} owner {resource._data.owner} must be granted to the current session"
                         )
 
@@ -747,7 +750,7 @@ class Blueprint:
         manifest = self.generate_manifest(session_ctx)
         remote_state = self.fetch_remote_state(session, manifest)
         try:
-            completed_plan = self._plan(remote_state, manifest)
+            finished_plan = self._plan(remote_state, manifest)
         except Exception as e:
             logger.error("~" * 80 + "REMOTE STATE")
             logger.error(remote_state)
@@ -755,8 +758,8 @@ class Blueprint:
             logger.error(manifest)
 
             raise e
-        self._raise_for_nonconforming_plan(completed_plan)
-        return completed_plan
+        self._raise_for_nonconforming_plan(finished_plan)
+        return finished_plan
 
     def apply(self, session, plan: Plan = None):
         if plan is None:
@@ -766,9 +769,10 @@ class Blueprint:
 
         """
             At this point, we have a list of actions as a part of the plan. Each action is one of:
-                1. [ADD] action (CREATE command)
-                2. [CHANGE] action (one or many ALTER or SET PARAMETER commands)
-                3. [REMOVE] action (DROP command, REVOKE command, or a rename operation)
+                1. ADD action (CREATE command)
+                2. CHANGE action (one or many ALTER or SET PARAMETER commands)
+                3. REMOVE action (DROP command, REVOKE command, or a rename operation)
+                4. TRANSFER action (GRANT OWNERSHIP command)
 
             Each action requires:
                 • a set of privileges necessary to run commands
@@ -782,7 +786,7 @@ class Blueprint:
 
         _raise_if_plan_would_drop_session_user(session_ctx, plan)
 
-        action_queue = self._compile_plan_to_sql(session_ctx, plan)
+        action_queue = compile_plan_to_sql(session_ctx, plan)
         actions_taken = []
 
         while action_queue:
@@ -803,83 +807,6 @@ class Blueprint:
                 else:
                     raise err
         return actions_taken
-
-    def _compile_plan_to_sql(self, session_ctx, plan: Plan):
-        action_queue = []
-        default_role = session_ctx["role"]
-
-        def _queue_change(change: ResourceChange):
-            """
-            In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
-
-            The active role of a session is set as follows:
-            - When a session is started:
-                - If the session is configured with a role, that is the active role
-                - Otherwise, if the user of the session has a default_role set, and that role exists, that is the active role
-                - Otherwise, the PUBLIC role is activated (PUBLIC cannot be revoked)
-            - Any time the USE ROLE command is run, the active role is switched
-
-            A session may run any command thats allowed by the active role or any role downstream from it in the role hierarchy.
-            When secondary roles are active (by running the command USE SECONDARY ROLES ALL), then the session may also run any
-            command that any secondary role or a role downstream from it is allowed to run.
-
-            However, when a CREATE command is run, only the active role is considered. This is because the role that
-            creates a new resource owns that resource by default. There are some exceptions with GRANTS.
-
-            For those reasons, we generally don't have to worry about the current role as long as we have activated secondary roles.
-            The exception is when creating new resources
-            """
-
-            before_action = []
-            action = None
-            after_action = []
-            if change.action == Action.ADD:
-                props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-                # TODO: raise exception if role isn't usable. Maybe can just let this fail naturally
-
-                if "owner" in change.after:
-                    if change.after["owner"] in SYSTEM_ROLES:
-                        before_action.append(f"USE ROLE {change.after['owner']}")
-                    else:
-                        before_action.append(f"USE ROLE {default_role}")
-                        after_action.append(
-                            f"GRANT OWNERSHIP ON {change.urn.resource_type} {change.urn.fqn} TO {change.after['owner']}"
-                        )
-                elif change.urn.resource_type in (ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
-                    # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
-                    before_action.append("USE ROLE SECURITYADMIN")
-                else:
-                    before_action.append(f"USE ROLE {default_role}")
-
-                action = lifecycle.create_resource(change.urn, change.after, props)
-            elif change.action == Action.CHANGE:
-                action = lifecycle.update_resource(change.urn, change.delta)
-            elif change.action == Action.REMOVE:
-                if "owner" in change.before:
-                    if change.before["owner"] in SYSTEM_ROLES:
-                        before_action.append(f"USE ROLE {change.before['owner']}")
-                    elif change.urn.resource_type in (
-                        ResourceType.GRANT,
-                        ResourceType.FUTURE_GRANT,
-                        ResourceType.ROLE_GRANT,
-                    ):
-                        before_action.append("USE ROLE SECURITYADMIN")
-                    else:
-                        before_action.append(f"USE ROLE {default_role}")
-
-                        before_action.append(
-                            f"GRANT OWNERSHIP ON {change.urn.resource_type} {change.urn.fqn} TO {default_role}"
-                        )
-                action = lifecycle.drop_resource(change.urn, change.before, if_exists=True)
-
-            action_queue.extend(before_action)
-            action_queue.append(action)
-            action_queue.extend(after_action)
-
-        action_queue.append("USE SECONDARY ROLES ALL")
-        for change in plan:
-            _queue_change(change)
-        return action_queue
 
     # def destroy(self, session, manifest: Manifest = None):
     #     session_ctx = data_provider.fetch_session(session)
@@ -911,6 +838,233 @@ class Blueprint:
             resources = resources[0]
         for resource in resources:
             self._add(resource)
+
+
+def owner_for_change(change: ResourceChange):
+    if change.action == Action.ADD and "owner" in change.after:
+        return change.after["owner"]
+    elif change.action == Action.CHANGE:
+        # TRANSFER actions occur strictly after CHANGE actions, so we use the before owner
+        # as the role for the change
+        return change.before["owner"]
+    elif change.action == Action.REMOVE and "owner" in change.before:
+        return change.before["owner"]
+    else:
+        return None
+
+
+def execution_role_for_change(
+    change: ResourceChange,
+    usable_roles: list[str],
+    default_role: str,
+    role_privileges: dict[str, list[dict]],
+):
+
+    change_is_a_grant = change.urn.resource_type in (
+        ResourceType.GRANT,
+        ResourceType.FUTURE_GRANT,
+        ResourceType.ROLE_GRANT,
+    )
+
+    if change_is_a_grant:
+        if "SECURITYADMIN" in usable_roles:
+            return "SECURITYADMIN"
+        else:
+            # Find a role that has MANAGE GRANTS, preferring the default role
+            raise Exception("SECURITYADMIN is required to perform this action")
+
+    change_owner = owner_for_change(change)
+
+    # See if change has an owner
+    if change_owner:
+        # Check if we can use that role
+        if change_owner in usable_roles:
+
+            # Check if that owner can execute the change
+            if role_can_execute_change(change_owner, change, role_privileges):
+                return change_owner
+            else:
+                raise MissingPrivilegeException(
+                    f"Owner {change_owner} does not have the required privileges to execute {change.action} on {change.urn}"
+                )
+
+        else:
+            raise Exception(f"Owner {change_owner} is not available")
+
+    # If not, find a role that can execute the change, preferring the default role
+    # If you can't find a role that can execute the change, raise an exception
+
+    raise NotImplementedError
+
+
+# NOTE: this is in a hot loop and maybe should be cached
+def role_can_execute_change(role: str, change: ResourceChange, role_privileges: dict[str, list[GrantedPrivilege]]):
+
+    # Assume ACCOUNTADMIN can do anything
+    if role == "ACCOUNTADMIN":
+        return True
+
+    if role not in role_privileges:
+        return False
+    if len(role_privileges[role]) == 0:
+        return False
+
+    if change.action == Action.ADD:
+        # For most resources, to add it you need the CREATE PRIV on the resource container
+        # For some resources like grants, you need the special MANAGE GRANTS priv
+        # There may be other cases but I don't remember them right now
+        required_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
+        for granted_priv in role_privileges[role]:
+
+            # TODO: refactor this
+            if change.urn.resource_type == ResourceType.DATABASE:
+                principal = str(change.urn.account_locator)
+            else:
+                principal = str(change.urn.database().fqn)
+
+            granted_priv_satisfies_requirement = granted_priv.on == principal and (
+                granted_priv.privilege == required_priv or is_ownership_priv(granted_priv.privilege)
+            )
+            if granted_priv_satisfies_requirement:
+                return True
+
+        return False
+    else:
+        raise NotImplementedError
+
+
+def sql_commands_for_change(
+    change: ResourceChange,
+    usable_roles: list[str],
+    default_role: str,
+    role_privileges: dict[str, list[GrantedPrivilege]],
+):
+    """
+    In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
+
+    The active role of a session is set as follows:
+    - When a session is started:
+        - If the session is configured with a role, that is the active role
+        - Otherwise, if the user of the session has a default_role set, and that role exists, that is the active role
+        - Otherwise, the PUBLIC role is activated (PUBLIC cannot be revoked)
+    - Any time the USE ROLE command is run, the active role is switched
+
+    A session may run any command thats allowed by the active role or any role downstream from it in the role hierarchy.
+    When secondary roles are active (by running the command USE SECONDARY ROLES ALL), then the session may also run any
+    command that any secondary role or a role downstream from it is allowed to run.
+
+    However, when a CREATE command is run, only the active role is considered. This is because the role that
+    creates a new resource owns that resource by default. There are some exceptions with GRANTS.
+
+    For those reasons, we generally don't have to worry about the current role as long as we have activated secondary roles.
+    The exception is when creating new resources
+    """
+
+    before_change_cmd = []
+    change_cmd = None
+    after_change_cmd = []
+
+    # change_is_a_grant = change.urn.resource_type in (
+    #     ResourceType.GRANT,
+    #     ResourceType.FUTURE_GRANT,
+    #     ResourceType.ROLE_GRANT,
+    # )
+    execution_role = execution_role_for_change(change, usable_roles, default_role, role_privileges)
+    before_change_cmd.append(f"USE ROLE {execution_role}")
+
+    if change.action == Action.ADD:
+
+        # TODO: In the event we are using a custom role, we need to be sure
+        # that the custom role is capable of performing the add action.
+        # If that role is not able to, we need to fall back to the default role + grant ownership
+        # approach
+
+        # if "owner" in change.after:
+        #     if change.after["owner"] in usable_roles:
+        #         before_action.append(f"USE ROLE {change.after['owner']}")
+        #     else:
+        #         before_action.append(f"USE ROLE {default_role}")
+        #         after_action.append(
+        #             lifecycle.transfer_resource(
+        #                 change.urn,
+        #                 owner=change.after["owner"],
+        #                 copy_current_grants=True,
+        #             )
+        #         )
+        # elif change_is_a_grant:
+        #     # TODO: switch to role with MANAGE GRANTS if we dont have access to SECURITYADMIN
+        #     before_action.append("USE ROLE SECURITYADMIN")
+        # else:
+        #     before_action.append(f"USE ROLE {default_role}")
+
+        props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+        change_cmd = lifecycle.create_resource(change.urn, change.after, props)
+    elif change.action == Action.CHANGE:
+        change_cmd = lifecycle.update_resource(change.urn, change.delta)
+    elif change.action == Action.REMOVE:
+        # if "owner" in change.before:
+
+        #     owner_role_is_available = change.before["owner"] in usable_roles
+
+        #     if owner_role_is_available:
+        #         before_action.append(f"USE ROLE {change.before['owner']}")
+        #     elif change_is_a_grant:
+        #         before_action.append("USE ROLE SECURITYADMIN")
+        #     else:
+        #         raise Exception(f"Cannot drop resource {change.urn} owned by {change.before['owner']}")
+        # else:
+        #     before_action.append(f"USE ROLE {default_role}")
+        change_cmd = lifecycle.drop_resource(
+            change.urn,
+            change.before,
+            if_exists=True,
+        )
+    elif change.action == Action.TRANSFER:
+        change_cmd = lifecycle.transfer_resource(
+            change.urn,
+            owner=change.after["owner"],
+            copy_current_grants=True,
+        )
+
+    return before_change_cmd + [change_cmd] + after_change_cmd
+
+
+def compile_plan_to_sql(session_ctx, plan: Plan):
+    sql_commands = []
+
+    sql_commands.append("USE SECONDARY ROLES ALL")
+    usable_roles = session_ctx["available_roles"]
+    default_role = session_ctx["role"]
+    role_privileges = session_ctx["role_privileges"]
+    for change in plan:
+        # Generate SQL commands
+        commands = sql_commands_for_change(
+            change,
+            usable_roles,
+            default_role,
+            role_privileges,
+        )
+        sql_commands.extend(commands)
+
+        # Update state
+        if change.action == Action.ADD:
+            if change.urn.resource_type == ResourceType.ROLE_GRANT:
+                if change.after["to_role"] in usable_roles:
+                    usable_roles.append(change.after["role"])
+            elif change.urn.resource_type == ResourceType.GRANT:
+                # TODO: update state
+                pass
+            elif "owner" in change.after:
+                # When creating any other resource type, creating implies ownership
+                ownership_priv = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]("OWNERSHIP")
+                role_privileges[str(change.after["owner"])].append(
+                    GrantedPrivilege.from_grant(
+                        privilege=ownership_priv,
+                        granted_on=change.urn.resource_type,
+                        name=str(change.urn.fqn),
+                    )
+                )
+    return sql_commands
 
 
 def topological_sort(resource_set: set, references: set):
