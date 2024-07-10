@@ -42,6 +42,7 @@
 * [Pipe](resources/pipe.md)
 * [PythonStoredProcedure](resources/python_stored_procedure.md)
 * [PythonUDF](resources/python_udf.md)
+* [ReplicationGroup](resources/replication_group.md)
 * [ResourceMonitor](resources/resource_monitor.md)
 * [Role](resources/role.md)
 * [RoleGrant](resources/role_grant.md)

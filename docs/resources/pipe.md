@@ -33,7 +33,7 @@ pipe = Pipe(
 ```yaml
 pipes:
   - name: some_pipe
-    as: "COPY INTO some_table FROM @%some_stage"
+    as_: "COPY INTO some_table FROM @%some_stage"
     owner: SYSADMIN
     auto_ingest: true
     error_integration: some_integration

@@ -2,11 +2,13 @@ import os
 
 import pytest
 
+from tests.helpers import safe_fetch
 from titan import data_provider
 from titan import resources as res
 from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
 from titan.client import reset_cache
 from titan.enums import ResourceType
+from titan.identifiers import parse_URN
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -323,3 +325,22 @@ def test_blueprint_quoted_identifier_drift(cursor, test_db, suffix):
     cursor.execute(f'DROP SCHEMA {test_db}."multiCaseString_{suffix}"')
 
     assert len(plan) == 0
+
+
+def test_blueprint_grant_role_to_public(cursor, suffix, marked_for_cleanup):
+    session = cursor.connection
+
+    role_name = f"role{suffix}_grant_role_to_public"
+    role = res.Role(name=role_name)
+    marked_for_cleanup.append(role)
+    grant = res.RoleGrant(role=role, to_role="PUBLIC")
+    blueprint = Blueprint(resources=[role, grant])
+    blueprint.apply(session)
+    role_data = safe_fetch(cursor, role.urn)
+    assert role_data is not None
+    assert role_data["name"] == role.name
+
+    grant_data = safe_fetch(cursor, grant.urn)
+    assert grant_data is not None
+    assert grant_data["role"] == role_name
+    assert grant_data["to_role"] == "PUBLIC"
