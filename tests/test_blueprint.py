@@ -273,7 +273,9 @@ def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
 def test_blueprint_implied_container_tree(session_ctx, remote_state):
     remote_state[parse_URN("urn::ABCD123:database/STATIC_DB")] = {}
     remote_state[parse_URN("urn::ABCD123:schema/STATIC_DB.PUBLIC")] = {}
-    func = res.JavascriptUDF(name="func", returns="INT", as_="return 1;", database="STATIC_DB", schema="public")
+    func = res.JavascriptUDF(
+        name="func", args=[], returns="INT", as_="return 1;", database="STATIC_DB", schema="public"
+    )
     blueprint = Blueprint(name="blueprint", resources=[func])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)

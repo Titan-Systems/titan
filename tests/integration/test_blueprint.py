@@ -193,11 +193,10 @@ def test_blueprint_present_resource_pointer(cursor):
     assert len(plan) == 2
 
 
-def test_blueprint_missing_database(cursor):
+def test_blueprint_missing_database_inferred_from_session_context(cursor):
     session = cursor.connection
-    func = res.JavascriptUDF(name="func", returns="INT", as_="return 1;", schema="public")
+    func = res.JavascriptUDF(name="func", args=[], returns="INT", as_="return 1;", schema="public")
     blueprint = Blueprint(name="blueprint", resources=[func])
-    # with pytest.raises(Exception):
     blueprint.plan(session)
 
 

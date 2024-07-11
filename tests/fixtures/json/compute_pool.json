@@ -6,5 +6,6 @@
     "auto_resume": true,
     "auto_suspend_secs": 3600,
     "comment": null,
-    "initially_suspended": null
+    "initially_suspended": null,
+    "owner": "ACCOUNTADMIN"
 }
