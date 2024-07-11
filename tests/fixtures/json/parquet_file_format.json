@@ -1,5 +1,11 @@
 {
     "name": "my_parquet_format",
     "type": "PARQUET",
-    "compression": "SNAPPY"
+    "compression": "SNAPPY",
+    "owner": "SYSADMIN",
+    "binary_as_text": true,
+    "comment": "A file format comment",
+    "null_if": [],
+    "replace_invalid_characters": false,
+    "trim_space": false
 }

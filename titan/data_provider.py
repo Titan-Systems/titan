@@ -703,8 +703,8 @@ def fetch_external_access_integration(session, fqn: FQN):
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "allowed_network_rules": properties["allowed_network_rules"],
-        "allowed_api_authentication_integrations": properties["allowed_api_authentication_integrations"],
-        "allowed_authentication_secrets": properties["allowed_authentication_secrets"],
+        "allowed_api_authentication_integrations": properties["allowed_api_authentication_integrations"] or None,
+        "allowed_authentication_secrets": properties["allowed_authentication_secrets"] or None,
         "enabled": data["enabled"] == "true",
         "owner": owner,
         "comment": data["comment"] or None,
@@ -764,6 +764,28 @@ def fetch_file_format(session, fqn: FQN):
             "trim_space": format_options["TRIM_SPACE"],
             "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
             "null_if": format_options["NULL_IF"],
+        }
+    elif data["type"] == "JSON":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "owner": data["owner"],
+            "comment": data["comment"] or None,
+            "compression": format_options["COMPRESSION"],
+            "date_format": format_options["DATE_FORMAT"],
+            "time_format": format_options["TIME_FORMAT"],
+            "timestamp_format": format_options["TIMESTAMP_FORMAT"],
+            "binary_format": format_options["BINARY_FORMAT"],
+            "trim_space": format_options["TRIM_SPACE"],
+            "null_if": format_options["NULL_IF"],
+            "file_extension": format_options["FILE_EXTENSION"],
+            "enable_octal": format_options["ENABLE_OCTAL"],
+            "allow_duplicate": format_options["ALLOW_DUPLICATE"],
+            "strip_outer_array": format_options["STRIP_OUTER_ARRAY"],
+            "strip_null_values": format_options["STRIP_NULL_VALUES"],
+            "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
+            "ignore_utf8_errors": format_options["IGNORE_UTF8_ERRORS"],
+            "skip_byte_order_mark": format_options["SKIP_BYTE_ORDER_MARK"],
         }
     else:
         raise Exception(f"Unsupported file format type: {data['type']}")

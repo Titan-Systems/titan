@@ -1,0 +1,21 @@
+{
+    "name": "my_json_format",
+    "type": "JSON",
+    "owner": "SYSADMIN",
+    "comment": null,
+    "compression": "AUTO",
+    "date_format": "AUTO",
+    "time_format": "AUTO",
+    "timestamp_format": "AUTO",
+    "binary_format": "HEX",
+    "trim_space": false,
+    "null_if": [],
+    "file_extension": "json",
+    "enable_octal": false,
+    "allow_duplicate": false,
+    "strip_outer_array": false,
+    "strip_null_values": false,
+    "replace_invalid_characters": false,
+    "ignore_utf8_errors": false,
+    "skip_byte_order_mark": true
+}

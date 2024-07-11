@@ -12,7 +12,7 @@ from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
-from .file_format import CSVFileFormat, ParquetFileFormat
+from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
@@ -83,6 +83,7 @@ __all__ = [
     "ExternalFunction",
     "ExternalStage",
     "FailoverGroup",
+    "JSONFileFormat",
     "FutureGrant",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",

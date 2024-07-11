@@ -26,14 +26,10 @@ class _ExternalAccessIntegration(ResourceSpec):
         if self.allowed_network_rules is not None and len(self.allowed_network_rules) < 1:
             raise ValueError("allowed_network_rules must have at least one element")
 
-        if self.allowed_api_authentication_integrations is None:
-            self.allowed_api_authentication_integrations = []
-        elif len(self.allowed_api_authentication_integrations) < 1:
+        if self.allowed_api_authentication_integrations and len(self.allowed_api_authentication_integrations) < 1:
             raise ValueError("allowed_api_authentication_integrations must have at least one element if specified")
 
-        if self.allowed_authentication_secrets is None:
-            self.allowed_authentication_secrets = []
-        else:
+        if self.allowed_authentication_secrets:
             if len(self.allowed_authentication_secrets) < 1:
                 raise ValueError("allowed_authentication_secrets must have at least one element if specified")
 

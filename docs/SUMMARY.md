@@ -31,6 +31,7 @@
 * [HybridTable](resources/hybrid_table.md)
 * [ImageRepository](resources/image_repository.md)
 * [InternalStage](resources/internal_stage.md)
+* [JSONFileFormat](resources/json_file_format.md)
 * [JavascriptUDF](resources/javascript_udf.md)
 * [MaterializedView](resources/materialized_view.md)
 * [NetworkRule](resources/network_rule.md)

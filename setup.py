@@ -19,6 +19,11 @@ setup(
     project_urls={
         "Homepage": "https://github.com/Titan-Systems/titan",
     },
+    entry_points={
+        "console_scripts": [
+            "titan=titan.cli:titan_cli",
+        ],
+    },
     classifiers=[
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: Apache Software License",

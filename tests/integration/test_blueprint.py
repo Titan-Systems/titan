@@ -114,6 +114,31 @@ def test_blueprint_zero_drift_after_apply(cursor, test_db, suffix, marked_for_cl
     assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."
 
 
+def test_blueprint_modify_resource(cursor, suffix, marked_for_cleanup):
+    cursor.execute(f"CREATE WAREHOUSE modify_me_{suffix}")
+    session = cursor.connection
+    blueprint = Blueprint(name="test_remove_resource")
+    warehouse = res.Warehouse(
+        name=f"modify_me_{suffix}",
+        auto_suspend=60,
+        owner=TEST_ROLE,
+    )
+    marked_for_cleanup.append(warehouse)
+    blueprint.add(warehouse)
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.CHANGE
+    assert plan[0].urn == parse_URN(f"urn::REB31081:warehouse/MODIFY_ME_{suffix}")
+    assert plan[0].delta == {"auto_suspend": 60}
+
+    sql_commands = blueprint.apply(session, plan)
+    assert sql_commands == [
+        "USE SECONDARY ROLES ALL",
+        f"USE ROLE {TEST_ROLE}",
+        f"ALTER WAREHOUSE MODIFY_ME_{suffix} SET auto_suspend = 60",
+    ]
+
+
 def test_blueprint_crossreferenced_database(cursor):
     session = cursor.connection
     bp = Blueprint(name="failing-reference")

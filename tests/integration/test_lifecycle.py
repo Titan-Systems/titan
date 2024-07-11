@@ -27,7 +27,7 @@ def resource(request):
 
 
 @pytest.mark.requires_snowflake
-def test_create_drop_from_json(resource, cursor, suffix):
+def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
     lifecycle_db = f"LIFECYCLE_DB_{suffix}"
     cursor.execute("USE ROLE SYSADMIN")
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {lifecycle_db}")
@@ -35,10 +35,16 @@ def test_create_drop_from_json(resource, cursor, suffix):
     cursor.execute("USE WAREHOUSE CI")
 
     database = res.Database(name=lifecycle_db, owner="SYSADMIN")
+    marked_for_cleanup.append(database)
 
     feature_enabled = True
 
-    if resource.__class__ == res.Service:
+    # Not easily testable without flakiness
+    if resource.__class__ in (
+        res.Service,
+        res.Grant,
+        res.RoleGrant,
+    ):
         pytest.skip("Skipping Service")
 
     try:

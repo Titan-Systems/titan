@@ -324,11 +324,11 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | Compute Pool                  | ✅         |
 | Connection                    | ❌         |
 | Database                      | ✅         |
-| External Access Integration   | 🚧         |
+| External Access Integration   | ✅         |
 | External Volume               | ❌         |
 | Failover Group                | 🚧         |
 | Grant                         |           |
-| ↳ Future Grant                | 🚧         |
+| ↳ Future Grant                | ✅         |
 | ↳ Privilege Grant             | ✅         |
 | ↳ Role Grant                  | ✅         |
 | Network Policy                | ✅         |
@@ -368,10 +368,10 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | External Table                | ❌         |
 | File Format                   |           |
 | ↳ CSV                         | ✅         |
-| ↳ JSON                        | ❌         |
+| ↳ JSON                        | ✅         |
 | ↳ AVRO                        | ❌         |
 | ↳ ORC                         | ❌         |
-| ↳ Parquet                     | ❌         |
+| ↳ Parquet                     | ✅         |
 | Hybrid Table                  | 🚧         |
 | Iceberg Table                 | ❌         |
 | Image Repository              | ✅         |

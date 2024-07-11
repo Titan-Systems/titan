@@ -77,3 +77,16 @@ users:
       - transformer
     comment: "Analysts writing queries in a SQL client, notebook, via dbt, etc. Users that are building dbt models should be assigned the transformer role so that they can access raw tables."
 
+future_grants:
+  - priv: USAGE
+    on_future_schemas_in_database: raw
+    to: transformer
+  - priv: SELECT
+    on_future_tables_in_database: raw
+    to: transformer
+  - priv: USAGE
+    on_future_schemas_in_database: analytics
+    to: transformer
+  - priv: SELECT
+    on_future_tables_in_database: analytics
+    to: reporter

@@ -253,11 +253,27 @@ class FutureGrant(Resource):
     Python:
 
         ```python
+        # Database Object Privs:
+        future_grant = FutureGrant(
+            priv="CREATE TABLE",
+            on_future_schemas_in=Database(name="somedb"),
+            to="somerole",
+        )
+        future_grant = FutureGrant(
+            priv="CREATE TABLE",
+            on_future_schemas_in_database="somedb",
+            to="somerole",
+        )
+
+        # Schema Object Privs:
         future_grant = FutureGrant(
             priv="SELECT",
-            on_type="TABLE",
-            in_type="SCHEMA",
-            in_name="someschema",
+            on_future_tables_in=Schema(name="someschema"),
+            to="somerole",
+        )
+        future_grant = FutureGrant(
+            priv="READ",
+            on_future_image_repositories_in_schema="someschema",
             to="somerole",
         )
         ```
@@ -267,9 +283,7 @@ class FutureGrant(Resource):
         ```yaml
         future_grants:
           - priv: SELECT
-            on_type: TABLE
-            in_type: SCHEMA
-            in_name: someschema
+            on_future_tables_in_schema: someschema
             to: somerole
         ```
     """
@@ -296,13 +310,6 @@ class FutureGrant(Resource):
         Usage
         -----
 
-        Database Object Privs:
-        >>> Grant(priv="CREATE TABLE", on_future_schemas_in=Database(name="somedb"), to="somerole")
-        >>> Grant(priv="CREATE TABLE", on_future_schemas_in_database="somedb", to="somerole")
-
-        Schema Object Privs:
-        >>> Grant(priv="SELECT", on_future_tables_in=Schema(name="someschema"), to="somerole")
-        >>> Grant(priv="READ", on_future_image_repositories_in_schema="someschema", to="somerole")
 
         """
         on_type = kwargs.pop("on_type", None)
@@ -409,7 +416,7 @@ class _GrantOnAll(ResourceSpec):
     in_name: str
     to: Role
     grant_option: bool = False
-    owner: Role = "SECURITYADMIN"
+    owner: Role = field(default_factory=None, metadata={"fetchable": False})
 
     def __post_init__(self):
         super().__post_init__()
@@ -445,6 +452,7 @@ class GrantOnAll(Resource):
         priv: str,
         to: Role,
         grant_option: bool = False,
+        owner: str = None,
         **kwargs,
     ):
         """
@@ -492,10 +500,10 @@ class GrantOnAll(Resource):
                         in_type = ResourceType(in_stmt)
                         in_name = arg
 
-        if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
-            owner = "ACCOUNTADMIN"
-        else:
-            owner = "SECURITYADMIN"
+        # if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
+        #     owner = "ACCOUNTADMIN"
+        # else:
+        #     owner = "SECURITYADMIN"
 
         super().__init__(**kwargs)
         self._data: _GrantOnAll = _GrantOnAll(
