@@ -156,8 +156,8 @@ def test_blueprint_with_udf(resource_manifest):
     udf_urn = URN(
         resource_type=ResourceType.FUNCTION,
         fqn=FQN(
-            database="DB",
-            schema="SCHEMA",
+            database=ResourceName("DB"),
+            schema=ResourceName("SCHEMA"),
             name=ResourceName("SOMEUDF"),
             arg_types=[],
         ),

@@ -1894,8 +1894,8 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
     for row in show_result:
         resources.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )
@@ -2038,7 +2038,12 @@ def list_schemas(session, database=None) -> list[FQN]:
         for row in show_result:
             if row["database_name"] in SYSTEM_DATABASES or row["name"] == "INFORMATION_SCHEMA":
                 continue
-            schemas.append(FQN(database=row["database_name"], name=ResourceName.from_snowflake_metadata(row["name"])))
+            schemas.append(
+                FQN(
+                    database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                    name=ResourceName.from_snowflake_metadata(row["name"]),
+                )
+            )
         return schemas
     except ProgrammingError as err:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
@@ -2076,8 +2081,8 @@ def list_stages(session) -> list[FQN]:
             continue
         stages.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )
@@ -2100,8 +2105,8 @@ def list_tables(session) -> list[FQN]:
             continue
         tables.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )
@@ -2117,8 +2122,8 @@ def list_tags(session) -> list[FQN]:
                 continue
             tags.append(
                 FQN(
-                    database=row["database_name"],
-                    schema=row["schema_name"],
+                    database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                    schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                     name=ResourceName.from_snowflake_metadata(row["name"]),
                 )
             )
@@ -2154,8 +2159,8 @@ def list_views(session) -> list[FQN]:
             continue
         views.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )

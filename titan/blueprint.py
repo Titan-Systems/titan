@@ -952,19 +952,21 @@ def find_role_to_execute_change(
 
 def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceChange):
 
-    if change.action not in (Action.ADD,):
-        raise NotImplementedError
+    # if change.action not in (Action.ADD,):
+    #     raise NotImplementedError
 
     scope = RESOURCE_SCOPES[change.urn.resource_type]
 
     if isinstance(scope, AccountScope):
-        change_container = str(change.urn.account_locator)
+        container_name = str(change.urn.account_locator)
     elif isinstance(scope, DatabaseScope):
-        change_container = str(change.urn.database().fqn)
+        container_name = str(change.urn.database().fqn)
     elif isinstance(scope, SchemaScope):
-        change_container = str(change.urn.schema().fqn)
+        container_name = str(change.urn.schema().fqn)
     else:
-        raise Exception
+        raise Exception("Exception in granted_priv_allows_change, this should never be reached")
+
+    resource_name = str(change.urn.fqn)
 
     if change.action == Action.ADD:
 
@@ -979,7 +981,7 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
                 return True
 
         # If we own the resource container, we can always perform ADD
-        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == change_container:
+        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == container_name:
             return True
 
         # If we don't own the container, we need the CREATE privilege for the resource on the container
@@ -987,16 +989,30 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
         if change.urn.resource_type in CREATE_PRIV_FOR_RESOURCE_TYPE:
             create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
 
-        if granted_priv.privilege == create_priv and granted_priv.on == change_container:
+        if granted_priv.privilege == create_priv and granted_priv.on == container_name:
             return True
 
         return False
 
     elif change.action == Action.CHANGE:
+
+        # If we own the resource, we can always make changes
+        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
+            return True
+
+        # Some resources have a MODIFY privilege that typically allows changes
+        if str(granted_priv.privilege) == "MODIFY" and granted_priv.on == resource_name:
+            return True
+
         return False
     elif change.action == Action.REMOVE:
+        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
+            return True
         return False
     elif change.action == Action.TRANSFER:
+        # We must own the resource in order to transfer ownership
+        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
+            return True
         return False
 
 

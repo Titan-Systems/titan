@@ -23,7 +23,7 @@ def test_fetch_over_1000_objects(cursor, test_db):
         cursor,
         URN(
             ResourceType.SCHEMA,
-            fqn=FQN(database=test_db, name=f"{test_db}_schema_1004"),
+            fqn=FQN(database=ResourceName(test_db), name=ResourceName(f"{test_db}_schema_1004")),
             account_locator="",
         ),
     )
@@ -34,7 +34,8 @@ def test_fetch_over_1000_objects(cursor, test_db):
 def test_fetch_quoted_identifier(cursor, test_db):
     cursor.execute(f'CREATE SCHEMA {test_db}."multiCaseString"')
     schema = safe_fetch(
-        cursor, URN(ResourceType.SCHEMA, fqn=FQN(database=test_db, name=ResourceName('"multiCaseString"')))
+        cursor,
+        URN(ResourceType.SCHEMA, fqn=FQN(database=ResourceName(test_db), name=ResourceName('"multiCaseString"'))),
     )
     assert schema is not None
     assert schema["name"] == '"multiCaseString"'
