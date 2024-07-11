@@ -10,8 +10,6 @@ from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
 
-TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
-
 
 @pytest.fixture
 def session_ctx() -> dict:
@@ -30,7 +28,11 @@ def session_ctx() -> dict:
             "USERADMIN": [
                 GrantedPrivilege(privilege=AccountPriv.CREATE_ROLE, on="ABCD123"),
                 GrantedPrivilege(privilege=AccountPriv.CREATE_USER, on="ABCD123"),
-            ]
+            ],
+            "SYSADMIN": [
+                GrantedPrivilege(privilege=AccountPriv.CREATE_DATABASE, on="ABCD123"),
+                GrantedPrivilege(privilege=AccountPriv.CREATE_WAREHOUSE, on="ABCD123"),
+            ],
         },
     }
 
@@ -205,7 +207,7 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert changes[2] == "CREATE ROLE SOME_ROLE"
     assert changes[3] == "USE ROLE SECURITYADMIN"
     assert changes[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
-    assert changes[5] == f"USE ROLE {TEST_ROLE}"
+    assert changes[5] == f"USE ROLE {session_ctx['role']}"
     assert changes[6] == "CREATE DATABASE DB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
     assert changes[7] == "GRANT OWNERSHIP ON DATABASE DB TO ROLE SOME_ROLE COPY CURRENT GRANTS"
 
@@ -415,6 +417,6 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert sql[2] == "CREATE ROLE SOME_ROLE"
     assert sql[3] == "USE ROLE SECURITYADMIN"
     assert sql[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
-    assert sql[5] == f"USE ROLE {TEST_ROLE}"
+    assert sql[5] == f"USE ROLE {session_ctx['role']}"
     assert sql[6] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
     assert sql[7] == "GRANT OWNERSHIP ON DATABASE DB1 TO ROLE SOME_ROLE COPY CURRENT GRANTS"

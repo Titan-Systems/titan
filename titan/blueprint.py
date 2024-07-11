@@ -990,6 +990,15 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
         if granted_priv.privilege == create_priv and granted_priv.on == change_container:
             return True
 
+        return False
+
+    elif change.action == Action.CHANGE:
+        return False
+    elif change.action == Action.REMOVE:
+        return False
+    elif change.action == Action.TRANSFER:
+        return False
+
 
 def sql_commands_for_change(
     change: ResourceChange,
