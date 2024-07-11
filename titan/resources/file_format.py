@@ -188,12 +188,70 @@ class CSVFileFormat(NamedResource, Resource):
         )
 
 
+@dataclass(unsafe_hash=True)
+class _ParquetFileFormat(ResourceSpec):
+    name: ResourceName
+    owner: Role = "SYSADMIN"
+    type: FileType = FileType.PARQUET
+    compression: Compression = Compression.AUTO
+    binary_as_text: bool = True
+    trim_space: bool = False
+    replace_invalid_characters: bool = False
+    null_if: list[str] = None
+    comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.null_if is None:
+            self.null_if = []
+
+
+class ParquetFileFormat(NamedResource, Resource):
+    resource_type = ResourceType.FILE_FORMAT
+    props = Props(
+        type=EnumProp("type", [FileType.PARQUET]),
+        compression=EnumProp("compression", Compression),
+        binary_as_text=BoolProp("binary_as_text"),
+        trim_space=BoolProp("trim_space"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        null_if=StringListProp("null_if", parens=True),
+        comment=StringProp("comment"),
+    )
+    scope = SchemaScope()
+    spec = _ParquetFileFormat
+
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        compression: str = "AUTO",
+        binary_as_text: bool = True,
+        trim_space: bool = False,
+        replace_invalid_characters: bool = False,
+        null_if: list[str] = None,
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        super().__init__(name, **kwargs)
+        self._data: _ParquetFileFormat = _ParquetFileFormat(
+            name=self._name,
+            owner=owner,
+            compression=compression,
+            binary_as_text=binary_as_text,
+            trim_space=trim_space,
+            replace_invalid_characters=replace_invalid_characters,
+            null_if=null_if,
+            comment=comment,
+        )
+
+
 FileFormatMap = {
     FileType.CSV: CSVFileFormat,
     # FileType.JSON: JSONFileFormat,
     # FileType.AVRO: AvroFileFormat,
     # FileType.ORC: OrcFileFormat,
-    # FileType.PARQUET: ParquetFileFormat,
+    FileType.PARQUET: ParquetFileFormat,
     # FileType.XML: XMLFileFormat,
 }
 

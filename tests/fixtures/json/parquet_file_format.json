@@ -1,0 +1,5 @@
+{
+    "name": "my_parquet_format",
+    "type": "PARQUET",
+    "compression": "SNAPPY"
+}

@@ -721,37 +721,52 @@ def fetch_file_format(session, fqn: FQN):
     data = show_result[0]
     format_options = json.loads(data["format_options"])
 
-    return {
-        "type": data["type"],
-        "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
-        "field_delimiter": format_options["FIELD_DELIMITER"],
-        "skip_header": format_options["SKIP_HEADER"],
-        "null_if": format_options["NULL_IF"],
-        "empty_field_as_null": format_options["EMPTY_FIELD_AS_NULL"],
-        "compression": format_options["COMPRESSION"],
-        "record_delimiter": format_options["RECORD_DELIMITER"],
-        "file_extension": format_options["FILE_EXTENSION"],
-        "parse_header": format_options["PARSE_HEADER"],
-        "skip_blank_lines": format_options["SKIP_BLANK_LINES"],
-        "date_format": format_options["DATE_FORMAT"],
-        "time_format": format_options["TIME_FORMAT"],
-        "timestamp_format": format_options["TIMESTAMP_FORMAT"],
-        "binary_format": format_options["BINARY_FORMAT"],
-        "escape": format_options["ESCAPE"] if format_options["ESCAPE"] != "NONE" else None,
-        "escape_unenclosed_field": format_options["ESCAPE_UNENCLOSED_FIELD"],
-        "trim_space": format_options["TRIM_SPACE"],
-        "field_optionally_enclosed_by": (
-            format_options["FIELD_OPTIONALLY_ENCLOSED_BY"]
-            if format_options["FIELD_OPTIONALLY_ENCLOSED_BY"] != "NONE"
-            else None
-        ),
-        "error_on_column_count_mismatch": format_options["ERROR_ON_COLUMN_COUNT_MISMATCH"],
-        "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
-        "skip_byte_order_mark": format_options["SKIP_BYTE_ORDER_MARK"],
-        "encoding": format_options["ENCODING"],
-        "comment": data["comment"] or None,
-    }
+    if data["type"] == "CSV":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "owner": data["owner"],
+            "field_delimiter": format_options["FIELD_DELIMITER"],
+            "skip_header": format_options["SKIP_HEADER"],
+            "null_if": format_options["NULL_IF"],
+            "empty_field_as_null": format_options["EMPTY_FIELD_AS_NULL"],
+            "compression": format_options["COMPRESSION"],
+            "record_delimiter": format_options["RECORD_DELIMITER"],
+            "file_extension": format_options["FILE_EXTENSION"],
+            "parse_header": format_options["PARSE_HEADER"],
+            "skip_blank_lines": format_options["SKIP_BLANK_LINES"],
+            "date_format": format_options["DATE_FORMAT"],
+            "time_format": format_options["TIME_FORMAT"],
+            "timestamp_format": format_options["TIMESTAMP_FORMAT"],
+            "binary_format": format_options["BINARY_FORMAT"],
+            "escape": format_options["ESCAPE"] if format_options["ESCAPE"] != "NONE" else None,
+            "escape_unenclosed_field": format_options["ESCAPE_UNENCLOSED_FIELD"],
+            "trim_space": format_options["TRIM_SPACE"],
+            "field_optionally_enclosed_by": (
+                format_options["FIELD_OPTIONALLY_ENCLOSED_BY"]
+                if format_options["FIELD_OPTIONALLY_ENCLOSED_BY"] != "NONE"
+                else None
+            ),
+            "error_on_column_count_mismatch": format_options["ERROR_ON_COLUMN_COUNT_MISMATCH"],
+            "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
+            "skip_byte_order_mark": format_options["SKIP_BYTE_ORDER_MARK"],
+            "encoding": format_options["ENCODING"],
+            "comment": data["comment"] or None,
+        }
+    elif data["type"] == "PARQUET":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "owner": data["owner"],
+            "comment": data["comment"] or None,
+            "compression": format_options["COMPRESSION"],
+            "binary_as_text": format_options["BINARY_AS_TEXT"],
+            "trim_space": format_options["TRIM_SPACE"],
+            "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
+            "null_if": format_options["NULL_IF"],
+        }
+    else:
+        raise Exception(f"Unsupported file format type: {data['type']}")
 
 
 def fetch_function(session, fqn: FQN):

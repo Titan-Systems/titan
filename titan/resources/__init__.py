@@ -12,7 +12,7 @@ from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
-from .file_format import CSVFileFormat
+from .file_format import CSVFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
@@ -100,6 +100,7 @@ __all__ = [
     "OAuthSecret",
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
+    "ParquetFileFormat",
     "PasswordPolicy",
     "PasswordSecret",
     "Pipe",

@@ -1016,3 +1016,19 @@ def test_fetch_external_access_integration(cursor, suffix, marked_for_cleanup):
     result = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, result)
     data = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, integration.to_dict())
     assert result == data
+
+
+def test_fetch_parquet_file_format(cursor, suffix, marked_for_cleanup):
+    file_format = res.ParquetFileFormat(
+        name=f"SOME_PARQUET_FILE_FORMAT_{suffix}",
+        compression="SNAPPY",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(file_format.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(file_format)
+
+    result = safe_fetch(cursor, file_format.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.ParquetFileFormat.spec, result)
+    data = strip_nones_and_unfetchable(res.ParquetFileFormat.spec, file_format.to_dict())
+    assert result == data
