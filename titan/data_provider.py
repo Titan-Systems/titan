@@ -69,6 +69,9 @@ def _desc_type2_result_to_dict(desc_result, lower_properties=False):
             value = value or None
         elif row["property_type"] == "List":
             value = _parse_list_property(value)
+        # Not sure this is correct. External Access Integration uses this
+        elif row["property_type"] == "Object":
+            value = _parse_list_property(value)
         result[property] = value
     return result
 
@@ -581,6 +584,7 @@ def fetch_compute_pool(session, fqn: FQN):
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
+        "owner": data["owner"],
         "min_nodes": data["min_nodes"],
         "max_nodes": data["max_nodes"],
         "instance_family": data["instance_family"],
@@ -685,6 +689,28 @@ def fetch_event_table(session, fqn: FQN):
     }
 
 
+def fetch_external_access_integration(session, fqn: FQN):
+    integrations = _show_resources(session, "EXTERNAL ACCESS INTEGRATIONS", fqn)
+    if len(integrations) == 0:
+        return None
+    if len(integrations) > 1:
+        raise Exception(f"Found multiple external access integrations matching {fqn}")
+
+    data = integrations[0]
+    desc_result = execute(session, f"DESC EXTERNAL ACCESS INTEGRATION {fqn}", cacheable=True)
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
+    return {
+        "name": _quote_snowflake_identifier(data["name"]),
+        "allowed_network_rules": properties["allowed_network_rules"],
+        "allowed_api_authentication_integrations": properties["allowed_api_authentication_integrations"],
+        "allowed_authentication_secrets": properties["allowed_authentication_secrets"],
+        "enabled": data["enabled"] == "true",
+        "owner": owner,
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_file_format(session, fqn: FQN):
     show_result = _show_resources(session, "FILE FORMATS", fqn)
     if len(show_result) == 0:
@@ -740,17 +766,32 @@ def fetch_function(session, fqn: FQN):
     inputs, output = data["arguments"].split(" RETURN ")
     desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
+    owner = _fetch_owner(session, "FUNCTION", fqn)
 
-    return {
-        "name": _quote_snowflake_identifier(data["name"]),
-        "secure": data["is_secure"] == "Y",
-        # "args": data["arguments"],
-        "returns": output,
-        "language": data["language"],
-        "comment": None if data["description"] == "user-defined function" else data["description"],
-        "volatility": properties["volatility"],
-        "as_": properties["body"],
-    }
+    if data["language"] == "PYTHON":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "secure": data["is_secure"] == "Y",
+            "args": _parse_signature(properties["signature"]),
+            "returns": output,
+            "language": data["language"],
+            "comment": None if data["description"] == "user-defined function" else data["description"],
+            "volatility": properties["volatility"],
+            "as_": properties["body"],
+            "owner": owner,
+        }
+    elif data["language"] == "JAVASCRIPT":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "secure": data["is_secure"] == "Y",
+            "args": _parse_signature(properties["signature"]),
+            "returns": output,
+            "language": data["language"],
+            "comment": None if data["description"] == "user-defined function" else data["description"],
+            "volatility": properties["volatility"],
+            "as_": properties["body"],
+            "owner": owner,
+        }
 
 
 def fetch_future_grant(session, fqn: FQN):

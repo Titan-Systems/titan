@@ -559,10 +559,10 @@ def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
     assert_resource_dicts_eq_ignore_nulls(result, dynamic_table.to_dict())
 
 
-@pytest.mark.skip(reason="Generates invalid SQL")
 def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
     function = res.JavascriptUDF(
         name="SOME_JAVASCRIPT_UDF",
+        args=[{"name": "INPUT_ARG", "data_type": "VARIANT"}],
         returns="FLOAT",
         volatility="VOLATILE",
         as_="return 42;",
@@ -576,7 +576,9 @@ def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, function.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, function.to_dict())
+    result = strip_nones_and_unfetchable(res.JavascriptUDF.spec, result)
+    data = strip_nones_and_unfetchable(res.JavascriptUDF.spec, function.to_dict())
+    assert result == data
 
 
 def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
@@ -806,7 +808,9 @@ def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, compute_pool.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, compute_pool.to_dict())
+    result = strip_nones_and_unfetchable(res.ComputePool.spec, result)
+    data = strip_nones_and_unfetchable(res.ComputePool.spec, compute_pool.to_dict())
+    assert result == data
 
 
 def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
@@ -994,4 +998,21 @@ def test_fetch_authentication_policies(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, result)
     data = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, policy.to_dict())
+    assert result == data
+
+
+def test_fetch_external_access_integration(cursor, suffix, marked_for_cleanup):
+    integration = res.ExternalAccessIntegration(
+        name=f"EXTERNAL_ACCESS_INTEGRATION_{suffix}",
+        allowed_network_rules=["static_database.public.static_network_rule"],
+        comment="External access integration for testing",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(integration)
+
+    result = safe_fetch(cursor, integration.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, result)
+    data = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, integration.to_dict())
     assert result == data

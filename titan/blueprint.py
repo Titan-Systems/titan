@@ -1090,17 +1090,19 @@ def compile_plan_to_sql(session_ctx, plan: Plan):
                     )
             elif "owner" in change.after:
                 # When creating any other resource type, creating implies ownership
-                ownership_priv = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]("OWNERSHIP")
-                owner_role = str(change.after["owner"])
-                if owner_role not in role_privileges:
-                    role_privileges[owner_role] = []
-                role_privileges[owner_role].append(
-                    GrantedPrivilege.from_grant(
-                        privilege=ownership_priv,
-                        granted_on=change.urn.resource_type,
-                        name=str(change.urn.fqn),
+                resource_priv_types = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]
+                if resource_priv_types and "OWNERSHIP" in resource_priv_types:
+                    ownership_priv = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]("OWNERSHIP")
+                    owner_role = str(change.after["owner"])
+                    if owner_role not in role_privileges:
+                        role_privileges[owner_role] = []
+                    role_privileges[owner_role].append(
+                        GrantedPrivilege.from_grant(
+                            privilege=ownership_priv,
+                            granted_on=change.urn.resource_type,
+                            name=str(change.urn.fqn),
+                        )
                     )
-                )
                 # Special case for databases: if you create a database you own the public schema
                 if change.urn.resource_type == ResourceType.DATABASE:
                     role_privileges[owner_role].append(

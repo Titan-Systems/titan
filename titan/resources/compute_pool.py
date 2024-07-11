@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec, NamedResource
+from .role import Role
 from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
     IntProp,
@@ -27,6 +28,7 @@ class InstanceFamily(ParseableEnum):
 @dataclass(unsafe_hash=True)
 class _ComputePool(ResourceSpec):
     name: ResourceName
+    owner: Role = "ACCOUNTADMIN"
     min_nodes: int = None
     max_nodes: int = None
     instance_family: InstanceFamily = None
@@ -46,6 +48,7 @@ class ComputePool(NamedResource, Resource):
 
     Fields:
         name (string, required): The unique name of the compute pool.
+        owner (string or Role): The owner of the compute pool. Defaults to "ACCOUNTADMIN".
         min_nodes (int): The minimum number of nodes in the compute pool.
         max_nodes (int): The maximum number of nodes in the compute pool.
         instance_family (string or InstanceFamily): The family of instances to use for the compute nodes.
@@ -58,6 +61,7 @@ class ComputePool(NamedResource, Resource):
         ```python
         compute_pool = ComputePool(
             name="some_compute_pool",
+            owner="ACCOUNTADMIN",
             min_nodes=2,
             max_nodes=10,
             instance_family="CPU_X64_S",
@@ -72,6 +76,7 @@ class ComputePool(NamedResource, Resource):
         ```yaml
         compute_pools:
           - name: some_compute_pool
+            owner: ACCOUNTADMIN
             min_nodes: 2
             max_nodes: 10
             instance_family: CPU_X64_S
@@ -99,6 +104,7 @@ class ComputePool(NamedResource, Resource):
     def __init__(
         self,
         name: str,
+        owner: str = "ACCOUNTADMIN",
         min_nodes: int = None,
         max_nodes: int = None,
         instance_family: InstanceFamily = None,
@@ -111,6 +117,7 @@ class ComputePool(NamedResource, Resource):
         super().__init__(name, **kwargs)
         self._data: _ComputePool = _ComputePool(
             name=self._name,
+            owner=owner,
             min_nodes=min_nodes,
             max_nodes=max_nodes,
             instance_family=instance_family,

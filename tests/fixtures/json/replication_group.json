@@ -5,10 +5,10 @@
         "SHARES"
     ],
     "allowed_databases": [
-        "db1"
+        "STATIC_DATABASE"
     ],
     "allowed_shares": [
-        "s1"
+        "STATIC_SHARE"
     ],
     "allowed_integration_types": null,
     "allowed_accounts": [

@@ -2,16 +2,6 @@ from dataclasses import dataclass
 
 from .enums import ParseableEnum, ResourceType
 
-# from .identifiers import URN
-# from .resource_name import ResourceName
-
-
-# @dataclass
-# class GrantedPrivilege:
-#     privilege: str
-#     granted_on: ResourceType
-#     name: ResourceName
-
 
 class Priv(ParseableEnum):
     pass
@@ -139,6 +129,10 @@ class DatabasePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
     # REFERENCE_USAGE = "REFERENCE_USAGE" # Only granted to shares
     USAGE = "USAGE"
+
+
+class DatabaseRolePriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
 
 
 class EventTablePriv(ParseableEnum):
@@ -348,9 +342,15 @@ class WarehousePriv(ParseableEnum):
 
 PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.ACCOUNT: AccountPriv,
+    ResourceType.AGGREGATION_POLICY: None,
     ResourceType.ALERT: AlertPriv,
     ResourceType.API_INTEGRATION: IntegrationPriv,
+    ResourceType.AUTHENTICATION_POLICY: None,
+    ResourceType.CATALOG_INTEGRATION: None,
+    ResourceType.COLUMN: None,
+    ResourceType.COMPUTE_POOL: None,
     ResourceType.DATABASE: DatabasePriv,
+    ResourceType.DATABASE_ROLE: DatabaseRolePriv,
     ResourceType.DYNAMIC_TABLE: TablePriv,
     ResourceType.EVENT_TABLE: EventTablePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
@@ -358,33 +358,39 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.FAILOVER_GROUP: FailoverGroupPriv,
     ResourceType.FILE_FORMAT: FileFormatPriv,
     ResourceType.FUNCTION: FunctionPriv,
+    ResourceType.FUTURE_GRANT: None,
+    ResourceType.GIT_REPOSITORY: None,
+    ResourceType.GRANT: None,
+    ResourceType.GRANT_ON_ALL: None,
+    ResourceType.HYBRID_TABLE: None,
+    ResourceType.IMAGE_REPOSITORY: None,
     ResourceType.MATERIALIZED_VIEW: MaterializedViewPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
+    ResourceType.NOTIFICATION_INTEGRATION: None,
     ResourceType.PACKAGES_POLICY: PackagesPolicyPriv,
     ResourceType.PASSWORD_POLICY: PasswordPolicyPriv,
     ResourceType.PIPE: PipePriv,
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.REPLICATION_GROUP: ReplicationGroupPriv,
+    ResourceType.RESOURCE_MONITOR: None,
     ResourceType.ROLE: RolePriv,
+    ResourceType.ROLE_GRANT: None,
     ResourceType.SCHEMA: SchemaPriv,
     ResourceType.SECRET: SecretPriv,
     ResourceType.SEQUENCE: SequencePriv,
+    ResourceType.SERVICE: None,
+    ResourceType.SHARE: None,
     ResourceType.STAGE: StagePriv,
+    ResourceType.STORAGE_INTEGRATION: None,
     ResourceType.STREAM: StreamPriv,
     ResourceType.TABLE: TablePriv,
     ResourceType.TAG: TagPriv,
+    ResourceType.TAG_REFERENCE: None,
     ResourceType.TASK: TaskPriv,
     ResourceType.USER: UserPriv,
     ResourceType.VIEW: ViewPriv,
     ResourceType.WAREHOUSE: WarehousePriv,
 }
-
-
-# def priv_for_principal(principal: URN, priv: str):
-#     if principal.resource_type not in PRIVS_FOR_RESOURCE_TYPE:
-#         # raise Exception(f"Unsupported resource type: {principal.resource_type}")
-#         return None
-#     return PRIVS_FOR_RESOURCE_TYPE[principal.resource_type](priv)
 
 
 CREATE_PRIV_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {

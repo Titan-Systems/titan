@@ -24,15 +24,18 @@ class _ExternalAccessIntegration(ResourceSpec):
     def __post_init__(self):
         super().__post_init__()
         if self.allowed_network_rules is not None and len(self.allowed_network_rules) < 1:
-            raise ValueError("allowed_network_rules must have at least one element if not None")
-        if (
-            self.allowed_api_authentication_integrations is not None
-            and len(self.allowed_api_authentication_integrations) < 1
-        ):
-            raise ValueError("allowed_api_authentication_integrations must have at least one element if not None")
-        if self.allowed_authentication_secrets is not None:
+            raise ValueError("allowed_network_rules must have at least one element")
+
+        if self.allowed_api_authentication_integrations is None:
+            self.allowed_api_authentication_integrations = []
+        elif len(self.allowed_api_authentication_integrations) < 1:
+            raise ValueError("allowed_api_authentication_integrations must have at least one element if specified")
+
+        if self.allowed_authentication_secrets is None:
+            self.allowed_authentication_secrets = []
+        else:
             if len(self.allowed_authentication_secrets) < 1:
-                raise ValueError("allowed_authentication_secrets must have at least one element if not None")
+                raise ValueError("allowed_authentication_secrets must have at least one element if specified")
 
             if "any" in self.allowed_authentication_secrets and len(self.allowed_authentication_secrets) > 1:
                 raise ValueError("allowed_authentication_secrets must not contain 'any' if there are other secrets")
