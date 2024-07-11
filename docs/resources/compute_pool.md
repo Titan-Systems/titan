@@ -17,6 +17,7 @@ A compute pool is a group of compute resources in Snowflake that can be used to 
 ```python
 compute_pool = ComputePool(
     name="some_compute_pool",
+    owner="ACCOUNTADMIN",
     min_nodes=2,
     max_nodes=10,
     instance_family="CPU_X64_S",
@@ -33,6 +34,7 @@ compute_pool = ComputePool(
 ```yaml
 compute_pools:
   - name: some_compute_pool
+    owner: ACCOUNTADMIN
     min_nodes: 2
     max_nodes: 10
     instance_family: CPU_X64_S
@@ -46,6 +48,7 @@ compute_pools:
 ## Fields
 
 * `name` (string, required) - The unique name of the compute pool.
+* `owner` (string or [Role](role.md)) - The owner of the compute pool. Defaults to "ACCOUNTADMIN".
 * `min_nodes` (int) - The minimum number of nodes in the compute pool.
 * `max_nodes` (int) - The maximum number of nodes in the compute pool.
 * `instance_family` (string or [InstanceFamily](instance_family.md)) - The family of instances to use for the compute nodes.

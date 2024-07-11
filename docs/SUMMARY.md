@@ -37,6 +37,7 @@
 * [OAuthSecret](resources/oauth_secret.md)
 * [ObjectStoreCatalogIntegration](resources/object_store_catalog_integration.md)
 * [PackagesPolicy](resources/packages_policy.md)
+* [ParquetFileFormat](resources/parquet_file_format.md)
 * [PasswordPolicy](resources/password_policy.md)
 * [PasswordSecret](resources/password_secret.md)
 * [Pipe](resources/pipe.md)
