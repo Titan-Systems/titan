@@ -15,11 +15,26 @@ Represents a future grant of privileges on a resource to a role in Snowflake.
 ### Python
 
 ```python
+# Database Object Privs:
+future_grant = FutureGrant(
+    priv="CREATE TABLE",
+    on_future_schemas_in=Database(name="somedb"),
+    to="somerole",
+)
+future_grant = FutureGrant(
+    priv="CREATE TABLE",
+    on_future_schemas_in_database="somedb",
+    to="somerole",
+)
+# Schema Object Privs:
 future_grant = FutureGrant(
     priv="SELECT",
-    on_type="TABLE",
-    in_type="SCHEMA",
-    in_name="someschema",
+    on_future_tables_in=Schema(name="someschema"),
+    to="somerole",
+)
+future_grant = FutureGrant(
+    priv="READ",
+    on_future_image_repositories_in_schema="someschema",
     to="somerole",
 )
 ```
@@ -30,9 +45,7 @@ future_grant = FutureGrant(
 ```yaml
 future_grants:
   - priv: SELECT
-    on_type: TABLE
-    in_type: SCHEMA
-    in_name: someschema
+    on_future_tables_in_schema: someschema
     to: somerole
 ```
 

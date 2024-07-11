@@ -2,13 +2,14 @@ from dataclasses import dataclass
 
 from ..enums import AccountEdition, ResourceType
 from ..props import Props
+from ..resource_name import ResourceName
 from ..scope import OrganizationScope
-from .resource import Resource, ResourceContainer, ResourceSpec, NamedResource
+from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
 class _Account(ResourceSpec):
-    name: str
+    name: ResourceName
     locator: str
     edition: AccountEdition = None
     region: str = None

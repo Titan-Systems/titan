@@ -258,3 +258,35 @@ def test_resource_with_named_nested_dependency():
     assert str(network_rule_serialized) == "DB.SCH.SOME_NETWORK_RULE"
 
     assert True
+
+
+def test_resource_type_checking_basic_type():
+    with pytest.raises(
+        TypeError,
+        match=r"Expected S3StorageIntegration.comment to be .*, got -1 instead",
+    ):
+        res.S3StorageIntegration(
+            name="some_s3_storage_integration",
+            enabled=True,
+            storage_aws_role_arn="arn:aws:iam::123456789012:role/MyS3AccessRole",
+            storage_allowed_locations=["s3://mybucket/myfolder/"],
+            storage_blocked_locations=["s3://mybucket/myblockedfolder/"],
+            storage_aws_object_acl="bucket-owner-full-control",
+            comment=-1,
+        )
+
+
+def test_resource_type_checking_nested_type():
+    with pytest.raises(
+        TypeError,
+        match=r"Expected S3StorageIntegration.storage_allowed_locations to be list\[str\], got 's3://mybucket/myfolder/' instead",
+    ):
+        res.S3StorageIntegration(
+            name="some_s3_storage_integration",
+            enabled=True,
+            storage_aws_role_arn="arn:aws:iam::123456789012:role/MyS3AccessRole",
+            storage_allowed_locations="s3://mybucket/myfolder/",
+            storage_blocked_locations=["s3://mybucket/myblockedfolder/"],
+            storage_aws_object_acl="bucket-owner-full-control",
+            comment="This is a sample S3 storage integration.",
+        )

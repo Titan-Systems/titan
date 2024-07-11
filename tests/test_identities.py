@@ -24,7 +24,9 @@ def resource(request):
 
 
 def _resource_field_type_is_resource(field):
-    if issubclass(field.type, Resource):
+    if isinstance(field.type, str) and field.name == "owner" and field.type == "Role":
+        return True
+    elif issubclass(field.type, Resource):
         return True
     elif get_origin(field.type) == list and issubclass(get_args(field.type)[0], Resource):
         return True

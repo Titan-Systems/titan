@@ -1,7 +1,7 @@
 import datetime
+import logging
 import json
 import sys
-from collections import defaultdict
 from functools import cache
 from typing import Optional, Union
 
@@ -25,16 +25,17 @@ from .client import (
 from .enums import ResourceType, WarehouseSize
 from .identifiers import FQN, URN, parse_FQN, resource_type_for_label
 from .parse import (
-    FullyQualifiedIdentifier,
     _parse_column,
     _parse_dynamic_table_text,
     _parse_view_ddl,
     parse_collection_string,
-    parse_function_name,
 )
+from .privs import GrantedPrivilege
 from .resource_name import ResourceName, attribute_is_resource_name
 
 __this__ = sys.modules[__name__]
+
+logger = logging.getLogger("titan")
 
 
 def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
@@ -67,6 +68,9 @@ def _desc_type2_result_to_dict(desc_result, lower_properties=False):
         elif row["property_type"] == "String":
             value = value or None
         elif row["property_type"] == "List":
+            value = _parse_list_property(value)
+        # Not sure this is correct. External Access Integration uses this
+        elif row["property_type"] == "Object":
             value = _parse_list_property(value)
         result[property] = value
     return result
@@ -123,30 +127,30 @@ def _filter_result(result, **kwargs):
     return filtered
 
 
-def _urn_from_grant(row, session_ctx):
-    account_scoped_resources = {"user", "role", "warehouse", "database", "task"}
-    granted_on = row["granted_on"].lower()
-    if granted_on == "account":
-        return URN.from_session_ctx(session_ctx)
-    else:
-        if granted_on == "procedure" or granted_on == "function":
-            # This needs a special function because Snowflake gives an incorrect FQN for functions/sprocs
-            # eg. TITAN_DEV.PUBLIC."FETCH_DATABASE(NAME VARCHAR):OBJECT"
-            # The correct FQN is TITAN_DEV.PUBLIC."FETCH_DATABASE"(VARCHAR)
-            id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
-            name = parse_function_name(id_parts[-1])
-            fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
-        elif granted_on in account_scoped_resources:
-            # This is probably all account-scoped resources
-            fqn = FQN(name=ResourceName(row["name"]))
-        else:
-            # Scoped resources
-            fqn = parse_FQN(row["name"], is_db_scoped=(granted_on == "schema"))
-        return URN(
-            resource_type=ResourceType(granted_on),
-            account_locator=session_ctx["account_locator"],
-            fqn=fqn,
-        )
+# def _urn_from_grant(row, session_ctx):
+#     account_scoped_resources = {"user", "role", "warehouse", "database", "task"}
+#     granted_on = row["granted_on"].lower()
+#     if granted_on == "account":
+#         return URN.from_session_ctx(session_ctx)
+#     else:
+#         if granted_on == "procedure" or granted_on == "function":
+#             # This needs a special function because Snowflake gives an incorrect FQN for functions/sprocs
+#             # eg. TITAN_DEV.PUBLIC."FETCH_DATABASE(NAME VARCHAR):OBJECT"
+#             # The correct FQN is TITAN_DEV.PUBLIC."FETCH_DATABASE"(VARCHAR)
+#             id_parts = list(FullyQualifiedIdentifier.parse_string(row["name"], parse_all=True))
+#             name = parse_function_name(id_parts[-1])
+#             fqn = FQN(database=id_parts[0], schema=id_parts[1], name=name)
+#         elif granted_on in account_scoped_resources:
+#             # This is probably all account-scoped resources
+#             fqn = FQN(name=ResourceName(row["name"]))
+#         else:
+#             # Scoped resources
+#             fqn = parse_FQN(row["name"], is_db_scoped=(granted_on == "schema"))
+#         return URN(
+#             resource_type=ResourceType(granted_on),
+#             account_locator=session_ctx["account_locator"],
+#             fqn=fqn,
+#         )
 
 
 def _convert_to_gmt(dt: datetime.datetime, fmt_str: str = "%Y-%m-%d %H:%M:%S") -> Optional[str]:
@@ -377,10 +381,33 @@ def fetch_session(session):
         else:
             raise
 
+    available_roles = [ResourceName(name=role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
+
+    role_privileges = {}
+    for role in available_roles:
+
+        # Adds 30+s of latency and we can infer what privs are available
+        if role == "ACCOUNTADMIN" or role.startswith("SNOWFLAKE."):
+            continue
+
+        role_privileges[role] = []
+        grants = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
+        for grant in grants:
+            try:
+                granted_priv = GrantedPrivilege.from_grant(
+                    privilege=grant["privilege"],
+                    granted_on=grant["granted_on"].replace("_", " "),
+                    name=grant["name"],
+                )
+                role_privileges[role].append(granted_priv)
+            except ValueError as err:
+                logger.warning(f"Privileges for type: {grant['granted_on']} not currently supported: {err}")
+                continue
+
     return {
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
         "account": session_obj["ACCOUNT"],
-        "available_roles": json.loads(session_obj["AVAILABLE_ROLES"]),
+        "available_roles": available_roles,
         "database": session_obj["DATABASE"],
         "role": session_obj["ROLE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
@@ -390,6 +417,7 @@ def fetch_session(session):
         "user": session_obj["USER"],
         "version": session_obj["VERSION"],
         "warehouse": session_obj["WAREHOUSE"],
+        "role_privileges": role_privileges,
     }
 
 
@@ -556,6 +584,7 @@ def fetch_compute_pool(session, fqn: FQN):
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
+        "owner": data["owner"],
         "min_nodes": data["min_nodes"],
         "max_nodes": data["max_nodes"],
         "instance_family": data["instance_family"],
@@ -660,6 +689,28 @@ def fetch_event_table(session, fqn: FQN):
     }
 
 
+def fetch_external_access_integration(session, fqn: FQN):
+    integrations = _show_resources(session, "EXTERNAL ACCESS INTEGRATIONS", fqn)
+    if len(integrations) == 0:
+        return None
+    if len(integrations) > 1:
+        raise Exception(f"Found multiple external access integrations matching {fqn}")
+
+    data = integrations[0]
+    desc_result = execute(session, f"DESC EXTERNAL ACCESS INTEGRATION {fqn}", cacheable=True)
+    properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
+    return {
+        "name": _quote_snowflake_identifier(data["name"]),
+        "allowed_network_rules": properties["allowed_network_rules"],
+        "allowed_api_authentication_integrations": properties["allowed_api_authentication_integrations"] or None,
+        "allowed_authentication_secrets": properties["allowed_authentication_secrets"] or None,
+        "enabled": data["enabled"] == "true",
+        "owner": owner,
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_file_format(session, fqn: FQN):
     show_result = _show_resources(session, "FILE FORMATS", fqn)
     if len(show_result) == 0:
@@ -670,37 +721,74 @@ def fetch_file_format(session, fqn: FQN):
     data = show_result[0]
     format_options = json.loads(data["format_options"])
 
-    return {
-        "type": data["type"],
-        "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
-        "field_delimiter": format_options["FIELD_DELIMITER"],
-        "skip_header": format_options["SKIP_HEADER"],
-        "null_if": format_options["NULL_IF"],
-        "empty_field_as_null": format_options["EMPTY_FIELD_AS_NULL"],
-        "compression": format_options["COMPRESSION"],
-        "record_delimiter": format_options["RECORD_DELIMITER"],
-        "file_extension": format_options["FILE_EXTENSION"],
-        "parse_header": format_options["PARSE_HEADER"],
-        "skip_blank_lines": format_options["SKIP_BLANK_LINES"],
-        "date_format": format_options["DATE_FORMAT"],
-        "time_format": format_options["TIME_FORMAT"],
-        "timestamp_format": format_options["TIMESTAMP_FORMAT"],
-        "binary_format": format_options["BINARY_FORMAT"],
-        "escape": format_options["ESCAPE"] if format_options["ESCAPE"] != "NONE" else None,
-        "escape_unenclosed_field": format_options["ESCAPE_UNENCLOSED_FIELD"],
-        "trim_space": format_options["TRIM_SPACE"],
-        "field_optionally_enclosed_by": (
-            format_options["FIELD_OPTIONALLY_ENCLOSED_BY"]
-            if format_options["FIELD_OPTIONALLY_ENCLOSED_BY"] != "NONE"
-            else None
-        ),
-        "error_on_column_count_mismatch": format_options["ERROR_ON_COLUMN_COUNT_MISMATCH"],
-        "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
-        "skip_byte_order_mark": format_options["SKIP_BYTE_ORDER_MARK"],
-        "encoding": format_options["ENCODING"],
-        "comment": data["comment"] or None,
-    }
+    if data["type"] == "CSV":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "owner": data["owner"],
+            "field_delimiter": format_options["FIELD_DELIMITER"],
+            "skip_header": format_options["SKIP_HEADER"],
+            "null_if": format_options["NULL_IF"],
+            "empty_field_as_null": format_options["EMPTY_FIELD_AS_NULL"],
+            "compression": format_options["COMPRESSION"],
+            "record_delimiter": format_options["RECORD_DELIMITER"],
+            "file_extension": format_options["FILE_EXTENSION"],
+            "parse_header": format_options["PARSE_HEADER"],
+            "skip_blank_lines": format_options["SKIP_BLANK_LINES"],
+            "date_format": format_options["DATE_FORMAT"],
+            "time_format": format_options["TIME_FORMAT"],
+            "timestamp_format": format_options["TIMESTAMP_FORMAT"],
+            "binary_format": format_options["BINARY_FORMAT"],
+            "escape": format_options["ESCAPE"] if format_options["ESCAPE"] != "NONE" else None,
+            "escape_unenclosed_field": format_options["ESCAPE_UNENCLOSED_FIELD"],
+            "trim_space": format_options["TRIM_SPACE"],
+            "field_optionally_enclosed_by": (
+                format_options["FIELD_OPTIONALLY_ENCLOSED_BY"]
+                if format_options["FIELD_OPTIONALLY_ENCLOSED_BY"] != "NONE"
+                else None
+            ),
+            "error_on_column_count_mismatch": format_options["ERROR_ON_COLUMN_COUNT_MISMATCH"],
+            "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
+            "skip_byte_order_mark": format_options["SKIP_BYTE_ORDER_MARK"],
+            "encoding": format_options["ENCODING"],
+            "comment": data["comment"] or None,
+        }
+    elif data["type"] == "PARQUET":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "owner": data["owner"],
+            "comment": data["comment"] or None,
+            "compression": format_options["COMPRESSION"],
+            "binary_as_text": format_options["BINARY_AS_TEXT"],
+            "trim_space": format_options["TRIM_SPACE"],
+            "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
+            "null_if": format_options["NULL_IF"],
+        }
+    elif data["type"] == "JSON":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "type": data["type"],
+            "owner": data["owner"],
+            "comment": data["comment"] or None,
+            "compression": format_options["COMPRESSION"],
+            "date_format": format_options["DATE_FORMAT"],
+            "time_format": format_options["TIME_FORMAT"],
+            "timestamp_format": format_options["TIMESTAMP_FORMAT"],
+            "binary_format": format_options["BINARY_FORMAT"],
+            "trim_space": format_options["TRIM_SPACE"],
+            "null_if": format_options["NULL_IF"],
+            "file_extension": format_options["FILE_EXTENSION"],
+            "enable_octal": format_options["ENABLE_OCTAL"],
+            "allow_duplicate": format_options["ALLOW_DUPLICATE"],
+            "strip_outer_array": format_options["STRIP_OUTER_ARRAY"],
+            "strip_null_values": format_options["STRIP_NULL_VALUES"],
+            "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
+            "ignore_utf8_errors": format_options["IGNORE_UTF8_ERRORS"],
+            "skip_byte_order_mark": format_options["SKIP_BYTE_ORDER_MARK"],
+        }
+    else:
+        raise Exception(f"Unsupported file format type: {data['type']}")
 
 
 def fetch_function(session, fqn: FQN):
@@ -715,17 +803,32 @@ def fetch_function(session, fqn: FQN):
     inputs, output = data["arguments"].split(" RETURN ")
     desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
+    owner = _fetch_owner(session, "FUNCTION", fqn)
 
-    return {
-        "name": _quote_snowflake_identifier(data["name"]),
-        "secure": data["is_secure"] == "Y",
-        # "args": data["arguments"],
-        "returns": output,
-        "language": data["language"],
-        "comment": None if data["description"] == "user-defined function" else data["description"],
-        "volatility": properties["volatility"],
-        "as_": properties["body"],
-    }
+    if data["language"] == "PYTHON":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "secure": data["is_secure"] == "Y",
+            "args": _parse_signature(properties["signature"]),
+            "returns": output,
+            "language": data["language"],
+            "comment": None if data["description"] == "user-defined function" else data["description"],
+            "volatility": properties["volatility"],
+            "as_": properties["body"],
+            "owner": owner,
+        }
+    elif data["language"] == "JAVASCRIPT":
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "secure": data["is_secure"] == "Y",
+            "args": _parse_signature(properties["signature"]),
+            "returns": output,
+            "language": data["language"],
+            "comment": None if data["description"] == "user-defined function" else data["description"],
+            "volatility": properties["volatility"],
+            "as_": properties["body"],
+            "owner": owner,
+        }
 
 
 def fetch_future_grant(session, fqn: FQN):
@@ -1043,34 +1146,34 @@ def fetch_procedure(session, fqn: FQN):
     }
 
 
-def fetch_role_grants(session, role: str):
-    if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
-        return {}
-    try:
-        show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
-    except ProgrammingError as err:
-        if err.errno == DOES_NOT_EXIST_ERR:
-            return None
-        raise
-    session_ctx = fetch_session(session)
+# def fetch_role_grants(session, role: str):
+#     if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
+#         return {}
+#     try:
+#         show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
+#     except ProgrammingError as err:
+#         if err.errno == DOES_NOT_EXIST_ERR:
+#             return None
+#         raise
+#     session_ctx = fetch_session(session)
 
-    priv_map = defaultdict(list)
+#     priv_map = defaultdict(list)
 
-    for row in show_result:
-        try:
-            urn = _urn_from_grant(row, session_ctx)
-        except ValueError:
-            # Grant for a Snowflake resource type that Titan doesn't support yet
-            continue
-        priv_map[str(urn)].append(
-            {
-                "priv": row["privilege"],
-                "grant_option": row["grant_option"] == "true",
-                "owner": row["granted_by"],
-            }
-        )
+#     for row in show_result:
+#         try:
+#             urn = _urn_from_grant(row, session_ctx)
+#         except ValueError:
+#             # Grant for a Snowflake resource type that Titan doesn't support yet
+#             continue
+#         priv_map[str(urn)].append(
+#             {
+#                 "priv": row["privilege"],
+#                 "grant_option": row["grant_option"] == "true",
+#                 "owner": row["granted_by"],
+#             }
+#         )
 
-    return dict(priv_map)
+#     return dict(priv_map)
 
 
 def fetch_role(session, fqn: FQN):
@@ -1475,6 +1578,7 @@ def fetch_tag(session, fqn: FQN):
     data = tags[0]
     return {
         "name": _quote_snowflake_identifier(data["name"]),
+        "owner": data["owner"],
         "comment": data["comment"] or None,
         "allowed_values": json.loads(data["allowed_values"]) if data["allowed_values"] else None,
     }
@@ -1790,8 +1894,8 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
     for row in show_result:
         resources.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )
@@ -1872,7 +1976,12 @@ def list_grants(session) -> list[FQN]:
         role_name = ResourceName.from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        show_result = execute(session, f"SHOW GRANTS TO ROLE {role_name}")
+        try:
+            show_result = execute(session, f"SHOW GRANTS TO ROLE {role_name}")
+        except ProgrammingError as err:
+            if err.errno == DOES_NOT_EXIST_ERR:
+                continue
+            raise
         for data in show_result:
             if data["granted_on"] == "ROLE":
                 # raise Exception(f"Role grants are not supported yet: {data}")
@@ -1934,7 +2043,12 @@ def list_schemas(session, database=None) -> list[FQN]:
         for row in show_result:
             if row["database_name"] in SYSTEM_DATABASES or row["name"] == "INFORMATION_SCHEMA":
                 continue
-            schemas.append(FQN(database=row["database_name"], name=ResourceName.from_snowflake_metadata(row["name"])))
+            schemas.append(
+                FQN(
+                    database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                    name=ResourceName.from_snowflake_metadata(row["name"]),
+                )
+            )
         return schemas
     except ProgrammingError as err:
         if err.errno == OBJECT_DOES_NOT_EXIST_ERR:
@@ -1972,8 +2086,8 @@ def list_stages(session) -> list[FQN]:
             continue
         stages.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )
@@ -1996,8 +2110,8 @@ def list_tables(session) -> list[FQN]:
             continue
         tables.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )
@@ -2013,8 +2127,8 @@ def list_tags(session) -> list[FQN]:
                 continue
             tags.append(
                 FQN(
-                    database=row["database_name"],
-                    schema=row["schema_name"],
+                    database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                    schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                     name=ResourceName.from_snowflake_metadata(row["name"]),
                 )
             )
@@ -2050,8 +2164,8 @@ def list_views(session) -> list[FQN]:
             continue
         views.append(
             FQN(
-                database=row["database_name"],
-                schema=row["schema_name"],
+                database=ResourceName.from_snowflake_metadata(row["database_name"]),
+                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
                 name=ResourceName.from_snowflake_metadata(row["name"]),
             )
         )

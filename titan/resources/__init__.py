@@ -12,7 +12,7 @@ from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
 from .failover_group import FailoverGroup
-from .file_format import CSVFileFormat
+from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
@@ -53,7 +53,7 @@ from .storage_integration import (
 )
 from .stream import StageStream, TableStream, ViewStream  # ExternalTableStream
 from .table import Table  # , CreateTableAsSelect
-from .tag import Tag
+from .tag import Tag, TagReference
 from .task import Task
 from .user import User
 from .view import View
@@ -83,6 +83,7 @@ __all__ = [
     "ExternalFunction",
     "ExternalStage",
     "FailoverGroup",
+    "JSONFileFormat",
     "FutureGrant",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
@@ -100,6 +101,7 @@ __all__ = [
     "OAuthSecret",
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
+    "ParquetFileFormat",
     "PasswordPolicy",
     "PasswordSecret",
     "Pipe",
@@ -121,6 +123,7 @@ __all__ = [
     "Table",
     "TableStream",
     "Tag",
+    "TagReference",
     "Task",
     "User",
     "View",

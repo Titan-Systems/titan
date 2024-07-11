@@ -34,4 +34,5 @@ def test_example(example, cursor, marked_for_cleanup):
         dry_run=False,
     )
     plan = blueprint.plan(cursor.connection)
-    blueprint.apply(cursor.connection, plan)
+    cmds = blueprint.apply(cursor.connection, plan)
+    assert cmds

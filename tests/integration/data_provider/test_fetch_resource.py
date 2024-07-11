@@ -43,7 +43,9 @@ def test_fetch_privilege_grant(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
+    result = data_provider.remove_none_values(result)
+    data = data_provider.remove_none_values(grant.to_dict())
+    assert result == data
 
 
 @pytest.mark.enterprise
@@ -124,24 +126,26 @@ def test_fetch_database(cursor, suffix):
 
 
 def test_fetch_grant_all_on_resource(cursor):
-    cursor.execute(f"GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE STATIC_ROLE")
-    grant_all_urn = parse_URN(f"urn:::grant/STATIC_ROLE?priv=ALL&on=warehouse/STATIC_WAREHOUSE")
+    cursor.execute("GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE STATIC_ROLE")
+    grant_all_urn = parse_URN("urn:::grant/STATIC_ROLE?priv=ALL&on=warehouse/STATIC_WAREHOUSE")
+    try:
+        grant = safe_fetch(cursor, grant_all_urn)
+        assert grant is not None
+        assert grant["priv"] == "ALL"
+        assert grant["on_type"] == "WAREHOUSE"
+        assert grant["on"] == "STATIC_WAREHOUSE"
+        assert grant["to"] == "STATIC_ROLE"
+        assert grant["owner"] == "SYSADMIN"
+        assert grant["grant_option"] is False
+        assert grant["_privs"] == ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"]
 
-    grant = safe_fetch(cursor, grant_all_urn)
-    assert grant is not None
-    assert grant["priv"] == "ALL"
-    assert grant["on_type"] == "WAREHOUSE"
-    assert grant["on"] == "STATIC_WAREHOUSE"
-    assert grant["to"] == "STATIC_ROLE"
-    assert grant["owner"] == "SYSADMIN"
-    assert grant["grant_option"] is False
-    assert grant["_privs"] == ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"]
+        cursor.execute("REVOKE MODIFY ON WAREHOUSE STATIC_WAREHOUSE FROM ROLE STATIC_ROLE")
 
-    cursor.execute(f"REVOKE MODIFY ON WAREHOUSE STATIC_WAREHOUSE FROM ROLE STATIC_ROLE")
-
-    grant = safe_fetch(cursor, grant_all_urn)
-    assert grant is not None
-    assert "MODIFY" not in grant["_privs"]
+        grant = safe_fetch(cursor, grant_all_urn)
+        assert grant is not None
+        assert "MODIFY" not in grant["_privs"]
+    finally:
+        cursor.execute("REVOKE ALL ON WAREHOUSE STATIC_WAREHOUSE FROM ROLE STATIC_ROLE")
 
 
 def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
@@ -340,6 +344,7 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
         schema="PUBLIC",
         comment="Tag for testing",
         allowed_values=["SOME_VALUE"],
+        owner=TEST_ROLE,
     )
     cursor.execute(tag.create_sql(if_not_exists=True))
     marked_for_cleanup.append(tag)
@@ -354,6 +359,7 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
         comment="Tag for testing",
+        owner=TEST_ROLE,
     )
     cursor.execute(tag.create_sql(if_not_exists=True))
     marked_for_cleanup.append(tag)
@@ -555,10 +561,10 @@ def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
     assert_resource_dicts_eq_ignore_nulls(result, dynamic_table.to_dict())
 
 
-@pytest.mark.skip(reason="Generates invalid SQL")
 def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
     function = res.JavascriptUDF(
-        name="SOMEFUNC",
+        name="SOME_JAVASCRIPT_UDF",
+        args=[{"name": "INPUT_ARG", "data_type": "VARIANT"}],
         returns="FLOAT",
         volatility="VOLATILE",
         as_="return 42;",
@@ -572,12 +578,14 @@ def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, function.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, function.to_dict())
+    result = strip_nones_and_unfetchable(res.JavascriptUDF.spec, result)
+    data = strip_nones_and_unfetchable(res.JavascriptUDF.spec, function.to_dict())
+    assert result == data
 
 
 def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
     password_policy = res.PasswordPolicy(
-        name="SOMEPOLICY",
+        name="SOME_PASSWORD_POLICY",
         password_min_length=12,
         password_max_length=24,
         password_min_upper_case_chars=2,
@@ -802,7 +810,9 @@ def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, compute_pool.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, compute_pool.to_dict())
+    result = strip_nones_and_unfetchable(res.ComputePool.spec, result)
+    data = strip_nones_and_unfetchable(res.ComputePool.spec, compute_pool.to_dict())
+    assert result == data
 
 
 def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
@@ -990,4 +1000,52 @@ def test_fetch_authentication_policies(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, result)
     data = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, policy.to_dict())
+    assert result == data
+
+
+def test_fetch_external_access_integration(cursor, suffix, marked_for_cleanup):
+    integration = res.ExternalAccessIntegration(
+        name=f"EXTERNAL_ACCESS_INTEGRATION_{suffix}",
+        allowed_network_rules=["static_database.public.static_network_rule"],
+        comment="External access integration for testing",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(integration)
+
+    result = safe_fetch(cursor, integration.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, result)
+    data = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, integration.to_dict())
+    assert result == data
+
+
+def test_fetch_parquet_file_format(cursor, suffix, marked_for_cleanup):
+    file_format = res.ParquetFileFormat(
+        name=f"SOME_PARQUET_FILE_FORMAT_{suffix}",
+        compression="SNAPPY",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(file_format.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(file_format)
+
+    result = safe_fetch(cursor, file_format.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.ParquetFileFormat.spec, result)
+    data = strip_nones_and_unfetchable(res.ParquetFileFormat.spec, file_format.to_dict())
+    assert result == data
+
+
+def test_fetch_json_file_format(cursor, suffix, marked_for_cleanup):
+    file_format = res.JSONFileFormat(
+        name=f"SOME_JSON_FILE_FORMAT_{suffix}",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(file_format.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(file_format)
+
+    result = safe_fetch(cursor, file_format.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.JSONFileFormat.spec, result)
+    data = strip_nones_and_unfetchable(res.JSONFileFormat.spec, file_format.to_dict())
     assert result == data

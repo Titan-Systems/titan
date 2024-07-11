@@ -188,12 +188,294 @@ class CSVFileFormat(NamedResource, Resource):
         )
 
 
+@dataclass(unsafe_hash=True)
+class _JSONFileFormat(ResourceSpec):
+    name: ResourceName
+    owner: Role = "SYSADMIN"
+    type: FileType = FileType.JSON
+    compression: Compression = Compression.AUTO
+    date_format: str = "AUTO"
+    time_format: str = "AUTO"
+    timestamp_format: str = "AUTO"
+    binary_format: BinaryFormat = BinaryFormat.HEX
+    trim_space: bool = False
+    null_if: list[str] = None
+    file_extension: str = None
+    enable_octal: bool = False
+    allow_duplicate: bool = False
+    strip_outer_array: bool = False
+    strip_null_values: bool = False
+    replace_invalid_characters: bool = False
+    ignore_utf8_errors: bool = False
+    skip_byte_order_mark: bool = True
+    comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.null_if is None:
+            self.null_if = []
+
+
+class JSONFileFormat(NamedResource, Resource):
+    """
+    Description:
+        A JSON file format in Snowflake.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-file-format
+
+    Fields:
+        name (string, required): The name of the file format.
+        owner (string or Role): The owner role of the file format. Defaults to "SYSADMIN".
+        compression (string): The compression type for the file format. Defaults to "AUTO".
+        date_format (string): The format used for date values. Defaults to "AUTO".
+        time_format (string): The format used for time values. Defaults to "AUTO".
+        timestamp_format (string): The format used for timestamp values. Defaults to "AUTO".
+        binary_format (BinaryFormat): The format used for binary data. Defaults to HEX.
+        trim_space (bool): Whether to trim spaces. Defaults to False.
+        null_if (list): A list of strings to be interpreted as NULL.
+        file_extension (string): The file extension used for files of this format.
+        enable_octal (bool): Whether to enable octal values. Defaults to False.
+        allow_duplicate (bool): Whether to allow duplicate keys. Defaults to False.
+        strip_outer_array (bool): Whether to strip the outer array. Defaults to False.
+        strip_null_values (bool): Whether to strip null values. Defaults to False.
+        replace_invalid_characters (bool): Whether to replace invalid characters. Defaults to False.
+        ignore_utf8_errors (bool): Whether to ignore UTF-8 errors. Defaults to False.
+        skip_byte_order_mark (bool): Whether to skip the byte order mark. Defaults to True.
+        comment (string): A comment for the file format.
+
+    Python:
+
+        ```python
+        file_format = JSONFileFormat(
+            name="some_json_file_format",
+            owner="SYSADMIN",
+            compression="AUTO",
+            date_format="AUTO",
+            time_format="AUTO",
+            timestamp_format="AUTO",
+            binary_format=BinaryFormat.HEX,
+            trim_space=False,
+            null_if=["NULL"],
+            file_extension="json",
+            enable_octal=False,
+            allow_duplicate=False,
+            strip_outer_array=False,
+            strip_null_values=False,
+            replace_invalid_characters=False,
+            ignore_utf8_errors=False,
+            skip_byte_order_mark=True,
+            comment="This is a JSON file format."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        file_formats:
+          - name: some_json_file_format
+            owner: SYSADMIN
+            compression: AUTO
+            date_format: AUTO
+            time_format: AUTO
+            timestamp_format: AUTO
+            binary_format: HEX
+            trim_space: false
+            null_if:
+              - NULL
+            file_extension: json
+            enable_octal: false
+            allow_duplicate: false
+            strip_outer_array: false
+            strip_null_values: false
+            replace_invalid_characters: false
+            ignore_utf8_errors: false
+            skip_byte_order_mark: true
+            comment: This is a JSON file format.
+        ```
+    """
+
+    resource_type = ResourceType.FILE_FORMAT
+    props = Props(
+        type=EnumProp("type", [FileType.JSON]),
+        compression=EnumProp("compression", Compression),
+        date_format=StringProp("date_format", alt_tokens=["AUTO"]),
+        time_format=StringProp("time_format", alt_tokens=["AUTO"]),
+        timestamp_format=StringProp("timestamp_format", alt_tokens=["AUTO"]),
+        binary_format=EnumProp("binary_format", BinaryFormat),
+        trim_space=BoolProp("trim_space"),
+        null_if=StringListProp("null_if", parens=True),
+        file_extension=StringProp("file_extension"),
+        enable_octal=BoolProp("enable_octal"),
+        allow_duplicate=BoolProp("allow_duplicate"),
+        strip_outer_array=BoolProp("strip_outer_array"),
+        strip_null_values=BoolProp("strip_null_values"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        ignore_utf8_errors=BoolProp("ignore_utf8_errors"),
+        skip_byte_order_mark=BoolProp("skip_byte_order_mark"),
+        comment=StringProp("comment"),
+    )
+    scope = SchemaScope()
+    spec = _JSONFileFormat
+
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        compression: Compression = Compression.AUTO,
+        date_format: str = "AUTO",
+        time_format: str = "AUTO",
+        timestamp_format: str = "AUTO",
+        binary_format: BinaryFormat = BinaryFormat.HEX,
+        trim_space: bool = False,
+        null_if: list[str] = None,
+        file_extension: str = "json",
+        enable_octal: bool = False,
+        allow_duplicate: bool = False,
+        strip_outer_array: bool = False,
+        strip_null_values: bool = False,
+        replace_invalid_characters: bool = False,
+        ignore_utf8_errors: bool = False,
+        skip_byte_order_mark: bool = True,
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        super().__init__(name, **kwargs)
+        self._data: _JSONFileFormat = _JSONFileFormat(
+            name=self._name,
+            owner=owner,
+            compression=compression,
+            date_format=date_format,
+            time_format=time_format,
+            timestamp_format=timestamp_format,
+            binary_format=binary_format,
+            trim_space=trim_space,
+            null_if=null_if,
+            file_extension=file_extension,
+            enable_octal=enable_octal,
+            allow_duplicate=allow_duplicate,
+            strip_outer_array=strip_outer_array,
+            strip_null_values=strip_null_values,
+            replace_invalid_characters=replace_invalid_characters,
+            ignore_utf8_errors=ignore_utf8_errors,
+            skip_byte_order_mark=skip_byte_order_mark,
+            comment=comment,
+        )
+
+
+@dataclass(unsafe_hash=True)
+class _ParquetFileFormat(ResourceSpec):
+    name: ResourceName
+    owner: Role = "SYSADMIN"
+    type: FileType = FileType.PARQUET
+    compression: Compression = Compression.AUTO
+    binary_as_text: bool = True
+    trim_space: bool = False
+    replace_invalid_characters: bool = False
+    null_if: list[str] = None
+    comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.null_if is None:
+            self.null_if = []
+
+
+class ParquetFileFormat(NamedResource, Resource):
+    """
+    Description:
+        A Parquet file format in Snowflake.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/create-file-format
+
+    Fields:
+        name (string, required): The name of the file format.
+        owner (string or Role): The owner role of the file format. Defaults to "SYSADMIN".
+        compression (string): The compression type for the file format. Defaults to "AUTO".
+        binary_as_text (bool): Whether to interpret binary data as text. Defaults to True.
+        trim_space (bool): Whether to trim spaces. Defaults to False.
+        replace_invalid_characters (bool): Whether to replace invalid characters. Defaults to False.
+        null_if (list): A list of strings to be interpreted as NULL.
+        comment (string): A comment for the file format.
+
+    Python:
+
+        ```python
+        file_format = ParquetFileFormat(
+            name="some_file_format",
+            owner="SYSADMIN",
+            compression="AUTO",
+            binary_as_text=True,
+            trim_space=False,
+            replace_invalid_characters=False,
+            null_if=["NULL"],
+            comment="This is a Parquet file format."
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        file_formats:
+          - name: some_file_format
+            owner: SYSADMIN
+            compression: AUTO
+            binary_as_text: true
+            trim_space: false
+            replace_invalid_characters: false
+            null_if:
+              - NULL
+            comment: This is a Parquet file format.
+        ```
+    """
+
+    resource_type = ResourceType.FILE_FORMAT
+    props = Props(
+        type=EnumProp("type", [FileType.PARQUET]),
+        compression=EnumProp("compression", Compression),
+        binary_as_text=BoolProp("binary_as_text"),
+        trim_space=BoolProp("trim_space"),
+        replace_invalid_characters=BoolProp("replace_invalid_characters"),
+        null_if=StringListProp("null_if", parens=True),
+        comment=StringProp("comment"),
+    )
+    scope = SchemaScope()
+    spec = _ParquetFileFormat
+
+    def __init__(
+        self,
+        name: str,
+        owner: str = "SYSADMIN",
+        compression: str = "AUTO",
+        binary_as_text: bool = True,
+        trim_space: bool = False,
+        replace_invalid_characters: bool = False,
+        null_if: list[str] = None,
+        comment: str = None,
+        **kwargs,
+    ):
+        kwargs.pop("type", None)
+        super().__init__(name, **kwargs)
+        self._data: _ParquetFileFormat = _ParquetFileFormat(
+            name=self._name,
+            owner=owner,
+            compression=compression,
+            binary_as_text=binary_as_text,
+            trim_space=trim_space,
+            replace_invalid_characters=replace_invalid_characters,
+            null_if=null_if,
+            comment=comment,
+        )
+
+
 FileFormatMap = {
     FileType.CSV: CSVFileFormat,
-    # FileType.JSON: JSONFileFormat,
+    FileType.JSON: JSONFileFormat,
     # FileType.AVRO: AvroFileFormat,
     # FileType.ORC: OrcFileFormat,
-    # FileType.PARQUET: ParquetFileFormat,
+    FileType.PARQUET: ParquetFileFormat,
     # FileType.XML: XMLFileFormat,
 }
 

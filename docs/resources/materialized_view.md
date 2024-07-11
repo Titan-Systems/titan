@@ -32,7 +32,7 @@ materialized_views:
   - name: some_materialized_view
     owner: SYSADMIN
     secure: true
-    as: SELECT * FROM some_table
+    as_: SELECT * FROM some_table
 ```
 
 

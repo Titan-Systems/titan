@@ -7,6 +7,7 @@ class Action(Enum):
     ADD = "add"
     REMOVE = "remove"
     CHANGE = "change"
+    TRANSFER = "transfer"
 
 
 def eq(lhs, rhs, key):
@@ -91,8 +92,14 @@ def diff(original, new):
 
             delta = dict_delta(original[key], new[key])
 
+            owner_attr = delta.pop("owner", None)
+
             for attr, value in delta.items():
                 yield Action.CHANGE, key, {attr: value}
+
+            # Force the transfer to happen after all other attribute changes
+            if owner_attr:
+                yield Action.TRANSFER, key, {"owner": owner_attr}
 
         elif isinstance(original[key], list):
 

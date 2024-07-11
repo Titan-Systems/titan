@@ -1,18 +1,22 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
-from ..identifiers import FQN
 from ..enums import AccountEdition, ResourceType
+from ..identifiers import FQN
 from ..props import Props, StringListProp, StringProp
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
 from ..scope import AccountScope, SchemaScope
-from .resource import Resource, NamedResource, ResourceSpec, ResourcePointer
+from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
+
+if TYPE_CHECKING:
+    from .role import Role
 
 
 @dataclass(unsafe_hash=True)
 class _Tag(ResourceSpec):
     name: ResourceName
+    owner: "Role" = "SYSADMIN"
     comment: str = None
     allowed_values: list = None
 
@@ -65,6 +69,7 @@ class Tag(NamedResource, Resource):
     def __init__(
         self,
         name: str,
+        owner: str = "SYSADMIN",
         comment: str = None,
         allowed_values: list = None,
         **kwargs,
@@ -72,6 +77,7 @@ class Tag(NamedResource, Resource):
         super().__init__(name, **kwargs)
         self._data: _Tag = _Tag(
             name=self._name,
+            owner=owner,
             comment=comment,
             allowed_values=allowed_values,
         )
@@ -80,7 +86,7 @@ class Tag(NamedResource, Resource):
 @dataclass(unsafe_hash=True)
 class _TagReference(ResourceSpec):
     object_name: str
-    object_domain: str
+    object_domain: ResourceType
     tags: ResourceTags
 
 
@@ -95,7 +101,7 @@ class TagReference(Resource):
     def __init__(
         self,
         object_name: str,
-        object_domain: ResourceType,
+        object_domain: str,
         tags: dict[str, str],
         **kwargs,
     ):
@@ -105,6 +111,9 @@ class TagReference(Resource):
             object_domain=object_domain,
             tags=tags,
         )
+        for tag in tags.keys():
+            tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
+            self.requires(tag_ptr)
 
     @property
     def fqn(self):
@@ -119,8 +128,16 @@ def tag_reference_fqn(data: _TagReference) -> FQN:
     return FQN(
         name=ResourceName(data.object_name),
         params={
-            "domain": data.object_domain,
+            "domain": str(data.object_domain),
         },
+    )
+
+
+def tag_reference_for_resource(resource: Resource, tags: dict[str, str]) -> TagReference:
+    return TagReference(
+        object_name=str(resource.fqn),
+        object_domain=resource.resource_type,
+        tags=tags,
     )
 
 
@@ -140,15 +157,8 @@ class TaggableResource:
     def create_tag_reference(self):
         if self._tags is None:
             return None
-        ref = TagReference(
-            object_name=str(self.fqn),
-            object_domain=self.resource_type,
-            tags=self._tags,
-        )
+        ref = tag_reference_for_resource(self, self._tags)
         ref.requires(self)
-        for tag in self._tags.keys():
-            tag_ptr = ResourcePointer(name=tag, resource_type=ResourceType.TAG)
-            ref.requires(tag_ptr)
         return ref
 
     @property

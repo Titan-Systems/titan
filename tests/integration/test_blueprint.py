@@ -2,11 +2,13 @@ import os
 
 import pytest
 
+from tests.helpers import safe_fetch
 from titan import data_provider
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, MissingResourceException, plan_sql
+from titan.blueprint import Action, Blueprint, MissingResourceException, compile_plan_to_sql
 from titan.client import reset_cache
 from titan.enums import ResourceType
+from titan.identifiers import parse_URN
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -112,6 +114,31 @@ def test_blueprint_zero_drift_after_apply(cursor, test_db, suffix, marked_for_cl
     assert len(subsequent_changes) == 0, "Expected no changes in the blueprint plan but found some."
 
 
+def test_blueprint_modify_resource(cursor, suffix, marked_for_cleanup):
+    cursor.execute(f"CREATE WAREHOUSE modify_me_{suffix}")
+    session = cursor.connection
+    blueprint = Blueprint(name="test_remove_resource")
+    warehouse = res.Warehouse(
+        name=f"modify_me_{suffix}",
+        auto_suspend=60,
+        owner=TEST_ROLE,
+    )
+    marked_for_cleanup.append(warehouse)
+    blueprint.add(warehouse)
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    assert plan[0].action == Action.CHANGE
+    assert plan[0].urn.fqn.name == f"MODIFY_ME_{suffix}"
+    assert plan[0].delta == {"auto_suspend": 60}
+
+    sql_commands = blueprint.apply(session, plan)
+    assert sql_commands == [
+        "USE SECONDARY ROLES ALL",
+        f"USE ROLE {TEST_ROLE}",
+        f"ALTER WAREHOUSE MODIFY_ME_{suffix} SET auto_suspend = 60",
+    ]
+
+
 def test_blueprint_crossreferenced_database(cursor):
     session = cursor.connection
     bp = Blueprint(name="failing-reference")
@@ -150,8 +177,14 @@ def test_blueprint_plan_sql(cursor, user):
     blueprint.add(somedb)
     plan = blueprint.plan(session)
 
-    assert plan_sql(plan) == [
-        "CREATE DATABASE THIS_DATABASE_DOES_NOT_EXIST DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
+    session_ctx = data_provider.fetch_session(session)
+
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+
+    assert sql_commands == [
+        "USE SECONDARY ROLES ALL",
+        "USE ROLE SYSADMIN",
+        "CREATE DATABASE THIS_DATABASE_DOES_NOT_EXIST DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14",
     ]
 
     blueprint = Blueprint(name="test_modify_user")
@@ -159,7 +192,13 @@ def test_blueprint_plan_sql(cursor, user):
     blueprint.add(modified_user)
     plan = blueprint.plan(session)
 
-    assert plan_sql(plan) == [f"ALTER USER {user.name} SET display_name = 'new_display_name'"]
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+
+    assert sql_commands == [
+        "USE SECONDARY ROLES ALL",
+        "USE ROLE ACCOUNTADMIN",
+        f"ALTER USER {user.name} SET display_name = 'new_display_name'",
+    ]
 
 
 def test_blueprint_missing_resource_pointer(cursor):
@@ -179,11 +218,10 @@ def test_blueprint_present_resource_pointer(cursor):
     assert len(plan) == 2
 
 
-def test_blueprint_missing_database(cursor):
+def test_blueprint_missing_database_inferred_from_session_context(cursor):
     session = cursor.connection
-    func = res.JavascriptUDF(name="func", returns="INT", as_="return 1;", schema="public")
+    func = res.JavascriptUDF(name="func", args=[], returns="INT", as_="return 1;", schema="public")
     blueprint = Blueprint(name="blueprint", resources=[func])
-    # with pytest.raises(Exception):
     blueprint.plan(session)
 
 
@@ -323,3 +361,22 @@ def test_blueprint_quoted_identifier_drift(cursor, test_db, suffix):
     cursor.execute(f'DROP SCHEMA {test_db}."multiCaseString_{suffix}"')
 
     assert len(plan) == 0
+
+
+def test_blueprint_grant_role_to_public(cursor, suffix, marked_for_cleanup):
+    session = cursor.connection
+
+    role_name = f"role{suffix}_grant_role_to_public"
+    role = res.Role(name=role_name)
+    marked_for_cleanup.append(role)
+    grant = res.RoleGrant(role=role, to_role="PUBLIC")
+    blueprint = Blueprint(resources=[role, grant])
+    blueprint.apply(session)
+    role_data = safe_fetch(cursor, role.urn)
+    assert role_data is not None
+    assert role_data["name"] == role.name
+
+    grant_data = safe_fetch(cursor, grant.urn)
+    assert grant_data is not None
+    assert grant_data["role"] == role_name
+    assert grant_data["to_role"] == "PUBLIC"

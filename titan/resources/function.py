@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Union
 
 from ..enums import DataType, Language, NullHandling, ResourceType, Volatility
@@ -23,12 +23,12 @@ from .role import Role
 @dataclass(unsafe_hash=True)
 class _JavascriptUDF(ResourceSpec):
     name: ResourceName
+    args: list[Arg]
     returns: str
     as_: str
     language: Language = Language.JAVASCRIPT
-    args: list[Arg] = None
     comment: str = None
-    copy_grants: bool = False
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     external_access_integrations: list[str] = None
     handler: str = None
     imports: list[str] = None
@@ -101,7 +101,8 @@ class JavascriptUDF(NamedResource, Resource):
         # Specifies to retain the access privileges from the original function when a new
         # function is created using CREATE OR REPLACE FUNCTION.
         # copy_grants=FlagProp("copy_grants"),
-        returns=EnumProp("returns", DataType, eq=False),
+        # returns=EnumProp("returns", DataType, eq=False),
+        returns=ReturnsProp("returns", eq=False),
         # not_null=BoolProp("not_null"),
         language=EnumProp("language", [Language.JAVASCRIPT], eq=False),
         null_handling=EnumFlagProp(NullHandling),
@@ -115,12 +116,12 @@ class JavascriptUDF(NamedResource, Resource):
     def __init__(
         self,
         name: str,
-        returns: DataType,
+        args: list,
+        returns: str,
         as_: str,
         copy_grants: bool = False,
         owner: str = "SYSADMIN",
         secure: bool = False,
-        args: list = [],
         null_handling: NullHandling = None,
         volatility: Volatility = None,
         comment: str = None,
@@ -156,7 +157,7 @@ class _PythonUDF(ResourceSpec):
     language: Language = Language.PYTHON
     as_: str = None
     comment: str = None
-    copy_grants: bool = False
+    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     external_access_integrations: list[str] = None
     imports: list[str] = None
     null_handling: NullHandling = None
@@ -271,10 +272,10 @@ class PythonUDF(NamedResource, Resource):
     def __init__(
         self,
         name: str,
+        args: list,
         returns: str,
         runtime_version: str,
         handler: str,
-        args: list,
         as_: str = None,
         comment: str = None,
         copy_grants: bool = False,

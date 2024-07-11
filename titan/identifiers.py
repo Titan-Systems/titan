@@ -11,18 +11,26 @@ class FQN:
     def __init__(
         self,
         name: ResourceName,
-        database: Optional[Union[str, ResourceName]] = None,
-        schema: Optional[Union[str, ResourceName]] = None,
+        database: Optional[ResourceName] = None,
+        schema: Optional[ResourceName] = None,
         arg_types: Optional[list] = None,
         params: Optional[dict] = None,
     ) -> None:
+
+        if not isinstance(name, ResourceName):
+            raise TypeError(f"FQN name: {name} is {type(name)}, not a ResourceName")
+
+        if database and not isinstance(database, ResourceName):
+            raise TypeError(f"FQN database: {database} is {type(database)}, not a ResourceName")
+
+        if schema and not isinstance(schema, ResourceName):
+            raise TypeError(f"FQN schema: {schema} is {type(schema)}, not a ResourceName")
+
         self.name = name
         self.database = database
         self.schema = schema
         self.arg_types = arg_types
         self.params = params or {}
-        if not isinstance(name, ResourceName):
-            raise Exception
 
     def __eq__(self, other):
         if not isinstance(other, FQN):
@@ -38,17 +46,17 @@ class FQN:
     def __hash__(self):
         return hash(
             (
-                ResourceName(self.name),
-                ResourceName(self.database) if self.database else None,
-                ResourceName(self.schema) if self.schema else None,
+                self.name,
+                self.database,
+                self.schema,
                 tuple(self.arg_types or []),
                 tuple(self.params.items()),
             )
         )
 
     def __str__(self):
-        db = f"{ResourceName(self.database)}." if self.database else ""
-        schema = f"{ResourceName(self.schema)}." if self.schema else ""
+        db = f"{self.database}." if self.database else ""
+        schema = f"{self.schema}." if self.schema else ""
         arg_types = ""
         if self.arg_types is not None:
             arg_types = f"({', '.join(map(str, self.arg_types))})"
@@ -56,13 +64,18 @@ class FQN:
         return f"{db}{schema}{self.name}{arg_types}{params}"
 
     def __repr__(self):  # pragma: no cover
-        db = f", db={self.database}" if self.database else ""
-        schema = f", schema={self.schema}" if self.schema else ""
+
+        name = getattr(self, "name", None)
+        database = getattr(self, "database", None)
+        schema = getattr(self, "schema", None)
+
+        db = f", db={database}" if database else ""
+        schema = f", schema={schema}" if schema else ""
         arg_types = ""
         if self.arg_types is not None:
             arg_types = f", args=({', '.join(map(str, self.arg_types))})"
         params = " ?" + _params_to_str(self.params) if self.params else ""
-        return f"FQN(name={self.name}{db}{schema}{arg_types}{params})"
+        return f"FQN(name={name}{db}{schema}{arg_types}{params})"
 
 
 class URN:
@@ -117,20 +130,6 @@ class URN:
     @classmethod
     def from_resource(cls, resource, account_locator: str = ""):
         return cls(resource_type=resource.resource_type, fqn=resource.fqn, account_locator=account_locator)
-
-    # @classmethod
-    # def from_locator(cls, locator: "ResourceLocator"):
-    #     if locator.star:
-    #         raise Exception("Cannot create URN from a wildcard locator")
-    #     return cls(resource_type=locator.resource_key, fqn=FQN.from_str(locator.locator))
-
-    @classmethod
-    def from_session_ctx(cls, session_ctx):
-        return cls(
-            resource_type=ResourceType.ACCOUNT,
-            fqn=FQN(name=session_ctx["account"]),
-            account_locator=session_ctx["account_locator"],
-        )
 
     def database(self):
         if not self.fqn.database:
@@ -263,7 +262,14 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> dict:
 def parse_FQN(fqn_str: str, is_db_scoped=False) -> FQN:
     identifier = parse_identifier(fqn_str, is_db_scoped=is_db_scoped)
     name = identifier.pop("name")
-    return FQN(name=ResourceName(name), **identifier)
+    database = identifier.pop("database", None)
+    schema = identifier.pop("schema", None)
+    return FQN(
+        name=ResourceName(name),
+        database=ResourceName(database) if database else None,
+        schema=ResourceName(schema) if schema else None,
+        **identifier,
+    )
 
 
 # NOTE: can't put this into identifiers.py:URN because of circular import

@@ -17,7 +17,7 @@ class _Parseable(EnumMeta):
         return super().__call__(value, *args, **kw)
 
     def __contains__(self, child):
-        raise NotImplementedError
+        return child in self.__members__
 
 
 class ParseableEnum(Enum, metaclass=_Parseable):
