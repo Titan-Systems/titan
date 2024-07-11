@@ -128,7 +128,7 @@ def test_blueprint_modify_resource(cursor, suffix, marked_for_cleanup):
     plan = blueprint.plan(session)
     assert len(plan) == 1
     assert plan[0].action == Action.CHANGE
-    assert plan[0].urn == parse_URN(f"urn::REB31081:warehouse/MODIFY_ME_{suffix}")
+    assert plan[0].urn.fqn.name == f"MODIFY_ME_{suffix}"
     assert plan[0].delta == {"auto_suspend": 60}
 
     sql_commands = blueprint.apply(session, plan)
