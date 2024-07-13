@@ -385,15 +385,11 @@ def test_blueprint_grant_role_to_public(cursor, suffix, marked_for_cleanup):
 def test_blueprint_account_grants(cursor, suffix, marked_for_cleanup):
     session = cursor.connection
 
-    role_name = f"role{suffix}_account_grants"
+    role_name = f"ROLE{suffix}_ACCOUNT_GRANTS"
     role = res.Role(name=role_name)
     marked_for_cleanup.append(role)
-    grants = [
-        res.Grant(priv="APPLY SESSION POLICY", on="ACCOUNT", to=role),
-        res.Grant(priv="CREATE DATABASE", on="ACCOUNT", to=role),
-    ]
-    blueprint = Blueprint(resources=[role])
-    blueprint.add(*grants)
+    grant = res.Grant(priv="CREATE DATABASE", on="ACCOUNT", to=role)
+    blueprint = Blueprint(resources=[role, grant])
     blueprint.apply(session)
     role_data = safe_fetch(cursor, role.urn)
     assert role_data is not None
@@ -401,5 +397,7 @@ def test_blueprint_account_grants(cursor, suffix, marked_for_cleanup):
 
     grant_data = safe_fetch(cursor, grant.urn)
     assert grant_data is not None
-    assert grant_data["role"] == role_name
-    assert grant_data["to_role"] == "PUBLIC"
+    assert grant_data["to"] == role_name
+    assert grant_data["priv"] == "CREATE DATABASE"
+    assert grant_data["on"] == "ACCOUNT"
+    assert grant_data["on_type"] == "ACCOUNT"
