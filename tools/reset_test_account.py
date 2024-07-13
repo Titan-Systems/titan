@@ -41,6 +41,7 @@ def main():
         [
             "compute pool",
             "database",
+            "database role",
             "grant",
             "network rule",
             "role grant",

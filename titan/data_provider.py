@@ -400,8 +400,9 @@ def fetch_session(session):
                     name=grant["name"],
                 )
                 role_privileges[role].append(granted_priv)
-            except ValueError as err:
-                logger.warning(f"Privileges for type: {grant['granted_on']} not currently supported: {err}")
+            # If titan isnt aware of the privilege, ignore it
+            except ValueError:
+                # print(f"Privileges >>> {grant}")
                 continue
 
     return {
@@ -1935,8 +1936,27 @@ def list_databases(session) -> list[FQN]:
     ]
 
 
-# def list_database_roles(session) -> list[FQN]:
-#     return list_account_scoped_resource(session, "DATABASE ROLES")
+def list_database_roles(session) -> list[FQN]:
+    databases = execute(session, "SHOW DATABASES")
+    roles = []
+    for database in databases:
+        database_name = ResourceName.from_snowflake_metadata(database["name"])
+        if database_name in SYSTEM_DATABASES:
+            continue
+        # try:
+        database_roles = execute(session, f"SHOW DATABASE ROLES IN DATABASE {database_name}")
+        # except ProgrammingError as err:
+        #     if err.errno == DOES_NOT_EXIST_ERR:
+        #         continue
+        #     raise
+        for role in database_roles:
+            roles.append(
+                FQN(
+                    name=ResourceName.from_snowflake_metadata(role["name"]),
+                    database=database_name,
+                )
+            )
+    return roles
 
 
 def list_dynamic_tables(session) -> list[FQN]:
@@ -1986,7 +2006,10 @@ def list_grants(session) -> list[FQN]:
             if data["granted_on"] == "ROLE":
                 # raise Exception(f"Role grants are not supported yet: {data}")
                 continue
-            on = f"{data['granted_on'].lower()}/{data['name']}"
+            name = data["name"]
+            if data["granted_on"] == "ACCOUNT":
+                name = "ACCOUNT"
+            on = f"{data['granted_on'].lower()}/{name}"
             grants.append(
                 FQN(
                     name=role_name,

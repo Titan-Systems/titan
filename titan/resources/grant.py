@@ -145,10 +145,8 @@ class Grant(Resource):
                 on_type = ResourceType.ACCOUNT
 
         if owner is None:
-            if on_type == ResourceType.ACCOUNT and isinstance(priv, AccountPriv):
-                owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
             # Hacky fix
-            elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
+            if on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
                 owner = "ACCOUNTADMIN"
             elif "INTEGRATION" in str(on_type):
                 owner = "ACCOUNTADMIN"

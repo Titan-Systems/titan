@@ -16,16 +16,21 @@ class GrantedPrivilege:
     def from_grant(cls, privilege: str, granted_on: str, name: str):
         resource_type = ResourceType(granted_on)
         priv_type = PRIVS_FOR_RESOURCE_TYPE[resource_type]
-        priv = priv_type(privilege)
-        return cls(privilege=priv, on=name)
+        if priv_type:
+            priv = priv_type(privilege)
+            return cls(privilege=priv, on=name)
+        else:
+            return cls(privilege=privilege, on=granted_on)
 
 
 class AccountPriv(Priv):
     ALL = "ALL"
+    APPLY_AGGREGATION_POLICY = "APPLY AGGREGATION POLICY"
     APPLY_AUTHENTICATION_POLICY = "APPLY AUTHENTICATION POLICY"
     APPLY_MASKING_POLICY = "APPLY MASKING POLICY"
     APPLY_PACKAGES_POLICY = "APPLY PACKAGES POLICY"
     APPLY_PASSWORD_POLICY = "APPLY PASSWORD POLICY"
+    APPLY_PROJECTION_POLICY = "APPLY PROJECTION POLICY"
     APPLY_RESOURCE_GROUP = "APPLY RESOURCE GROUP"
     APPLY_ROW_ACCESS_POLICY = "APPLY ROW ACCESS POLICY"
     APPLY_SESSION_POLICY = "APPLY SESSION POLICY"
@@ -42,6 +47,7 @@ class AccountPriv(Priv):
     CREATE_CREDENTIAL = "CREATE CREDENTIAL"
     CREATE_DATA_EXCHANGE_LISTING = "CREATE DATA EXCHANGE LISTING"
     CREATE_DATABASE = "CREATE DATABASE"
+    CREATE_EXTERNAL_VOLUME = "CREATE EXTERNAL VOLUME"
     CREATE_FAILOVER_GROUP = "CREATE FAILOVER GROUP"
     CREATE_INTEGRATION = "CREATE INTEGRATION"
     CREATE_NETWORK_POLICY = "CREATE NETWORK POLICY"
@@ -52,6 +58,7 @@ class AccountPriv(Priv):
     CREATE_WAREHOUSE = "CREATE WAREHOUSE"
     EXECUTE_ALERT = "EXECUTE ALERT"
     EXECUTE_DATA_METRIC_FUNCTION = "EXECUTE DATA METRIC FUNCTION"
+    EXECUTE_MANAGED_ALERT = "EXECUTE MANAGED ALERT"
     EXECUTE_MANAGED_TASK = "EXECUTE MANAGED TASK"
     EXECUTE_TASK = "EXECUTE TASK"
     IMPORT_SHARE = "IMPORT SHARE"
@@ -61,7 +68,9 @@ class AccountPriv(Priv):
     MANAGE_USER_SUPPORT_CASES = "MANAGE USER SUPPORT CASES"
     MANAGE_WAREHOUSES = "MANAGE WAREHOUSES"
     MODIFY_LOG_LEVEL = "MODIFY LOG LEVEL"
+    MODIFY_METRIC_LEVEL = "MODIFY METRIC LEVEL"
     MODIFY_SESSION_LOG_LEVEL = "MODIFY SESSION LOG LEVEL"
+    MODIFY_SESSION_METRIC_LEVEL = "MODIFY SESSION METRIC LEVEL"
     MODIFY_SESSION_TRACE_LEVEL = "MODIFY SESSION TRACE LEVEL"
     MODIFY_TRACE_LEVEL = "MODIFY TRACE LEVEL"
     MONITOR = "MONITOR"
@@ -127,11 +136,16 @@ class DatabasePriv(ParseableEnum):
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
     OWNERSHIP = "OWNERSHIP"
-    # REFERENCE_USAGE = "REFERENCE_USAGE" # Only granted to shares
+    REFERENCE_USAGE = "REFERENCE_USAGE"  # Cannot be granted to roles, only shares
     USAGE = "USAGE"
 
 
 class DatabaseRolePriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
+class DirectoryTablePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
@@ -295,8 +309,10 @@ class TablePriv(ParseableEnum):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     DELETE = "DELETE"
+    EVOLVE_SCHEMA = "EVOLVE SCHEMA"
     INSERT = "INSERT"
     OWNERSHIP = "OWNERSHIP"
+    REBUILD = "REBUILD"
     REFERENCES = "REFERENCES"
     SELECT = "SELECT"
     TRUNCATE = "TRUNCATE"
@@ -325,9 +341,16 @@ class UserPriv(ParseableEnum):
 
 class ViewPriv(ParseableEnum):
     ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    DELETE = "DELETE"
+    EVOLVE_SCHEMA = "EVOLVE SCHEMA"
+    INSERT = "INSERT"
     OWNERSHIP = "OWNERSHIP"
+    REBUILD = "REBUILD"
     REFERENCES = "REFERENCES"
     SELECT = "SELECT"
+    TRUNCATE = "TRUNCATE"
+    UPDATE = "UPDATE"
 
 
 class WarehousePriv(ParseableEnum):
@@ -345,12 +368,15 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.AGGREGATION_POLICY: None,
     ResourceType.ALERT: AlertPriv,
     ResourceType.API_INTEGRATION: IntegrationPriv,
+    ResourceType.APPLICATION_ROLE: None,
     ResourceType.AUTHENTICATION_POLICY: None,
     ResourceType.CATALOG_INTEGRATION: None,
+    ResourceType.CLASS: None,
     ResourceType.COLUMN: None,
     ResourceType.COMPUTE_POOL: None,
-    ResourceType.DATABASE: DatabasePriv,
     ResourceType.DATABASE_ROLE: DatabaseRolePriv,
+    ResourceType.DATABASE: DatabasePriv,
+    ResourceType.DIRECTORY_TABLE: DirectoryTablePriv,
     ResourceType.DYNAMIC_TABLE: TablePriv,
     ResourceType.EVENT_TABLE: EventTablePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
@@ -360,10 +386,11 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.FUNCTION: FunctionPriv,
     ResourceType.FUTURE_GRANT: None,
     ResourceType.GIT_REPOSITORY: None,
-    ResourceType.GRANT: None,
     ResourceType.GRANT_ON_ALL: None,
+    ResourceType.GRANT: None,
     ResourceType.HYBRID_TABLE: None,
     ResourceType.IMAGE_REPOSITORY: None,
+    ResourceType.INTEGRATION: IntegrationPriv,
     ResourceType.MATERIALIZED_VIEW: MaterializedViewPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
     ResourceType.NOTIFICATION_INTEGRATION: None,
@@ -373,19 +400,20 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.PROCEDURE: ProcedurePriv,
     ResourceType.REPLICATION_GROUP: ReplicationGroupPriv,
     ResourceType.RESOURCE_MONITOR: None,
-    ResourceType.ROLE: RolePriv,
     ResourceType.ROLE_GRANT: None,
+    ResourceType.ROLE: RolePriv,
     ResourceType.SCHEMA: SchemaPriv,
     ResourceType.SECRET: SecretPriv,
+    ResourceType.SECURITY_INTEGRATION: IntegrationPriv,
     ResourceType.SEQUENCE: SequencePriv,
     ResourceType.SERVICE: None,
     ResourceType.SHARE: None,
     ResourceType.STAGE: StagePriv,
-    ResourceType.STORAGE_INTEGRATION: None,
+    ResourceType.STORAGE_INTEGRATION: IntegrationPriv,
     ResourceType.STREAM: StreamPriv,
     ResourceType.TABLE: TablePriv,
-    ResourceType.TAG: TagPriv,
     ResourceType.TAG_REFERENCE: None,
+    ResourceType.TAG: TagPriv,
     ResourceType.TASK: TaskPriv,
     ResourceType.USER: UserPriv,
     ResourceType.VIEW: ViewPriv,
@@ -441,3 +469,9 @@ def _all_privs_for_resource_type(resource_type):
         if priv != "ALL" and priv != "OWNERSHIP":
             all_privs.append(priv)
     return all_privs
+
+
+def priv_must_be_granted_by_accountadmin(priv):
+    if str(priv) == "BIND SERVICE ENDPOINT":
+        return True
+    return False

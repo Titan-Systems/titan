@@ -23,12 +23,13 @@ from .privs import (
     AccountPriv,
     GrantedPrivilege,
     is_ownership_priv,
+    priv_must_be_granted_by_accountadmin,
 )
 from .resource_name import ResourceName
 from .resources import Account, Database
 from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer
 from .resources.tag import Tag, TaggableResource
-from .scope import ResourceScope, AccountScope, DatabaseScope, OrganizationScope, SchemaScope
+from .scope import AccountScope, DatabaseScope, OrganizationScope, ResourceScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
@@ -490,6 +491,16 @@ class Blueprint:
             elif action == Action.REMOVE:
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
             elif action == Action.TRANSFER:
+                resource = manifest[urn]
+
+                attr = list(delta.keys())[0]
+                attr_metadata = resource.spec.get_metadata(attr)
+                change_is_fetchable = attr_metadata.get("fetchable", True)
+                change_should_be_ignored = attr in resource.lifecycle.ignore_changes
+                if not change_is_fetchable:
+                    continue
+                if change_should_be_ignored:
+                    continue
                 changes.append(ResourceChange(action=action, urn=urn, before=before, after=after, delta=delta))
 
         for urn in marked_for_replacement:
@@ -876,6 +887,11 @@ def execution_strategy_for_change(
     change_is_a_tag_reference = change.urn.resource_type == ResourceType.TAG_REFERENCE
 
     if change_is_a_grant:
+
+        if change.urn.resource_type == ResourceType.GRANT:
+            if priv_must_be_granted_by_accountadmin(change.after["priv"]):
+                return "ACCOUNTADMIN", False
+
         if "SECURITYADMIN" in usable_roles:
             return "SECURITYADMIN", False
         alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
