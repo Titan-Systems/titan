@@ -13,6 +13,7 @@ from snowflake.connector.errors import ProgrammingError
 logger = logging.getLogger("titan")
 
 UNSUPPORTED_FEATURE = 2
+SYNTAX_ERROR = 1003
 OBJECT_ALREADY_EXISTS_ERR = 2002
 DOES_NOT_EXIST_ERR = 2003
 INVALID_IDENTIFIER = 2004

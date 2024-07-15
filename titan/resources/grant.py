@@ -6,7 +6,7 @@ from inflection import singularize
 from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant, format_collection_string
-from ..privs import GLOBAL_PRIV_DEFAULT_OWNERS, AccountPriv, _all_privs_for_resource_type
+from ..privs import _all_privs_for_resource_type
 from ..props import FlagProp, IdentifierProp, Props
 from ..resource_name import ResourceName
 from ..scope import AccountScope
@@ -145,10 +145,8 @@ class Grant(Resource):
                 on_type = ResourceType.ACCOUNT
 
         if owner is None:
-            if on_type == ResourceType.ACCOUNT and isinstance(priv, AccountPriv):
-                owner = GLOBAL_PRIV_DEFAULT_OWNERS.get(priv, "SYSADMIN")
             # Hacky fix
-            elif on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
+            if on_type == ResourceType.SCHEMA and on.upper().startswith("SNOWFLAKE"):
                 owner = "ACCOUNTADMIN"
             elif "INTEGRATION" in str(on_type):
                 owner = "ACCOUNTADMIN"

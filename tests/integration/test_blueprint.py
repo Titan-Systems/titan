@@ -153,7 +153,7 @@ def test_blueprint_crossreferenced_database(cursor):
     assert len(plan) == 4
 
 
-def test_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
+def test_blueprint_name_equivalence_drift(cursor, suffix, marked_for_cleanup):
 
     # Create user
     user_name = f"TEST_USER_{suffix}_NAME_EQUIVALENCE".upper()
@@ -313,7 +313,7 @@ def test_blueprint_quoted_references(cursor):
     assert len(plan) == 0
 
 
-def test_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cleanup):
+def test_blueprint_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cleanup):
     session = cursor.connection
 
     def _blueprint():
@@ -380,3 +380,24 @@ def test_blueprint_grant_role_to_public(cursor, suffix, marked_for_cleanup):
     assert grant_data is not None
     assert grant_data["role"] == role_name
     assert grant_data["to_role"] == "PUBLIC"
+
+
+def test_blueprint_account_grants(cursor, suffix, marked_for_cleanup):
+    session = cursor.connection
+
+    role_name = f"ROLE{suffix}_ACCOUNT_GRANTS"
+    role = res.Role(name=role_name)
+    marked_for_cleanup.append(role)
+    grant = res.Grant(priv="CREATE DATABASE", on="ACCOUNT", to=role)
+    blueprint = Blueprint(resources=[role, grant])
+    blueprint.apply(session)
+    role_data = safe_fetch(cursor, role.urn)
+    assert role_data is not None
+    assert role_data["name"] == role.name
+
+    grant_data = safe_fetch(cursor, grant.urn)
+    assert grant_data is not None
+    assert grant_data["to"] == role_name
+    assert grant_data["priv"] == "CREATE DATABASE"
+    assert grant_data["on"] == "ACCOUNT"
+    assert grant_data["on_type"] == "ACCOUNT"
