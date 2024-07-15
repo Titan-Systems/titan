@@ -1919,12 +1919,12 @@ def list_database_roles(session) -> list[FQN]:
         database_name = ResourceName.from_snowflake_metadata(database["name"])
         if database_name in SYSTEM_DATABASES:
             continue
-        # try:
-        database_roles = execute(session, f"SHOW DATABASE ROLES IN DATABASE {database_name}")
-        # except ProgrammingError as err:
-        #     if err.errno == DOES_NOT_EXIST_ERR:
-        #         continue
-        #     raise
+        try:
+            database_roles = execute(session, f"SHOW DATABASE ROLES IN DATABASE {database_name}")
+        except ProgrammingError as err:
+            if err.errno == DOES_NOT_EXIST_ERR:
+                continue
+            raise
         for role in database_roles:
             roles.append(
                 FQN(
@@ -1999,6 +1999,10 @@ def list_image_repositories(session) -> list[FQN]:
 
 def list_pipes(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "PIPES")
+
+
+def list_resource_monitors(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "RESOURCE MONITORS")
 
 
 def list_roles(session) -> list[FQN]:
