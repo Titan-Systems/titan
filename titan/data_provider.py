@@ -337,6 +337,29 @@ def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list
             raise
 
 
+def _show_grants_to_role(session, role: str, cacheable: bool = False) -> list:
+    """
+    {
+        'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
+        'privilege': 'USAGE',
+        'granted_on': 'DATABASE',
+        'name': 'STATIC_DATABASE',
+        'granted_to': 'ROLE',
+        'grantee_name': 'THATROLE',
+        'grant_option': 'false',
+        'granted_by': 'ACCOUNTADMIN'
+    }
+    """
+    try:
+        grants = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=cacheable)
+        return grants
+
+    except ProgrammingError as err:
+        if err.errno == DOES_NOT_EXIST_ERR:
+            return []
+        raise
+
+
 def fetch_resource(session, urn: URN) -> Optional[dict]:
     return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
 
@@ -391,7 +414,8 @@ def fetch_session(session):
             continue
 
         role_privileges[role] = []
-        grants = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
+
+        grants = _show_grants_to_role(session, role, cacheable=True)
         for grant in grants:
             try:
                 granted_priv = GrantedPrivilege.from_grant(
@@ -402,7 +426,6 @@ def fetch_session(session):
                 role_privileges[role].append(granted_priv)
             # If titan isnt aware of the privilege, ignore it
             except ValueError:
-                # print(f"Privileges >>> {grant}")
                 continue
 
     return {
@@ -893,24 +916,6 @@ def fetch_future_grant(session, fqn: FQN):
 
 
 def fetch_grant(session, fqn: FQN):
-    try:
-        show_result = execute(session, f"SHOW GRANTS TO ROLE {fqn.name}", cacheable=True)
-        """
-        {
-            'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
-            'privilege': 'USAGE',
-            'granted_on': 'DATABASE',
-            'name': 'STATIC_DATABASE',
-            'granted_to': 'ROLE',
-            'grantee_name': 'THATROLE',
-            'grant_option': 'false',
-            'granted_by': 'ACCOUNTADMIN'
-        }
-        """
-    except ProgrammingError as err:
-        if err.errno == DOES_NOT_EXIST_ERR:
-            return None
-        raise
     priv = fqn.params["priv"]
     on_type, on = fqn.params["on"].split("/")
     # on_type = str(resource_type_for_label(on_type)).replace(" ", "_")
@@ -926,7 +931,8 @@ def fetch_grant(session, fqn: FQN):
     if priv != "ALL":
         filters["privilege"] = priv
 
-    grants = _filter_result(show_result, **filters)
+    grants = _show_grants_to_role(session, fqn.name, cacheable=True)
+    grants = _filter_result(grants, **filters)
 
     if len(grants) == 0:
         return None
@@ -1145,36 +1151,6 @@ def fetch_procedure(session, fqn: FQN):
         "secure": data["is_secure"] == "Y",
         "as_": properties["body"],
     }
-
-
-# def fetch_role_grants(session, role: str):
-#     if role in ["ACCOUNTADMIN", "ORGADMIN", "SECURITYADMIN"]:
-#         return {}
-#     try:
-#         show_result = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=True)
-#     except ProgrammingError as err:
-#         if err.errno == DOES_NOT_EXIST_ERR:
-#             return None
-#         raise
-#     session_ctx = fetch_session(session)
-
-#     priv_map = defaultdict(list)
-
-#     for row in show_result:
-#         try:
-#             urn = _urn_from_grant(row, session_ctx)
-#         except ValueError:
-#             # Grant for a Snowflake resource type that Titan doesn't support yet
-#             continue
-#         priv_map[str(urn)].append(
-#             {
-#                 "priv": row["privilege"],
-#                 "grant_option": row["grant_option"] == "true",
-#                 "owner": row["granted_by"],
-#             }
-#         )
-
-#     return dict(priv_map)
 
 
 def fetch_role(session, fqn: FQN):
@@ -1996,13 +1972,8 @@ def list_grants(session) -> list[FQN]:
         role_name = ResourceName.from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        try:
-            show_result = execute(session, f"SHOW GRANTS TO ROLE {role_name}")
-        except ProgrammingError as err:
-            if err.errno == DOES_NOT_EXIST_ERR:
-                continue
-            raise
-        for data in show_result:
+        grant_data = _show_grants_to_role(session, role_name, cacheable=True)
+        for data in grant_data:
             if data["granted_on"] == "ROLE":
                 # raise Exception(f"Role grants are not supported yet: {data}")
                 continue

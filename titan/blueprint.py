@@ -23,7 +23,7 @@ from .privs import (
     AccountPriv,
     GrantedPrivilege,
     is_ownership_priv,
-    priv_must_be_granted_by_accountadmin,
+    execution_role_for_priv,
 )
 from .resource_name import ResourceName
 from .resources import Account, Database
@@ -889,8 +889,9 @@ def execution_strategy_for_change(
     if change_is_a_grant:
 
         if change.urn.resource_type == ResourceType.GRANT:
-            if priv_must_be_granted_by_accountadmin(change.after["priv"]):
-                return "ACCOUNTADMIN", False
+            execution_role = execution_role_for_priv(change.after["priv"])
+            if execution_role and execution_role in usable_roles:
+                return execution_role, False
 
         if "SECURITYADMIN" in usable_roles:
             return "SECURITYADMIN", False
