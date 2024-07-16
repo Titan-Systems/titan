@@ -4,7 +4,7 @@ import yaml
 
 from titan.blueprint import print_plan, dump_plan
 from titan.enums import ResourceType
-from titan.operations.export import export_resources
+from titan.operations.export import export_resources, export_all_resources
 from titan.operations.blueprint import blueprint_plan, blueprint_apply
 
 
@@ -73,20 +73,53 @@ def apply(config_file, plan_file, run_mode, dry_run):
         blueprint_apply(plan_obj, run_mode, dry_run)
 
 
+FOOBAR = "some var"
+
+
 @titan_cli.command()
 @click.option("--resource", type=str, help="Specify the type of resource to export.")
+@click.option("--all", "export_all", is_flag=True, help="Export all resources.")
 @click.option("--out", type=str, help="Output filename for the exported data.")
 @click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Specify the output format.")
-def export(resource, out, format):
-    """Export Titan resources"""
-    # Implementation for exporting resources
-    resource_type = ResourceType(resource)
-    resources = export_resources(resource_type)
+def export(resource, export_all, out, format):
+    """
+    This command allows you to export resources from Titan in either JSON or YAML format.
+    You can specify the type of resource to export and the output filename for the exported data.
+
+    Examples:
+
+    \b
+    titan export --resource=database --out=databases.yml --format=yml
+
+    Account-level resources:
+
+      api_integration, catalog_integration, database, user, role, warehouse
+
+    Database-level resources:
+
+      database_role, schema
+
+    Schema-level resources:
+
+      table, view, function, procedure, stream, pipe, external_table
+
+    """
+    config = {}
+    if export_all:
+        config = export_all_resources()
+    else:
+        raise
+
+    # # Implementation for exporting resources
+    # # TODO: fixme
+    # resource_type = ResourceType(resource)
+    # resources = export_resources(resource_type)
+
     output = None
     if format == "json":
-        output = json.dumps(resources, indent=2)
+        output = json.dumps(config, indent=2)
     elif format == "yml":
-        output = yaml.dump(resources)
+        output = yaml.dump(config, sort_keys=False)
     else:
         raise ValueError(f"Unsupported format: {format}")
 

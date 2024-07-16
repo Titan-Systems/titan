@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .resource import Resource, ResourceSpec, NamedResource
 from .role import Role
@@ -25,7 +25,7 @@ class _APIIntegration(ResourceSpec):
     enabled: bool
     api_allowed_prefixes: list[str]
     api_blocked_prefixes: list[str] = None
-    api_key: str = None
+    api_key: str = field(default_factory=None, metadata={"fetchable": False})
     owner: Role = "ACCOUNTADMIN"
     comment: str = None
 

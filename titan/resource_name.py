@@ -2,6 +2,7 @@ import re
 from typing import Union
 
 import pyparsing as pp
+import yaml
 
 from .parse_primitives import FullyQualifiedIdentifier
 
@@ -69,3 +70,6 @@ class ResourceName:
 
     def startswith(self, prefix: str) -> bool:
         return self._name.startswith(prefix)
+
+
+yaml.add_representer(ResourceName, lambda dumper, data: dumper.represent_str(str(data)))

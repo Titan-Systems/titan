@@ -747,6 +747,25 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
     assert result is not None
     assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
 
+    api_integration = res.APIIntegration(
+        name=f"API_INTEGRATION_EXAMPLE_{suffix}_WITH_API_KEY",
+        api_provider="AWS_API_GATEWAY",
+        api_aws_role_arn="arn:aws:iam::123456789012:role/MyRole",
+        api_allowed_prefixes=["https://xyz.execute-api.us-west-2.amazonaws.com/production"],
+        api_blocked_prefixes=["https://xyz.execute-api.us-west-2.amazonaws.com/test"],
+        api_key="api-123456789",
+        comment="Example API integration",
+        enabled=False,
+        owner=TEST_ROLE,
+    )
+
+    cursor.execute(api_integration.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(api_integration)
+
+    result = safe_fetch(cursor, api_integration.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
+
 
 def test_fetch_database_role(cursor, suffix, test_db, marked_for_cleanup):
     database_role = res.DatabaseRole(
