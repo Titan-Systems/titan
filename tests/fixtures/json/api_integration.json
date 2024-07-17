@@ -1,5 +1,5 @@
 {
-    "name": "SOMEINT",
+    "name": "SOME_API_INTEGRATION",
     "owner": "ACCOUNTADMIN",
     "api_provider": "AWS_API_GATEWAY",
     "api_key": "api-987654321",
@@ -11,5 +11,5 @@
         "https://xyz.execute-api.us-west-2.amazonaws.com/development"
     ],
     "enabled": true,
-    "comment": "This is a test integration"
+    "comment": "This is a test API integration"
 }

@@ -508,7 +508,6 @@ def fetch_api_integration(session, fqn: FQN):
         "enabled": properties["enabled"],
         "api_allowed_prefixes": properties["api_allowed_prefixes"],
         "api_blocked_prefixes": properties["api_blocked_prefixes"],
-        "api_key": properties["api_key"],
         "owner": owner,
         "comment": data["comment"] or None,
     }

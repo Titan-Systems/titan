@@ -1,11 +1,13 @@
-import click
 import json
+
+import click
 import yaml
 
-from titan.blueprint import print_plan, dump_plan
-from titan.enums import ResourceType
+from titan.blueprint import dump_plan
+from titan.operations.blueprint import blueprint_apply, blueprint_plan
 from titan.operations.export import export_resources
-from titan.operations.blueprint import blueprint_plan, blueprint_apply
+
+from .identifiers import resource_type_for_label
 
 
 def load_config(config_file):
@@ -26,13 +28,17 @@ def titan_cli():
     pass
 
 
-@titan_cli.command()
-@click.option("--config", "config_file", type=str, help="Path to configuration YAML file.")
-# @click.option("--resources", type=str, help="Specify resources to include in the plan.")
-@click.option("--json", "json_output", is_flag=True, help="Output plan in machine-readable JSON format.")
-@click.option("--out", "output_file", type=str, help="Output filename for the plan.")
+@titan_cli.command("plan", no_args_is_help=True)
+@click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
+@click.option("--json", "json_output", is_flag=True, help="Output plan in machine-readable JSON format")
+@click.option("--out", "output_file", type=str, help="Write plan to a file", metavar="<filename>")
 @click.option(
-    "--run_mode", type=click.Choice(["CREATE-OR-UPDATE"]), default="CREATE-OR-UPDATE", help="Run mode for the plan."
+    "--mode",
+    type=click.Choice(["CREATE-OR-UPDATE"]),
+    metavar="<run_mode>",
+    default="CREATE-OR-UPDATE",
+    show_default=True,
+    help="Run strategy",
 )
 def plan(config_file, json_output, output_file, run_mode):
     """Generate an execution plan based on your configuration"""
@@ -50,14 +56,18 @@ def plan(config_file, json_output, output_file, run_mode):
         print(output)
 
 
-@titan_cli.command()
-@click.option("--config", "config_file", type=str, help="Path to configuration YAML file.")
-# @click.option("--resources", type=str, help="Specify resources to include in the apply.")
-@click.option("--plan", "plan_file", type=str, help="Path to plan JSON file.")
+@titan_cli.command("apply", no_args_is_help=True)
+@click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
+@click.option("--plan", "plan_file", type=str, help="Path to plan JSON file", metavar="<filename>")
 @click.option(
-    "--run_mode", type=click.Choice(["CREATE-OR-UPDATE"]), default="CREATE-OR-UPDATE", help="Run mode for the apply."
+    "--mode",
+    type=click.Choice(["CREATE-OR-UPDATE"]),
+    default="CREATE-OR-UPDATE",
+    metavar="<run_mode>",
+    show_default=True,
+    help="Run strategy",
 )
-@click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes.")
+@click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes")
 def apply(config_file, plan_file, run_mode, dry_run):
     """Apply a plan to Titan resources"""
     if config_file and plan_file:
@@ -73,20 +83,57 @@ def apply(config_file, plan_file, run_mode, dry_run):
         blueprint_apply(plan_obj, run_mode, dry_run)
 
 
-@titan_cli.command()
-@click.option("--resource", type=str, help="Specify the type of resource to export.")
-@click.option("--out", type=str, help="Output filename for the exported data.")
-@click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Specify the output format.")
-def export(resource, out, format):
-    """Export Titan resources"""
-    # Implementation for exporting resources
-    resource_type = ResourceType(resource)
-    resources = export_resources(resource_type)
+def _parse_resources(resource_labels_str):
+    if resource_labels_str is None:
+        return None
+    return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
+
+
+@titan_cli.command("export", context_settings={"show_default": True}, no_args_is_help=True)
+@click.option("--resource", type=str, help="The resource types to export", metavar="<resource_types>")
+@click.option("--all", "export_all", is_flag=True, help="Export all resources")
+@click.option("--exclude", "exclude", type=str, help="Exclude resources, used with --all", metavar="<resource_types>")
+@click.option("--out", type=str, help="Write exported config to a file", metavar="<filename>")
+@click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Output format")
+def export(resource, export_all, exclude, out, format):
+    """
+    This command allows you to export resources from Titan in either JSON or YAML format.
+    You can specify the type of resource to export and the output filename for the exported data.
+
+    Resource types are specified with snake case (eg. Warehouse => warehouse, NetworkRule => network_rule, etc.).
+    You can also export all resources by using the --all flag. Specify multiple resource types by separating them with commas.
+
+    Examples:
+
+    \b
+    # Export all database configurations to a file
+    titan export --resource=database --out=databases.yml --format=yml
+
+    \b
+    # Export all resources
+    titan export --all --out=titan.yml --format=yml
+
+    \b
+    # Export all resources except for users and roles
+    titan export --all --exclude=user,role --out=titan.yml
+    """
+
+    if resource and export_all:
+        raise click.UsageError("You can't specify both --resource and --all options at the same time.")
+
+    resource_config = {}
+    if resource:
+        resource_config = export_resources(include=_parse_resources(resource))
+    elif export_all:
+        resource_config = export_resources(exclude=_parse_resources(exclude))
+    else:
+        raise
+
     output = None
     if format == "json":
-        output = json.dumps(resources, indent=2)
+        output = json.dumps(resource_config, indent=2)
     elif format == "yml":
-        output = yaml.dump(resources)
+        output = yaml.dump(resource_config, sort_keys=False)
     else:
         raise ValueError(f"Unsupported format: {format}")
 
