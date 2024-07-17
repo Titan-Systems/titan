@@ -34,6 +34,7 @@ def titan_cli():
 @click.option("--out", "output_file", type=str, help="Write plan to a file", metavar="<filename>")
 @click.option(
     "--mode",
+    "run_mode",
     type=click.Choice(["CREATE-OR-UPDATE"]),
     metavar="<run_mode>",
     default="CREATE-OR-UPDATE",
@@ -61,6 +62,7 @@ def plan(config_file, json_output, output_file, run_mode):
 @click.option("--plan", "plan_file", type=str, help="Path to plan JSON file", metavar="<filename>")
 @click.option(
     "--mode",
+    "run_mode",
     type=click.Choice(["CREATE-OR-UPDATE"]),
     default="CREATE-OR-UPDATE",
     metavar="<run_mode>",
