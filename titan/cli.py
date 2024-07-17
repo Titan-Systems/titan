@@ -28,13 +28,17 @@ def titan_cli():
     pass
 
 
-@titan_cli.command()
-@click.option("--config", "config_file", type=str, help="Path to configuration YAML file.")
-# @click.option("--resources", type=str, help="Specify resources to include in the plan.")
-@click.option("--json", "json_output", is_flag=True, help="Output plan in machine-readable JSON format.")
-@click.option("--out", "output_file", type=str, help="Output filename for the plan.")
+@titan_cli.command("plan", no_args_is_help=True)
+@click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
+@click.option("--json", "json_output", is_flag=True, help="Output plan in machine-readable JSON format")
+@click.option("--out", "output_file", type=str, help="Write plan to a file", metavar="<filename>")
 @click.option(
-    "--run_mode", type=click.Choice(["CREATE-OR-UPDATE"]), default="CREATE-OR-UPDATE", help="Run mode for the plan."
+    "--mode",
+    type=click.Choice(["CREATE-OR-UPDATE"]),
+    metavar="<run_mode>",
+    default="CREATE-OR-UPDATE",
+    show_default=True,
+    help="Run strategy",
 )
 def plan(config_file, json_output, output_file, run_mode):
     """Generate an execution plan based on your configuration"""
@@ -52,14 +56,18 @@ def plan(config_file, json_output, output_file, run_mode):
         print(output)
 
 
-@titan_cli.command()
-@click.option("--config", "config_file", type=str, help="Path to configuration YAML file.")
-# @click.option("--resources", type=str, help="Specify resources to include in the apply.")
-@click.option("--plan", "plan_file", type=str, help="Path to plan JSON file.")
+@titan_cli.command("apply", no_args_is_help=True)
+@click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
+@click.option("--plan", "plan_file", type=str, help="Path to plan JSON file", metavar="<filename>")
 @click.option(
-    "--run_mode", type=click.Choice(["CREATE-OR-UPDATE"]), default="CREATE-OR-UPDATE", help="Run mode for the apply."
+    "--mode",
+    type=click.Choice(["CREATE-OR-UPDATE"]),
+    default="CREATE-OR-UPDATE",
+    metavar="<run_mode>",
+    show_default=True,
+    help="Run strategy",
 )
-@click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes.")
+@click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes")
 def apply(config_file, plan_file, run_mode, dry_run):
     """Apply a plan to Titan resources"""
     if config_file and plan_file:
@@ -81,7 +89,7 @@ def _parse_resources(resource_labels_str):
     return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
 
 
-@titan_cli.command()
+@titan_cli.command("export", context_settings={"show_default": True}, no_args_is_help=True)
 @click.option("--resource", type=str, help="The resource types to export", metavar="<resource_types>")
 @click.option("--all", "export_all", is_flag=True, help="Export all resources")
 @click.option("--exclude", "exclude", type=str, help="Exclude resources, used with --all", metavar="<resource_types>")

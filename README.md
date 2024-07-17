@@ -223,6 +223,12 @@ python -m titan plan --config titan.yml
 python -m titan apply --config titan.yml
 ```
 
+The CLI can be used to export your current resource config to a file.
+
+```sh
+python -m titan export --resource=warehouse,grant,role --out=titan.yml
+```
+
 ### Using the GitHub Action
 The Titan Core GitHub Action allows you to automate the deployment of Snowflake resources using a git-based workflow.
 
