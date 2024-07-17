@@ -745,7 +745,9 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
+    result = strip_nones_and_unfetchable(res.APIIntegration.spec, result)
+    data = strip_nones_and_unfetchable(res.APIIntegration.spec, api_integration.to_dict())
+    assert result == data
 
     api_integration = res.APIIntegration(
         name=f"API_INTEGRATION_EXAMPLE_{suffix}_WITH_API_KEY",
@@ -764,7 +766,9 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, api_integration.to_dict())
+    result = strip_nones_and_unfetchable(res.APIIntegration.spec, result)
+    data = strip_nones_and_unfetchable(res.APIIntegration.spec, api_integration.to_dict())
+    assert result == data
 
 
 def test_fetch_database_role(cursor, suffix, test_db, marked_for_cleanup):

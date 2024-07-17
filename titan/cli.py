@@ -86,10 +86,18 @@ def export(resource, export_all, out, format):
     This command allows you to export resources from Titan in either JSON or YAML format.
     You can specify the type of resource to export and the output filename for the exported data.
 
+    Resources should be specified using snake case (eg. Warehouse => warehouse, NetworkRule => network_rule, etc.)
+
     Examples:
 
     \b
+    # Export a single resource type
     titan export --resource=database --out=databases.yml --format=yml
+
+    # Export all resources
+    titan export --all --out=titan.yml --format=yml
+
+    # Export a set of resources
 
     Account-level resources:
 
