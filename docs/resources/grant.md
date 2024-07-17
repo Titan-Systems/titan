@@ -33,7 +33,7 @@ grant = Grant(priv="SELECT", on_table="sometable", to="somerole")
 ```yaml
 - Grant:
     priv: "SELECT"
-    on: "some_table"
+    on_table: "some_table"
     to: "some_role"
     grant_option: true
 ```

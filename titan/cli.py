@@ -1,11 +1,13 @@
-import click
 import json
+
+import click
 import yaml
 
-from titan.blueprint import print_plan, dump_plan
-from titan.enums import ResourceType
-from titan.operations.export import export_resources, export_all_resources
-from titan.operations.blueprint import blueprint_plan, blueprint_apply
+from titan.blueprint import dump_plan
+from titan.operations.blueprint import blueprint_apply, blueprint_plan
+from titan.operations.export import export_resources
+
+from .identifiers import resource_type_for_label
 
 
 def load_config(config_file):
@@ -73,61 +75,57 @@ def apply(config_file, plan_file, run_mode, dry_run):
         blueprint_apply(plan_obj, run_mode, dry_run)
 
 
-FOOBAR = "some var"
+def _parse_resources(resource_labels_str):
+    if resource_labels_str is None:
+        return None
+    return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
 
 
 @titan_cli.command()
-@click.option("--resource", type=str, help="Specify the type of resource to export.")
-@click.option("--all", "export_all", is_flag=True, help="Export all resources.")
-@click.option("--out", type=str, help="Output filename for the exported data.")
-@click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Specify the output format.")
-def export(resource, export_all, out, format):
+@click.option("--resource", type=str, help="The resource types to export", metavar="<resource_types>")
+@click.option("--all", "export_all", is_flag=True, help="Export all resources")
+@click.option("--exclude", "exclude", type=str, help="Exclude resources, used with --all", metavar="<resource_types>")
+@click.option("--out", type=str, help="Write exported config to a file", metavar="<filename>")
+@click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Output format")
+def export(resource, export_all, exclude, out, format):
     """
     This command allows you to export resources from Titan in either JSON or YAML format.
     You can specify the type of resource to export and the output filename for the exported data.
 
-    Resources should be specified using snake case (eg. Warehouse => warehouse, NetworkRule => network_rule, etc.)
+    Resource types are specified with snake case (eg. Warehouse => warehouse, NetworkRule => network_rule, etc.).
+    You can also export all resources by using the --all flag. Specify multiple resource types by separating them with commas.
 
     Examples:
 
     \b
-    # Export a single resource type
+    # Export all database configurations to a file
     titan export --resource=database --out=databases.yml --format=yml
 
+    \b
     # Export all resources
     titan export --all --out=titan.yml --format=yml
 
-    # Export a set of resources
-
-    Account-level resources:
-
-      api_integration, catalog_integration, database, user, role, warehouse
-
-    Database-level resources:
-
-      database_role, schema
-
-    Schema-level resources:
-
-      table, view, function, procedure, stream, pipe, external_table
-
+    \b
+    # Export all resources except for users and roles
+    titan export --all --exclude=user,role --out=titan.yml
     """
-    config = {}
-    if export_all:
-        config = export_all_resources()
+
+    if resource and export_all:
+        raise click.UsageError("You can't specify both --resource and --all options at the same time.")
+
+    resource_config = {}
+    if resource:
+        resource_config = export_resources(include=_parse_resources(resource))
+    elif export_all:
+        resource_config = export_resources(exclude=_parse_resources(exclude))
     else:
         raise
 
-    # # Implementation for exporting resources
-    # # TODO: fixme
-    # resource_type = ResourceType(resource)
-    # resources = export_resources(resource_type)
-
     output = None
     if format == "json":
-        output = json.dumps(config, indent=2)
+        output = json.dumps(resource_config, indent=2)
     elif format == "yml":
-        output = yaml.dump(config, sort_keys=False)
+        output = yaml.dump(resource_config, sort_keys=False)
     else:
         raise ValueError(f"Unsupported format: {format}")
 

@@ -76,7 +76,7 @@ class Grant(Resource):
         ```yaml
         - Grant:
             priv: "SELECT"
-            on: "some_table"
+            on_table: "some_table"
             to: "some_role"
             grant_option: true
         ```
@@ -215,6 +215,17 @@ def grant_fqn(grant: _Grant):
             "on": on,
         },
     )
+
+
+def grant_yaml(data: dict):
+    grant = _Grant(**data)
+    resource_label = resource_label_for_type(grant.on_type)
+    return {
+        "priv": grant.priv,
+        f"on_{resource_label}": grant.on,
+        "to": grant.to.name,
+        "grant_option": grant.grant_option,
+    }
 
 
 @dataclass(unsafe_hash=True)
