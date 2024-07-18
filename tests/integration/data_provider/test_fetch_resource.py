@@ -1098,7 +1098,7 @@ def test_fetch_notebook(cursor, suffix, marked_for_cleanup):
         name=f"SOME_NOTEBOOK_{suffix}",
         query_warehouse="static_warehouse",
         comment="This is a test notebook",
-        # version="v1.0.0-final-FINAL",
+        owner=TEST_ROLE,
     )
     cursor.execute(notebook.create_sql(if_not_exists=True))
     marked_for_cleanup.append(notebook)

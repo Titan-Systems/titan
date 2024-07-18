@@ -1,0 +1,15 @@
+{
+    "name": "some_network_policy",
+    "allowed_network_rule_list": [
+        "static_database.public.static_network_rule"
+    ],
+    "blocked_network_rule_list": [
+        "static_database.public.static_network_rule"
+    ],
+    "allowed_ip_list": [
+        "192.168.1.0/24"
+    ],
+    "blocked_ip_list": [
+        "192.168.1.99"
+    ]
+}
