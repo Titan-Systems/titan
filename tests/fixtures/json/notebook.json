@@ -4,5 +4,6 @@
     "main_file": "my_notebook_file.ipynb",
     "query_warehouse": "my_warehouse",
     "comment": "This is a test notebook",
-    "version": "v1.0.0-final-FINAL"
+    "version": "v1.0.0-final-FINAL",
+    "default_version": null
 }

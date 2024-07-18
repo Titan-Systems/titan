@@ -12,10 +12,14 @@ users:
         - first_name
         - last_name
         - owner
+  - name: TITAN_CI
+    type_: SERVICE
 
 roles:
   - name: CI
     comment: CI role, do not drop
+    lifecycle:
+      prevent_destroy: true
   - name: EMPTY
     comment: This role is intentionally left empty
   - name: STATIC_ROLE
@@ -64,11 +68,13 @@ network_rules:
     database: static_database
     schema: public
 
-# secrets:
-#   - name: static_secret
-#     type: PASSWORD
-#     username: someuser
-#     password: somepass
+secrets:
+  - name: static_secret
+    type: PASSWORD
+    username: someuser
+    password: somepass
+    database: static_database
+    schema: public
 
 
 grants:
@@ -215,3 +221,11 @@ security_integrations:
     oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
     oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'
     enabled: true
+
+tags:
+  - name: static_tag
+    database: static_database
+    schema: PUBLIC
+    comment: This is a static tag
+    allowed_values:
+      - STATIC_TAG_VALUE

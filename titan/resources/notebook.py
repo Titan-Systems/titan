@@ -23,7 +23,6 @@ class _Notebook(ResourceSpec):
     comment: str = None
     default_version: str = None
     query_warehouse: Warehouse = None
-    tags: dict[str, str] = None
 
 
 class Notebook(NamedResource, TaggableResource, Resource):
@@ -61,6 +60,5 @@ class Notebook(NamedResource, TaggableResource, Resource):
             comment=comment,
             default_version=default_version,
             query_warehouse=query_warehouse,
-            tags=tags,
         )
         self.set_tags(tags)
