@@ -42,7 +42,11 @@ def export_resource(session, resource_type: ResourceType) -> dict[str, list]:
         if resource is None:
             logger.warning(f"Found resource {urn} in metadata but failed to fetch")
             continue
-        resources.append(_format_resource_config(resource, resource_type))
+        try:
+            resources.append(_format_resource_config(resource, resource_type))
+        except Exception as e:
+            logger.warning(f"Failed to format resource {urn}: {e}")
+            continue
     return {pluralize(resource_label): resources}
 
 
