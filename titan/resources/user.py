@@ -1,12 +1,19 @@
 from dataclasses import dataclass
 
-from ..enums import ResourceType
-from ..props import BoolProp, IntProp, Props, StringListProp, StringProp, TagsProp
+from ..enums import ParseableEnum, ResourceType
+from ..props import BoolProp, EnumProp, IntProp, Props, StringListProp, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
 from .resource import NamedResource, Resource, ResourceSpec
 from .role import Role
 from .tag import TaggableResource
+
+
+class UserType(ParseableEnum):
+    PERSON = "PERSON"
+    SERVICE = "SERVICE"
+    LEGACY_SERVICE = "LEGACY_SERVICE"
+    NULL = "NULL"
 
 
 @dataclass(unsafe_hash=True)
@@ -33,6 +40,7 @@ class _User(ResourceSpec):
     rsa_public_key_2: str = None
     comment: str = None
     network_policy: str = None
+    type_: UserType = "NULL"
 
     def __post_init__(self):
         super().__post_init__()
@@ -118,6 +126,7 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2=StringProp("rsa_public_key_2"),
         comment=StringProp("comment"),
         network_policy=StringProp("network_policy"),
+        type_=EnumProp("type", UserType),
         tags=TagsProp(),
     )
     scope = AccountScope()
@@ -147,6 +156,7 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2: str = None,
         comment: str = None,
         network_policy: str = None,
+        type_: str = "NULL",
         tags: dict[str, str] = None,
         **kwargs,
     ):
@@ -174,6 +184,7 @@ class User(NamedResource, TaggableResource, Resource):
             rsa_public_key_2=rsa_public_key_2,
             comment=comment,
             network_policy=network_policy,
+            type_=type_,
         )
         self.set_tags(tags)
 

@@ -409,13 +409,32 @@ def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
 
 
 def test_fetch_user(cursor, suffix, marked_for_cleanup):
-    user = res.User(name=f"SOME_USER_{suffix}@applytitan.com", owner=TEST_ROLE)
+    user = res.User(
+        name=f"SOME_USER_{suffix}@applytitan.com",
+        owner=TEST_ROLE,
+    )
     cursor.execute(user.create_sql(if_not_exists=True))
     marked_for_cleanup.append(user)
 
     result = safe_fetch(cursor, user.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, user.to_dict())
+    result = strip_nones_and_unfetchable(res.User.spec, result)
+    data = strip_nones_and_unfetchable(res.User.spec, user.to_dict())
+    assert result == data
+
+    user = res.User(
+        name=f"SOME_USER_TYPE_PERSON_{suffix}@applytitan.com",
+        owner=TEST_ROLE,
+        type_="PERSON",
+    )
+    cursor.execute(user.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(user)
+
+    result = safe_fetch(cursor, user.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.User.spec, result)
+    data = strip_nones_and_unfetchable(res.User.spec, user.to_dict())
+    assert result == data
 
 
 def test_fetch_glue_catalog_integration(cursor, marked_for_cleanup):

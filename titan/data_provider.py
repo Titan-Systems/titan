@@ -1765,9 +1765,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
     # SHOW USERS requires the MANAGE GRANTS privilege
     # Other roles can see the list of users but don't get access to other metadata such as login_name.
     # This causes incorrect drift
-    show_result = execute(session, "SHOW USERS", cacheable=True)
-
-    users = _filter_result(show_result, name=fqn.name)
+    users = _show_resources(session, "USERS", fqn)
 
     if len(users) == 0:
         return None
@@ -1775,6 +1773,8 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         raise Exception(f"Found multiple users matching {fqn}")
 
     data = users[0]
+    desc_result = execute(session, f"DESC USER {fqn}")
+    properties = _desc_result_to_dict(desc_result, lower_properties=True)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1793,6 +1793,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         "default_role": data["default_role"] or None,
         "default_secondary_roles": data["default_secondary_roles"] or None,
         "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
+        "type_": properties["type"].upper(),
         "owner": data["owner"],
     }
 
