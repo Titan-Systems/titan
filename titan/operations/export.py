@@ -1,3 +1,5 @@
+import logging
+
 from inflection import pluralize
 
 from titan.data_provider import fetch_resource, list_resource
@@ -5,6 +7,8 @@ from titan.enums import ResourceType
 from titan.identifiers import URN, resource_label_for_type
 from titan.operations.connector import connect
 from titan.resources.grant import grant_yaml
+
+logger = logging.getLogger("titan")
 
 
 def export_resources(include: list[ResourceType] = None, exclude: list[ResourceType] = None) -> dict[str, list]:
@@ -29,7 +33,11 @@ def export_resource(session, resource_type: ResourceType) -> dict[str, list]:
         return {}
     resources = []
     for fqn in resource_names:
-        resource = fetch_resource(session, URN(resource_type, fqn, account_locator=""))
+        urn = URN(resource_type, fqn, account_locator="")
+        resource = fetch_resource(session, urn)
+        if resource is None:
+            logger.warning(f"Found resource {urn} in metadata but failed to fetch")
+            continue
         resources.append(_format_resource_config(resource, resource_type))
     return {pluralize(resource_label): resources}
 
