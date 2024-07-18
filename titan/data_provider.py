@@ -337,6 +337,11 @@ def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list
             raise
 
 
+def _show_resource_parameters(session, type_str: str, fqn: FQN, cacheable: bool = True) -> list[dict]:
+    result = execute(session, f"SHOW PARAMETERS IN {type_str} {fqn}", cacheable=cacheable)
+    return params_result_to_dict(result)
+
+
 def _show_grants_to_role(session, role: str, cacheable: bool = False) -> list:
     """
     {
@@ -618,7 +623,6 @@ def fetch_compute_pool(session, fqn: FQN):
 
 
 def fetch_database(session, fqn: FQN):
-    # show_result = execute(session, f"SHOW DATABASES LIKE '{fqn.name}'", cacheable=True)
     show_result = _show_resources(session, "DATABASES", fqn)
 
     if len(show_result) == 0:
@@ -635,8 +639,7 @@ def fetch_database(session, fqn: FQN):
         return None
 
     options = options_result_to_list(data["options"])
-    show_params_result = execute(session, f"SHOW PARAMETERS IN DATABASE {fqn.name}")
-    params = params_result_to_dict(show_params_result)
+    params = _show_resource_parameters(session, "DATABASE", fqn)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1223,8 +1226,7 @@ def fetch_schema(session, fqn: FQN):
     data = show_result[0]
 
     options = options_result_to_list(data["options"])
-    show_params_result = execute(session, f"SHOW PARAMETERS IN SCHEMA {fqn}", cacheable=True)
-    params = params_result_to_dict(show_params_result)
+    params = _show_resource_parameters(session, "SCHEMA", fqn)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1502,7 +1504,7 @@ def fetch_storage_integration(session, fqn: FQN):
 
 
 def fetch_stream(session, fqn: FQN):
-    show_result = execute(session, "SHOW STREAMS IN ACCOUNT")
+    show_result = execute(session, "SHOW STREAMS IN ACCOUNT", cacheable=True)
 
     streams = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
 

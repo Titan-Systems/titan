@@ -34,7 +34,11 @@ def export_resource(session, resource_type: ResourceType) -> dict[str, list]:
     resources = []
     for fqn in resource_names:
         urn = URN(resource_type, fqn, account_locator="")
-        resource = fetch_resource(session, urn)
+        try:
+            resource = fetch_resource(session, urn)
+        except Exception as e:
+            logger.warning(f"Failed to fetch resource {urn}: {e}")
+            continue
         if resource is None:
             logger.warning(f"Found resource {urn} in metadata but failed to fetch")
             continue
