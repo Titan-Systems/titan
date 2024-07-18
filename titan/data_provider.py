@@ -1995,7 +1995,9 @@ def list_database_roles(session) -> list[FQN]:
         if database_name in SYSTEM_DATABASES:
             continue
         try:
-            database_roles = execute(session, f"SHOW DATABASE ROLES IN DATABASE {database_name}")
+            # A rare case where we need to always quote the identifier. Snowflake chokes if the database name
+            # is DATABASE, but this will work if quoted
+            database_roles = execute(session, f'SHOW DATABASE ROLES IN DATABASE "{database_name}"')
         except ProgrammingError as err:
             if err.errno == DOES_NOT_EXIST_ERR:
                 continue

@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Union
 
@@ -13,6 +14,8 @@ from ..scope import AccountScope
 from .resource import Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
+
+logger = logging.getLogger("titan")
 
 # TODO: Should Grant objects verify grant types in advance?
 
@@ -425,25 +428,16 @@ class _GrantOnAll(ResourceSpec):
     in_name: str
     to: Role
     grant_option: bool = False
-    owner: Role = field(default_factory=None, metadata={"fetchable": False})
 
     def __post_init__(self):
         super().__post_init__()
         if isinstance(self.priv, str):
             self.priv = self.priv.upper()
         if self.in_type not in [ResourceType.DATABASE, ResourceType.SCHEMA]:
-            raise ValueError("in_type must be either DATABASE or SCHEMA")
+            raise ValueError(f"in_type must be either DATABASE or SCHEMA, not {self.in_type}")
 
 
 class GrantOnAll(Resource):
-    """
-    GRANT
-          { schemaPrivileges         | ALL [ PRIVILEGES ] } ON ALL SCHEMAS IN DATABASE <db_name>
-        | { schemaObjectPrivileges   | ALL [ PRIVILEGES ] } ON ALL <object_type_plural> IN { DATABASE <db_name> | SCHEMA <schema_name> }
-        }
-    TO [ ROLE ] <role_name> [ WITH GRANT OPTION ]
-    """
-
     resource_type = ResourceType.GRANT_ON_ALL
     props = Props(
         priv=IdentifierProp("priv", eq=False),
@@ -461,7 +455,6 @@ class GrantOnAll(Resource):
         priv: str,
         to: Role,
         grant_option: bool = False,
-        owner: str = None,
         **kwargs,
     ):
         """
@@ -480,6 +473,10 @@ class GrantOnAll(Resource):
         on_type = kwargs.pop("on_type", None)
         in_type = kwargs.pop("in_type", None)
         in_name = kwargs.pop("in_name", None)
+
+        _owner = kwargs.pop("owner", None)
+        if _owner is not None:
+            logger.warning("owner attribute on GrantOnAll is deprecated and will be removed in a future release")
 
         # Init from serialized
         if all([on_type, in_type, in_name]):
@@ -509,11 +506,6 @@ class GrantOnAll(Resource):
                         in_type = ResourceType(in_stmt)
                         in_name = arg
 
-        # if in_type == ResourceType.SCHEMA and in_name.upper().startswith("SNOWFLAKE"):
-        #     owner = "ACCOUNTADMIN"
-        # else:
-        #     owner = "SECURITYADMIN"
-
         super().__init__(**kwargs)
         self._data: _GrantOnAll = _GrantOnAll(
             priv=priv,
@@ -522,7 +514,6 @@ class GrantOnAll(Resource):
             in_name=in_name,
             to=to,
             grant_option=grant_option,
-            owner=owner,
         )
         self.requires(self._data.to)
 
@@ -552,7 +543,6 @@ class _RoleGrant(ResourceSpec):
     role: Role
     to_role: Role = None
     to_user: User = None
-    # owner: str = "SECURITYADMIN"
 
     def __post_init__(self):
         super().__post_init__()
@@ -612,7 +602,6 @@ class RoleGrant(Resource):
         role: Role,
         to_role: Role = None,
         to_user: User = None,
-        # owner: str = None,  # = "SECURITYADMIN"
         **kwargs,
     ):
         """

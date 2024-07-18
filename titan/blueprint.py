@@ -15,21 +15,21 @@ from .client import (
     reset_cache,
 )
 from .diff import Action, diff
-from .enums import ParseableEnum, ResourceType
+from .enums import ParseableEnum, ResourceType, resource_type_is_grant
 from .identifiers import URN, parse_identifier, resource_label_for_type
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     PRIVS_FOR_RESOURCE_TYPE,
     AccountPriv,
     GrantedPrivilege,
-    is_ownership_priv,
     execution_role_for_priv,
+    is_ownership_priv,
 )
 from .resource_name import ResourceName
 from .resources import Account, Database
 from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer
 from .resources.tag import Tag, TaggableResource
-from .scope import AccountScope, DatabaseScope, OrganizationScope, ResourceScope, SchemaScope
+from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
@@ -879,15 +879,7 @@ def execution_strategy_for_change(
     role_privileges: dict[str, list[dict]],
 ) -> tuple[str, bool]:
 
-    change_is_a_grant = change.urn.resource_type in (
-        ResourceType.GRANT,
-        ResourceType.FUTURE_GRANT,
-        ResourceType.ROLE_GRANT,
-    )
-
-    change_is_a_tag_reference = change.urn.resource_type == ResourceType.TAG_REFERENCE
-
-    if change_is_a_grant:
+    if resource_type_is_grant(change.urn.resource_type):
 
         if change.urn.resource_type == ResourceType.GRANT:
             execution_role = execution_role_for_priv(change.after["priv"])
@@ -901,7 +893,7 @@ def execution_strategy_for_change(
             return alternate_role, False
         raise MissingPrivilegeException(f"{change} requires a role with MANAGE GRANTS privilege")
 
-    elif change_is_a_tag_reference:
+    elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
         # There are two ways you can create a tag reference:
         # 1. You have the global APPLY TAGS priv on the account (given to ACCOUNTADMIN by default)
         # 2. You have APPLY privilege on the TAG object AND you have ownership of the tagged object
@@ -989,7 +981,7 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
     if change.action == Action.ADD:
 
         # if resource is a grant, check for MANAGE GRANTS
-        if change.urn.resource_type in (ResourceType.GRANT, ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
+        if resource_type_is_grant(change.urn.resource_type):
             if granted_priv.privilege == AccountPriv.MANAGE_GRANTS:
                 return True
 

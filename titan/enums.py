@@ -348,3 +348,12 @@ class BinaryFormat(ParseableEnum):
     HEX = "HEX"
     BASE64 = "BASE64"
     UTF8 = "UTF8"
+
+
+def resource_type_is_grant(resource_type: ResourceType) -> bool:
+    return resource_type in (
+        ResourceType.GRANT,
+        ResourceType.GRANT_ON_ALL,
+        ResourceType.ROLE_GRANT,
+        ResourceType.GRANT_ON_ALL,
+    )
