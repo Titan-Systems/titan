@@ -154,6 +154,10 @@ class MaterializedViewPriv(ParseableEnum):
     SELECT = "SELECT"
 
 
+class NetworkPolicyPriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+
+
 class NetworkRulePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
@@ -360,6 +364,7 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.IMAGE_REPOSITORY: None,
     ResourceType.INTEGRATION: IntegrationPriv,
     ResourceType.MATERIALIZED_VIEW: MaterializedViewPriv,
+    ResourceType.NETWORK_POLICY: NetworkPolicyPriv,
     ResourceType.NETWORK_RULE: NetworkRulePriv,
     ResourceType.NOTEBOOK: NotebookPriv,
     ResourceType.NOTIFICATION_INTEGRATION: IntegrationPriv,
@@ -404,6 +409,7 @@ CREATE_PRIV_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {
     ResourceType.FUNCTION: SchemaPriv.CREATE_FUNCTION,
     # ResourceType.GRANT: AccountPriv.CREATE_GRANT,
     ResourceType.MATERIALIZED_VIEW: SchemaPriv.CREATE_MATERIALIZED_VIEW,
+    ResourceType.NETWORK_POLICY: AccountPriv.CREATE_NETWORK_POLICY,
     ResourceType.NETWORK_RULE: SchemaPriv.CREATE_NETWORK_RULE,
     ResourceType.PACKAGES_POLICY: SchemaPriv.CREATE_PACKAGES_POLICY,
     ResourceType.PASSWORD_POLICY: SchemaPriv.CREATE_PASSWORD_POLICY,
@@ -440,14 +446,12 @@ GLOBAL_PRIV_DEFAULT_OWNERS = {
     AccountPriv.APPLY_TAG: "ACCOUNTADMIN",
     AccountPriv.ATTACH_POLICY: "SECURITYADMIN",
     AccountPriv.AUDIT: "ACCOUNTADMIN",
-    AccountPriv.BIND_SERVICE_ENDPOINT: "ACCOUNTADMIN",
     AccountPriv.BIND_SERVICE_ENDPOINT: "SECURITYADMIN",
     AccountPriv.CANCEL_QUERY: "ACCOUNTADMIN",
     AccountPriv.CREATE_ACCOUNT: "ACCOUNTADMIN",
     AccountPriv.CREATE_API_INTEGRATION: "ACCOUNTADMIN",
     AccountPriv.CREATE_APPLICATION_PACKAGE: "ACCOUNTADMIN",
     AccountPriv.CREATE_APPLICATION: "ACCOUNTADMIN",
-    AccountPriv.CREATE_COMPUTE_POOL: "ACCOUNTADMIN",
     AccountPriv.CREATE_COMPUTE_POOL: "SYSADMIN",
     AccountPriv.CREATE_CREDENTIAL: "ACCOUNTADMIN",
     AccountPriv.CREATE_DATA_EXCHANGE_LISTING: "ACCOUNTADMIN",
@@ -455,7 +459,6 @@ GLOBAL_PRIV_DEFAULT_OWNERS = {
     AccountPriv.CREATE_EXTERNAL_VOLUME: "ACCOUNTADMIN",
     AccountPriv.CREATE_FAILOVER_GROUP: "ACCOUNTADMIN",
     AccountPriv.CREATE_INTEGRATION: "ACCOUNTADMIN",
-    AccountPriv.CREATE_NETWORK_POLICY: "ACCOUNTADMIN",
     AccountPriv.CREATE_NETWORK_POLICY: "SECURITYADMIN",
     AccountPriv.CREATE_REPLICATION_GROUP: "ACCOUNTADMIN",
     AccountPriv.CREATE_ROLE: "USERADMIN",

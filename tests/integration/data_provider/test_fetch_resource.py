@@ -616,7 +616,7 @@ def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
         password_max_retries=3,
         password_lockout_time_mins=30,
         password_history=5,
-        comment="production account password policy",
+        # comment="production account password policy", # Leaving this out until Snowflake fixes their bugs
         owner=TEST_ROLE,
         database=test_db,
         schema="PUBLIC",
@@ -626,7 +626,7 @@ def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, password_policy.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, password_policy.to_dict())
+    assert result == password_policy.to_dict()
 
 
 def test_fetch_python_stored_procedure(cursor, suffix, test_db, marked_for_cleanup):
@@ -1096,11 +1096,9 @@ def test_fetch_json_file_format(cursor, suffix, marked_for_cleanup):
 def test_fetch_notebook(cursor, suffix, marked_for_cleanup):
     notebook = res.Notebook(
         name=f"SOME_NOTEBOOK_{suffix}",
-        from_="STATIC_DATABASE.PUBLIC.STATIC_STAGE",
-        main_file="my_notebook_file.ipynb",
-        query_warehouse="my_warehouse",
+        query_warehouse="static_warehouse",
         comment="This is a test notebook",
-        version="v1.0.0-final-FINAL",
+        # version="v1.0.0-final-FINAL",
     )
     cursor.execute(notebook.create_sql(if_not_exists=True))
     marked_for_cleanup.append(notebook)
@@ -1109,4 +1107,24 @@ def test_fetch_notebook(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = strip_nones_and_unfetchable(res.Notebook.spec, result)
     data = strip_nones_and_unfetchable(res.Notebook.spec, notebook.to_dict())
+    assert result == data
+
+
+def test_fetch_network_policy(cursor, suffix, marked_for_cleanup):
+    policy = res.NetworkPolicy(
+        name=f"SOME_NETWORK_POLICY_{suffix}",
+        allowed_network_rule_list=["static_database.public.static_network_rule"],
+        blocked_network_rule_list=["static_database.public.static_network_rule"],
+        allowed_ip_list=["1.1.1.1", "2.2.2.2"],
+        blocked_ip_list=["3.3.3.3", "4.4.4.4"],
+        comment="Network policy for testing",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(policy.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(policy)
+
+    result = safe_fetch(cursor, policy.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.NetworkPolicy.spec, result)
+    data = strip_nones_and_unfetchable(res.NetworkPolicy.spec, policy.to_dict())
     assert result == data

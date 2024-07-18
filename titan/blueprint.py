@@ -607,7 +607,7 @@ class Blueprint:
                 raise OrphanResourceException(
                     "Blueprint is missing a database but includes resources that require a database or schema"
                 )
-
+            logger.warning(f"No database found in config, using database {session_ctx['database']} from session")
             self._root.add(ResourcePointer(name=session_ctx["database"], resource_type=ResourceType.DATABASE))
             databases = self._root.items(resource_type=ResourceType.DATABASE)
 
@@ -630,7 +630,8 @@ class Blueprint:
 
             if resource.container is None:
                 if len(databases) == 1:
-                    databases[0].public_schema.add(resource)
+                    logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
+                    databases[0].find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(resource)
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):

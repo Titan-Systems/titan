@@ -34,6 +34,8 @@ def main():
 
     conn = snowflake.connector.connect(**connection_params)
 
+    # check if account is standard/enterprise, probably by checking tag status, then dynamically pop tag/secret if standard
+
     load_and_run_config(
         conn,
         "test_account.yml",
@@ -55,18 +57,19 @@ def main():
             "storage integration",
             "stream",
             "table",
+            "tag",
             "user",
             "view",
             "warehouse",
         ],
     )
 
-    load_and_run_config(
-        conn,
-        "test_account_enterprise.yml",
-        "SYNC",
-        ["tag"],
-    )
+    # load_and_run_config(
+    #     conn,
+    #     "test_account_enterprise.yml",
+    #     "SYNC",
+    #     ["tag"],
+    # )
 
 
 if __name__ == "__main__":

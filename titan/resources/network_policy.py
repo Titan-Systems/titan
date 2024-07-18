@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from ..enums import ParseableEnum, ResourceType
+from ..enums import ResourceType
 from ..props import (
     IdentifierListProp,
     Props,
@@ -8,7 +8,7 @@ from ..props import (
     StringProp,
 )
 from ..resource_name import ResourceName
-from ..scope import SchemaScope
+from ..scope import AccountScope
 from .network_rule import NetworkRule
 from .resource import NamedResource, Resource, ResourceSpec
 from .role import Role
@@ -80,15 +80,15 @@ class NetworkPolicy(NamedResource, Resource):
         ```
     """
 
-    resource_type = ResourceType.NETWORK_RULE
+    resource_type = ResourceType.NETWORK_POLICY
     props = Props(
-        allowed_network_rule_list=IdentifierListProp("allowed_network_rule_list", NetworkRule),
-        blocked_network_rule_list=IdentifierListProp("blocked_network_rule_list", NetworkRule),
+        allowed_network_rule_list=IdentifierListProp("allowed_network_rule_list", parens=True, eq=True),
+        blocked_network_rule_list=IdentifierListProp("blocked_network_rule_list", parens=True, eq=True),
         allowed_ip_list=StringListProp("allowed_ip_list", parens=True, eq=True),
         blocked_ip_list=StringListProp("blocked_ip_list", parens=True, eq=True),
         comment=StringProp("comment"),
     )
-    scope = SchemaScope()
+    scope = AccountScope()
     spec = _NetworkPolicy
 
     def __init__(
@@ -112,3 +112,9 @@ class NetworkPolicy(NamedResource, Resource):
             comment=comment,
             owner=owner,
         )
+        if self._data.allowed_network_rule_list:
+            for network_rule in self._data.allowed_network_rule_list:
+                self.requires(network_rule)
+        if self._data.blocked_network_rule_list:
+            for network_rule in self._data.blocked_network_rule_list:
+                self.requires(network_rule)

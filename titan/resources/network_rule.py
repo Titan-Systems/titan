@@ -40,7 +40,7 @@ class _NetworkRule(ResourceSpec):
         if self.type == NetworkIdentifierType.HOST_PORT and self.mode != NetworkRuleMode.EGRESS:
             raise ValueError("When TYPE is HOST_PORT, MODE must be set to EGRESS.")
 
-        if len(self.value_list) == 0:
+        if self.value_list is not None and len(self.value_list) == 0:
             raise ValueError("value_list must have at least one entry")
 
 

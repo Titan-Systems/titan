@@ -1,9 +1,6 @@
 {
     "name": "mynotebook",
-    "from_": "@static_database.static_schema.static_stage",
-    "main_file": "my_notebook_file.ipynb",
-    "query_warehouse": "my_warehouse",
+    "query_warehouse": "static_warehouse",
     "comment": "This is a test notebook",
-    "version": "v1.0.0-final-FINAL",
     "default_version": null
 }

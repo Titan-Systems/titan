@@ -102,6 +102,17 @@ def _desc_type3_result_to_dict(desc_result, lower_properties=False):
     return result
 
 
+def _desc_type4_result_to_dict(desc_result, lower_properties=False):
+    result = {}
+    for row in desc_result:
+        property = row["name"]
+        if lower_properties:
+            property = property.lower()
+        result[property] = row["value"]
+
+    return result
+
+
 def _fail_if_not_granted(result, *args):
     if len(result) == 0:
         raise Exception("Failed to create grant")
@@ -994,6 +1005,47 @@ def fetch_materialized_view(session, fqn: FQN):
     }
 
 
+def fetch_network_policy(session, fqn: FQN):
+    policies = _show_resources(session, "NETWORK POLICIES", fqn)
+    if len(policies) == 0:
+        return None
+    if len(policies) > 1:
+        raise Exception(f"Found multiple network policies matching {fqn}")
+
+    data = policies[0]
+    desc_result = execute(session, f"DESC NETWORK POLICY {fqn}", cacheable=True)
+    properties = _desc_type4_result_to_dict(desc_result, lower_properties=True)
+
+    allowed_network_rule_list = None
+    if "allowed_network_rule_list" in properties:
+        allowed_network_rule_list = [
+            rule["fullyQualifiedRuleName"] for rule in json.loads(properties["allowed_network_rule_list"])
+        ]
+    blocked_network_rule_list = None
+    if "blocked_network_rule_list" in properties:
+        blocked_network_rule_list = [
+            rule["fullyQualifiedRuleName"] for rule in json.loads(properties["blocked_network_rule_list"])
+        ]
+    allowed_ip_list = None
+    if "allowed_ip_list" in properties:
+        allowed_ip_list = properties["allowed_ip_list"].split(",")
+    blocked_ip_list = None
+    if "blocked_ip_list" in properties:
+        blocked_ip_list = properties["blocked_ip_list"].split(",")
+
+    owner = _fetch_owner(session, "NETWORK POLICY", fqn)
+
+    return {
+        "name": data["name"],
+        "allowed_network_rule_list": allowed_network_rule_list,
+        "blocked_network_rule_list": blocked_network_rule_list,
+        "allowed_ip_list": allowed_ip_list,
+        "blocked_ip_list": blocked_ip_list,
+        "comment": data["comment"] or None,
+        "owner": owner,
+    }
+
+
 def fetch_network_rule(session, fqn: FQN):
     show_result = _show_resources(session, "NETWORK RULES", fqn)
 
@@ -1024,14 +1076,15 @@ def fetch_notebook(session, fqn: FQN):
         raise Exception(f"Found multiple notebooks matching {fqn}")
 
     data = notebooks[0]
-    print(data)
+    desc_result = execute(session, f"DESC NOTEBOOK {fqn}", cacheable=True)
+    properties = desc_result[0]
     return {
         "name": data["name"],
-        "from_": data["from_"],
-        "main_file": data["main_file"],
+        "main_file": None if properties["main_file"] == "notebook_app.ipynb" else properties["main_file"],
         "query_warehouse": data["query_warehouse"],
         "comment": data["comment"],
-        "version": data["version"],
+        "owner": data["owner"],
+        # "version": data["version"],
     }
 
 
@@ -1085,8 +1138,7 @@ def fetch_packages_policy(session, fqn: FQN):
 
 
 def fetch_password_policy(session, fqn: FQN):
-    show_result = execute(session, f"SHOW PASSWORD POLICIES IN SCHEMA {fqn.database}.{fqn.schema}")
-    policies = _filter_result(show_result, name=fqn.name)
+    policies = _show_resources(session, "PASSWORD POLICIES", fqn)
     if len(policies) == 0:
         return None
     if len(policies) > 1:
@@ -1095,6 +1147,8 @@ def fetch_password_policy(session, fqn: FQN):
     data = policies[0]
     desc_result = execute(session, f"DESC PASSWORD POLICY {fqn}")
     properties = _desc_result_to_dict(desc_result)
+
+    comment = properties["COMMENT"] if properties["COMMENT"] != "null" else None
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1109,7 +1163,7 @@ def fetch_password_policy(session, fqn: FQN):
         "password_max_retries": int(properties["PASSWORD_MAX_RETRIES"]),
         "password_lockout_time_mins": int(properties["PASSWORD_LOCKOUT_TIME_MINS"]),
         "password_history": int(properties["PASSWORD_HISTORY"]),
-        "comment": properties["COMMENT"] or None,
+        "comment": comment,
         "owner": properties["OWNER"],
     }
 

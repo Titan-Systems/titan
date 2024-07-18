@@ -1,6 +1,13 @@
+databases:
+  - name: ADMIN
+    schemas:
+      - name: network_rules
+
 network_rules:
   - name: unc5537_suspicious_ips
     type: IPV4
+    database: ADMIN
+    schema: network_rules
     value_list:
       - 104.223.91.28
       - 198.54.135.99
@@ -304,5 +311,5 @@ network_rules:
 network_policies:
   - name: unc5537_account_hardening
     blocked_network_rule_list:
-      - unc5537_suspicious_ips
+      - admin.network_rules.unc5537_suspicious_ips
     comment: "See Snowflake's security bulletin on UNC5537 for more details (https://community.snowflake.com/s/article/Communication-ID-0108977-Additional-Information)"
