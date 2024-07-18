@@ -1072,3 +1072,22 @@ def test_fetch_json_file_format(cursor, suffix, marked_for_cleanup):
     result = strip_nones_and_unfetchable(res.JSONFileFormat.spec, result)
     data = strip_nones_and_unfetchable(res.JSONFileFormat.spec, file_format.to_dict())
     assert result == data
+
+
+def test_fetch_notebook(cursor, suffix, marked_for_cleanup):
+    notebook = res.Notebook(
+        name=f"SOME_NOTEBOOK_{suffix}",
+        from_="STATIC_DATABASE.PUBLIC.STATIC_STAGE",
+        main_file="my_notebook_file.ipynb",
+        query_warehouse="my_warehouse",
+        comment="This is a test notebook",
+        version="v1.0.0-final-FINAL",
+    )
+    cursor.execute(notebook.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(notebook)
+
+    result = safe_fetch(cursor, notebook.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.Notebook.spec, result)
+    data = strip_nones_and_unfetchable(res.Notebook.spec, notebook.to_dict())
+    assert result == data

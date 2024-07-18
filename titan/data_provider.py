@@ -1016,6 +1016,25 @@ def fetch_network_rule(session, fqn: FQN):
     }
 
 
+def fetch_notebook(session, fqn: FQN):
+    notebooks = _show_resources(session, "NOTEBOOKS", fqn)
+    if len(notebooks) == 0:
+        return None
+    if len(notebooks) > 1:
+        raise Exception(f"Found multiple notebooks matching {fqn}")
+
+    data = notebooks[0]
+    print(data)
+    return {
+        "name": data["name"],
+        "from_": data["from_"],
+        "main_file": data["main_file"],
+        "query_warehouse": data["query_warehouse"],
+        "comment": data["comment"],
+        "version": data["version"],
+    }
+
+
 def fetch_notification_integration(session, fqn: FQN):
     show_result = execute(session, f"SHOW NOTIFICATION INTEGRATIONS LIKE '{fqn.name}'")
     if len(show_result) == 0:

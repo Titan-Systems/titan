@@ -27,6 +27,7 @@ from .notification_integration import (
     GCPInboundNotificationIntegration,
     GCPOutboundNotificationIntegration,
 )
+from .notebook import Notebook
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
 from .pipe import Pipe
@@ -98,6 +99,7 @@ __all__ = [
     "JavascriptUDF",
     "MaterializedView",
     "NetworkRule",
+    "Notebook",
     "OAuthSecret",
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",
