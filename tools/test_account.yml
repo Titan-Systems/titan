@@ -13,7 +13,7 @@ users:
         - last_name
         - owner
   - name: TITAN_CI
-    type_: SERVICE
+    user_type: SERVICE
 
 roles:
   - name: CI
@@ -24,6 +24,8 @@ roles:
     comment: This role is intentionally left empty
   - name: STATIC_ROLE
     comment: Static role
+    tags:
+      static_database.public.static_tag: STATIC_TAG_VALUE
   - name: ~@#$%^&*()_+
     owner: ACCOUNTADMIN
     comment: This role has some issues
@@ -70,7 +72,7 @@ network_rules:
 
 secrets:
   - name: static_secret
-    type: PASSWORD
+    secret_type: PASSWORD
     username: someuser
     password: somepass
     database: static_database

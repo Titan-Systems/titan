@@ -19,18 +19,18 @@ from ..scope import SchemaScope
 class _CSVFileFormat(ResourceSpec):
     name: ResourceName
     owner: Role = "SYSADMIN"
-    type: FileType = FileType.CSV
-    compression: Compression = None
+    type: FileType = "CSV"
+    compression: Compression = "AUTO"
     record_delimiter: str = "\n"
-    field_delimiter: str = None
+    field_delimiter: str = ","
     file_extension: str = None
     parse_header: bool = False
-    skip_header: int = None
+    skip_header: int = 0
     skip_blank_lines: bool = False
     date_format: str = "AUTO"
     time_format: str = "AUTO"
     timestamp_format: str = "AUTO"
-    binary_format: BinaryFormat = BinaryFormat.HEX
+    binary_format: BinaryFormat = "HEX"
     escape: str = None
     escape_unenclosed_field: str = "\\"
     trim_space: bool = False
@@ -38,10 +38,15 @@ class _CSVFileFormat(ResourceSpec):
     null_if: list[str] = None
     error_on_column_count_mismatch: bool = True
     replace_invalid_characters: bool = False
-    empty_field_as_null: bool = None
+    empty_field_as_null: bool = True
     skip_byte_order_mark: bool = True
     encoding: str = "UTF8"
     comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.null_if is None:
+            self.null_if = ["\n"]
 
 
 class CSVFileFormat(NamedResource, Resource):
@@ -53,8 +58,7 @@ class CSVFileFormat(NamedResource, Resource):
         https://docs.snowflake.com/en/sql-reference/sql/create-file-format
 
     Fields:
-        type (FileType, required): The type of file format, which is CSV for this class. Defaults to CSV.
-        compression (Compression): The compression type used for the file format.
+        compression (string or Compression): The compression type used for the file format.
         record_delimiter (string): Specifies the character that delimits records. Defaults to "\n".
         field_delimiter (string): Specifies the character that delimits fields.
         file_extension (string): The file extension used for files of this format.
@@ -64,7 +68,7 @@ class CSVFileFormat(NamedResource, Resource):
         date_format (string): The format used for date values. Defaults to "AUTO".
         time_format (string): The format used for time values. Defaults to "AUTO".
         timestamp_format (string): The format used for timestamp values. Defaults to "AUTO".
-        binary_format (BinaryFormat): The format used for binary data. Defaults to HEX.
+        binary_format (string or BinaryFormat): The format used for binary data. Defaults to HEX.
         escape (string): The escape character used in the file format.
         escape_unenclosed_field (string): The escape character for unenclosed fields. Defaults to "\\".
         trim_space (bool): Whether to trim spaces from fields. Defaults to False.
@@ -134,17 +138,17 @@ class CSVFileFormat(NamedResource, Resource):
         self,
         name: str,
         owner: str = "SYSADMIN",
-        compression: Compression = None,
+        compression: Compression = "AUTO",
         record_delimiter: str = "\n",
-        field_delimiter: str = None,
+        field_delimiter: str = ",",
         file_extension: str = None,
         parse_header: bool = False,
-        skip_header: int = None,
+        skip_header: int = 0,
         skip_blank_lines: bool = False,
         date_format: str = "AUTO",
         time_format: str = "AUTO",
         timestamp_format: str = "AUTO",
-        binary_format: BinaryFormat = BinaryFormat.HEX,
+        binary_format: BinaryFormat = "HEX",
         escape: str = None,
         escape_unenclosed_field: str = "\\",
         trim_space: bool = False,
@@ -152,7 +156,7 @@ class CSVFileFormat(NamedResource, Resource):
         null_if: list[str] = None,
         error_on_column_count_mismatch: bool = True,
         replace_invalid_characters: bool = False,
-        empty_field_as_null: bool = None,
+        empty_field_as_null: bool = True,
         skip_byte_order_mark: bool = True,
         encoding: str = "UTF8",
         comment: str = None,

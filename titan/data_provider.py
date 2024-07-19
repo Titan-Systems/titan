@@ -27,7 +27,7 @@ from .identifiers import FQN, URN, parse_FQN, resource_type_for_label
 from .parse import (
     _parse_column,
     _parse_dynamic_table_text,
-    _parse_view_ddl,
+    parse_view_ddl,
     parse_collection_string,
 )
 from .privs import GrantedPrivilege
@@ -990,18 +990,23 @@ def fetch_image_repository(session, fqn: FQN):
 
 
 def fetch_materialized_view(session, fqn: FQN):
-    # show_result = execute(session, f"SHOW MATERIALIZED VIEWS LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
-    show_result = _show_resources(session, "MATERIALIZED VIEWS", fqn)
-    if len(show_result) == 0:
+    materialized_views = _show_resources(session, "MATERIALIZED VIEWS", fqn)
+    if len(materialized_views) == 0:
         return None
-    if len(show_result) > 1:
+    if len(materialized_views) > 1:
         raise Exception(f"Found multiple materialized views matching {fqn}")
 
-    data = show_result[0]
+    data = materialized_views[0]
+    columns = fetch_columns(session, "VIEW", fqn)
 
     return {
         "name": fqn.name,
         "owner": data["owner"],
+        "secure": data["is_secure"] == "true",
+        "columns": columns,
+        "cluster_by": _parse_cluster_keys(data["cluster_by"]),
+        "comment": data["comment"] or None,
+        "as_": parse_view_ddl(data["text"]),
     }
 
 
@@ -1791,12 +1796,17 @@ def fetch_tag_reference(session, fqn: FQN):
     name = str(fqn).split("?")[0]
     resource_fqn = parse_FQN(name, is_db_scoped=(object_domain == "SCHEMA"))
 
+    tag_db = resource_fqn.database if resource_fqn.database else resource_fqn
+
+    if str(resource_fqn) == "DATABASE":
+        resource_fqn = '"DATABASE"'
+
     try:
         tag_refs = execute(
             session,
             f"""
                 SELECT *
-                FROM table({resource_fqn.database}.information_schema.tag_references(
+                FROM table({tag_db}.information_schema.tag_references(
                     '{resource_fqn}', '{object_domain}'
                 ))""",
         )
@@ -1830,10 +1840,20 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
     desc_result = execute(session, f"DESC USER {fqn}")
     properties = _desc_result_to_dict(desc_result, lower_properties=True)
 
+    user_type = properties["type"].upper()
+
+    display_name = None
+    login_name = None
+    must_change_password = None
+    if user_type != "SERVICE":
+        display_name = data["display_name"]
+        login_name = data["login_name"]
+        must_change_password = data["must_change_password"] == "true"
+
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "login_name": data["login_name"],
-        "display_name": data["display_name"],
+        "login_name": login_name,
+        "display_name": display_name,
         "first_name": data["first_name"] or None,
         "last_name": data["last_name"] or None,
         "email": data["email"] or None,
@@ -1841,13 +1861,13 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         "days_to_expiry": data["days_to_expiry"] or None,
         "comment": data["comment"] or None,
         "disabled": data["disabled"] == "true",
-        "must_change_password": data["must_change_password"] == "true",
+        "must_change_password": must_change_password,
         "default_warehouse": data["default_warehouse"] or None,
         "default_namespace": data["default_namespace"] or None,
         "default_role": data["default_role"] or None,
         "default_secondary_roles": data["default_secondary_roles"] or None,
         "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
-        "type_": properties["type"].upper(),
+        "user_type": user_type,
         "owner": data["owner"],
     }
 
@@ -1879,7 +1899,7 @@ def fetch_view(session, fqn: FQN):
         "columns": columns,
         "change_tracking": data["change_tracking"] == "ON",
         "comment": data["comment"] or None,
-        "as_": _parse_view_ddl(data["text"]),
+        "as_": parse_view_ddl(data["text"]),
     }
 
 
@@ -2043,7 +2063,7 @@ def list_functions(session) -> list[FQN]:
 
 
 def list_grants(session) -> list[FQN]:
-    roles = execute(session, "SHOW ROLES")
+    roles = execute(session, "SHOW ROLES", cacheable=True)
     grants = []
     for role in roles:
         role_name = ResourceName.from_snowflake_metadata(role["name"])
@@ -2053,6 +2073,14 @@ def list_grants(session) -> list[FQN]:
         for data in grant_data:
             if data["granted_on"] == "ROLE":
                 # raise Exception(f"Role grants are not supported yet: {data}")
+                continue
+
+            # Titan Grants don't support OWNERSHIP privilege
+            if data["privilege"] == "OWNERSHIP":
+                continue
+
+            # Skip this undocumented new priv because it's unrevokable
+            if data["privilege"] == "CREATE CORTEX SEARCH SERVICE":
                 continue
             name = data["name"]
             if data["granted_on"] == "ACCOUNT":
@@ -2131,6 +2159,10 @@ def list_schemas(session, database=None) -> list[FQN]:
         raise
 
 
+def list_secrets(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "SECRETS")
+
+
 def list_security_integrations(session) -> list[FQN]:
     show_result = execute(session, "SHOW SECURITY INTEGRATIONS")
     integrations = []
@@ -2191,6 +2223,52 @@ def list_tables(session) -> list[FQN]:
             )
         )
     return tables
+
+
+def list_tag_references(session) -> list[FQN]:
+    try:
+        show_result = execute(session, "SHOW TAGS IN ACCOUNT")
+        tag_references = []
+        for tag in show_result:
+            if tag["database_name"] in SYSTEM_DATABASES or tag["schema_name"] == "INFORMATION_SCHEMA":
+                continue
+
+            tag_refs = execute(
+                session,
+                f"""
+                    SELECT *
+                    FROM table(snowflake.account_usage.tag_references_with_lineage(
+                        '{tag['database_name']}.{tag['schema_name']}.{tag['name']}'
+                    ))
+                """,
+            )
+
+            for ref in tag_refs:
+                if ref["OBJECT_DELETED"] is not None:
+                    continue
+                print(ref)
+            # raise
+        return tag_references
+
+        #     tags.append(
+        #         FQN(
+        #             database=ResourceName.from_snowflake_metadata(row["database_name"]),
+        #             schema=ResourceName.from_snowflake_metadata(tag["schema_name"]),
+        #             name=ResourceName.from_snowflake_metadata(tag["name"]),
+        #         )
+        #     )
+        # return tags
+    except ProgrammingError as err:
+        if err.errno == UNSUPPORTED_FEATURE:
+            return []
+        else:
+            raise
+
+    tag_map = {}
+    for tag_ref in tag_refs:
+        tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
+        tag_map[tag_name] = tag_ref["TAG_VALUE"]
+    return tag_map
 
 
 def list_tags(session) -> list[FQN]:

@@ -356,4 +356,5 @@ def resource_type_is_grant(resource_type: ResourceType) -> bool:
         ResourceType.GRANT_ON_ALL,
         ResourceType.ROLE_GRANT,
         ResourceType.GRANT_ON_ALL,
+        ResourceType.FUTURE_GRANT,
     )

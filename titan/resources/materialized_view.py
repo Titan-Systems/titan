@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..enums import AccountEdition, ResourceType
 from ..props import (
@@ -12,6 +12,7 @@ from ..props import (
 )
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
+from .column import Column
 from .resource import NamedResource, Resource, ResourceSpec
 from .role import Role
 from .tag import TaggableResource
@@ -22,11 +23,16 @@ class _MaterializedView(ResourceSpec):
     name: ResourceName
     owner: Role = "SYSADMIN"
     secure: bool = False
-    columns: list[dict] = None
+    columns: list[Column] = field(default_factory=None, metadata={"ignore_changes": True})
     copy_grants: bool = False
     cluster_by: list[str] = None
     comment: str = None
     as_: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.as_ is not None:
+            self.as_ = self.as_.strip()
 
 
 class MaterializedView(NamedResource, TaggableResource, Resource):

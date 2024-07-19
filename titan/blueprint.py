@@ -132,7 +132,8 @@ class Manifest:
 
         if urn in self._data:
             # if resource_data != self._data[urn]:
-            logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {resource}")
+            if not isinstance(resource, ResourcePointer):
+                logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {resource}")
             return
         self._data[urn] = resource
         for ref in resource.refs:
@@ -467,10 +468,10 @@ class Blueprint:
                 attr = list(delta.keys())[0]
                 attr_metadata = resource.spec.get_metadata(attr)
 
-                change_requires_replacement = attr_metadata.get("triggers_replacement", False)
-                change_forces_add = attr_metadata.get("forces_add", False)
-                change_is_fetchable = attr_metadata.get("fetchable", True)
-                change_should_be_ignored = attr in resource.lifecycle.ignore_changes
+                change_requires_replacement = attr_metadata.triggers_replacement
+                change_forces_add = attr_metadata.forces_add
+                change_is_fetchable = attr_metadata.fetchable
+                change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
 
                 if change_requires_replacement:
                     raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
@@ -495,8 +496,8 @@ class Blueprint:
 
                 attr = list(delta.keys())[0]
                 attr_metadata = resource.spec.get_metadata(attr)
-                change_is_fetchable = attr_metadata.get("fetchable", True)
-                change_should_be_ignored = attr in resource.lifecycle.ignore_changes
+                change_is_fetchable = attr_metadata.fetchable
+                change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
                 if not change_is_fetchable:
                     continue
                 if change_should_be_ignored:
@@ -881,7 +882,7 @@ def execution_strategy_for_change(
 
     if resource_type_is_grant(change.urn.resource_type):
 
-        if change.urn.resource_type == ResourceType.GRANT:
+        if change.action == Action.ADD and change.urn.resource_type == ResourceType.GRANT:
             execution_role = execution_role_for_priv(change.after["priv"])
             if execution_role and execution_role in usable_roles:
                 return execution_role, False

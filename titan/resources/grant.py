@@ -107,6 +107,9 @@ class Grant(Resource):
 
         priv = priv.value if isinstance(priv, ParseableEnum) else priv
 
+        if priv == "OWNERSHIP":
+            raise ValueError("Grant does not support OWNERSHIP privilege")
+
         # Handle instantiation from data dict
         on_type = kwargs.pop("on_type", None)
         if on_type:
@@ -527,15 +530,26 @@ class GrantOnAll(Resource):
         return grant_on_all_fqn(self._data)
 
 
-def grant_on_all_fqn(grant: _GrantOnAll):
+def grant_on_all_fqn(data: _GrantOnAll):
+    in_type = resource_label_for_type(data.in_type)
+    in_name = data.in_name
+    on_type = resource_label_for_type(data.on_type).upper()
+    collection = format_collection_string({"in_name": in_name, "in_type": in_type, "on_type": on_type})
     return FQN(
-        name=grant.to.name,
+        name=data.to.name,
         params={
-            "on_type": str(grant.on_type),
-            "in_type": str(grant.in_type),
-            "in_name": grant.in_name,
+            "priv": data.priv,
+            "on": f"{in_type}/{collection}",
         },
     )
+    # return FQN(
+    #     name=grant.to.name,
+    #     params={
+    #         "on_type": str(grant.on_type),
+    #         "in_type": str(grant.in_type),
+    #         "in_name": grant.in_name,
+    #     },
+    # )
 
 
 @dataclass(unsafe_hash=True)

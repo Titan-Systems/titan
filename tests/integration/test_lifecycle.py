@@ -44,6 +44,7 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         res.Service,
         res.Grant,
         res.RoleGrant,
+        res.PasswordPolicy,
     ):
         pytest.skip("Skipping Service")
 

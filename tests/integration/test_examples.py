@@ -30,8 +30,14 @@ def test_example(example, cursor, marked_for_cleanup):
     blueprint = Blueprint(
         name="test-example",
         resources=resources,
-        dry_run=False,
     )
     plan = blueprint.plan(cursor.connection)
     cmds = blueprint.apply(cursor.connection, plan)
     assert cmds
+
+    blueprint = Blueprint(
+        name="check-drift",
+        resources=collect_resources_from_config(example),
+    )
+    plan = blueprint.plan(cursor.connection)
+    assert not plan
