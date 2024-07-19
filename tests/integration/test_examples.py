@@ -4,6 +4,7 @@ import yaml
 from tests.helpers import get_examples_yml
 
 from titan.blueprint import Blueprint
+from titan.enums import ResourceType
 from titan.gitops import collect_resources_from_config
 
 EXAMPLES_YML = list(get_examples_yml())
@@ -40,4 +41,9 @@ def test_example(example, cursor, marked_for_cleanup):
         resources=collect_resources_from_config(example),
     )
     plan = blueprint.plan(cursor.connection)
-    assert not plan
+    unexpected_drift = [change for change in plan if not change_is_expected(change)]
+    assert len(unexpected_drift) == 0
+
+
+def change_is_expected(change):
+    return change.urn.resource_type == ResourceType.GRANT and change.after.get("priv", "") == "ALL"

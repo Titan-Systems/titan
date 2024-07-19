@@ -1798,6 +1798,7 @@ def fetch_tag_reference(session, fqn: FQN):
 
     tag_db = resource_fqn.database if resource_fqn.database else resource_fqn
 
+    # Another hacky fix
     if str(resource_fqn) == "DATABASE":
         resource_fqn = '"DATABASE"'
 
@@ -1822,7 +1823,11 @@ def fetch_tag_reference(session, fqn: FQN):
     for tag_ref in tag_refs:
         tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
         tag_map[tag_name] = tag_ref["TAG_VALUE"]
-    return tag_map
+    return {
+        "object_name": name,
+        "object_domain": object_domain,
+        "tags": tag_map,
+    }
 
 
 def fetch_user(session, fqn: FQN) -> Optional[dict]:

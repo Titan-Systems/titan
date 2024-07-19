@@ -529,6 +529,16 @@ class Blueprint:
             elif isinstance(data, list):
                 raise Exception(f"Fetching list of {urn.resource_type} is not supported yet")
             else:
+                # There is an edge case here where the resource spec doesnt have defaults specified.
+                # Instead of throwing an error, dataclass will provide a dataclass._MISSINGFIELD object
+                # That is bad.
+                # The answer is not that defaults should be added. The root cause is that data_provider
+                # method return raw dicts that aren't type checked against their corresponding
+                # Resource spec.
+                # I have considered tightly coupling the data provider to the resource spec, but I don't think
+                # the complexity is worth it.
+                # Another solution would be to build in automatic tests to check that the data_provider
+                # returns data that matches the spec.
                 normalized = resource_cls.defaults() | data
             return normalized
 
