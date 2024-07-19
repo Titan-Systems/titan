@@ -75,7 +75,7 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "owner": TEST_ROLE,
         "comment": None,
     }
-    tags = safe_fetch(
+    tag_ref = safe_fetch(
         cursor,
         URN(
             resource_type=ResourceType.TAG_REFERENCE,
@@ -83,9 +83,9 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
             account_locator=account_locator,
         ),
     )
-    assert tags is not None
-    assert "STATIC_DATABASE.PUBLIC.STATIC_TAG" in tags
-    assert tags["STATIC_DATABASE.PUBLIC.STATIC_TAG"] == "STATIC_TAG_VALUE"
+    assert tag_ref is not None
+    assert "STATIC_DATABASE.PUBLIC.STATIC_TAG" in tag_ref["tags"]
+    assert tag_ref["tags"]["STATIC_DATABASE.PUBLIC.STATIC_TAG"] == "STATIC_TAG_VALUE"
 
 
 def test_fetch_grant_on_account(cursor, suffix):
