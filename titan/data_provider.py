@@ -2107,6 +2107,14 @@ def list_image_repositories(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "IMAGE REPOSITORIES")
 
 
+def list_network_policies(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "NETWORK POLICIES")
+
+
+def list_network_rules(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "NETWORK RULES")
+
+
 def list_pipes(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "PIPES")
 
@@ -2336,7 +2344,3 @@ def list_warehouses(session) -> list[FQN]:
     for row in show_result:
         warehouses.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
     return warehouses
-
-
-def list_network_rules(session) -> list[FQN]:
-    return list_schema_scoped_resource(session, "NETWORK RULES")
