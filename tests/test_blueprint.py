@@ -247,15 +247,15 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
     blueprint = Blueprint(
         name="blueprint",
         resources=[
-            res.Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
-            res.Grant(priv="OWNERSHIP", on_database="DB", to="SOME_ROLE"),
+            res.Grant(priv="USAGE", on_database="DB", to="SOME_ROLE"),
+            res.Grant(priv="USAGE", on_database="DB", to="SOME_ROLE"),
         ],
     )
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
     assert plan[0].action == Action.ADD
-    assert plan[0].urn == parse_URN("urn::ABCD123:grant/SOME_ROLE?priv=OWNERSHIP&on=database/DB")
+    assert plan[0].urn == parse_URN("urn::ABCD123:grant/SOME_ROLE?priv=USAGE&on=database/DB")
 
 
 def test_blueprint_dont_add_public_schema(session_ctx, remote_state):

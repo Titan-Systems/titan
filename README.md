@@ -382,7 +382,7 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | Iceberg Table                 | ❌         |
 | Image Repository              | ✅         |
 | Masking Policy                | ❌         |
-| Materialized View             | ✅         |
+| Materialized View             | 🚧         |
 | Model                         | ❌         |
 | Network Rule                  | ✅         |
 | Packages Policy               | ✅         |

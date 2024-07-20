@@ -75,7 +75,7 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
         "owner": TEST_ROLE,
         "comment": None,
     }
-    tags = safe_fetch(
+    tag_ref = safe_fetch(
         cursor,
         URN(
             resource_type=ResourceType.TAG_REFERENCE,
@@ -83,9 +83,9 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
             account_locator=account_locator,
         ),
     )
-    assert tags is not None
-    assert "STATIC_DATABASE.PUBLIC.STATIC_TAG" in tags
-    assert tags["STATIC_DATABASE.PUBLIC.STATIC_TAG"] == "STATIC_TAG_VALUE"
+    assert tag_ref is not None
+    assert "STATIC_DATABASE.PUBLIC.STATIC_TAG" in tag_ref["tags"]
+    assert tag_ref["tags"]["STATIC_DATABASE.PUBLIC.STATIC_TAG"] == "STATIC_TAG_VALUE"
 
 
 def test_fetch_grant_on_account(cursor, suffix):
@@ -217,6 +217,19 @@ def test_fetch_csv_file_format(cursor, test_db, marked_for_cleanup):
         null_if=["NULL", "null"],
         empty_field_as_null=True,
         compression="GZIP",
+        database=test_db,
+        schema="PUBLIC",
+    )
+    cursor.execute(csv_file_format.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(csv_file_format)
+
+    result = safe_fetch(cursor, csv_file_format.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls(result, csv_file_format.to_dict())
+
+    csv_file_format = res.CSVFileFormat(
+        name="CSV_FILE_FORMAT_EXAMPLE_ALL_DEFAULTS",
+        owner=TEST_ROLE,
         database=test_db,
         schema="PUBLIC",
     )
@@ -409,13 +422,32 @@ def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
 
 
 def test_fetch_user(cursor, suffix, marked_for_cleanup):
-    user = res.User(name=f"SOME_USER_{suffix}@applytitan.com", owner=TEST_ROLE)
+    user = res.User(
+        name=f"SOME_USER_{suffix}@applytitan.com",
+        owner=TEST_ROLE,
+    )
     cursor.execute(user.create_sql(if_not_exists=True))
     marked_for_cleanup.append(user)
 
     result = safe_fetch(cursor, user.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, user.to_dict())
+    result = strip_nones_and_unfetchable(res.User.spec, result)
+    data = strip_nones_and_unfetchable(res.User.spec, user.to_dict())
+    assert result == data
+
+    user = res.User(
+        name=f"SOME_USER_TYPE_PERSON_{suffix}@applytitan.com",
+        owner=TEST_ROLE,
+        user_type="PERSON",
+    )
+    cursor.execute(user.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(user)
+
+    result = safe_fetch(cursor, user.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.User.spec, result)
+    data = strip_nones_and_unfetchable(res.User.spec, user.to_dict())
+    assert result == data
 
 
 def test_fetch_glue_catalog_integration(cursor, marked_for_cleanup):
@@ -597,7 +629,7 @@ def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
         password_max_retries=3,
         password_lockout_time_mins=30,
         password_history=5,
-        comment="production account password policy",
+        # comment="production account password policy", # Leaving this out until Snowflake fixes their bugs
         owner=TEST_ROLE,
         database=test_db,
         schema="PUBLIC",
@@ -607,7 +639,7 @@ def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
 
     result = safe_fetch(cursor, password_policy.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, password_policy.to_dict())
+    assert result == password_policy.to_dict()
 
 
 def test_fetch_python_stored_procedure(cursor, suffix, test_db, marked_for_cleanup):
@@ -1071,4 +1103,41 @@ def test_fetch_json_file_format(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = strip_nones_and_unfetchable(res.JSONFileFormat.spec, result)
     data = strip_nones_and_unfetchable(res.JSONFileFormat.spec, file_format.to_dict())
+    assert result == data
+
+
+def test_fetch_notebook(cursor, suffix, marked_for_cleanup):
+    notebook = res.Notebook(
+        name=f"SOME_NOTEBOOK_{suffix}",
+        query_warehouse="static_warehouse",
+        comment="This is a test notebook",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(notebook.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(notebook)
+
+    result = safe_fetch(cursor, notebook.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.Notebook.spec, result)
+    data = strip_nones_and_unfetchable(res.Notebook.spec, notebook.to_dict())
+    assert result == data
+
+
+def test_fetch_network_policy(cursor, suffix, marked_for_cleanup):
+    policy = res.NetworkPolicy(
+        name=f"SOME_NETWORK_POLICY_{suffix}",
+        allowed_network_rule_list=["static_database.public.static_network_rule"],
+        blocked_network_rule_list=["static_database.public.static_network_rule"],
+        allowed_ip_list=["1.1.1.1", "2.2.2.2"],
+        blocked_ip_list=["3.3.3.3", "4.4.4.4"],
+        comment="Network policy for testing",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(policy.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(policy)
+
+    result = safe_fetch(cursor, policy.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.NetworkPolicy.spec, result)
+    data = strip_nones_and_unfetchable(res.NetworkPolicy.spec, policy.to_dict())
     assert result == data

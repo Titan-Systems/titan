@@ -4,6 +4,7 @@ import yaml
 from tests.helpers import get_examples_yml
 
 from titan.blueprint import Blueprint
+from titan.enums import ResourceType
 from titan.gitops import collect_resources_from_config
 
 EXAMPLES_YML = list(get_examples_yml())
@@ -19,7 +20,6 @@ def example(request):
     yield yaml.safe_load(example_content)
 
 
-# @pytest.mark.skip(reason="skipping for this release")
 @pytest.mark.enterprise
 @pytest.mark.requires_snowflake
 def test_example(example, cursor, marked_for_cleanup):
@@ -31,8 +31,19 @@ def test_example(example, cursor, marked_for_cleanup):
     blueprint = Blueprint(
         name="test-example",
         resources=resources,
-        dry_run=False,
     )
     plan = blueprint.plan(cursor.connection)
     cmds = blueprint.apply(cursor.connection, plan)
     assert cmds
+
+    blueprint = Blueprint(
+        name="check-drift",
+        resources=collect_resources_from_config(example),
+    )
+    plan = blueprint.plan(cursor.connection)
+    unexpected_drift = [change for change in plan if not change_is_expected(change)]
+    assert len(unexpected_drift) == 0
+
+
+def change_is_expected(change):
+    return change.urn.resource_type == ResourceType.GRANT and change.after.get("priv", "") == "ALL"

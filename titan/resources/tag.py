@@ -20,6 +20,11 @@ class _Tag(ResourceSpec):
     comment: str = None
     allowed_values: list = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.allowed_values is not None:
+            self.allowed_values.sort()
+
 
 class Tag(NamedResource, Resource):
     """

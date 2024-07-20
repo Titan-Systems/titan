@@ -119,11 +119,15 @@ def collect_resources_from_config(config: dict):
     for resource_type in Resource.__types__.keys():
         resource_label = pluralize(resource_label_for_type(resource_type))
         for data in config.pop(resource_label, []):
-            requires = data.pop("requires", [])
-            resource_cls = Resource.resolve_resource_cls(resource_type, data)
-            resource = resource_cls(**data)
-            process_requires(resource, requires)
-            resources.append(resource)
+            try:
+                requires = data.pop("requires", [])
+                resource_cls = Resource.resolve_resource_cls(resource_type, data)
+                resource = resource_cls(**data)
+                process_requires(resource, requires)
+                resources.append(resource)
+            except Exception as e:
+                print(f"Error processing resource: {data}")
+                raise e
 
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")

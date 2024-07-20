@@ -1,12 +1,19 @@
 from dataclasses import dataclass
 
-from ..enums import ResourceType
-from ..props import BoolProp, IntProp, Props, StringListProp, StringProp, TagsProp
+from ..enums import ParseableEnum, ResourceType
+from ..props import BoolProp, EnumProp, IntProp, Props, StringListProp, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
 from .resource import NamedResource, Resource, ResourceSpec
 from .role import Role
 from .tag import TaggableResource
+
+
+class UserType(ParseableEnum):
+    PERSON = "PERSON"
+    SERVICE = "SERVICE"
+    LEGACY_SERVICE = "LEGACY_SERVICE"
+    NULL = "NULL"
 
 
 @dataclass(unsafe_hash=True)
@@ -20,7 +27,7 @@ class _User(ResourceSpec):
     middle_name: str = None
     last_name: str = None
     email: str = None
-    must_change_password: bool = False
+    must_change_password: bool = None
     disabled: bool = False
     days_to_expiry: int = None
     mins_to_unlock: int = None
@@ -33,13 +40,31 @@ class _User(ResourceSpec):
     rsa_public_key_2: str = None
     comment: str = None
     network_policy: str = None
+    user_type: UserType = "NULL"
 
     def __post_init__(self):
         super().__post_init__()
-        if self.login_name is None or self.login_name == "":
-            self.login_name = self.name._name.upper()
-        if self.display_name is None:
-            self.display_name = self.name._name
+        if self.user_type == UserType.SERVICE:
+            if self.first_name is not None:
+                raise ValueError("First name is not supported for service users")
+            if self.middle_name is not None:
+                raise ValueError("Middle name is not supported for service users")
+            if self.last_name is not None:
+                raise ValueError("Last name is not supported for service users")
+            if self.password is not None:
+                raise ValueError("Password is not supported for service users")
+            if self.must_change_password is not None:
+                raise ValueError("Must change password is not supported for service users")
+            if self.mins_to_bypass_mfa is not None:
+                raise ValueError("Mins to bypass MFA is not supported for service users")
+
+        else:
+            if self.login_name is None or self.login_name == "":
+                self.login_name = self.name._name.upper()
+            if self.display_name is None:
+                self.display_name = self.name._name
+            if self.must_change_password is None:
+                self.must_change_password = False
 
 
 class User(NamedResource, TaggableResource, Resource):
@@ -73,6 +98,7 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2 (string): The RSA public key for the user.
         comment (string): A comment for the user.
         network_policy (string): The network policy for the user.
+        user_type (string or UserType): The type of the user. Defaults to "NULL".
         tags (dict): Tags for the user.
 
     Python:
@@ -82,6 +108,7 @@ class User(NamedResource, TaggableResource, Resource):
             name="some_user",
             owner="USERADMIN",
             email="some.user@example.com",
+            user_type="PERSON",
         )
         ```
 
@@ -92,6 +119,7 @@ class User(NamedResource, TaggableResource, Resource):
           - name: some_user
             owner: USERADMIN
             email: some.user@example.com
+            user_type: PERSON
         ```
 
     """
@@ -118,6 +146,7 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2=StringProp("rsa_public_key_2"),
         comment=StringProp("comment"),
         network_policy=StringProp("network_policy"),
+        user_type=EnumProp("type", UserType),
         tags=TagsProp(),
     )
     scope = AccountScope()
@@ -134,7 +163,7 @@ class User(NamedResource, TaggableResource, Resource):
         middle_name: str = None,
         last_name: str = None,
         email: str = None,
-        must_change_password: bool = False,
+        must_change_password: bool = None,
         disabled: bool = False,
         days_to_expiry: int = None,
         mins_to_unlock: int = None,
@@ -147,6 +176,7 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2: str = None,
         comment: str = None,
         network_policy: str = None,
+        user_type: str = "NULL",
         tags: dict[str, str] = None,
         **kwargs,
     ):
@@ -174,6 +204,7 @@ class User(NamedResource, TaggableResource, Resource):
             rsa_public_key_2=rsa_public_key_2,
             comment=comment,
             network_policy=network_policy,
+            user_type=user_type,
         )
         self.set_tags(tags)
 

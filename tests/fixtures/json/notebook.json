@@ -1,0 +1,9 @@
+{
+    "name": "mynotebook",
+    "from_": null,
+    "main_file": null,
+    "query_warehouse": "static_warehouse",
+    "comment": "This is a test notebook",
+    "default_version": null,
+    "owner": "SYSADMIN"
+}

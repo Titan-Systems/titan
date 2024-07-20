@@ -4,6 +4,8 @@ import uuid
 
 import snowflake.connector
 
+from titan.enums import ResourceType
+
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 
@@ -62,7 +64,12 @@ def cursor(suffix, test_db, marked_for_cleanup):
             yield cur
             cur.execute(f"USE ROLE {TEST_ROLE}")
             cur.execute(f"USE DATABASE {test_db}")
-            for res in marked_for_cleanup:
+
+            # Prioritize NetworkPolicy resources for cleanup
+            network_policies = [res for res in marked_for_cleanup if res.resource_type == ResourceType.NETWORK_POLICY]
+            other_resources = [res for res in marked_for_cleanup if res.resource_type != ResourceType.NETWORK_POLICY]
+
+            for res in network_policies + other_resources:
                 try:
                     cur.execute(res.drop_sql(if_exists=True))
                 except snowflake.connector.errors.ProgrammingError as err:
@@ -70,6 +77,7 @@ def cursor(suffix, test_db, marked_for_cleanup):
                         pass
                     else:
                         raise
+
         finally:
             cur.execute(f"DROP DATABASE {test_db}")
 

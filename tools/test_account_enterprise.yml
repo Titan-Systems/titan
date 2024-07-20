@@ -1,7 +1,0 @@
-tags:
-  - name: static_tag
-    database: static_database
-    schema: PUBLIC
-    comment: This is a static tag
-    allowed_values:
-      - STATIC_TAG_VALUE

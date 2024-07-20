@@ -149,6 +149,14 @@ def _coerce_resource_field(field_value, field_type):
 
 
 @dataclass
+class ResourceSpecMetadata:
+    fetchable: bool = True
+    triggers_replacement: bool = False
+    forces_add: bool = False
+    ignore_changes: bool = False
+
+
+@dataclass
 class ResourceSpec:
     def __post_init__(self):
         for f in fields(self):
@@ -166,8 +174,11 @@ class ResourceSpec:
                     ) from err
 
     @classmethod
-    def get_metadata(cls, field_name: str):
-        return {f.name: f.metadata for f in fields(cls)}[field_name]
+    def get_metadata(cls, field_name: str) -> ResourceSpecMetadata:
+        for f in fields(cls):
+            if f.name == field_name:
+                return ResourceSpecMetadata(**f.metadata)
+        raise ValueError(f"Field {field_name} not found in {cls.__name__}")
 
 
 RESOURCE_SCOPES = {
@@ -299,6 +310,8 @@ class Resource(metaclass=_Resource):
         return {f.name: f.default for f in fields(cls.spec)}
 
     def __repr__(self):  # pragma: no cover
+        if not hasattr(self, "_data"):
+            return f"{self.__class__.__name__}(<uninitialized>)"
         name = getattr(self._data, "name", None)
         implicit = "~" if self.implicit else ""
         return f"{self.__class__.__name__}({implicit}{name})"

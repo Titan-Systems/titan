@@ -15,21 +15,21 @@ from .client import (
     reset_cache,
 )
 from .diff import Action, diff
-from .enums import ParseableEnum, ResourceType
+from .enums import ParseableEnum, ResourceType, resource_type_is_grant
 from .identifiers import URN, parse_identifier, resource_label_for_type
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     PRIVS_FOR_RESOURCE_TYPE,
     AccountPriv,
     GrantedPrivilege,
-    is_ownership_priv,
     execution_role_for_priv,
+    is_ownership_priv,
 )
 from .resource_name import ResourceName
 from .resources import Account, Database
 from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer
 from .resources.tag import Tag, TaggableResource
-from .scope import AccountScope, DatabaseScope, OrganizationScope, ResourceScope, SchemaScope
+from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
@@ -132,7 +132,8 @@ class Manifest:
 
         if urn in self._data:
             # if resource_data != self._data[urn]:
-            logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {resource}")
+            if not isinstance(resource, ResourcePointer):
+                logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {resource}")
             return
         self._data[urn] = resource
         for ref in resource.refs:
@@ -467,10 +468,10 @@ class Blueprint:
                 attr = list(delta.keys())[0]
                 attr_metadata = resource.spec.get_metadata(attr)
 
-                change_requires_replacement = attr_metadata.get("triggers_replacement", False)
-                change_forces_add = attr_metadata.get("forces_add", False)
-                change_is_fetchable = attr_metadata.get("fetchable", True)
-                change_should_be_ignored = attr in resource.lifecycle.ignore_changes
+                change_requires_replacement = attr_metadata.triggers_replacement
+                change_forces_add = attr_metadata.forces_add
+                change_is_fetchable = attr_metadata.fetchable
+                change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
 
                 if change_requires_replacement:
                     raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
@@ -495,8 +496,8 @@ class Blueprint:
 
                 attr = list(delta.keys())[0]
                 attr_metadata = resource.spec.get_metadata(attr)
-                change_is_fetchable = attr_metadata.get("fetchable", True)
-                change_should_be_ignored = attr in resource.lifecycle.ignore_changes
+                change_is_fetchable = attr_metadata.fetchable
+                change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
                 if not change_is_fetchable:
                     continue
                 if change_should_be_ignored:
@@ -528,6 +529,16 @@ class Blueprint:
             elif isinstance(data, list):
                 raise Exception(f"Fetching list of {urn.resource_type} is not supported yet")
             else:
+                # There is an edge case here where the resource spec doesnt have defaults specified.
+                # Instead of throwing an error, dataclass will provide a dataclass._MISSINGFIELD object
+                # That is bad.
+                # The answer is not that defaults should be added. The root cause is that data_provider
+                # method return raw dicts that aren't type checked against their corresponding
+                # Resource spec.
+                # I have considered tightly coupling the data provider to the resource spec, but I don't think
+                # the complexity is worth it.
+                # Another solution would be to build in automatic tests to check that the data_provider
+                # returns data that matches the spec.
                 normalized = resource_cls.defaults() | data
             return normalized
 
@@ -607,7 +618,7 @@ class Blueprint:
                 raise OrphanResourceException(
                     "Blueprint is missing a database but includes resources that require a database or schema"
                 )
-
+            logger.warning(f"No database found in config, using database {session_ctx['database']} from session")
             self._root.add(ResourcePointer(name=session_ctx["database"], resource_type=ResourceType.DATABASE))
             databases = self._root.items(resource_type=ResourceType.DATABASE)
 
@@ -630,7 +641,8 @@ class Blueprint:
 
             if resource.container is None:
                 if len(databases) == 1:
-                    databases[0].public_schema.add(resource)
+                    logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
+                    databases[0].find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(resource)
                 else:
                     raise Exception(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
@@ -878,17 +890,9 @@ def execution_strategy_for_change(
     role_privileges: dict[str, list[dict]],
 ) -> tuple[str, bool]:
 
-    change_is_a_grant = change.urn.resource_type in (
-        ResourceType.GRANT,
-        ResourceType.FUTURE_GRANT,
-        ResourceType.ROLE_GRANT,
-    )
+    if resource_type_is_grant(change.urn.resource_type):
 
-    change_is_a_tag_reference = change.urn.resource_type == ResourceType.TAG_REFERENCE
-
-    if change_is_a_grant:
-
-        if change.urn.resource_type == ResourceType.GRANT:
+        if change.action == Action.ADD and change.urn.resource_type == ResourceType.GRANT:
             execution_role = execution_role_for_priv(change.after["priv"])
             if execution_role and execution_role in usable_roles:
                 return execution_role, False
@@ -900,7 +904,7 @@ def execution_strategy_for_change(
             return alternate_role, False
         raise MissingPrivilegeException(f"{change} requires a role with MANAGE GRANTS privilege")
 
-    elif change_is_a_tag_reference:
+    elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
         # There are two ways you can create a tag reference:
         # 1. You have the global APPLY TAGS priv on the account (given to ACCOUNTADMIN by default)
         # 2. You have APPLY privilege on the TAG object AND you have ownership of the tagged object
@@ -988,7 +992,7 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
     if change.action == Action.ADD:
 
         # if resource is a grant, check for MANAGE GRANTS
-        if change.urn.resource_type in (ResourceType.GRANT, ResourceType.FUTURE_GRANT, ResourceType.ROLE_GRANT):
+        if resource_type_is_grant(change.urn.resource_type):
             if granted_priv.privilege == AccountPriv.MANAGE_GRANTS:
                 return True
 

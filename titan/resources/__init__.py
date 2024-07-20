@@ -18,6 +18,7 @@ from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
 from .image_repository import ImageRepository
 from .materialized_view import MaterializedView
+from .network_policy import NetworkPolicy
 from .network_rule import NetworkRule
 from .notification_integration import (
     AWSOutboundNotificationIntegration,
@@ -27,6 +28,7 @@ from .notification_integration import (
     GCPInboundNotificationIntegration,
     GCPOutboundNotificationIntegration,
 )
+from .notebook import Notebook
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
 from .pipe import Pipe
@@ -97,7 +99,9 @@ __all__ = [
     "InternalStage",
     "JavascriptUDF",
     "MaterializedView",
+    "NetworkPolicy",
     "NetworkRule",
+    "Notebook",
     "OAuthSecret",
     "ObjectStoreCatalogIntegration",
     "PackagesPolicy",

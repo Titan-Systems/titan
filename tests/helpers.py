@@ -33,7 +33,7 @@ def strip_nones_and_unfetchable(spec, data):
     keys = set(data.keys())
     for attr in keys:
         attr_metadata = spec.get_metadata(attr)
-        if not attr_metadata.get("fetchable", True):
+        if not attr_metadata.fetchable:
             data.pop(attr, None)
     return data
 

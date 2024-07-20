@@ -567,7 +567,7 @@ def _parse_dynamic_table_text(text: str):
     )
 
 
-def _parse_view_ddl(text: str):
+def parse_view_ddl(text: str):
     """
     Parse the DDL for a view.
 

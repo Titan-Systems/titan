@@ -19,6 +19,13 @@ class _Column(ResourceSpec):
     default: str = None
     tags: ResourceTags = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        try:
+            self.data_type = DataType(self.data_type).value
+        except ValueError:
+            self.data_type = self.data_type.upper()
+
 
 class Column(Resource):
     """

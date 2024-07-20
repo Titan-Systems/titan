@@ -13,6 +13,9 @@ def attribute_is_resource_name(attribute: str) -> bool:
 
 class ResourceName:
     def __init__(self, name: Union[str, "ResourceName"]) -> None:
+        if not isinstance(name, (str, ResourceName)):
+            raise ValueError(f"ResourceName must be a string or ResourceName, got {type(name)}")
+
         if isinstance(name, ResourceName):
             self._name = name._name
             self._quoted = name._quoted

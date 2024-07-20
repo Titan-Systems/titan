@@ -66,7 +66,9 @@ class ResourceType(ParseableEnum):
     IMAGE_REPOSITORY = "IMAGE REPOSITORY"
     INTEGRATION = "INTEGRATION"
     MATERIALIZED_VIEW = "MATERIALIZED VIEW"
+    NETWORK_POLICY = "NETWORK POLICY"
     NETWORK_RULE = "NETWORK RULE"
+    NOTEBOOK = "NOTEBOOK"
     NOTIFICATION_INTEGRATION = "NOTIFICATION INTEGRATION"
     PACKAGES_POLICY = "PACKAGES POLICY"
     PASSWORD_POLICY = "PASSWORD POLICY"
@@ -346,3 +348,13 @@ class BinaryFormat(ParseableEnum):
     HEX = "HEX"
     BASE64 = "BASE64"
     UTF8 = "UTF8"
+
+
+def resource_type_is_grant(resource_type: ResourceType) -> bool:
+    return resource_type in (
+        ResourceType.GRANT,
+        ResourceType.GRANT_ON_ALL,
+        ResourceType.ROLE_GRANT,
+        ResourceType.GRANT_ON_ALL,
+        ResourceType.FUTURE_GRANT,
+    )
