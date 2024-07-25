@@ -123,48 +123,43 @@ def _fail_if_not_granted(result, *args):
 _INDEX = {}
 
 
-def _filter_result(result, indexed: bool = False, **kwargs):
-
-    if indexed:
-        # granted_on, privilege, name
-        # index_key = {}
-        # for key, value in predicates.items():
-        #     if attribute_is_resource_name(key):
-        #         index_key[key] = ResourceName(value)
-
-        if id(result) not in _INDEX:
-            local_index = {}
-            _INDEX[id(result)] = local_index
-            for row in result:
-                index_key = (row["granted_on"], row["privilege"], row["name"])
-                if index_key not in local_index:
-                    local_index[index_key] = row
-        else:
-            local_index = _INDEX[id(result)]
-
-        needle = (kwargs["granted_on"], kwargs["privilege"], kwargs["name"])
-        if needle in local_index:
-            return [local_index[needle]]
-        else:
-            print(local_index)
-            raise Exception(needle)
-
+def _fetch_grant_to_role(session, role: str, granted_on: str, name: str, privilege: str):
+    grants = _show_grants_to_role(session, role, cacheable=True)
+    if id(grants) not in _INDEX:
+        local_index = {}
+        _INDEX[id(grants)] = local_index
+        for grant in grants:
+            index_key = (grant["granted_on"], grant["privilege"], grant["name"])
+            if index_key not in local_index:
+                local_index[index_key] = grant
     else:
-        filtered = []
-        predicates = {key: value for key, value in kwargs.items() if value is not None}
-        for row in result:
-            for key, value in predicates.items():
-                # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
-                if attribute_is_resource_name(key):
-                    if resource_name_from_snowflake_metadata(row[key]) != ResourceName(value):
-                        # if ResourceName(value) != f'"{row[key]}"':
-                        break
-                else:
-                    if row[key] != value:
-                        break
+        local_index = _INDEX[id(grants)]
+
+    needle = (granted_on, privilege, name)
+    if needle in local_index:
+        return local_index[needle]
+    else:
+        # print(local_index)
+        raise Exception(needle)
+
+
+def _filter_result(result, **kwargs):
+
+    filtered = []
+    predicates = {key: value for key, value in kwargs.items() if value is not None}
+    for row in result:
+        for key, value in predicates.items():
+            # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
+            if attribute_is_resource_name(key):
+                if resource_name_from_snowflake_metadata(row[key]) != ResourceName(value):
+                    # if ResourceName(value) != f'"{row[key]}"':
+                    break
             else:
-                filtered.append(row)
-        return filtered
+                if row[key] != value:
+                    break
+        else:
+            filtered.append(row)
+    return filtered
 
 
 # def _urn_from_grant(row, session_ctx):
@@ -999,29 +994,42 @@ def fetch_grant(session, fqn: FQN):
     # on_type = str(resource_type_for_label(on_type)).replace(" ", "_")
     on_type = on_type.upper()
 
-    filters = {
-        "granted_on": on_type,
-    }
+    if priv == "ALL":
 
-    if on_type != "ACCOUNT":
-        filters["name"] = on
+        filters = {
+            "granted_on": on_type,
+        }
 
-    if priv != "ALL":
-        filters["privilege"] = priv
+        if on_type != "ACCOUNT":
+            filters["name"] = on
 
-    grants = _show_grants_to_role(session, fqn.name, cacheable=True)
-    grants = _filter_result(grants, indexed=True, **filters)
+        # if priv != "ALL":
+        #     filters["privilege"] = priv
 
-    if len(grants) == 0:
-        return None
-    elif len(grants) > 1 and priv != "ALL":
-        # This is likely to happen when a grant has been issued by ACCOUNTADMIN
-        # and some other role with MANAGE GRANTS or OWNERSHIP. It needs to be properly
-        # handled in the future.
-        raise Exception(f"Found multiple grants matching {fqn}")
+        grants = _show_grants_to_role(session, fqn.name, cacheable=True)
+        grants = _filter_result(grants, **filters)
 
-    data = grants[0]
-    privs = sorted([g["privilege"] for g in grants])
+        if len(grants) == 0:
+            return None
+
+        data = grants[0]
+        privs = sorted([g["privilege"] for g in grants])
+
+    else:
+        data = _fetch_grant_to_role(
+            session,
+            role=fqn.name,
+            granted_on=on_type,
+            name=on,
+            privilege=priv,
+        )
+        privs = [priv]
+
+    # elif len(grants) > 1 and priv != "ALL":
+    #     # This is likely to happen when a grant has been issued by ACCOUNTADMIN
+    #     # and some other role with MANAGE GRANTS or OWNERSHIP. It needs to be properly
+    #     # handled in the future.
+    #     raise Exception(f"Found multiple grants matching {fqn}")
 
     return {
         "priv": priv,
@@ -2088,7 +2096,9 @@ def list_database_roles(session) -> list[FQN]:
         try:
             # A rare case where we need to always quote the identifier. Snowflake chokes if the database name
             # is DATABASE, but this will work if quoted
-            database_roles = execute(session, f'SHOW DATABASE ROLES IN DATABASE "{database_name}"')
+            if database_name == "DATABASE":
+                database_name._quoted = True
+            database_roles = execute(session, f"SHOW DATABASE ROLES IN DATABASE {database_name}")
         except ProgrammingError as err:
             if err.errno == DOES_NOT_EXIST_ERR:
                 continue
@@ -2408,5 +2418,7 @@ def list_warehouses(session) -> list[FQN]:
     show_result = execute(session, "SHOW WAREHOUSES")
     warehouses = []
     for row in show_result:
+        if row["name"].startswith("SYSTEM$"):
+            continue
         warehouses.append(FQN(name=resource_name_from_snowflake_metadata(row["name"])))
     return warehouses
