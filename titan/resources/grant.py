@@ -139,7 +139,7 @@ class Grant(Resource):
                     # Grant targeting a specific resource
                     # on_{resource} kwargs
                     # on_schema="foo" -> on=Schema(name="foo")
-                    on = arg
+                    on = str(arg)
                     on_type = resource_type_for_label(keyword[3:])
         # Handle on= kwarg
         else:

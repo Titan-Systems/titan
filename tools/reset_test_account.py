@@ -100,7 +100,7 @@ def configure_aws_heavy(conn):
                 pass
             for k in range(5):
                 table = res.Table(
-                    name=f"TABLE_{k}", columns=[{"name": "ID", "data_type": "NUMBER(38, 0)"}], schema=schema
+                    name=f"TABLE_{k}", columns=[{"name": "ID", "data_type": "NUMBER(38,0)"}], schema=schema
                 )
                 bp.add(table)
                 for role in roles:

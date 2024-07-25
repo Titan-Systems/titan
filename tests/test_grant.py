@@ -172,3 +172,11 @@ def test_grant_refs():
 def test_grant_priv_is_serialized_uppercase():
     grant = res.Grant(priv="usage", on_warehouse="somewh", to="somerole")
     assert grant.priv == "USAGE"
+
+
+def test_grant_on_accepts_resource_name():
+    wh = res.Warehouse(name="somewh")
+    assert isinstance(wh.name, ResourceName)
+    grant = res.Grant(priv="usage", on_warehouse=wh.name, to="somerole")
+    assert grant.on == "SOMEWH"
+    assert grant.on_type == ResourceType.WAREHOUSE
