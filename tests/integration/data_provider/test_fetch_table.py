@@ -41,7 +41,7 @@ def test_fetch_table_clustered(cursor, test_db, suffix):
 
 def test_fetch_table_simple(cursor, test_db, suffix):
     cursor.execute(f"USE DATABASE {test_db}")
-    cursor.execute(f"USE SCHEMA PUBLIC")
+    cursor.execute("USE SCHEMA PUBLIC")
     table = res.Table(
         name=f"TABLE_{suffix}",
         database=test_db,
@@ -59,7 +59,7 @@ def test_fetch_table_simple(cursor, test_db, suffix):
 
 def test_fetch_table_transient(cursor, test_db, suffix):
     cursor.execute(f"USE DATABASE {test_db}")
-    cursor.execute(f"USE SCHEMA PUBLIC")
+    cursor.execute("USE SCHEMA PUBLIC")
     table = res.Table(
         name=f"TABLE_{suffix}",
         database=test_db,

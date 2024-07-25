@@ -123,24 +123,26 @@ def _fail_if_not_granted(result, *args):
 _INDEX = {}
 
 
-def _fetch_grant_to_role(session, role: str, granted_on: str, name: str, privilege: str):
+def _fetch_grant_to_role(session, role: str, granted_on: str, on_name: str, privilege: str):
     grants = _show_grants_to_role(session, role, cacheable=True)
     if id(grants) not in _INDEX:
         local_index = {}
         _INDEX[id(grants)] = local_index
         for grant in grants:
-            index_key = (grant["granted_on"], grant["privilege"], grant["name"])
+            name = "ACCOUNT" if grant["granted_on"] == "ACCOUNT" else grant["name"]
+            index_key = (grant["granted_on"], grant["privilege"], name)
             if index_key not in local_index:
                 local_index[index_key] = grant
     else:
         local_index = _INDEX[id(grants)]
 
-    needle = (granted_on, privilege, name)
+    needle = (granted_on, privilege, on_name)
     if needle in local_index:
         return local_index[needle]
     else:
         # print(local_index)
-        raise Exception(needle)
+        # raise Exception(needle)
+        return None
 
 
 def _filter_result(result, **kwargs):
@@ -991,7 +993,6 @@ def fetch_future_grant(session, fqn: FQN):
 def fetch_grant(session, fqn: FQN):
     priv = fqn.params["priv"]
     on_type, on = fqn.params["on"].split("/")
-    # on_type = str(resource_type_for_label(on_type)).replace(" ", "_")
     on_type = on_type.upper()
 
     if priv == "ALL":
@@ -1002,9 +1003,6 @@ def fetch_grant(session, fqn: FQN):
 
         if on_type != "ACCOUNT":
             filters["name"] = on
-
-        # if priv != "ALL":
-        #     filters["privilege"] = priv
 
         grants = _show_grants_to_role(session, fqn.name, cacheable=True)
         grants = _filter_result(grants, **filters)
@@ -1020,9 +1018,11 @@ def fetch_grant(session, fqn: FQN):
             session,
             role=fqn.name,
             granted_on=on_type,
-            name=on,
+            on_name=on,
             privilege=priv,
         )
+        if data is None:
+            return None
         privs = [priv]
 
     # elif len(grants) > 1 and priv != "ALL":
@@ -1377,7 +1377,7 @@ def fetch_schema(session, fqn: FQN):
     data = show_result[0]
 
     options = options_result_to_list(data["options"])
-    # params = _show_resource_parameters(session, "SCHEMA", fqn)
+    params = _show_resource_parameters(session, "SCHEMA", fqn)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1385,8 +1385,8 @@ def fetch_schema(session, fqn: FQN):
         "owner": data["owner"],
         "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
-        # "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
-        # "default_ddl_collation": params["default_ddl_collation"],
+        "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
+        "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
     }
 
@@ -1838,12 +1838,12 @@ def fetch_table(session, fqn: FQN):
     if len(tables) > 1:
         raise Exception(f"Found multiple tables matching {fqn}")
 
-    # columns = fetch_columns(session, "TABLE", fqn)
-    columns = _fetch_columns_for_table(session, fqn)
+    columns = fetch_columns(session, "TABLE", fqn)
+    # columns = _fetch_columns_for_table(session, fqn)
 
     data = tables[0]
-    # show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
-    # params = params_result_to_dict(show_params_result)
+    show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
+    params = params_result_to_dict(show_params_result)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1855,7 +1855,7 @@ def fetch_table(session, fqn: FQN):
         "enable_schema_evolution": data["enable_schema_evolution"] == "Y",
         # "data_retention_time_in_days": int(data["retention_time"]),
         # "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days", None),
-        # "default_ddl_collation": params.get("default_ddl_collation", None),
+        "default_ddl_collation": params.get("default_ddl_collation", None),
         "change_tracking": data["change_tracking"] == "ON",
     }
 
