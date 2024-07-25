@@ -38,7 +38,8 @@ def export_resource(session, resource_type: ResourceType) -> dict[str, list]:
             resource = fetch_resource(session, urn)
         except Exception as e:
             logger.warning(f"Failed to fetch resource {urn}: {e}")
-            continue
+            # continue
+            raise e
         if resource is None:
             logger.warning(f"Found resource {urn} in metadata but failed to fetch")
             continue

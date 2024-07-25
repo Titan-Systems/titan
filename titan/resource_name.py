@@ -1,4 +1,5 @@
 import re
+from functools import lru_cache
 from typing import Union
 
 import pyparsing as pp
@@ -7,8 +8,29 @@ import yaml
 from .parse_primitives import FullyQualifiedIdentifier
 
 
+@lru_cache(maxsize=1024 * 1024)
 def attribute_is_resource_name(attribute: str) -> bool:
     return attribute == "name" or attribute == "on" or attribute.endswith("_name") or attribute == "owner"
+
+
+@lru_cache(maxsize=1024 * 1024)
+def resource_name_from_snowflake_metadata(name: str) -> "ResourceName":
+    if name.startswith('"') and name.endswith('"'):
+        raise RuntimeError(f"{name} is not from snowflake metadata")
+    if re.match(r"^[A-Z_][A-Z0-9_]*$", name):
+        return ResourceName(name)
+    else:
+        return ResourceName(f'"{name}"')
+
+
+@lru_cache(maxsize=1024 * 1024)
+def _name_should_be_quoted(name: str) -> bool:
+    try:
+        # If we can parse it, we don't need to quote it
+        FullyQualifiedIdentifier.parse_string(name, parse_all=True)
+        return False
+    except pp.ParseException:
+        return True
 
 
 class ResourceName:
@@ -24,12 +46,7 @@ class ResourceName:
             self._quoted = True
         else:
             self._name = name
-            try:
-                # If we can parse it, we don't need to quote it
-                FullyQualifiedIdentifier.parse_string(name, parse_all=True)
-                self._quoted = False
-            except pp.ParseException:
-                self._quoted = True
+            self._quoted = _name_should_be_quoted(name)
 
     def __repr__(self):
         name = getattr(self, "_name", None)
@@ -59,14 +76,14 @@ class ResourceName:
         else:
             raise ValueError("Cannot compare ResourceName with a non-ResourceName")
 
-    @classmethod
-    def from_snowflake_metadata(cls, name: str) -> "ResourceName":
-        if name.startswith('"') and name.endswith('"'):
-            raise RuntimeError(f"{name} is not from snowflake metadata")
-        if re.match(r"^[A-Z_][A-Z0-9_]*$", name):
-            return cls(name)
-        else:
-            return cls(f'"{name}"')
+    # @classmethod
+    # def from_snowflake_metadata(cls, name: str) -> "ResourceName":
+    #     if name.startswith('"') and name.endswith('"'):
+    #         raise RuntimeError(f"{name} is not from snowflake metadata")
+    #     if re.match(r"^[A-Z_][A-Z0-9_]*$", name):
+    #         return cls(name)
+    #     else:
+    #         return cls(f'"{name}"')
 
     def upper(self):
         return self

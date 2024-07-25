@@ -545,7 +545,16 @@ class SchemaProp(Prop):
         for column in values:
             name = column["name"]
             data_type = str(column["data_type"])
+            not_null = " NOT NULL" if column["not_null"] else ""
+
+            if isinstance(column["default"], str):
+                default = f" DEFAULT '{column['default']}'"
+            elif column["default"] is not None:
+                default = f" DEFAULT {column['default']}"
+            else:
+                default = ""
+
             comment = f" COMMENT '{column['comment']}'" if "comment" in column and column["comment"] else ""
-            column_str = f"{name} {data_type}{comment}"
+            column_str = f"{name} {data_type}{not_null}{default}{comment}"
             columns.append(column_str)
         return f"({', '.join(columns)})"

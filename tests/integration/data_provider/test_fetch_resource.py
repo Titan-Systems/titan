@@ -306,11 +306,25 @@ def test_fetch_grant_with_fully_qualified_ref(cursor, test_db, suffix, marked_fo
     result["on"] = ResourceName(result["on"])
     assert result == data_provider.remove_none_values(grant.to_dict())
 
+    cursor.execute(f"USE DATABASE {test_db}")
+    cursor.execute(f'CREATE SCHEMA if not exists {test_db}."This_is_A_quoted_schema"')
+    role = res.Role(name=f"test_role_grant_{suffix}")
+    cursor.execute(role.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(role)
+    cursor.execute(f'GRANT USAGE ON SCHEMA {test_db}."This_is_A_quoted_schema" TO ROLE {role.name}')
+    grant = res.Grant.from_sql(f'GRANT USAGE ON SCHEMA {test_db}."This_is_A_quoted_schema" TO ROLE {role.name}')
+    grant._data.owner = TEST_ROLE
+    result = safe_fetch(cursor, grant.urn)
+    assert result is not None
+    result = data_provider.remove_none_values(result)
+    result["on"] = ResourceName(result["on"])
+    assert result == data_provider.remove_none_values(grant.to_dict())
+
 
 def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
     pipe = res.Pipe(
         name="PIPE_EXAMPLE",
-        as_=f"""
+        as_="""
         COPY INTO pipe_destination
         FROM '@%pipe_destination'
         FILE_FORMAT = (TYPE = 'CSV');
@@ -1140,4 +1154,25 @@ def test_fetch_network_policy(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = strip_nones_and_unfetchable(res.NetworkPolicy.spec, result)
     data = strip_nones_and_unfetchable(res.NetworkPolicy.spec, policy.to_dict())
+    assert result == data
+
+
+def test_fetch_table(cursor, suffix, marked_for_cleanup):
+    table = res.Table(
+        name=f"SOME_TABLE_{suffix}",
+        columns=[
+            res.Column(name="ID", data_type="NUMBER(38, 0)", not_null=True),
+            res.Column(name="NAME", data_type="VARCHAR(16777216)", not_null=False),
+        ],
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(table.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(table)
+
+    result = safe_fetch(cursor, table.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.Table.spec, result)
+    data = strip_nones_and_unfetchable(res.Table.spec, table.to_dict())
     assert result == data

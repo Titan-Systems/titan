@@ -41,6 +41,7 @@ def execute(
     conn_or_cursor: Union[SnowflakeConnection, SnowflakeCursor],
     sql: str,
     cacheable: bool = False,
+    empty_response_codes: Optional[list[int]] = None,
 ) -> list:
     if isinstance(sql, str):
         sql_text = sql
@@ -83,5 +84,13 @@ def execute(
             _EXECUTION_CACHE[session.role][sql_text] = result
         return result
     except ProgrammingError as err:
+        if empty_response_codes and err.errno in empty_response_codes:
+            runtime = time.time() - start
+            logger.warning(f"{session_header}    \033[94m(empty, {runtime:.2f}s)\033[0m")
+            if cacheable:
+                if session.role not in _EXECUTION_CACHE:
+                    _EXECUTION_CACHE[session.role] = {}
+                _EXECUTION_CACHE[session.role][sql_text] = []
+            return []
         logger.error(f"{session_header}    \033[31m(err {err.errno}, {time.time() - start:.2f}s)\033[0m")
         raise ProgrammingError(f"failed to execute sql, [{sql_text}]", errno=err.errno) from err

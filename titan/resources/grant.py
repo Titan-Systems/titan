@@ -5,13 +5,13 @@ from typing import Any, Union
 from inflection import singularize
 
 from ..enums import ParseableEnum, ResourceType
-from ..identifiers import FQN, resource_label_for_type, resource_type_for_label
+from ..identifiers import FQN, resource_label_for_type, resource_type_for_label, parse_FQN
 from ..parse import _parse_grant, format_collection_string
 from ..privs import _all_privs_for_resource_type
 from ..props import FlagProp, IdentifierProp, Props
 from ..resource_name import ResourceName
 from ..scope import AccountScope
-from .resource import Resource, ResourcePointer, ResourceSpec
+from .resource import Resource, ResourcePointer, ResourceSpec, NamedResource
 from .role import Role
 from .user import User
 
@@ -23,7 +23,7 @@ logger = logging.getLogger("titan")
 @dataclass(unsafe_hash=True)
 class _Grant(ResourceSpec):
     priv: str
-    on: ResourceName
+    on: str
     on_type: ResourceType
     to: Role
     grant_option: bool = False
@@ -32,8 +32,13 @@ class _Grant(ResourceSpec):
 
     def __post_init__(self):
         super().__post_init__()
+
+        self.on = str(parse_FQN(self.on))
+
         if isinstance(self.priv, str):
             self.priv = self.priv.upper()
+        if self.on_type is None:
+            raise ValueError("on_type must be set")
         if not self._privs:
             if self.priv == "ALL":
                 self._privs = sorted(_all_privs_for_resource_type(self.on_type))
@@ -142,10 +147,11 @@ class Grant(Resource):
                 raise ValueError("You must specify an 'on' parameter")
             elif isinstance(on, ResourcePointer):
                 on_type = on.resource_type
-                on = on.name
-            elif isinstance(on, Resource):
+                on = str(on.name)
+            elif isinstance(on, NamedResource):
+                # It might make sense to explicitly fail if we cant fully resolve the resource
                 on_type = on.resource_type
-                on = on._data.name
+                on = str(on.fqn)
             elif isinstance(on, str) and on.upper() == "ACCOUNT":
                 on = "ACCOUNT"
                 on_type = ResourceType.ACCOUNT
@@ -428,14 +434,14 @@ class _GrantOnAll(ResourceSpec):
     priv: str
     on_type: ResourceType
     in_type: ResourceType
-    in_name: str
+    in_name: ResourceName
     to: Role
     grant_option: bool = False
 
     def __post_init__(self):
         super().__post_init__()
-        if isinstance(self.priv, str):
-            self.priv = self.priv.upper()
+        # if isinstance(self.priv, str):
+        #     self.priv = self.priv.upper()
         if self.in_type not in [ResourceType.DATABASE, ResourceType.SCHEMA]:
             raise ValueError(f"in_type must be either DATABASE or SCHEMA, not {self.in_type}")
 

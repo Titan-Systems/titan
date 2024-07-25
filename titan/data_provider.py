@@ -31,7 +31,7 @@ from .parse import (
     parse_collection_string,
 )
 from .privs import GrantedPrivilege
-from .resource_name import ResourceName, attribute_is_resource_name
+from .resource_name import ResourceName, attribute_is_resource_name, resource_name_from_snowflake_metadata
 
 __this__ = sys.modules[__name__]
 
@@ -39,7 +39,7 @@ logger = logging.getLogger("titan")
 
 
 def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
-    return str(ResourceName.from_snowflake_metadata(identifier))
+    return str(resource_name_from_snowflake_metadata(identifier))
 
 
 def _desc_result_to_dict(desc_result, lower_properties=False):
@@ -120,22 +120,51 @@ def _fail_if_not_granted(result, *args):
         raise Exception(result[0]["status"], *args)
 
 
-def _filter_result(result, **kwargs):
-    filtered = []
-    for row in result:
-        for key, value in kwargs.items():
-            if value is None:
-                continue
-            # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
-            if attribute_is_resource_name(key):
-                if ResourceName.from_snowflake_metadata(row[key]) != ResourceName(value):
-                    break
-            else:
-                if row[key] != value:
-                    break
+_INDEX = {}
+
+
+def _filter_result(result, indexed: bool = False, **kwargs):
+
+    if indexed:
+        # granted_on, privilege, name
+        # index_key = {}
+        # for key, value in predicates.items():
+        #     if attribute_is_resource_name(key):
+        #         index_key[key] = ResourceName(value)
+
+        if id(result) not in _INDEX:
+            local_index = {}
+            _INDEX[id(result)] = local_index
+            for row in result:
+                index_key = (row["granted_on"], row["privilege"], row["name"])
+                if index_key not in local_index:
+                    local_index[index_key] = row
         else:
-            filtered.append(row)
-    return filtered
+            local_index = _INDEX[id(result)]
+
+        needle = (kwargs["granted_on"], kwargs["privilege"], kwargs["name"])
+        if needle in local_index:
+            return [local_index[needle]]
+        else:
+            print(local_index)
+            raise Exception(needle)
+
+    else:
+        filtered = []
+        predicates = {key: value for key, value in kwargs.items() if value is not None}
+        for row in result:
+            for key, value in predicates.items():
+                # Roughly match any names. `name`, `database_name`, `schema_name`, etc.
+                if attribute_is_resource_name(key):
+                    if resource_name_from_snowflake_metadata(row[key]) != ResourceName(value):
+                        # if ResourceName(value) != f'"{row[key]}"':
+                        break
+                else:
+                    if row[key] != value:
+                        break
+            else:
+                filtered.append(row)
+        return filtered
 
 
 # def _urn_from_grant(row, session_ctx):
@@ -289,6 +318,43 @@ def remove_none_values(d):
     return new_dict
 
 
+def _fetch_columns_for_table(session, fqn: FQN):
+    info_schema_result = execute(session, f"SELECT * FROM {fqn.database}.INFORMATION_SCHEMA.COLUMNS", cacheable=True)
+    columns = []
+    for col in info_schema_result:
+
+        if (
+            resource_name_from_snowflake_metadata(col["TABLE_SCHEMA"]) != fqn.schema
+            or resource_name_from_snowflake_metadata(col["TABLE_NAME"]) != fqn.name
+        ):
+            continue
+
+        data_type = None
+        default = col["COLUMN_DEFAULT"]
+
+        if col["DATA_TYPE"] == "NUMBER":
+            data_type = f"NUMBER({col['NUMERIC_PRECISION']}, {col['NUMERIC_SCALE']})"
+        elif col["DATA_TYPE"] == "TEXT":
+            data_type = f"VARCHAR({col['CHARACTER_MAXIMUM_LENGTH']})"
+            if col["COLUMN_DEFAULT"]:
+                default = col["COLUMN_DEFAULT"].strip("'")
+        else:
+            data_type = col["DATA_TYPE"]
+
+        columns.append(
+            {
+                "name": col["COLUMN_NAME"],
+                "data_type": data_type,
+                "not_null": col["IS_NULLABLE"] == "NO",
+                "default": default,
+                "comment": col["COMMENT"] or None,
+                "constraint": None,
+                "collate": None,
+            }
+        )
+    return columns
+
+
 def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
@@ -366,14 +432,13 @@ def _show_grants_to_role(session, role: str, cacheable: bool = False) -> list:
         'granted_by': 'ACCOUNTADMIN'
     }
     """
-    try:
-        grants = execute(session, f"SHOW GRANTS TO ROLE {role}", cacheable=cacheable)
-        return grants
-
-    except ProgrammingError as err:
-        if err.errno == DOES_NOT_EXIST_ERR:
-            return []
-        raise
+    grants = execute(
+        session,
+        f"SHOW GRANTS TO ROLE {role}",
+        cacheable=cacheable,
+        empty_response_codes=[DOES_NOT_EXIST_ERR],
+    )
+    return grants
 
 
 def fetch_resource(session, urn: URN) -> Optional[dict]:
@@ -945,7 +1010,7 @@ def fetch_grant(session, fqn: FQN):
         filters["privilege"] = priv
 
     grants = _show_grants_to_role(session, fqn.name, cacheable=True)
-    grants = _filter_result(grants, **filters)
+    grants = _filter_result(grants, indexed=True, **filters)
 
     if len(grants) == 0:
         return None
@@ -1266,8 +1331,8 @@ def fetch_role_grant(session, fqn: FQN):
 
     for data in show_result:
         if (
-            ResourceName.from_snowflake_metadata(data["granted_to"]) == subject
-            and ResourceName.from_snowflake_metadata(data["grantee_name"]) == name
+            resource_name_from_snowflake_metadata(data["granted_to"]) == subject
+            and resource_name_from_snowflake_metadata(data["grantee_name"]) == name
         ):
             if data["granted_to"] == "ROLE":
                 return {
@@ -1304,7 +1369,7 @@ def fetch_schema(session, fqn: FQN):
     data = show_result[0]
 
     options = options_result_to_list(data["options"])
-    params = _show_resource_parameters(session, "SCHEMA", fqn)
+    # params = _show_resource_parameters(session, "SCHEMA", fqn)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1312,8 +1377,8 @@ def fetch_schema(session, fqn: FQN):
         "owner": data["owner"],
         "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
-        "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
-        "default_ddl_collation": params["default_ddl_collation"],
+        # "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
+        # "default_ddl_collation": params["default_ddl_collation"],
         "comment": data["comment"] or None,
     }
 
@@ -1765,11 +1830,12 @@ def fetch_table(session, fqn: FQN):
     if len(tables) > 1:
         raise Exception(f"Found multiple tables matching {fqn}")
 
-    columns = fetch_columns(session, "TABLE", fqn)
+    # columns = fetch_columns(session, "TABLE", fqn)
+    columns = _fetch_columns_for_table(session, fqn)
 
     data = tables[0]
-    show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
-    params = params_result_to_dict(show_params_result)
+    # show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
+    # params = params_result_to_dict(show_params_result)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -1781,7 +1847,7 @@ def fetch_table(session, fqn: FQN):
         "enable_schema_evolution": data["enable_schema_evolution"] == "Y",
         # "data_retention_time_in_days": int(data["retention_time"]),
         # "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days", None),
-        "default_ddl_collation": params.get("default_ddl_collation", None),
+        # "default_ddl_collation": params.get("default_ddl_collation", None),
         "change_tracking": data["change_tracking"] == "ON",
     }
 
@@ -1961,7 +2027,7 @@ def list_account_scoped_resource(session, resource) -> list[FQN]:
     show_result = execute(session, f"SHOW {resource}")
     resources = []
     for row in show_result:
-        resources.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+        resources.append(FQN(name=resource_name_from_snowflake_metadata(row["name"])))
     return resources
 
 
@@ -1971,9 +2037,9 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
     for row in show_result:
         resources.append(
             FQN(
-                database=ResourceName.from_snowflake_metadata(row["database_name"]),
-                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
-                name=ResourceName.from_snowflake_metadata(row["name"]),
+                database=resource_name_from_snowflake_metadata(row["database_name"]),
+                schema=resource_name_from_snowflake_metadata(row["schema_name"]),
+                name=resource_name_from_snowflake_metadata(row["name"]),
             )
         )
     return resources
@@ -2000,13 +2066,13 @@ def list_catalog_integrations(session) -> list[FQN]:
 
 def list_compute_pools(session) -> list[FQN]:
     show_result = execute(session, "SHOW COMPUTE POOLS")
-    return [FQN(name=ResourceName.from_snowflake_metadata(row["name"])) for row in show_result]
+    return [FQN(name=resource_name_from_snowflake_metadata(row["name"])) for row in show_result]
 
 
 def list_databases(session) -> list[FQN]:
     show_result = execute(session, "SHOW DATABASES")
     return [
-        FQN(name=ResourceName.from_snowflake_metadata(row["name"]))
+        FQN(name=resource_name_from_snowflake_metadata(row["name"]))
         for row in show_result
         if row["name"] not in SYSTEM_DATABASES
     ]
@@ -2016,7 +2082,7 @@ def list_database_roles(session) -> list[FQN]:
     databases = execute(session, "SHOW DATABASES")
     roles = []
     for database in databases:
-        database_name = ResourceName.from_snowflake_metadata(database["name"])
+        database_name = resource_name_from_snowflake_metadata(database["name"])
         if database_name in SYSTEM_DATABASES:
             continue
         try:
@@ -2030,7 +2096,7 @@ def list_database_roles(session) -> list[FQN]:
         for role in database_roles:
             roles.append(
                 FQN(
-                    name=ResourceName.from_snowflake_metadata(role["name"]),
+                    name=resource_name_from_snowflake_metadata(role["name"]),
                     database=database_name,
                 )
             )
@@ -2044,7 +2110,7 @@ def list_dynamic_tables(session) -> list[FQN]:
 # def list_future_grants(session) -> list[FQN]:
 #     grants = []
 #     for role in roles:
-#         role_name = ResourceName.from_snowflake_metadata(role["name"])
+#         role_name = resource_name_from_snowflake_metadata(role["name"])
 #         if role_name in SYSTEM_ROLES:
 #             continue
 #         show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
@@ -2071,7 +2137,7 @@ def list_grants(session) -> list[FQN]:
     roles = execute(session, "SHOW ROLES", cacheable=True)
     grants = []
     for role in roles:
-        role_name = ResourceName.from_snowflake_metadata(role["name"])
+        role_name = resource_name_from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
         grant_data = _show_grants_to_role(session, role_name, cacheable=True)
@@ -2126,7 +2192,7 @@ def list_resource_monitors(session) -> list[FQN]:
 def list_roles(session) -> list[FQN]:
     show_result = execute(session, "SHOW ROLES")
     return [
-        FQN(name=ResourceName.from_snowflake_metadata(row["name"]))
+        FQN(name=resource_name_from_snowflake_metadata(row["name"]))
         for row in show_result
         if row["name"] not in SYSTEM_ROLES
     ]
@@ -2136,7 +2202,7 @@ def list_role_grants(session) -> list[FQN]:
     roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
-        role_name = ResourceName.from_snowflake_metadata(role["name"])
+        role_name = resource_name_from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
         try:
@@ -2161,8 +2227,8 @@ def list_schemas(session, database=None) -> list[FQN]:
                 continue
             schemas.append(
                 FQN(
-                    database=ResourceName.from_snowflake_metadata(row["database_name"]),
-                    name=ResourceName.from_snowflake_metadata(row["name"]),
+                    database=resource_name_from_snowflake_metadata(row["database_name"]),
+                    name=resource_name_from_snowflake_metadata(row["name"]),
                 )
             )
         return schemas
@@ -2182,7 +2248,7 @@ def list_security_integrations(session) -> list[FQN]:
     for row in show_result:
         if row["name"] in SYSTEM_SECURITY_INTEGRATIONS:
             continue
-        integrations.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+        integrations.append(FQN(name=resource_name_from_snowflake_metadata(row["name"])))
     return integrations
 
 
@@ -2192,7 +2258,7 @@ def list_shares(session) -> list[FQN]:
     for row in show_result:
         if row["kind"] == "INBOUND":
             continue
-        shares.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+        shares.append(FQN(name=resource_name_from_snowflake_metadata(row["name"])))
     return shares
 
 
@@ -2206,9 +2272,9 @@ def list_stages(session) -> list[FQN]:
             continue
         stages.append(
             FQN(
-                database=ResourceName.from_snowflake_metadata(row["database_name"]),
-                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
-                name=ResourceName.from_snowflake_metadata(row["name"]),
+                database=resource_name_from_snowflake_metadata(row["database_name"]),
+                schema=resource_name_from_snowflake_metadata(row["schema_name"]),
+                name=resource_name_from_snowflake_metadata(row["name"]),
             )
         )
     return stages
@@ -2230,9 +2296,9 @@ def list_tables(session) -> list[FQN]:
             continue
         tables.append(
             FQN(
-                database=ResourceName.from_snowflake_metadata(row["database_name"]),
-                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
-                name=ResourceName.from_snowflake_metadata(row["name"]),
+                database=resource_name_from_snowflake_metadata(row["database_name"]),
+                schema=resource_name_from_snowflake_metadata(row["schema_name"]),
+                name=resource_name_from_snowflake_metadata(row["name"]),
             )
         )
     return tables
@@ -2265,9 +2331,9 @@ def list_tag_references(session) -> list[FQN]:
 
         #     tags.append(
         #         FQN(
-        #             database=ResourceName.from_snowflake_metadata(row["database_name"]),
-        #             schema=ResourceName.from_snowflake_metadata(tag["schema_name"]),
-        #             name=ResourceName.from_snowflake_metadata(tag["name"]),
+        #             database=resource_name_from_snowflake_metadata(row["database_name"]),
+        #             schema=resource_name_from_snowflake_metadata(tag["schema_name"]),
+        #             name=resource_name_from_snowflake_metadata(tag["name"]),
         #         )
         #     )
         # return tags
@@ -2293,9 +2359,9 @@ def list_tags(session) -> list[FQN]:
                 continue
             tags.append(
                 FQN(
-                    database=ResourceName.from_snowflake_metadata(row["database_name"]),
-                    schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
-                    name=ResourceName.from_snowflake_metadata(row["name"]),
+                    database=resource_name_from_snowflake_metadata(row["database_name"]),
+                    schema=resource_name_from_snowflake_metadata(row["schema_name"]),
+                    name=resource_name_from_snowflake_metadata(row["name"]),
                 )
             )
         return tags
@@ -2316,7 +2382,7 @@ def list_users(session) -> list[FQN]:
     for row in show_result:
         if row["name"] in SYSTEM_USERS:
             continue
-        users.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+        users.append(FQN(name=resource_name_from_snowflake_metadata(row["name"])))
     return users
 
 
@@ -2330,9 +2396,9 @@ def list_views(session) -> list[FQN]:
             continue
         views.append(
             FQN(
-                database=ResourceName.from_snowflake_metadata(row["database_name"]),
-                schema=ResourceName.from_snowflake_metadata(row["schema_name"]),
-                name=ResourceName.from_snowflake_metadata(row["name"]),
+                database=resource_name_from_snowflake_metadata(row["database_name"]),
+                schema=resource_name_from_snowflake_metadata(row["schema_name"]),
+                name=resource_name_from_snowflake_metadata(row["name"]),
             )
         )
     return views
@@ -2342,5 +2408,5 @@ def list_warehouses(session) -> list[FQN]:
     show_result = execute(session, "SHOW WAREHOUSES")
     warehouses = []
     for row in show_result:
-        warehouses.append(FQN(name=ResourceName.from_snowflake_metadata(row["name"])))
+        warehouses.append(FQN(name=resource_name_from_snowflake_metadata(row["name"])))
     return warehouses

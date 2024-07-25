@@ -50,6 +50,7 @@ setup(
             "pytest-profiling",
             "pytest-xdist",
             "pytest>=6.0",
+            "python-dotenv",
             "ruff",
             "snowflake-cli-labs",
             "tabulate",
