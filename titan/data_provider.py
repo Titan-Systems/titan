@@ -726,7 +726,13 @@ def fetch_database(session, fqn: FQN):
 
 
 def fetch_database_role(session, fqn: FQN):
-    show_result = execute(session, f"SHOW DATABASE ROLES IN DATABASE {fqn.database}", cacheable=True)
+    try:
+        show_result = execute(session, f"SHOW DATABASE ROLES IN DATABASE {fqn.database}", cacheable=True)
+    except ProgrammingError as err:
+        if err.errno == DOES_NOT_EXIST_ERR:
+            return None
+        raise
+
     roles = _filter_result(show_result, name=fqn.name)
     if len(roles) == 0:
         return None
