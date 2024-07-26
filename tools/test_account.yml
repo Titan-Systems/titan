@@ -38,6 +38,7 @@ databases:
   - name: static_database
     schemas:
       - name: public
+  - name: static_database_the_second
 
 database_roles:
   - name: static_database_role
@@ -169,6 +170,8 @@ stages:
     type: INTERNAL
     directory:
       enable: true
+    database: static_database
+    schema: public
 
 streams:
   - name: static_stream

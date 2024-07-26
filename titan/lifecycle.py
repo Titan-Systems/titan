@@ -90,7 +90,7 @@ def create_future_grant(urn: URN, data: dict, props: Props, if_not_exists: bool)
 
 def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     on_type = data["on_type"]
-    if "INTEGRATION" in on_type:
+    if "INTEGRATION" in str(on_type):
         on_type = "INTEGRATION"
     elif on_type == "ACCOUNT":
         on_type = ""
@@ -230,6 +230,15 @@ def update_schema(urn: URN, data: dict) -> str:
     else:
         new_value = f"'{new_value}'" if isinstance(new_value, str) else new_value
         return tidy_sql("ALTER SCHEMA", urn.fqn, "SET", attr, "=", new_value)
+
+
+def update_table(urn: URN, data: dict) -> str:
+    attr, new_value = data.popitem()
+    attr = attr.lower()
+    if attr == "columns":
+        raise NotImplementedError(data)
+    else:
+        return update__default(urn, {attr: new_value})
 
 
 def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:
