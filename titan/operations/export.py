@@ -11,8 +11,11 @@ from titan.resources.grant import grant_yaml
 logger = logging.getLogger("titan")
 
 
-def export_resources(include: list[ResourceType] = None, exclude: list[ResourceType] = None) -> dict[str, list]:
-    session = connect()
+def export_resources(
+    session=None, include: list[ResourceType] = None, exclude: list[ResourceType] = None
+) -> dict[str, list]:
+    if session is None:
+        session = connect()
     config = {}
     for resource_type in ResourceType:
         if include and resource_type not in include:
@@ -21,6 +24,7 @@ def export_resources(include: list[ResourceType] = None, exclude: list[ResourceT
             continue
         try:
             config.update(export_resource(session, resource_type))
+        # No list method for resource
         except AttributeError:
             continue
     return config
