@@ -2073,26 +2073,37 @@ def list_catalog_integrations(session) -> list[FQN]:
 
 
 def list_compute_pools(session) -> list[FQN]:
-    show_result = execute(session, "SHOW COMPUTE POOLS")
+    try:
+        show_result = execute(session, "SHOW COMPUTE POOLS")
+    except ProgrammingError as err:
+        logger.warning(f"Error listing compute pools: {err}")
+        return []
     return [FQN(name=resource_name_from_snowflake_metadata(row["name"])) for row in show_result]
 
 
+def _list_databases(session) -> list[str]:
+    show_result = execute(session, "SHOW DATABASES", cacheable=True)
+    databases = []
+    for row in show_result:
+        # Exclude system databases like SNOWFLAKE
+        if row["name"] in SYSTEM_DATABASES:
+            continue
+        # Exclude database shares
+        if row["kind"] != "STANDARD":
+            continue
+        databases.append(resource_name_from_snowflake_metadata(row["name"]))
+    return databases
+
+
 def list_databases(session) -> list[FQN]:
-    show_result = execute(session, "SHOW DATABASES")
-    return [
-        FQN(name=resource_name_from_snowflake_metadata(row["name"]))
-        for row in show_result
-        if row["name"] not in SYSTEM_DATABASES
-    ]
+    databases = _list_databases(session)
+    return [FQN(name=database) for database in databases]
 
 
 def list_database_roles(session) -> list[FQN]:
-    databases = execute(session, "SHOW DATABASES")
+    databases = _list_databases(session)
     roles = []
-    for database in databases:
-        database_name = resource_name_from_snowflake_metadata(database["name"])
-        if database_name in SYSTEM_DATABASES:
-            continue
+    for database_name in databases:
         try:
             # A rare case where we need to always quote the identifier. Snowflake chokes if the database name
             # is DATABASE, but this will work if quoted
@@ -2228,12 +2239,24 @@ def list_role_grants(session) -> list[FQN]:
 
 
 def list_schemas(session, database=None) -> list[FQN]:
-    db = f" IN DATABASE {database}" if database else ""  # IN ACCOUNT
+    if database:
+        db = f" IN DATABASE {database}"
+        user_databases = None
+    else:
+        db = ""
+        user_databases = _list_databases(session)
     try:
         show_result = execute(session, f"SHOW SCHEMAS{db}")
         schemas = []
         for row in show_result:
-            if row["database_name"] in SYSTEM_DATABASES or row["name"] == "INFORMATION_SCHEMA":
+            # Skip system databases
+            if row["database_name"] in SYSTEM_DATABASES:
+                continue
+            # Skip system schemas
+            if row["name"] == "INFORMATION_SCHEMA":
+                continue
+            # Skip database shares
+            if database is None and row["database_name"] not in user_databases:
                 continue
             schemas.append(
                 FQN(
@@ -2300,9 +2323,22 @@ def list_streams(session) -> list[FQN]:
 
 def list_tables(session) -> list[FQN]:
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
+    user_databases = _list_databases(session)
     tables = []
     for row in show_result:
-        if row["database_name"] in SYSTEM_DATABASES or row["schema_name"] == "INFORMATION_SCHEMA":
+        if row["database_name"] in SYSTEM_DATABASES:
+            continue
+        if row["schema_name"] == "INFORMATION_SCHEMA":
+            continue
+        if row["database_name"] not in user_databases:
+            continue
+        if (
+            row["is_external"] == "Y"
+            or row["is_hybrid"] == "Y"
+            or row["is_iceberg"] == "Y"
+            or row["is_dynamic"] == "Y"
+            or row["is_event"] == "Y"
+        ):
             continue
         tables.append(
             FQN(
