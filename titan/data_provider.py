@@ -1054,16 +1054,14 @@ def fetch_grant_on_all(session, fqn: FQN):
 
 
 def fetch_image_repository(session, fqn: FQN):
-    show_result = execute(
-        session, f"SHOW IMAGE REPOSITORIES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True
-    )
+    repos = _show_resources(session, "IMAGE REPOSITORIES", fqn)
 
-    if len(show_result) == 0:
+    if len(repos) == 0:
         return None
-    if len(show_result) > 1:
+    if len(repos) > 1:
         raise Exception(f"Found multiple image repositories matching {fqn}")
 
-    data = show_result[0]
+    data = repos[0]
 
     return {"name": fqn.name, "owner": data["owner"]}
 
@@ -1276,6 +1274,7 @@ def fetch_pipe(session, fqn: FQN):
 
 def fetch_procedure(session, fqn: FQN):
     # SHOW PROCEDURES IN SCHEMA {}.{}
+    # FIXME: This will fail if the database doesnt exist
     show_result = execute(session, f"SHOW PROCEDURES IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True)
     sprocs = _filter_result(show_result, name=fqn.name)
     if len(sprocs) == 0:
