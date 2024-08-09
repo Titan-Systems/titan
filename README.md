@@ -379,7 +379,10 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | ↳ ORC                         | ❌         |
 | ↳ Parquet                     | ✅         |
 | Hybrid Table                  | 🚧         |
-| Iceberg Table                 | ❌         |
+| Iceberg Table                 |            |
+| ↳ Snowflake                   | 🚧         |
+| ↳ AWS Glue                    | ❌         |
+| ↳ Object Storage              | ❌         |
 | Image Repository              | ✅         |
 | Masking Policy                | ❌         |
 | Materialized View             | 🚧         |

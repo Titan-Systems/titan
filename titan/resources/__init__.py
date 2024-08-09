@@ -16,10 +16,12 @@ from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
+from .iceberg_table import SnowflakeIcebergTable
 from .image_repository import ImageRepository
 from .materialized_view import MaterializedView
 from .network_policy import NetworkPolicy
 from .network_rule import NetworkRule
+from .notebook import Notebook
 from .notification_integration import (
     AWSOutboundNotificationIntegration,
     AzureInboundNotificationIntegration,
@@ -28,7 +30,6 @@ from .notification_integration import (
     GCPInboundNotificationIntegration,
     GCPOutboundNotificationIntegration,
 )
-from .notebook import Notebook
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
 from .pipe import Pipe
@@ -85,7 +86,6 @@ __all__ = [
     "ExternalFunction",
     "ExternalStage",
     "FailoverGroup",
-    "JSONFileFormat",
     "FutureGrant",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
@@ -95,9 +95,11 @@ __all__ = [
     "Grant",
     "GrantOnAll",
     "HybridTable",
+    "SnowflakeIcebergTable",
     "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
+    "JSONFileFormat",
     "MaterializedView",
     "NetworkPolicy",
     "NetworkRule",

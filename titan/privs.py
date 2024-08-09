@@ -139,6 +139,18 @@ class FunctionPriv(ParseableEnum):
     USAGE = "USAGE"
 
 
+class IcebergTablePriv(ParseableEnum):
+    ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    DELETE = "DELETE"
+    INSERT = "INSERT"
+    OWNERSHIP = "OWNERSHIP"
+    REFERENCES = "REFERENCES"
+    SELECT = "SELECT"
+    TRUNCATE = "TRUNCATE"
+    UPDATE = "UPDATE"
+
+
 class IntegrationPriv(ParseableEnum):
     ALL = "ALL"
     USAGE = "USAGE"
@@ -361,6 +373,7 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.GRANT_ON_ALL: None,
     ResourceType.GRANT: None,
     ResourceType.HYBRID_TABLE: None,
+    ResourceType.ICEBERG_TABLE: IcebergTablePriv,
     ResourceType.IMAGE_REPOSITORY: None,
     ResourceType.INTEGRATION: IntegrationPriv,
     ResourceType.MATERIALIZED_VIEW: MaterializedViewPriv,
