@@ -527,6 +527,7 @@ def get_env_vars() -> dict:
         "SNOWFLAKE_ROLE",
         "SNOWFLAKE_WAREHOUSE",
         "SNOWFLAKE_MFA_PASSCODE",
+        "SNOWFLAKE_AUTHENTICATOR"
     ]:
         value = os.getenv(var, None)
         if value:
