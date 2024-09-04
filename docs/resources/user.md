@@ -19,6 +19,7 @@ user = User(
     name="some_user",
     owner="USERADMIN",
     email="some.user@example.com",
+    type="PERSON",
 )
 ```
 
@@ -30,6 +31,7 @@ users:
   - name: some_user
     owner: USERADMIN
     email: some.user@example.com
+    type: PERSON
 ```
 
 
@@ -57,6 +59,7 @@ users:
 * `rsa_public_key_2` (string) - The RSA public key for the user.
 * `comment` (string) - A comment for the user.
 * `network_policy` (string) - The network policy for the user.
+* `type` (string or [UserType](user_type.md)) - The type of the user. Defaults to "NULL".
 * `tags` (dict) - Tags for the user.
 
 

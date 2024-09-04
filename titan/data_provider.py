@@ -1951,7 +1951,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         "default_role": data["default_role"] or None,
         "default_secondary_roles": data["default_secondary_roles"] or None,
         "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
-        "user_type": user_type,
+        "type": user_type,
         "owner": data["owner"],
     }
 

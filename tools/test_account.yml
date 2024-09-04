@@ -13,7 +13,7 @@ users:
         - last_name
         - owner
   - name: TITAN_CI
-    user_type: SERVICE
+    type: SERVICE
 
 roles:
   - name: CI

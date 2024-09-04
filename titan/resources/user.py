@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 
 from ..enums import ParseableEnum, ResourceType
@@ -7,6 +8,9 @@ from ..scope import AccountScope
 from .resource import NamedResource, Resource, ResourceSpec
 from .role import Role
 from .tag import TaggableResource
+
+
+logger = logging.getLogger("titan")
 
 
 class UserType(ParseableEnum):
@@ -40,11 +44,15 @@ class _User(ResourceSpec):
     rsa_public_key_2: str = None
     comment: str = None
     network_policy: str = None
-    user_type: UserType = "NULL"
+    type: UserType = "NULL"
 
     def __post_init__(self):
         super().__post_init__()
-        if self.user_type == UserType.SERVICE:
+
+        if self.type is None:
+            self.type = UserType.NULL
+
+        if self.type == UserType.SERVICE:
             if self.first_name is not None:
                 raise ValueError("First name is not supported for service users")
             if self.middle_name is not None:
@@ -98,7 +106,7 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2 (string): The RSA public key for the user.
         comment (string): A comment for the user.
         network_policy (string): The network policy for the user.
-        user_type (string or UserType): The type of the user. Defaults to "NULL".
+        type (string or UserType): The type of the user. Defaults to "NULL".
         tags (dict): Tags for the user.
 
     Python:
@@ -108,7 +116,7 @@ class User(NamedResource, TaggableResource, Resource):
             name="some_user",
             owner="USERADMIN",
             email="some.user@example.com",
-            user_type="PERSON",
+            type="PERSON",
         )
         ```
 
@@ -119,7 +127,7 @@ class User(NamedResource, TaggableResource, Resource):
           - name: some_user
             owner: USERADMIN
             email: some.user@example.com
-            user_type: PERSON
+            type: PERSON
         ```
 
     """
@@ -146,7 +154,7 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2=StringProp("rsa_public_key_2"),
         comment=StringProp("comment"),
         network_policy=StringProp("network_policy"),
-        user_type=EnumProp("type", UserType),
+        type=EnumProp("type", UserType),
         tags=TagsProp(),
     )
     scope = AccountScope()
@@ -176,10 +184,19 @@ class User(NamedResource, TaggableResource, Resource):
         rsa_public_key_2: str = None,
         comment: str = None,
         network_policy: str = None,
-        user_type: str = "NULL",
+        type: str = None,
         tags: dict[str, str] = None,
         **kwargs,
     ):
+
+        user_type = kwargs.pop("user_type", None)
+        if user_type:
+            logging.warning("The 'user_type' parameter is deprecated. Use 'type' instead.")
+            if type is None:
+                type = user_type
+            else:
+                raise ValueError("Both 'type' and 'user_type' parameters are set. Use only 'type'.")
+
         super().__init__(name, **kwargs)
         self._data: _User = _User(
             name=self._name,
@@ -204,7 +221,7 @@ class User(NamedResource, TaggableResource, Resource):
             rsa_public_key_2=rsa_public_key_2,
             comment=comment,
             network_policy=network_policy,
-            user_type=user_type,
+            type=type,
         )
         self.set_tags(tags)
 

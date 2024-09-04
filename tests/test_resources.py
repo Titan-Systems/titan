@@ -1,11 +1,14 @@
+import logging
+
 import pytest
 
-from titan import resources as res
 from tests.helpers import get_sql_fixtures
+from titan import resources as res
 from titan.enums import ResourceType, WarehouseSize
 from titan.resource_name import ResourceName
 from titan.resource_tags import ResourceTags
 from titan.resources.resource import ResourcePointer
+from titan.resources.user import UserType
 
 SQL_FIXTURES = list(get_sql_fixtures())
 
@@ -290,3 +293,10 @@ def test_resource_type_checking_nested_type():
             storage_aws_object_acl="bucket-owner-full-control",
             comment="This is a sample S3 storage integration.",
         )
+
+
+def test_user_type_fallback(caplog):
+    caplog.set_level(logging.WARNING)
+    user = res.User(name="test_user", user_type="SERVICE")
+    assert "The 'user_type' parameter is deprecated. Use 'type' instead." in caplog.text
+    assert user._data.type == UserType.SERVICE

@@ -454,7 +454,7 @@ def test_fetch_user(cursor, suffix, marked_for_cleanup):
     user = res.User(
         name=f"SOME_USER_TYPE_PERSON_{suffix}@applytitan.com",
         owner=TEST_ROLE,
-        user_type="PERSON",
+        type="PERSON",
     )
     cursor.execute(user.create_sql(if_not_exists=True))
     marked_for_cleanup.append(user)

@@ -34,6 +34,7 @@
 * [JSONFileFormat](resources/json_file_format.md)
 * [JavascriptUDF](resources/javascript_udf.md)
 * [MaterializedView](resources/materialized_view.md)
+* [NetworkPolicy](resources/network_policy.md)
 * [NetworkRule](resources/network_rule.md)
 * [OAuthSecret](resources/oauth_secret.md)
 * [ObjectStoreCatalogIntegration](resources/object_store_catalog_integration.md)
