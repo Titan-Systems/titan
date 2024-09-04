@@ -135,25 +135,25 @@ def get_connection(env_vars):
         user=env_vars["SNOWFLAKE_USER"],
         password=env_vars["SNOWFLAKE_PASSWORD"],
         role=env_vars["SNOWFLAKE_ROLE"],
-        warehouse=env_vars["SNOWFLAKE_WAREHOUSE"],
+        # warehouse=env_vars["SNOWFLAKE_WAREHOUSE"],
     )
 
 
 def configure_test_accounts():
 
-    # for account in ["aws.standard", "aws.enterprise"]:
-    #     env_vars = dotenv_values(f".env.{account}")
-    #     conn = get_connection(env_vars)
-    #     try:
-    #         configure_test_account(conn)
-    #     except Exception as e:
-    #         print(f"Error configuring {account}: {e}")
-    #     finally:
-    #         conn.close()
+    for account in ["aws.standard", "aws.enterprise"]:
+        env_vars = dotenv_values(f".env.{account}")
+        conn = get_connection(env_vars)
+        try:
+            configure_test_account(conn)
+        except Exception as e:
+            print(f"Error configuring {account}: {e}")
+        finally:
+            conn.close()
 
-    now = time.time()
-    configure_aws_heavy(get_connection(dotenv_values(".env.aws.heavy")))
-    print(f"done in {time.time() - now:.2f}s")
+    # now = time.time()
+    # configure_aws_heavy(get_connection(dotenv_values(".env.aws.heavy")))
+    # print(f"done in {time.time() - now:.2f}s")
 
 
 if __name__ == "__main__":

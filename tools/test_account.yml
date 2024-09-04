@@ -186,6 +186,8 @@ tables:
       - name: id
         data_type: NUMBER(38,0)
     change_tracking: true
+    database: static_database
+    schema: public
 
 
 views:
@@ -198,6 +200,8 @@ views:
     requires:
       - name: static_table
         resource_type: table
+    database: static_database
+    schema: public
 
 warehouses:
   - name: static_warehouse
