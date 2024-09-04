@@ -13,7 +13,7 @@ users:
         - last_name
         - owner
   - name: TITAN_CI
-    user_type: SERVICE
+    type: SERVICE
 
 roles:
   - name: CI
@@ -24,8 +24,8 @@ roles:
     comment: This role is intentionally left empty
   - name: STATIC_ROLE
     comment: Static role
-    tags:
-      static_database.public.static_tag: STATIC_TAG_VALUE
+    # tags:
+    #   static_database.public.static_tag: STATIC_TAG_VALUE
   - name: ~@#$%^&*()_+
     owner: ACCOUNTADMIN
     comment: This role has some issues
@@ -71,14 +71,6 @@ network_rules:
     database: static_database
     schema: public
 
-secrets:
-  - name: static_secret
-    secret_type: PASSWORD
-    username: someuser
-    password: somepass
-    database: static_database
-    schema: public
-
 
 grants:
   - GRANT USAGE ON WAREHOUSE STATIC_WAREHOUSE TO ROLE CI
@@ -87,16 +79,12 @@ grants:
   - GRANT SELECT ON TABLE static_database.public.static_table TO ROLE CI
   - GRANT SELECT ON VIEW static_database.public.static_view TO ROLE CI
   - GRANT READ ON STAGE static_database.public.static_stage TO ROLE CI
-  - GRANT APPLY AGGREGATION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY AUTHENTICATION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY MASKING POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY PACKAGES POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY PASSWORD POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
-  - GRANT APPLY PROJECTION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY RESOURCE GROUP ON ACCOUNT TO ROLE EVERY_PRIVILEGE
-  - GRANT APPLY ROW ACCESS POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY SESSION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
-  - GRANT APPLY TAG ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT ATTACH POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT AUDIT ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE EVERY_PRIVILEGE
@@ -106,7 +94,6 @@ grants:
   - GRANT CREATE APPLICATION ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE APPLICATION PACKAGE ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE COMPUTE POOL ON ACCOUNT TO ROLE EVERY_PRIVILEGE
-  - GRANT CREATE CREDENTIAL ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE DATA EXCHANGE LISTING ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE DATABASE ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE EXTERNAL VOLUME ON ACCOUNT TO ROLE EVERY_PRIVILEGE
@@ -186,6 +173,8 @@ tables:
       - name: id
         data_type: NUMBER(38,0)
     change_tracking: true
+    database: static_database
+    schema: public
 
 
 views:
@@ -198,6 +187,8 @@ views:
     requires:
       - name: static_table
         resource_type: table
+    database: static_database
+    schema: public
 
 warehouses:
   - name: static_warehouse
@@ -214,10 +205,10 @@ compute_pools:
     instance_family: CPU_X64_XS
   
 security_integrations:
-  - name: SNOWSERVICES_INGRESS_OAUTH
-    type: OAUTH
-    oauth_client: snowservices_ingress
-    enabled: true
+  # - name: SNOWSERVICES_INGRESS_OAUTH
+  #   type: OAUTH
+  #   oauth_client: snowservices_ingress
+  #   enabled: true
   - name: STATIC_SECURITY_INTEGRATION
     type: api_authentication
     auth_type: OAUTH2
@@ -226,11 +217,3 @@ security_integrations:
     oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
     oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'
     enabled: true
-
-tags:
-  - name: static_tag
-    database: static_database
-    schema: PUBLIC
-    comment: This is a static tag
-    allowed_values:
-      - STATIC_TAG_VALUE

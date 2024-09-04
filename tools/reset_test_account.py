@@ -11,11 +11,21 @@ from titan.data_provider import fetch_session
 from titan.gitops import collect_resources_from_config
 
 
-def read_config(file):
+def read_config(file) -> dict:
     config_path = os.path.join(os.path.dirname(__file__), file)
     with open(config_path, "r") as f:
         config = yaml.safe_load(f)
     return config
+
+
+def merge_configs(config1: dict, config2: dict) -> dict:
+    merged = config1.copy()
+    for key, value in config2.items():
+        if key in merged:
+            merged[key] = merged[key] + value
+        else:
+            merged[key] = value
+    return merged
 
 
 def configure_test_account(conn):
@@ -59,10 +69,11 @@ def configure_test_account(conn):
                 "tag reference",
             ]
         )
-    else:
-        config.pop("tags")
-        config.pop("secrets")
-        config.pop("tag_references")
+        config = merge_configs(config, read_config("test_account_enterprise.yml"))
+    # else:
+    #     config.pop("tags", None)
+    #     config.pop("secrets", None)
+    #     config.pop("tag_references", None)
 
     resources = collect_resources_from_config(config)
 
@@ -135,25 +146,25 @@ def get_connection(env_vars):
         user=env_vars["SNOWFLAKE_USER"],
         password=env_vars["SNOWFLAKE_PASSWORD"],
         role=env_vars["SNOWFLAKE_ROLE"],
-        warehouse=env_vars["SNOWFLAKE_WAREHOUSE"],
+        # warehouse=env_vars["SNOWFLAKE_WAREHOUSE"],
     )
 
 
 def configure_test_accounts():
 
-    # for account in ["aws.standard", "aws.enterprise"]:
-    #     env_vars = dotenv_values(f".env.{account}")
-    #     conn = get_connection(env_vars)
-    #     try:
-    #         configure_test_account(conn)
-    #     except Exception as e:
-    #         print(f"Error configuring {account}: {e}")
-    #     finally:
-    #         conn.close()
+    for account in ["aws.standard", "aws.enterprise"]:
+        env_vars = dotenv_values(f".env.{account}")
+        conn = get_connection(env_vars)
+        try:
+            configure_test_account(conn)
+        # except Exception as e:
+        #     print(f"Error configuring {account}: {e}")
+        finally:
+            conn.close()
 
-    now = time.time()
-    configure_aws_heavy(get_connection(dotenv_values(".env.aws.heavy")))
-    print(f"done in {time.time() - now:.2f}s")
+    # now = time.time()
+    # configure_aws_heavy(get_connection(dotenv_values(".env.aws.heavy")))
+    # print(f"done in {time.time() - now:.2f}s")
 
 
 if __name__ == "__main__":
