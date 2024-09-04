@@ -1,18 +1,18 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, NamedResource
 from ..enums import ParseableEnum, ResourceType
-from ..resource_name import ResourceName
-from ..scope import AccountScope
-
 from ..props import (
     BoolProp,
-    StringProp,
-    StringListProp,
-    Props,
-    IntProp,
     EnumProp,
+    IntProp,
+    Props,
+    StringListProp,
+    StringProp,
 )
+from ..resource_name import ResourceName
+from ..scope import AccountScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 class SecurityIntegrationType(ParseableEnum):
@@ -42,6 +42,7 @@ class _SnowflakePartnerOAuthSecurityIntegration(ResourceSpec):
     oauth_issue_refresh_tokens: bool = True
     oauth_refresh_token_validity: int = 7776000
     comment: str = None
+    owner: Role = "ACCOUNTADMIN"
 
     def __post_init__(self):
         super().__post_init__()
@@ -147,6 +148,7 @@ class _SnowservicesOAuthSecurityIntegration(ResourceSpec):
     oauth_client: OAuthClient = OAuthClient.SNOWSERVICES_INGRESS
     enabled: bool = True
     comment: str = None
+    owner: Role = "ACCOUNTADMIN"
 
 
 class SnowservicesOAuthSecurityIntegration(NamedResource, Resource):
@@ -223,6 +225,7 @@ class _APIAuthenticationSecurityIntegration(ResourceSpec):
     oauth_access_token_validity: int = None
     oauth_allowed_scopes: list[str] = None
     comment: str = None
+    owner: Role = "ACCOUNTADMIN"
 
 
 class APIAuthenticationSecurityIntegration(NamedResource, Resource):
