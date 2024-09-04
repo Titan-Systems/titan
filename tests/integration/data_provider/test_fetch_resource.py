@@ -994,11 +994,9 @@ def test_fetch_api_authentication_security_integration(cursor, suffix, marked_fo
 
     result = safe_fetch(cursor, security_integration.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(
-        res.APIAuthenticationSecurityIntegration.spec,
-        result,
-        security_integration.to_dict(),
-    )
+    result = strip_nones_and_unfetchable(res.APIAuthenticationSecurityIntegration.spec, result)
+    data = strip_nones_and_unfetchable(res.APIAuthenticationSecurityIntegration.spec, security_integration.to_dict())
+    assert result == data
 
 
 def test_fetch_table_stream(cursor, suffix, marked_for_cleanup):

@@ -1445,11 +1445,9 @@ def fetch_security_integration(session, fqn: FQN):
         raise Exception(f"Found multiple security integrations matching {fqn}")
 
     data = show_result[0]
-
-    #
-
     desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "INTEGRATION", fqn)
 
     if data["type"] == "API_AUTHENTICATION":
         return {
@@ -1464,6 +1462,7 @@ def fetch_security_integration(session, fqn: FQN):
             "oauth_access_token_validity": properties["oauth_access_token_validity"],
             "oauth_allowed_scopes": properties["oauth_allowed_scopes"],
             "comment": data["comment"] or None,
+            "owner": owner,
         }
 
     elif data["type"].startswith("OAUTH"):
@@ -1474,6 +1473,7 @@ def fetch_security_integration(session, fqn: FQN):
                 "type": type_,
                 "oauth_client": oauth_client,
                 "enabled": data["enabled"] == "true",
+                "owner": owner,
             }
     raise Exception(f"Unsupported security integration type {data['type']}")
 
