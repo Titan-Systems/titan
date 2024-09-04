@@ -18,6 +18,9 @@ def fqn_to_sql(fqn: FQN):
     return f"{database}{schema}{name}"
 
 
+################ Create functions
+
+
 def create_resource(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     return getattr(__this__, f"create_{urn.resource_label}", create__default)(urn, data, props, if_not_exists)
 
@@ -43,6 +46,19 @@ def create_aggregation_policy(urn: URN, data: dict, props: Props, if_not_exists:
     )
 
 
+def create_database(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    data = data.copy()
+    transient = data.pop("transient", None)
+    return tidy_sql(
+        "CREATE",
+        "TRANSIENT" if transient else "",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
+        props.render(data),
+    )
+
+
 def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     db = f"{urn.fqn.database}." if urn.fqn.database else ""
     schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
@@ -51,20 +67,6 @@ def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
         "CREATE",
         urn.resource_type,
         "IF NOT EXISTS" if if_not_exists else "",
-        name,
-        props.render(data),
-    )
-
-
-def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
-    if if_not_exists:
-        raise Exception("IF NOT EXISTS not supported for CREATE PROCEDURE")
-    db = f"{urn.fqn.database}." if urn.fqn.database else ""
-    schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
-    name = f"{db}{schema}{urn.fqn.name}"
-    return tidy_sql(
-        "CREATE",
-        urn.resource_type,
         name,
         props.render(data),
     )
@@ -118,6 +120,20 @@ def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool)
     )
 
 
+def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    if if_not_exists:
+        raise Exception("IF NOT EXISTS not supported for CREATE PROCEDURE")
+    db = f"{urn.fqn.database}." if urn.fqn.database else ""
+    schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
+    name = f"{db}{schema}{urn.fqn.name}"
+    return tidy_sql(
+        "CREATE",
+        urn.resource_type,
+        name,
+        props.render(data),
+    )
+
+
 def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     return tidy_sql(
         "GRANT",
@@ -125,16 +141,12 @@ def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
     )
 
 
-def create_view(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+def create_schema(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     data = data.copy()
-    secure = data.pop("secure", None)
-    volatile = data.pop("volatile", None)
-    recursive = data.pop("recursive", None)
+    transient = data.pop("transient", None)
     return tidy_sql(
         "CREATE",
-        "SECURE" if secure else "",
-        "VOLATILE" if volatile else "",
-        "RECURSIVE" if recursive else "",
+        "TRANSIENT" if transient else "",
         urn.resource_type,
         "IF NOT EXISTS" if if_not_exists else "",
         urn.fqn,
@@ -164,6 +176,26 @@ def create_tag_reference(urn: URN, data: dict, props: Props, if_not_exists: bool
         "SET TAG",
         tags_sql,
     )
+
+
+def create_view(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    data = data.copy()
+    secure = data.pop("secure", None)
+    volatile = data.pop("volatile", None)
+    recursive = data.pop("recursive", None)
+    return tidy_sql(
+        "CREATE",
+        "SECURE" if secure else "",
+        "VOLATILE" if volatile else "",
+        "RECURSIVE" if recursive else "",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
+        props.render(data),
+    )
+
+
+################ Update functions
 
 
 def update_resource(urn: URN, data: dict) -> str:
@@ -239,6 +271,9 @@ def update_table(urn: URN, data: dict) -> str:
         raise NotImplementedError(data)
     else:
         return update__default(urn, {attr: new_value})
+
+
+################ Drop functions
 
 
 def drop_resource(urn: URN, data: dict, if_exists: bool = False) -> str:

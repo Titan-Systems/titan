@@ -113,16 +113,18 @@ def test_fetch_grant_on_account(cursor, suffix):
         cursor.execute(role.drop_sql(if_exists=True))
 
 
-def test_fetch_database(cursor, suffix):
-    database = res.Database(name=f"SOMEDB_{suffix}", owner=TEST_ROLE)
+def test_fetch_database(cursor, suffix, marked_for_cleanup):
+    database = res.Database(
+        name=f"SOMEDB_{suffix}",
+        owner=TEST_ROLE,
+        transient=True,
+    )
     cursor.execute(database.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(database)
 
-    try:
-        result = safe_fetch(cursor, database.urn)
-        assert result is not None
-        assert_resource_dicts_eq_ignore_nulls(result, database.to_dict())
-    finally:
-        cursor.execute(database.drop_sql(if_exists=True))
+    result = safe_fetch(cursor, database.urn)
+    assert result is not None
+    assert_resource_dicts_eq_ignore_nulls(result, database.to_dict())
 
 
 def test_fetch_grant_all_on_resource(cursor):
