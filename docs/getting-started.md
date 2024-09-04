@@ -120,6 +120,7 @@ To connect with Snowflake, the CLI uses environment variables. These environment
 * `SNOWFLAKE_ROLE`
 * `SNOWFLAKE_WAREHOUSE`
 * `SNOWFLAKE_MFA_PASSCODE`
+* `SNOWFLAKE_AUTHENTICATOR`
 
 ### CLI Example
 
