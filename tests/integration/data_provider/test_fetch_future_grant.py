@@ -4,7 +4,6 @@ import pytest
 
 from tests.helpers import (
     assert_resource_dicts_eq_ignore_nulls,
-    assert_resource_dicts_eq_ignore_nulls_and_unfetchable,
     safe_fetch,
 )
 from titan import resources as res

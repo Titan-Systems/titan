@@ -42,6 +42,19 @@ def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
     return str(resource_name_from_snowflake_metadata(identifier))
 
 
+def _get_owner_identifier(data: dict) -> str:
+    if "owner_role_type" not in data:
+        return _quote_snowflake_identifier(data["owner"])
+    if data["owner"] == "":
+        return ""
+    if data["owner_role_type"] == "DATABASE_ROLE":
+        return _quote_snowflake_identifier(data["database_name"]) + "." + _quote_snowflake_identifier(data["owner"])
+    elif data["owner_role_type"] == "ROLE":
+        return _quote_snowflake_identifier(data["owner"])
+    else:
+        raise Exception(f"Unsupported owner role type: {data['owner_role_type']}, {data}")
+
+
 def _desc_result_to_dict(desc_result, lower_properties=False):
     result = {}
     for row in desc_result:
@@ -545,7 +558,7 @@ def fetch_aggregation_policy(session, fqn: FQN):
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "body": properties["body"],
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -564,7 +577,7 @@ def fetch_alert(session, fqn: FQN):
         "comment": data["comment"] or None,
         "condition": data["condition"],
         "then": data["action"],
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -609,7 +622,7 @@ def fetch_authentication_policy(session, fqn: FQN):
         "client_types": _parse_list_property(properties["client_types"]),
         "security_integrations": _parse_list_property(properties["security_integrations"]),
         "comment": data["comment"] or None,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -685,7 +698,7 @@ def fetch_compute_pool(session, fqn: FQN):
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "min_nodes": data["min_nodes"],
         "max_nodes": data["max_nodes"],
         "instance_family": data["instance_family"],
@@ -719,7 +732,7 @@ def fetch_database(session, fqn: FQN):
         "data_retention_time_in_days": int(data["retention_time"]),
         "comment": data["comment"] or None,
         "transient": "TRANSIENT" in options,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
         "default_ddl_collation": params["default_ddl_collation"],
     }
@@ -741,7 +754,7 @@ def fetch_database_role(session, fqn: FQN):
     data = roles[0]
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "database": fqn.database,
         "comment": data["comment"] or None,
     }
@@ -762,7 +775,7 @@ def fetch_dynamic_table(session, fqn: FQN):
     refresh_mode, initialize, as_ = _parse_dynamic_table_text(data["text"])
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "warehouse": data["warehouse"],
         "refresh_mode": refresh_mode,
         "initialize": initialize,
@@ -790,7 +803,7 @@ def fetch_event_table(session, fqn: FQN):
         "cluster_by": _parse_cluster_keys(data["cluster_by"]),
         "data_retention_time_in_days": int(data["retention_time"]),
         "change_tracking": data["change_tracking"] == "ON",
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -830,7 +843,7 @@ def fetch_file_format(session, fqn: FQN):
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "type": data["type"],
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
             "field_delimiter": format_options["FIELD_DELIMITER"],
             "skip_header": format_options["SKIP_HEADER"],
             "null_if": format_options["NULL_IF"],
@@ -862,7 +875,7 @@ def fetch_file_format(session, fqn: FQN):
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "type": data["type"],
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
             "comment": data["comment"] or None,
             "compression": format_options["COMPRESSION"],
             "binary_as_text": format_options["BINARY_AS_TEXT"],
@@ -874,7 +887,7 @@ def fetch_file_format(session, fqn: FQN):
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "type": data["type"],
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
             "comment": data["comment"] or None,
             "compression": format_options["COMPRESSION"],
             "date_format": format_options["DATE_FORMAT"],
@@ -1063,7 +1076,7 @@ def fetch_image_repository(session, fqn: FQN):
 
     data = repos[0]
 
-    return {"name": fqn.name, "owner": data["owner"]}
+    return {"name": fqn.name, "owner": _get_owner_identifier(data)}
 
 
 def fetch_materialized_view(session, fqn: FQN):
@@ -1078,7 +1091,7 @@ def fetch_materialized_view(session, fqn: FQN):
 
     return {
         "name": fqn.name,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "secure": data["is_secure"] == "true",
         "columns": columns,
         "cluster_by": _parse_cluster_keys(data["cluster_by"]),
@@ -1142,7 +1155,7 @@ def fetch_network_rule(session, fqn: FQN):
     data = show_result[0]
     return {
         "name": fqn.name,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "type": data["type"],
         "value_list": _parse_comma_separated_values(properties["value_list"]),
         "mode": data["mode"],
@@ -1165,7 +1178,7 @@ def fetch_notebook(session, fqn: FQN):
         "main_file": None if properties["main_file"] == "notebook_app.ipynb" else properties["main_file"],
         "query_warehouse": data["query_warehouse"],
         "comment": data["comment"],
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         # "version": data["version"],
     }
 
@@ -1215,7 +1228,7 @@ def fetch_packages_policy(session, fqn: FQN):
         "blocklist": _parse_packages(properties["blocklist"]),
         "additional_creation_blocklist": _parse_packages(properties["additional_creation_blocklist"]),
         "comment": data["comment"] or None,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -1264,7 +1277,7 @@ def fetch_pipe(session, fqn: FQN):
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "as_": data["definition"],
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "error_integration": data["error_integration"],
         # "aws_sns_topic": data["aws_sns_topic"],
         "integration": data["integration"],
@@ -1324,7 +1337,7 @@ def fetch_role(session, fqn: FQN):
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "comment": data["comment"] or None,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -1387,7 +1400,7 @@ def fetch_schema(session, fqn: FQN):
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "transient": "TRANSIENT" in options,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "managed_access": "MANAGED ACCESS" in options,
         "data_retention_time_in_days": int(data["retention_time"]),
         "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
@@ -1411,14 +1424,14 @@ def fetch_secret(session, fqn: FQN):
             "secret_type": data["secret_type"],
             "username": properties["username"],
             "comment": data["comment"] or None,
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
         }
     elif data["secret_type"] == "GENERIC_STRING":
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "secret_type": data["secret_type"],
             "comment": data["comment"] or None,
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
         }
     elif data["secret_type"] == "OAUTH2":
         return {
@@ -1428,7 +1441,7 @@ def fetch_secret(session, fqn: FQN):
             "oauth_scopes": data["oauth_scopes"],
             "oauth_refresh_token_expiry_time": _convert_to_gmt(properties["oauth_refresh_token_expiry_time"]),
             "comment": data["comment"] or None,
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
         }
     else:
         raise NotImplementedError(f"Unsupported secret type {data['secret_type']}")
@@ -1501,7 +1514,7 @@ def fetch_sequence(session, fqn: FQN):
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "start": data["next_value"],
         "increment": data["interval"],
         "comment": data["comment"] or None,
@@ -1529,7 +1542,7 @@ def fetch_service(session, fqn: FQN):
         "max_instances": data["max_instances"],
         "query_warehouse": data["query_warehouse"],
         "comment": data["comment"] or None,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -1545,7 +1558,7 @@ def fetch_share(session, fqn: FQN):
     data = shares[0]
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "comment": data["comment"] or None,
     }
 
@@ -1565,7 +1578,7 @@ def fetch_shared_database(session, fqn: FQN):
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "from_share": data["origin"],
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -1586,7 +1599,7 @@ def fetch_stage(session, fqn: FQN):
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "url": data["url"],
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
             "type": data["type"],
             "storage_integration": data["storage_integration"],
             "directory": {"enable": data["directory_enabled"] == "Y"},
@@ -1595,7 +1608,7 @@ def fetch_stage(session, fqn: FQN):
     elif data["type"] in ("INTERNAL", "INTERNAL NO CSE"):
         return {
             "name": _quote_snowflake_identifier(data["name"]),
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
             "type": "INTERNAL",
             "directory": {"enable": data["directory_enabled"] == "Y"},
             "comment": data["comment"] or None,
@@ -1676,7 +1689,7 @@ def fetch_stream(session, fqn: FQN):
             "comment": data["comment"] or None,
             "append_only": data["mode"] == "APPEND_ONLY",
             "on_table": data["table_name"],
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
         }
     elif data["source_type"] == "View":
         return {
@@ -1684,13 +1697,13 @@ def fetch_stream(session, fqn: FQN):
             "comment": data["comment"] or None,
             "append_only": data["mode"] == "APPEND_ONLY",
             "on_view": data["table_name"],
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
         }
     elif data["source_type"] == "Stage":
         return {
             "name": _quote_snowflake_identifier(data["name"]),
             "on_stage": data["table_name"],
-            "owner": data["owner"],
+            "owner": _get_owner_identifier(data),
             "comment": data["comment"] or None,
         }
     else:
@@ -1712,7 +1725,7 @@ def fetch_tag(session, fqn: FQN):
     data = tags[0]
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "comment": data["comment"] or None,
         "allowed_values": json.loads(data["allowed_values"]) if data["allowed_values"] else None,
     }
@@ -1736,7 +1749,7 @@ def fetch_task(session, fqn: FQN):
         "warehouse": data["warehouse"],
         "schedule": data["schedule"],
         "state": str(data["state"]).upper(),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "as_": task_details["definition"],
     }
 
@@ -1762,7 +1775,7 @@ def fetch_replication_group(session, fqn: FQN):
         "allowed_accounts": None if data["allowed_accounts"] == "" else data["allowed_accounts"].split(","),
         "allowed_databases": databases,
         "replication_schedule": data["replication_schedule"],
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -1776,7 +1789,7 @@ def fetch_resource_monitor(session, fqn: FQN):
     data = resource_monitors[0]
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "credit_quota": int(float(data["credit_quota"])) if data["credit_quota"] else None,
         "frequency": data["frequency"],
         "start_timestamp": _convert_to_gmt(data["start_time"], "%Y-%m-%d %H:%M"),
@@ -1855,7 +1868,7 @@ def fetch_table(session, fqn: FQN):
         "columns": columns,
         "cluster_by": _parse_cluster_keys(data["cluster_by"]),
         "transient": data["kind"] == "TRANSIENT",
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "comment": data["comment"] or None,
         "enable_schema_evolution": data["enable_schema_evolution"] == "Y",
         # "data_retention_time_in_days": int(data["retention_time"]),
@@ -1952,7 +1965,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         "default_secondary_roles": data["default_secondary_roles"] or None,
         "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
         "type": user_type,
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
     }
 
 
@@ -1978,7 +1991,7 @@ def fetch_view(session, fqn: FQN):
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "secure": data["is_secure"] == "true",
         "columns": columns,
         "change_tracking": data["change_tracking"] == "ON",
@@ -2011,7 +2024,7 @@ def fetch_warehouse(session, fqn: FQN):
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
-        "owner": data["owner"],
+        "owner": _get_owner_identifier(data),
         "warehouse_type": data["type"],
         "warehouse_size": str(WarehouseSize(data["size"])),
         # "max_cluster_count": data["max_cluster_count"],

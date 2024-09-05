@@ -1,7 +1,7 @@
 import difflib
 import sys
 import types
-from dataclasses import dataclass, fields, field
+from dataclasses import dataclass, field, fields
 from inspect import isclass
 from itertools import chain
 from typing import Any, Type, TypedDict, Union, get_args, get_origin
@@ -15,6 +15,7 @@ from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
 from ..props import Props as ResourceProps
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
+from ..role_ref import RoleRef
 from ..scope import (
     AccountScope,
     DatabaseScope,
@@ -71,18 +72,20 @@ def _coerce_resource_field(field_value, field_type):
     # No type checking or coercion for Any
     if field_type == Any:
         return field_value
-    elif field_type == str:
-        if not isinstance(field_value, str):
-            raise TypeError
-        return field_value
+
+    # elif field_type is str:
+    #     if not isinstance(field_value, str):
+    #         raise TypeError
+    #     return field_value
 
     # Recursively traverse lists and dicts
-    if get_origin(field_type) == list:
+    elif get_origin(field_type) is list:
         if not isinstance(field_value, list):
             raise TypeError
         list_element_type = get_args(field_type) or (str,)
         return [_coerce_resource_field(v, field_type=list_element_type[0]) for v in field_value]
-    elif get_origin(field_type) == dict:
+
+    elif get_origin(field_type) is dict:
         if not isinstance(field_value, dict):
             raise TypeError
         dict_types = get_args(field_type)
@@ -90,8 +93,11 @@ def _coerce_resource_field(field_value, field_type):
             raise RuntimeError(f"Unexpected field type {field_type}")
         return {k: _coerce_resource_field(v, field_type=dict_types[1]) for k, v in field_value.items()}
 
+    elif field_type is RoleRef:
+        return convert_role_ref(field_value)
+
     # Check for field_value's type in a Union
-    if get_origin(field_type) == Union:
+    elif get_origin(field_type) == Union:
         union_types = get_args(field_type)
         for union_type in union_types:
             expected_type = get_origin(union_type) or union_type
@@ -99,26 +105,21 @@ def _coerce_resource_field(field_value, field_type):
                 return _coerce_resource_field(field_value, field_type=expected_type)
         raise RuntimeError(f"Unexpected field type {field_type}")
 
-    if isinstance(field_type, str):
-        # Special case for Tag owner which has the type "Role" due to a circular import issue
-        for subclass in Resource.__subclasses__():
-            if subclass.__name__ == field_type:
-                field_type = subclass
-                break
-        else:
-            raise RuntimeError(f"Class for type {field_type} not found")
+    # Handle quoted type annotations
+    elif isinstance(field_type, str):
+        # This special case shows up when specifying Tag owner which has the type "Role"
+        # due to a circular import issue.
+        field_type = _get_resource_cls_for_str(field_type)
 
-    if not isclass(field_type):
-        # If we want to support quoted type annotations, this is the place to do it.
-        # eg owner "Role" = "SYSADMIN"
+    elif not isclass(field_type):
         raise RuntimeError(f"Unexpected field type {field_type}")
 
     # Coerce enums
-    if issubclass(field_type, ParseableEnum):
+    elif issubclass(field_type, ParseableEnum):
         return field_type(field_value)
 
     # Coerce args
-    elif field_type == Arg:
+    elif field_type is Arg:
         arg_dict = {
             "name": field_value["name"].upper(),
             "data_type": DataType(field_value["data_type"]),
@@ -128,7 +129,7 @@ def _coerce_resource_field(field_value, field_type):
         return arg_dict
 
     # Coerce returns
-    elif field_type == Returns:
+    elif field_type is Returns:
         returns_dict = {
             "data_type": DataType(field_value["data_type"]),
             "metadata": field_value["metadata"],
@@ -140,11 +141,14 @@ def _coerce_resource_field(field_value, field_type):
     # Coerce resources
     elif issubclass(field_type, Resource):
         return convert_to_resource(field_type, field_value)
-    elif field_type == ResourceName:
+    elif field_type is ResourceName:
         return ResourceName(field_value)
-    elif field_type == ResourceTags:
+    elif field_type is ResourceTags:
         return ResourceTags(field_value)
     else:
+        # Typecheck all other field types (str, int, etc.)
+        if not isinstance(field_value, field_type):
+            raise TypeError
         return field_value
 
 
@@ -486,8 +490,14 @@ class NamedResource:
     >>> tbl = Table(name="DB.SCHEMA.TBL")
     """
 
-    def __init__(self, name: str, **kwargs):
-        name = str(name)
+    def __init__(self, name: Union[str, ResourceName], **kwargs):
+        if not isinstance(name, (str, ResourceName)):
+            raise TypeError(f"Expected str or ResourceName for name, got {name} ({type(name).__name__}) instead")
+
+        if isinstance(name, ResourceName):
+            self._name = name
+            super().__init__(**kwargs)
+            return
 
         if isinstance(self.scope, AccountScope):
             self._name = ResourceName(name)
@@ -569,7 +579,17 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
 
 
 def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource, ResourceName]) -> Resource:
-    """Convert a resource descriptor to a resource instance"""
+    """
+    This function helps provide flexibility to users on how Resource fields are set.
+    The most common use case is to allow a user to pass in a string of the name of a resource without
+    the need to specify the resource type.
+
+    For example:
+    >>> schema = Schema(name="my_schema", owner="some_role")
+
+    Another use case is to allow a user to pass in simple Python data structures for things like table columns.
+    >>> table = Table(name='my_table', columns=[{'name': 'id', 'data_type': 'int'}])
+    """
     if isinstance(resource_or_descriptor, str) or isinstance(resource_or_descriptor, ResourceName):
         return ResourcePointer(name=resource_or_descriptor, resource_type=cls.resource_type)
     elif isinstance(resource_or_descriptor, dict):
@@ -580,19 +600,51 @@ def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, 
         # 2. A dict representing a column or column-like object
         # Example:
         #   table = Table(name='my_table', columns=[{'name': 'id', 'data_type': 'int'}])
-
-        # if cls.__name__ == "Column":
-        #     return cls(**resource_or_descriptor)
         if cls.serialize_inline:
             return cls(**resource_or_descriptor)
         else:
+            # This isn't intended to be used by users. This handles the case when a
+            # ResourcePointer is deserialized and re-serialized.
             return ResourcePointer(**resource_or_descriptor, resource_type=cls.resource_type)
     elif isinstance(resource_or_descriptor, cls):
+        # We are expecting an instance of type cls. If it's a match, return it.
         return resource_or_descriptor
     elif isinstance(resource_or_descriptor, ResourcePointer):
         if resource_or_descriptor.resource_type == cls.resource_type:
             return resource_or_descriptor
         else:
-            raise ValueError(f"Unexpected resource type {resource_or_descriptor}")
+            # raise ValueError(f"Unexpected resource type {resource_or_descriptor} for {cls}")
+            raise TypeError
     else:
-        raise ValueError(f"Unexpected resource descriptor {resource_or_descriptor}")
+        # raise ValueError(f"Unexpected object {resource_or_descriptor} for {cls}")
+        raise TypeError
+
+
+def convert_role_ref(role_ref: RoleRef) -> Resource:
+    if role_ref.__class__.__name__ == "Role":
+        return role_ref
+    elif role_ref.__class__.__name__ == "DatabaseRole":
+        return role_ref
+    elif isinstance(role_ref, ResourcePointer) and role_ref.resource_type in (
+        ResourceType.DATABASE_ROLE,
+        ResourceType.ROLE,
+    ):
+        return role_ref
+    elif isinstance(role_ref, str):
+        if role_ref == "":
+            return ResourcePointer(name="", resource_type=ResourceType.ROLE)
+
+        identifier = parse_identifier(role_ref, is_db_scoped=True)
+        if "database" in identifier:
+            return ResourcePointer(name=identifier["name"], resource_type=ResourceType.DATABASE_ROLE)
+        else:
+            return ResourcePointer(name=identifier["name"], resource_type=ResourceType.ROLE)
+    else:
+        raise TypeError
+
+
+def _get_resource_cls_for_str(resource_cls_str: str) -> Type[Resource]:
+    for subclass in Resource.__subclasses__():
+        if subclass.__name__ == resource_cls_str:
+            return subclass
+    raise RuntimeError(f"Resource class for type {resource_cls_str} not found")

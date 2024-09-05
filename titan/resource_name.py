@@ -36,7 +36,7 @@ def _name_should_be_quoted(name: str) -> bool:
 class ResourceName:
     def __init__(self, name: Union[str, "ResourceName"]) -> None:
         if not isinstance(name, (str, ResourceName)):
-            raise ValueError(f"ResourceName must be a string or ResourceName, got {type(name)}")
+            raise RuntimeError(f"ResourceName must be a string or ResourceName, got {type(name)}")
 
         if isinstance(name, ResourceName):
             self._name = name._name
@@ -75,15 +75,6 @@ class ResourceName:
             return self._name.upper() == other._name
         else:
             raise ValueError("Cannot compare ResourceName with a non-ResourceName")
-
-    # @classmethod
-    # def from_snowflake_metadata(cls, name: str) -> "ResourceName":
-    #     if name.startswith('"') and name.endswith('"'):
-    #         raise RuntimeError(f"{name} is not from snowflake metadata")
-    #     if re.match(r"^[A-Z_][A-Z0-9_]*$", name):
-    #         return cls(name)
-    #     else:
-    #         return cls(f'"{name}"')
 
     def upper(self):
         return self

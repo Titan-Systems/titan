@@ -9,6 +9,7 @@ from tests.helpers import get_json_fixtures
 
 from titan.resources import Resource
 from titan.resource_name import ResourceName
+from titan.role_ref import RoleRef
 
 JSON_FIXTURES = list(get_json_fixtures())
 
@@ -24,11 +25,13 @@ def resource(request):
 
 
 def _resource_field_type_is_resource(field):
-    if isinstance(field.type, str) and field.name == "owner" and field.type == "Role":
+    if field.type is RoleRef:
+        return True
+    elif isinstance(field.type, str) and field.name == "owner" and field.type == "Role":
         return True
     elif issubclass(field.type, Resource):
         return True
-    elif get_origin(field.type) == list and issubclass(get_args(field.type)[0], Resource):
+    elif get_origin(field.type) is list and issubclass(get_args(field.type)[0], Resource):
         return True
 
     return False

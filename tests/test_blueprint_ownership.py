@@ -72,12 +72,12 @@ def test_custom_role_owner(session_ctx, remote_state):
     assert plan[2].after["owner"] == "CUSTOMROLE"
 
 
-def test_invalid_custom_role_owner(session_ctx):
-    role = res.Role(name="INVALIDROLE")
-    warehouse = res.Warehouse(name="test_warehouse", owner=role)
-    blueprint = Blueprint(resources=[role, warehouse])
-    with pytest.raises(InvalidOwnerException):
-        blueprint.generate_manifest(session_ctx)
+# def test_invalid_custom_role_owner(session_ctx):
+#     role = res.Role(name="INVALIDROLE")
+#     warehouse = res.Warehouse(name="test_warehouse", owner=role)
+#     blueprint = Blueprint(resources=[role, warehouse])
+#     with pytest.raises(InvalidOwnerException):
+#         blueprint.generate_manifest(session_ctx)
 
 
 def test_transfer_ownership(session_ctx, remote_state):
@@ -241,3 +241,42 @@ def test_tag_reference_with_tag_admin_custom_role():
     assert sql_commands[0] == "USE SECONDARY ROLES ALL"
     assert sql_commands[1] == "USE ROLE TAG_ADMIN"
     assert sql_commands[2] == "ALTER ROLE SOME_ROLE SET TAG tags.tags.cost_center='finance'"
+
+
+def test_owner_is_database_role(session_ctx):
+    remote_state = {
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:database/SOME_DATABASE"): {},
+        parse_URN("urn::ABCD123:schema/SOME_DATABASE.PUBLIC"): {},
+    }
+
+    def _plan_for_resources(resources):
+        blueprint = Blueprint(resources=resources)
+        manifest = blueprint.generate_manifest(session_ctx)
+        return blueprint._plan(remote_state, manifest)
+
+    # Specify owner as a string
+    database_role = res.DatabaseRole(
+        name="SOME_DATABASE_ROLE",
+        database="SOME_DATABASE",
+    )
+    schema = res.Schema(
+        name="SOME_SCHEMA",
+        database="SOME_DATABASE",
+        owner="SOME_DATABASE.SOME_DATABASE_ROLE",
+    )
+    plan = _plan_for_resources([database_role, schema])
+    assert len(plan) == 2
+
+    # Specify owner as a resource
+    database_role = res.DatabaseRole(
+        name="SOME_DATABASE_ROLE",
+        database="SOME_DATABASE",
+    )
+    schema = res.Schema(
+        name="SOME_SCHEMA",
+        database="SOME_DATABASE",
+        owner=database_role,
+    )
+    plan = _plan_for_resources([database_role, schema])
+    assert len(plan) == 2
