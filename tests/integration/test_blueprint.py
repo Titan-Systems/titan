@@ -135,7 +135,7 @@ def test_blueprint_modify_resource(cursor, suffix, marked_for_cleanup):
     assert sql_commands == [
         "USE SECONDARY ROLES ALL",
         f"USE ROLE {TEST_ROLE}",
-        f"ALTER WAREHOUSE MODIFY_ME_{suffix} SET auto_suspend = 60",
+        f"ALTER WAREHOUSE MODIFY_ME_{suffix} SET AUTO_SUSPEND = 60",
     ]
 
 
@@ -197,7 +197,7 @@ def test_blueprint_plan_sql(cursor, user):
     assert sql_commands == [
         "USE SECONDARY ROLES ALL",
         "USE ROLE ACCOUNTADMIN",
-        f"ALTER USER {user.name} SET display_name = 'new_display_name'",
+        f"ALTER USER {user.name} SET DISPLAY_NAME = $$new_display_name$$",
     ]
 
 

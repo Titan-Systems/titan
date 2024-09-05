@@ -245,19 +245,6 @@ def print_plan(plan: Plan):
     print(dump_plan(plan, format="text"))
 
 
-# def plan_sql(plan: Plan) -> list[str]:
-#     sql_commands = []
-#     for change in plan:
-#         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-#         if change.action == Action.ADD:
-#             sql_commands.append(lifecycle.create_resource(change.urn, change.after, props))
-#         elif change.action == Action.CHANGE:
-#             sql_commands.append(lifecycle.update_resource(change.urn, change.delta))
-#         elif change.action == Action.REMOVE:
-#             sql_commands.append(lifecycle.drop_resource(change.urn, change.before))
-#     return sql_commands
-
-
 def print_diffs(diffs):
     for action, target, deltas in diffs:
         print(f"[{action}]", target)
@@ -1083,7 +1070,8 @@ def sql_commands_for_change(
                 )
             )
     elif change.action == Action.CHANGE:
-        change_cmd = lifecycle.update_resource(change.urn, change.delta)
+        props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+        change_cmd = lifecycle.update_resource(change.urn, change.delta, props)
     elif change.action == Action.REMOVE:
         change_cmd = lifecycle.drop_resource(
             change.urn,
