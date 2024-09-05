@@ -452,7 +452,17 @@ def _show_grants_to_role(session, role: str, cacheable: bool = False) -> list:
 
 
 def fetch_resource(session, urn: URN) -> Optional[dict]:
-    return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
+    try:
+        return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
+    except ProgrammingError as err:
+        # This try/catch block fixes a cache-inconsistency issue where _show_resources returns the object as it existed at the start of the cache window,
+        # but _show_resource_parameters returns the object as it exists right now. If the object was dropped in between the cache window and the query execution,
+        # we should assume the database no longer exists.
+
+        # This is only likely to happen for long-running commands like export
+        if err.errno == DOES_NOT_EXIST_ERR:
+            return None
+        raise
 
 
 def fetch_account_locator(session):
@@ -725,17 +735,7 @@ def fetch_database(session, fqn: FQN):
         return None
 
     options = options_result_to_list(data["options"])
-    try:
-        # This try/catch block fixes a cache-inconsistency issue where _show_resources returns the object as it existed at the start of the cache window,
-        # but _show_resource_parameters returns the object as it exists right now. If the object was dropped in between the cache window and the query execution,
-        # we should assume the database no longer exists.
-
-        # This is only likely to happen for long-running commands like export
-        params = _show_resource_parameters(session, "DATABASE", fqn)
-    except ProgrammingError as err:
-        if err.errno == DOES_NOT_EXIST_ERR:
-            return None
-        raise
+    params = _show_resource_parameters(session, "DATABASE", fqn)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
@@ -929,7 +929,12 @@ def fetch_function(session, fqn: FQN):
 
     data = udfs[0]
     inputs, output = data["arguments"].split(" RETURN ")
-    desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+    try:
+        desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+    except ProgrammingError as err:
+        if err.errno == DOES_NOT_EXIST_ERR:
+            return None
+        raise
     properties = _desc_result_to_dict(desc_result)
     owner = _fetch_owner(session, "FUNCTION", fqn)
 
@@ -1405,17 +1410,7 @@ def fetch_schema(session, fqn: FQN):
     data = show_result[0]
 
     options = options_result_to_list(data["options"])
-    try:
-        # This try/catch block fixes a cache-inconsistency issue where _show_resources returns the object as it existed at the start of the cache window,
-        # but _show_resource_parameters returns the object as it exists right now. If the object was dropped in between the cache window and the query execution,
-        # we should assume the database no longer exists.
-
-        # This is only likely to happen for long-running commands like export
-        params = _show_resource_parameters(session, "SCHEMA", fqn)
-    except ProgrammingError as err:
-        if err.errno == DOES_NOT_EXIST_ERR:
-            return None
-        raise
+    params = _show_resource_parameters(session, "SCHEMA", fqn)
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
