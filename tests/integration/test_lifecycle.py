@@ -13,6 +13,8 @@ from titan.scope import DatabaseScope, SchemaScope
 JSON_FIXTURES = list(get_json_fixtures())
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
+pytestmark = pytest.mark.requires_snowflake
+
 
 @pytest.fixture(
     params=JSON_FIXTURES,
@@ -26,7 +28,6 @@ def resource(request):
     yield res
 
 
-@pytest.mark.requires_snowflake
 def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
     lifecycle_db = f"LIFECYCLE_DB_{suffix}"
     cursor.execute("USE ROLE SYSADMIN")
