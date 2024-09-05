@@ -1,15 +1,14 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import ResourceType
-from ..resource_name import ResourceName
-from ..scope import AccountScope
-
 from ..props import (
     Props,
     StringProp,
 )
+from ..resource_name import ResourceName
+from ..scope import AccountScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 @dataclass(unsafe_hash=True)

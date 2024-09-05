@@ -1,19 +1,19 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .database import Database
-from .role import Role
-from .share import Share
-from ..resource_name import ResourceName
 from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
-    FlagProp,
     EnumListProp,
+    FlagProp,
     IdentifierListProp,
     Props,
     StringProp,
 )
+from ..resource_name import ResourceName
 from ..scope import AccountScope
+from .database import Database
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
+from .share import Share
 
 
 class ObjectType(ParseableEnum):

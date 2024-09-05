@@ -11,16 +11,16 @@ from ..props import (
     TagsProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
 class _View(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     secure: bool = False
     volatile: bool = None
     recursive: bool = None

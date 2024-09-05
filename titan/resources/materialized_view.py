@@ -11,17 +11,17 @@ from ..props import (
     TagsProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .column import Column
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 
 
 @dataclass(unsafe_hash=True)
 class _MaterializedView(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     secure: bool = False
     columns: list[Column] = field(default_factory=None, metadata={"ignore_changes": True})
     copy_grants: bool = False

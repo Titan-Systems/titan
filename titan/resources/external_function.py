@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from .resource import Resource, ResourceSpec, Arg, NamedResource
-from .role import Role
+from ..role_ref import RoleRef
 from ..enums import DataType, NullHandling, Volatility, ResourceType
 from ..scope import SchemaScope
 from ..resource_name import ResourceName
@@ -36,7 +36,7 @@ class _ExternalFunction(ResourceSpec):
     compression: str = None
     request_translator: str = None
     response_translator: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class ExternalFunction(NamedResource, Resource):

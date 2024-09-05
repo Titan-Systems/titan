@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import BinaryFormat, Compression, FileType, ResourceType
 from ..props import (
     BoolProp,
@@ -12,13 +10,15 @@ from ..props import (
     StringProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
 class _CSVFileFormat(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     type: FileType = "CSV"
     compression: Compression = "AUTO"
     record_delimiter: str = "\n"
@@ -195,7 +195,7 @@ class CSVFileFormat(NamedResource, Resource):
 @dataclass(unsafe_hash=True)
 class _JSONFileFormat(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     type: FileType = FileType.JSON
     compression: Compression = Compression.AUTO
     date_format: str = "AUTO"
@@ -371,7 +371,7 @@ class JSONFileFormat(NamedResource, Resource):
 @dataclass(unsafe_hash=True)
 class _ParquetFileFormat(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     type: FileType = FileType.PARQUET
     compression: Compression = Compression.AUTO
     binary_as_text: bool = True

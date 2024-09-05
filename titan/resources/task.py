@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
-from .warehouse import Warehouse
-from ..enums import ResourceType, WarehouseSize, TaskState
+from ..enums import ResourceType, TaskState, WarehouseSize
 from ..props import (
     BoolProp,
     EnumProp,
@@ -17,13 +14,16 @@ from ..props import (
     StringProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .warehouse import Warehouse
 
 
 @dataclass(unsafe_hash=True)
 class _Task(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     warehouse: Warehouse = None
     user_task_managed_initial_warehouse_size: WarehouseSize = None
     schedule: str = None

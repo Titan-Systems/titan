@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Union
 
-from ..enums import DataType, Language, NullHandling, ResourceType, Volatility
+from ..enums import Language, NullHandling, ResourceType, Volatility
 from ..identifiers import FQN
 from ..props import (
     ArgsProp,
@@ -15,9 +15,9 @@ from ..props import (
     StringProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import Arg, NamedResource, Resource, ResourceSpec
-from .role import Role
 
 
 @dataclass(unsafe_hash=True)
@@ -33,7 +33,7 @@ class _JavascriptUDF(ResourceSpec):
     handler: str = None
     imports: list[str] = None
     null_handling: NullHandling = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     packages: list[str] = None
     runtime_version: str = None
     secrets: dict[str, str] = None
@@ -161,7 +161,7 @@ class _PythonUDF(ResourceSpec):
     external_access_integrations: list[str] = None
     imports: list[str] = None
     null_handling: NullHandling = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     packages: list[str] = None
     secrets: dict[str, str] = None
     secure: bool = False

@@ -5,13 +5,13 @@ from typing import Any, Union
 from inflection import singularize
 
 from ..enums import ParseableEnum, ResourceType
-from ..identifiers import FQN, resource_label_for_type, resource_type_for_label, parse_FQN
+from ..identifiers import FQN, parse_FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant, format_collection_string
 from ..privs import _all_privs_for_resource_type
 from ..props import FlagProp, IdentifierProp, Props
 from ..resource_name import ResourceName
 from ..scope import AccountScope
-from .resource import Resource, ResourcePointer, ResourceSpec, NamedResource
+from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
 from .role import Role
 from .user import User
 

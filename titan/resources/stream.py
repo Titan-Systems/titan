@@ -3,10 +3,9 @@ from dataclasses import dataclass, field
 from ..enums import ParseableEnum, ResourceType
 from ..props import BoolProp, FlagProp, IdentifierProp, Props, StringProp, TimeTravelProp
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
-
-from .role import Role
 from .table import Table
 from .view import View
 
@@ -22,7 +21,7 @@ class StreamType(ParseableEnum):
 class _TableStream(ResourceSpec):
     name: ResourceName
     on_table: Table
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     at: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
     before: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
@@ -200,7 +199,7 @@ class TableStream(NamedResource, Resource):
 class _StageStream(ResourceSpec):
     name: ResourceName
     on_stage: str
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
 
@@ -277,7 +276,7 @@ class StageStream(NamedResource, Resource):
 class _ViewStream(ResourceSpec):
     name: ResourceName
     on_view: View
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     at: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
     before: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})

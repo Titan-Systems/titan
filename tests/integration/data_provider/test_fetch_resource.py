@@ -1179,3 +1179,18 @@ def test_fetch_table(cursor, suffix, marked_for_cleanup):
     result = strip_nones_and_unfetchable(res.Table.spec, result)
     data = strip_nones_and_unfetchable(res.Table.spec, table.to_dict())
     assert result == data
+
+
+def test_fetch_image_repository(cursor, suffix, marked_for_cleanup):
+    repository = res.ImageRepository(
+        name=f"SOME_IMAGE_REPOSITORY_{suffix}",
+        owner=TEST_ROLE,
+    )
+    cursor.execute(repository.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(repository)
+
+    result = safe_fetch(cursor, repository.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.ImageRepository.spec, result)
+    data = strip_nones_and_unfetchable(res.ImageRepository.spec, repository.to_dict())
+    assert result == data

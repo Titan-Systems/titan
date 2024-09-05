@@ -11,9 +11,9 @@ from ..props import (
     TagsProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 
 
@@ -59,7 +59,7 @@ class EncryptionType(ParseableEnum):
 @dataclass(unsafe_hash=True)
 class _InternalStage(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     type: StageType = StageType.INTERNAL
     encryption: dict[str, EncryptionType] = field(default_factory=None, metadata={"fetchable": False})
     directory: dict[str, bool] = None
@@ -170,7 +170,7 @@ class InternalStage(NamedResource, TaggableResource, Resource):
 class _ExternalStage(ResourceSpec):
     name: ResourceName
     url: str
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
     storage_integration: str = None
     credentials: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})

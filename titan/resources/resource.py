@@ -105,12 +105,6 @@ def _coerce_resource_field(field_value, field_type):
                 return _coerce_resource_field(field_value, field_type=expected_type)
         raise RuntimeError(f"Unexpected field type {field_type}")
 
-    # Handle quoted type annotations
-    elif isinstance(field_type, str):
-        # This special case shows up when specifying Tag owner which has the type "Role"
-        # due to a circular import issue.
-        field_type = _get_resource_cls_for_str(field_type)
-
     elif not isclass(field_type):
         raise RuntimeError(f"Unexpected field type {field_type}")
 
@@ -613,10 +607,8 @@ def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, 
         if resource_or_descriptor.resource_type == cls.resource_type:
             return resource_or_descriptor
         else:
-            # raise ValueError(f"Unexpected resource type {resource_or_descriptor} for {cls}")
             raise TypeError
     else:
-        # raise ValueError(f"Unexpected object {resource_or_descriptor} for {cls}")
         raise TypeError
 
 
@@ -636,15 +628,8 @@ def convert_role_ref(role_ref: RoleRef) -> Resource:
 
         identifier = parse_identifier(role_ref, is_db_scoped=True)
         if "database" in identifier:
-            return ResourcePointer(name=identifier["name"], resource_type=ResourceType.DATABASE_ROLE)
+            return ResourcePointer(name=role_ref, resource_type=ResourceType.DATABASE_ROLE)
         else:
-            return ResourcePointer(name=identifier["name"], resource_type=ResourceType.ROLE)
+            return ResourcePointer(name=role_ref, resource_type=ResourceType.ROLE)
     else:
         raise TypeError
-
-
-def _get_resource_cls_for_str(resource_cls_str: str) -> Type[Resource]:
-    for subclass in Resource.__subclasses__():
-        if subclass.__name__ == resource_cls_str:
-            return subclass
-    raise RuntimeError(f"Resource class for type {resource_cls_str} not found")

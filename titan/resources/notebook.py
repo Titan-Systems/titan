@@ -10,8 +10,7 @@ from ..props import (
 from ..resource_name import ResourceName
 from ..scope import SchemaScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
-from .tag import TaggableResource
+from ..role_ref import RoleRef
 from .warehouse import Warehouse
 
 # TODO: I can't get version to work at all with Snowflake, I suspect it's buggy.
@@ -26,7 +25,7 @@ class _Notebook(ResourceSpec):
     comment: str = None
     default_version: str = None
     query_warehouse: Warehouse = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class Notebook(NamedResource, Resource):
@@ -52,7 +51,7 @@ class Notebook(NamedResource, Resource):
         comment: str = None,
         default_version: str = None,
         query_warehouse: str = None,
-        owner: Role = "SYSADMIN",
+        owner: str = "SYSADMIN",
         **kwargs,
     ):
         super().__init__(name, **kwargs)

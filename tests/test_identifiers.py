@@ -1,3 +1,5 @@
+import pytest
+
 import pyparsing as pp
 
 from titan import resources as res
@@ -88,3 +90,8 @@ def test_parse_fully_qualified_schema():
     # assert tbl.name == "TABLE"
     # assert tbl.container.name == "SCHEMA"
     # assert tbl.container.container.name == "DB"
+
+
+def test_resource_name_type_checking():
+    with pytest.raises(RuntimeError):
+        ResourceName(111)

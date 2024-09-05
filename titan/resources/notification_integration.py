@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 
-
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import ParseableEnum, ResourceType
-from ..props import Props, StringProp, BoolProp, EnumProp, StringListProp
-from ..scope import AccountScope
+from ..props import BoolProp, EnumProp, Props, StringListProp, StringProp
 from ..resource_name import ResourceName
+from ..scope import AccountScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 class NotificationType(ParseableEnum):

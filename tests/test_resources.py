@@ -94,6 +94,11 @@ def test_resource_cased_quoted_name_serialization():
     assert task.fqn.name == name_str_quoted
 
 
+def test_resource_name_type_checking():
+    with pytest.raises(TypeError):
+        res.Task(name=111)
+
+
 def test_tags_definition():
     db = res.Database(name="DB", tags={"project": "test_deployment", "priority": "low"})
     assert db.tags is not None

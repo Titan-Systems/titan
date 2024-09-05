@@ -12,9 +12,9 @@ from ..props import (
     StringProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import Arg, NamedResource, Resource, ResourceSpec
-from .role import Role
 
 
 @dataclass(unsafe_hash=True)
@@ -33,7 +33,7 @@ class _PythonStoredProcedure(ResourceSpec):
     external_access_integrations: list = None
     imports: list = field(default_factory=None, metadata={"triggers_replacement": True})
     null_handling: NullHandling = NullHandling.CALLED_ON_NULL_INPUT
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     secure: bool = False
 
     def __post_init__(self):

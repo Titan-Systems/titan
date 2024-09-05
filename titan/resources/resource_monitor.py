@@ -1,17 +1,17 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import ParseableEnum, ResourceType
-from ..scope import AccountScope
-from ..resource_name import ResourceName
 from ..props import (
     EnumProp,
     IntProp,
     Props,
-    StringProp,
     StringListProp,
+    StringProp,
 )
+from ..resource_name import ResourceName
+from ..scope import AccountScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 class ResourceMonitorFrequency(ParseableEnum):

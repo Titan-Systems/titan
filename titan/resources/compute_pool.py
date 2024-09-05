@@ -1,17 +1,17 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import AccountEdition, ParseableEnum, ResourceType
 from ..props import (
-    IntProp,
-    StringProp,
     BoolProp,
-    Props,
     EnumProp,
+    IntProp,
+    Props,
+    StringProp,
 )
 from ..resource_name import ResourceName
 from ..scope import AccountScope
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 class InstanceFamily(ParseableEnum):

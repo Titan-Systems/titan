@@ -11,9 +11,9 @@ from ..props import (
     TagsProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 
 
@@ -28,7 +28,7 @@ class _EventTable(ResourceSpec):
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
     # row_access_policy: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class EventTable(NamedResource, TaggableResource, Resource):
@@ -109,7 +109,7 @@ class EventTable(NamedResource, TaggableResource, Resource):
         default_ddl_collation: str = None,
         copy_grants: bool = None,
         comment: str = None,
-        owner: Role = "SYSADMIN",
+        owner: str = "SYSADMIN",
         tags: dict[str, str] = None,
         **kwargs,
     ):

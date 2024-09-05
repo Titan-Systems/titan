@@ -1,16 +1,15 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import ResourceType
-from ..scope import SchemaScope
-from ..resource_name import ResourceName
-
 from ..props import (
+    IntProp,
     Props,
     StringProp,
-    IntProp,
 )
+from ..resource_name import ResourceName
+from ..role_ref import RoleRef
+from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
@@ -28,7 +27,7 @@ class _PasswordPolicy(ResourceSpec):
     password_lockout_time_mins: int = 15
     password_history: int = 0
     comment: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class PasswordPolicy(NamedResource, Resource):

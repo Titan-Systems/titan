@@ -1,13 +1,11 @@
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import ParseableEnum, ResourceType
+from ..props import BoolProp, EnumProp, Props, StringListProp, StringProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
-
-
-from ..props import Props, EnumProp, StringProp, BoolProp, StringListProp
+from .resource import NamedResource, Resource, ResourceSpec
+from .role import Role
 
 
 class ApiProvider(ParseableEnum):
