@@ -8,9 +8,9 @@ from ..props import (
     StringProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
-from .resource import Resource, NamedResource, ResourceSpec
-from .role import Role
+from .resource import NamedResource, Resource, ResourceSpec
 
 
 class SecretType(ParseableEnum):
@@ -26,7 +26,7 @@ class _PasswordSecret(ResourceSpec):
     username: str = None
     password: str = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class PasswordSecret(NamedResource, Resource):
@@ -106,7 +106,7 @@ class _GenericSecret(ResourceSpec):
     secret_type: SecretType = SecretType.GENERIC_STRING
     secret_string: str = field(default_factory=None, metadata={"fetchable": False})
     comment: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class GenericSecret(NamedResource, Resource):
@@ -183,7 +183,7 @@ class _OAuthSecret(ResourceSpec):
     oauth_refresh_token: str = field(default_factory=None, metadata={"fetchable": False})
     oauth_refresh_token_expiry_time: str = None
     comment: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
     def __post_init__(self):
         super().__post_init__()

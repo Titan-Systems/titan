@@ -6,7 +6,7 @@ from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import DatabaseScope
 from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
-from .role import Role
+from ..role_ref import RoleRef
 from .tag import TaggableResource
 
 
@@ -18,7 +18,7 @@ class _Schema(ResourceSpec):
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
     default_ddl_collation: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     comment: str = None
 
     def __post_init__(self):

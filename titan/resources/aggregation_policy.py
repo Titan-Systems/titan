@@ -1,16 +1,14 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
-from ..enums import ResourceType
-from ..resource_name import ResourceName
-from ..scope import SchemaScope
-from ..enums import AccountEdition
-
+from ..enums import AccountEdition, ResourceType
 from ..props import (
     Props,
     QueryProp,
 )
+from ..resource_name import ResourceName
+from ..role_ref import RoleRef
+from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
@@ -18,7 +16,7 @@ class _AggregationPolicy(ResourceSpec):
     name: ResourceName
     body: str
     # comment: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 # TODO:

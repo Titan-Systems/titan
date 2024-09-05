@@ -710,11 +710,9 @@ class Blueprint:
                 if resource._data.owner.name == "":
                     continue
 
-                # Create the ownership ref
+                # Require that a resource's owner role exists in remote state or has been added to the blueprint
                 resource.requires(resource._data.owner)
 
-                # If the resource owner is a custom role, either it must already exist and be in available_roles
-                # or we must plan to grant it to the current session
                 if resource._data.owner.name not in session_ctx["available_roles"]:
                     for role_grant in self._root.items(ResourceType.ROLE_GRANT):
                         if role_grant.role.name != resource._data.owner.name:
@@ -725,10 +723,12 @@ class Blueprint:
                             continue
                         resource.requires(role_grant)
                         break
-                    else:
-                        raise InvalidOwnerException(
-                            f"Blueprint resource {resource} owner {resource._data.owner} must be granted to the current session"
-                        )
+                    # It's non-trivial to determine if an owner role is available in the current session because
+                    # database roles aren't explicitly available in the session context
+                    # else:
+                    #     raise InvalidOwnerException(
+                    #         f"Blueprint resource {resource} owner {resource._data.owner} must be granted to the current session"
+                    #     )
 
     def _create_grandparent_refs(self):
         for resource in _walk(self._root):

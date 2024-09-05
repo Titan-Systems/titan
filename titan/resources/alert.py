@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from ..enums import ResourceType
 from ..props import AlertConditionProp, Props, QueryProp, StringProp, TagsProp
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 from .warehouse import Warehouse
 
@@ -17,7 +17,7 @@ class _Alert(ResourceSpec):
     schedule: str
     condition: str
     then: str
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     comment: str = None
 
 

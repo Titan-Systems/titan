@@ -3,9 +3,9 @@ from dataclasses import dataclass
 from ..enums import ParseableEnum, ResourceType
 from ..props import EnumProp, Props, StringListProp, StringProp
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 
 
 class AuthenticationMethods(ParseableEnum):
@@ -37,7 +37,7 @@ class _AuthenticationPolicy(ResourceSpec):
     client_types: list[ClientTypes] = None
     security_integrations: list[str] = None
     comment: str = None
-    owner: Role = "SECURITYADMIN"
+    owner: RoleRef = "SECURITYADMIN"
 
     def __post_init__(self):
         super().__post_init__()

@@ -8,10 +8,10 @@ from ..props import (
     TagsProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .column import Column
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 
 
@@ -19,7 +19,7 @@ from .tag import TaggableResource
 class _HybridTable(ResourceSpec):
     name: ResourceName
     columns: list[Column]
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     comment: str = None
 
     def __post_init__(self):

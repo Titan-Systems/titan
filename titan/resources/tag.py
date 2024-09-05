@@ -1,22 +1,20 @@
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from ..enums import AccountEdition, ResourceType
 from ..identifiers import FQN
 from ..props import Props, StringListProp, StringProp
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
+from ..role_ref import RoleRef
 from ..scope import AccountScope, SchemaScope
 from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
-
-if TYPE_CHECKING:
-    from .role import Role
 
 
 @dataclass(unsafe_hash=True)
 class _Tag(ResourceSpec):
     name: ResourceName
-    owner: "Role" = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     comment: str = None
     allowed_values: list = None
 

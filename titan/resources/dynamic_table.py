@@ -11,9 +11,9 @@ from ..props import (
     TagsProp,
 )
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope, TableScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 from .warehouse import Warehouse
 
@@ -67,7 +67,7 @@ class _DynamicTable(ResourceSpec):
     refresh_mode: RefreshMode = RefreshMode.AUTO
     initialize: InitializeBehavior = InitializeBehavior.ON_CREATE
     comment: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class DynamicTable(NamedResource, TaggableResource, Resource):

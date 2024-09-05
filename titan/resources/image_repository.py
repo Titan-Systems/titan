@@ -1,17 +1,17 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import AccountEdition, ResourceType
 from ..props import Props
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
 class _ImageRepository(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
 
 class ImageRepository(NamedResource, Resource):

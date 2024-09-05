@@ -212,14 +212,6 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert changes[7] == "GRANT OWNERSHIP ON DATABASE DB TO ROLE SOME_ROLE COPY CURRENT GRANTS"
 
 
-def test_blueprint_resource_owned_by_plan_role_without_grant(session_ctx):
-    role = res.Role("SOME_ROLE")
-    db = res.Database("DB", owner=role)
-    blueprint = Blueprint(name="blueprint", resources=[db, role])
-    with pytest.raises(InvalidOwnerException):
-        blueprint.generate_manifest(session_ctx)
-
-
 def test_blueprint_deduplicate_resources(session_ctx, remote_state):
     blueprint = Blueprint(
         name="blueprint",

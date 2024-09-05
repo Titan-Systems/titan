@@ -13,10 +13,10 @@ from ..props import (
     StringProp,
     TagsProp,
 )
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
 from .column import Column
 from .resource import NamedResource, Resource, ResourceName, ResourceSpec
-from .role import Role
 from .tag import TaggableResource
 
 
@@ -35,7 +35,7 @@ class _Table(ResourceSpec):
     default_ddl_collation: str = None
     copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
     row_access_policy: dict[str, list] = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     comment: str = None
 
     def __post_init__(self):

@@ -5,19 +5,19 @@
 
 from dataclasses import dataclass, field
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import ResourceType
-from ..props import BoolProp, Props, StringProp, QueryProp
+from ..props import BoolProp, Props, QueryProp, StringProp
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
 
 
 @dataclass(unsafe_hash=True)
 class _Pipe(ResourceSpec):
     name: ResourceName
     as_: str
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     auto_ingest: bool = field(default_factory=None, metadata={"fetchable": False})
     error_integration: str = None
     aws_sns_topic: str = None

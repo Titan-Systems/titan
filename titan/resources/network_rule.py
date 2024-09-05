@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
-from .role import Role
 from ..enums import ParseableEnum, ResourceType
-from ..resource_name import ResourceName
-from ..scope import SchemaScope
 from ..props import (
     EnumProp,
     Props,
-    StringProp,
     StringListProp,
+    StringProp,
 )
+from ..resource_name import ResourceName
+from ..role_ref import RoleRef
+from ..scope import SchemaScope
+from .resource import NamedResource, Resource, ResourceSpec
 
 
 class NetworkIdentifierType(ParseableEnum):
@@ -33,7 +33,7 @@ class _NetworkRule(ResourceSpec):
     value_list: list[str] = None
     mode: NetworkRuleMode = NetworkRuleMode.INGRESS
     comment: str = None
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
 
     def __post_init__(self):
         super().__post_init__()
