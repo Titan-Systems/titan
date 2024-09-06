@@ -133,13 +133,15 @@ class UpdateResource(ResourceChange):
 
 @dataclass
 class TransferOwnership(ResourceChange):
-    owner: str
+    from_owner: str
+    to_owner: str
 
     def to_dict(self) -> dict:
         return {
             "action": "TRANSFER",
             "urn": str(self.urn),
-            "owner": self.owner,
+            "from_owner": self.from_owner,
+            "to_owner": self.to_owner,
         }
 
 
@@ -256,27 +258,38 @@ def dump_plan(plan: Plan, format: str = "json"):
 
         for change in plan:
             action_marker = ""
+            items = []
             if isinstance(change, CreateResource):
                 action_marker = "+"
+                items = change.after.items()
             elif isinstance(change, UpdateResource):
                 action_marker = "~"
+                items = change.delta.items()
             elif isinstance(change, DropResource):
                 action_marker = "-"
+                items = []
+            elif isinstance(change, TransferOwnership):
+                action_marker = "~"
+                items = [("owner", change.to_owner)]
+
             output += f"{action_marker} {change.urn}"
-            if isinstance(change, CreateResource):
+            if not isinstance(change, DropResource):
                 output += " {"
             output += "\n"
-            key_lengths = [len(key) for key in change.delta.keys()]
+
+            key_lengths = [len(key) for key, _ in items]
             max_key_length = max(key_lengths) if len(key_lengths) > 0 else 0
-            for key, value in change.delta.items():
+            for key, value in items:
                 if key.startswith("_"):
                     continue
                 new_value = _render_value(value)
                 before_value = ""
-                if key in change.before:
+                if isinstance(change, UpdateResource) and key in change.before:
                     before_value = _render_value(change.before[key]) + " -> "
+                elif isinstance(change, TransferOwnership):
+                    before_value = _render_value(change.from_owner) + " -> "
                 output += f"  {action_marker} {key:<{max_key_length}} = {before_value}{new_value}\n"
-            if isinstance(change, CreateResource):
+            if not isinstance(change, DropResource):
                 output += "}\n"
             output += "\n"
 
@@ -533,7 +546,7 @@ class Blueprint:
                     continue
                 if change_should_be_ignored:
                     continue
-                changes.append(TransferOwnership(urn, after["owner"]))
+                changes.append(TransferOwnership(urn, from_owner=before["owner"], to_owner=after["owner"]))
 
         for urn in marked_for_replacement:
             raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")

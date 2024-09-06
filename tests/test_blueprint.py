@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from titan import resources as res
@@ -6,6 +8,7 @@ from titan.blueprint import (
     CreateResource,
     DuplicateResourceException,
     compile_plan_to_sql,
+    dump_plan,
 )
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN, parse_URN
@@ -415,3 +418,138 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert sql[5] == f"USE ROLE {session_ctx['role']}"
     assert sql[6] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
     assert sql[7] == "GRANT OWNERSHIP ON DATABASE DB1 TO ROLE SOME_ROLE COPY CURRENT GRANTS"
+
+
+def test_blueprint_dump_plan_create(session_ctx, remote_state):
+    blueprint = Blueprint(resources=[res.Role("role1")])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    plan_json_str = dump_plan(plan, format="json")
+    assert json.loads(plan_json_str) == [
+        {
+            "action": "CREATE",
+            "urn": "urn::ABCD123:role/ROLE1",
+            "after": {"name": "ROLE1", "owner": "USERADMIN", "comment": None},
+        }
+    ]
+    plan_str = dump_plan(plan, format="text")
+    assert (
+        plan_str
+        == """
+» titan core
+» Plan: 1 to create, 0 to update, 0 to transfer, 0 to drop.
+
++ urn::ABCD123:role/ROLE1 {
+  + name    = "ROLE1"
+  + owner   = "USERADMIN"
+  + comment = None
+}
+
+"""
+    )
+
+
+def test_blueprint_dump_plan_update(session_ctx):
+    remote_state = {
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:role/ROLE1"): {
+            "name": "ROLE1",
+            "owner": "USERADMIN",
+            "comment": "old",
+        },
+    }
+    blueprint = Blueprint(resources=[res.Role("role1", comment="new")])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    plan_json_str = dump_plan(plan, format="json")
+    assert json.loads(plan_json_str) == [
+        {
+            "action": "UPDATE",
+            "urn": "urn::ABCD123:role/ROLE1",
+            "before": {"name": "ROLE1", "owner": "USERADMIN", "comment": "old"},
+            "after": {"name": "ROLE1", "owner": "USERADMIN", "comment": "new"},
+            "delta": {"comment": "new"},
+        }
+    ]
+    plan_str = dump_plan(plan, format="text")
+    assert (
+        plan_str
+        == """
+» titan core
+» Plan: 0 to create, 1 to update, 0 to transfer, 0 to drop.
+
+~ urn::ABCD123:role/ROLE1 {
+  ~ comment = "old" -> "new"
+}
+
+"""
+    )
+
+
+def test_blueprint_dump_plan_transfer(session_ctx):
+    remote_state = {
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:role/ROLE1"): {
+            "name": "ROLE1",
+            "owner": "ACCOUNTADMIN",
+            "comment": None,
+        },
+    }
+    blueprint = Blueprint(resources=[res.Role("role1", owner="USERADMIN")])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    plan_json_str = dump_plan(plan, format="json")
+    assert json.loads(plan_json_str) == [
+        {
+            "action": "TRANSFER",
+            "urn": "urn::ABCD123:role/ROLE1",
+            "from_owner": "ACCOUNTADMIN",
+            "to_owner": "USERADMIN",
+        }
+    ]
+    plan_str = dump_plan(plan, format="text")
+    assert (
+        plan_str
+        == """
+» titan core
+» Plan: 0 to create, 0 to update, 1 to transfer, 0 to drop.
+
+~ urn::ABCD123:role/ROLE1 {
+  ~ owner = "ACCOUNTADMIN" -> "USERADMIN"
+}
+
+"""
+    )
+
+
+def test_blueprint_dump_plan_drop(session_ctx):
+    remote_state = {
+        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:role/ROLE1"): {
+            "name": "ROLE1",
+            "owner": "ACCOUNTADMIN",
+            "comment": None,
+        },
+    }
+    blueprint = Blueprint(resources=[], run_mode="SYNC-ALL", allowlist=[ResourceType.ROLE])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    plan_json_str = dump_plan(plan, format="json")
+    assert json.loads(plan_json_str) == [
+        {
+            "action": "DROP",
+            "urn": "urn::ABCD123:role/ROLE1",
+            "before": {"name": "ROLE1", "owner": "ACCOUNTADMIN", "comment": None},
+        }
+    ]
+    plan_str = dump_plan(plan, format="text")
+    assert (
+        plan_str
+        == """
+» titan core
+» Plan: 0 to create, 0 to update, 0 to transfer, 1 to drop.
+
+- urn::ABCD123:role/ROLE1
+
+"""
+    )
