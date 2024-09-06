@@ -906,7 +906,7 @@ def owner_for_change(change: ResourceChange) -> Optional[str]:
     elif isinstance(change, DropResource) and "owner" in change.before:
         return change.before["owner"]
     elif isinstance(change, TransferOwnership):
-        return change.owner
+        return change.from_owner
     else:
         return None
 
