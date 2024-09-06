@@ -94,13 +94,14 @@ def test_transfer_ownership(session_ctx, remote_state):
         "comment": None,
     }
 
-    role = res.Role(name="test_role")
+    role = res.Role(name="test_role", owner="USERADMIN")
     blueprint = Blueprint(resources=[role])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], TransferOwnership)
-    assert plan[0].owner == "USERADMIN"
+    assert plan[0].from_owner == "ACCOUNTADMIN"
+    assert plan[0].to_owner == "USERADMIN"
 
 
 def test_transfer_ownership_with_changes(session_ctx, remote_state):
@@ -111,7 +112,7 @@ def test_transfer_ownership_with_changes(session_ctx, remote_state):
         "comment": None,
     }
 
-    role = res.Role(name="test_role", comment="This comment has been added")
+    role = res.Role(name="test_role", comment="This comment has been added", owner="USERADMIN")
     blueprint = Blueprint(resources=[role])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
@@ -119,7 +120,8 @@ def test_transfer_ownership_with_changes(session_ctx, remote_state):
     assert isinstance(plan[0], UpdateResource)
     assert plan[0].after["comment"] == "This comment has been added"
     assert isinstance(plan[1], TransferOwnership)
-    assert plan[1].owner == "USERADMIN"
+    assert plan[1].from_owner == "ACCOUNTADMIN"
+    assert plan[1].to_owner == "USERADMIN"
 
 
 def test_resource_has_custom_role_owner_with_create_priv(session_ctx, remote_state):

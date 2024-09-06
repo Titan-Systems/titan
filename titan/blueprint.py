@@ -880,22 +880,6 @@ class Blueprint:
                     raise err
         return actions_taken
 
-    # def destroy(self, session, manifest: Manifest = None):
-    #     session_ctx = data_provider.fetch_session(session)
-    #     manifest = manifest or self.generate_manifest(session_ctx)
-    #     for urn, data in manifest.items():
-
-    #         if isinstance(data, dict) and data.get("_pointer"):
-    #             continue
-    #         if urn.resource_type == ResourceType.GRANT:
-    #             for grant in data:
-    #                 execute(session, lifecycle.drop_resource(urn, grant))
-    #         else:
-    #             try:
-    #                 execute(session, lifecycle.drop_resource(urn, data))
-    #             except snowflake.connector.errors.ProgrammingError:
-    #                 continue
-
     def _add(self, resource: Resource):
         if self._finalized:
             raise Exception("Cannot add resources to a finalized blueprint")
