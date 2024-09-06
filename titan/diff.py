@@ -4,9 +4,9 @@ from .resource_name import ResourceName, attribute_is_resource_name
 
 
 class Action(Enum):
-    ADD = "add"
-    REMOVE = "remove"
-    CHANGE = "change"
+    CREATE = "create"
+    DROP = "drop"
+    UPDATE = "update"
     TRANSFER = "transfer"
 
 
@@ -71,7 +71,7 @@ def diff(original, new):
 
     # Resources in remote state but not in the manifest should be removed
     for key in original_keys - new_keys:
-        yield Action.REMOVE, key, original[key]
+        yield Action.DROP, key, original[key]
 
     # Resources in the manifest but not in remote state should be added
     for key in new_keys - original_keys:
@@ -79,9 +79,9 @@ def diff(original, new):
             raise Exception(f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {key}")
         elif isinstance(new[key], list):
             for item in new[key]:
-                yield Action.ADD, key, item
+                yield Action.CREATE, key, item
         else:
-            yield Action.ADD, key, new[key]
+            yield Action.CREATE, key, new[key]
 
     # Resources in both should be compared
     for key in original_keys & new_keys:
@@ -95,7 +95,7 @@ def diff(original, new):
             owner_attr = delta.pop("owner", None)
 
             for attr, value in delta.items():
-                yield Action.CHANGE, key, {attr: value}
+                yield Action.UPDATE, key, {attr: value}
 
             # Force the transfer to happen after all other attribute changes
             if owner_attr:
@@ -105,8 +105,8 @@ def diff(original, new):
 
             for item in original[key]:
                 if item not in new[key]:
-                    yield Action.REMOVE, key, item
+                    yield Action.DROP, key, item
 
             for item in new[key]:
                 if item not in original[key]:
-                    yield Action.ADD, key, item
+                    yield Action.CREATE, key, item

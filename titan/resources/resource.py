@@ -73,11 +73,6 @@ def _coerce_resource_field(field_value, field_type):
     if field_type == Any:
         return field_value
 
-    # elif field_type is str:
-    #     if not isinstance(field_value, str):
-    #         raise TypeError
-    #     return field_value
-
     # Recursively traverse lists and dicts
     elif get_origin(field_type) is list:
         if not isinstance(field_value, list):
@@ -325,12 +320,12 @@ class Resource(metaclass=_Resource):
     def to_dict(self):
         serialized = {}
 
-        def _serialize(value):
-            if isinstance(value, ResourcePointer):
+        def _serialize(field, value):
+            if field.name == "owner":
+                return str(value.fqn)
+            elif isinstance(value, ResourcePointer):
                 return str(value.fqn)
             elif isinstance(value, Resource):
-                # if hasattr(value, "serialize"):
-                #     return value.serialize()
                 if getattr(value, "serialize_inline", False):
                     return value.to_dict()
                 if hasattr(value._data, "name"):
@@ -340,9 +335,9 @@ class Resource(metaclass=_Resource):
             elif isinstance(value, ParseableEnum):
                 return str(value)
             elif isinstance(value, list):
-                return [_serialize(v) for v in value]
+                return [_serialize(field, v) for v in value]
             elif isinstance(value, dict):
-                return {k: _serialize(v) for k, v in value.items()}
+                return {k: _serialize(field, v) for k, v in value.items()}
             elif isinstance(value, ResourceName):
                 return str(value)
             elif isinstance(value, ResourceTags):
@@ -350,11 +345,9 @@ class Resource(metaclass=_Resource):
             else:
                 return value
 
-        # for key, value in asdict(self._data).items():
-        #     serialized[key] = _serialize(value)
         for f in fields(self._data):
             value = getattr(self._data, f.name)
-            serialized[f.name] = _serialize(value)
+            serialized[f.name] = _serialize(f, value)
 
         return serialized
 
@@ -623,13 +616,16 @@ def convert_role_ref(role_ref: RoleRef) -> Resource:
     ):
         return role_ref
     elif isinstance(role_ref, str):
-        if role_ref == "":
-            return ResourcePointer(name="", resource_type=ResourceType.ROLE)
-
-        identifier = parse_identifier(role_ref, is_db_scoped=True)
-        if "database" in identifier:
-            return ResourcePointer(name=role_ref, resource_type=ResourceType.DATABASE_ROLE)
-        else:
-            return ResourcePointer(name=role_ref, resource_type=ResourceType.ROLE)
+        return ResourcePointer(name=role_ref, resource_type=infer_role_type_from_name(role_ref))
     else:
         raise TypeError
+
+
+def infer_role_type_from_name(name: str) -> ResourceType:
+    if name == "":
+        return ResourceType.ROLE
+    identifier = parse_identifier(name, is_db_scoped=True)
+    if "database" in identifier:
+        return ResourceType.DATABASE_ROLE
+    else:
+        return ResourceType.ROLE

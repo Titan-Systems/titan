@@ -369,13 +369,15 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
 
 def transfer_resource(
     urn: URN,
-    owner=str,
+    owner: URN,
+    owner_resource_type: ResourceType,
     copy_current_grants: bool = False,
     revoke_current_grants: bool = False,
 ) -> str:
     return getattr(__this__, f"transfer_{urn.resource_label}", transfer__default)(
         urn,
         owner,
+        owner_resource_type,
         copy_current_grants,
         revoke_current_grants,
     )
@@ -384,6 +386,7 @@ def transfer_resource(
 def transfer__default(
     urn: URN,
     owner: str,
+    owner_resource_type: ResourceType,
     copy_current_grants: bool = False,
     revoke_current_grants: bool = False,
 ) -> str:
@@ -391,7 +394,8 @@ def transfer__default(
         "GRANT OWNERSHIP ON",
         urn.resource_type,
         urn.fqn,
-        "TO ROLE",
+        "TO",
+        owner_resource_type,
         owner,
         "REVOKE CURRENT GRANTS" if revoke_current_grants else "",
         "COPY CURRENT GRANTS" if copy_current_grants else "",

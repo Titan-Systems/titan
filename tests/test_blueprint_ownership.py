@@ -1,11 +1,17 @@
 import pytest
 
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, InvalidOwnerException, MissingPrivilegeException, compile_plan_to_sql
+from titan.blueprint import (
+    Blueprint,
+    CreateResource,
+    MissingPrivilegeException,
+    TransferOwnership,
+    UpdateResource,
+    compile_plan_to_sql,
+)
 from titan.identifiers import parse_URN
-from titan.privs import AccountPriv, GrantedPrivilege
+from titan.privs import AccountPriv, DatabasePriv, GrantedPrivilege
 from titan.resource_name import ResourceName
-from titan.resources.tag import tag_reference_for_resource
 
 
 @pytest.fixture
@@ -39,7 +45,7 @@ def test_default_owner(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].after["owner"] == "SYSADMIN"
 
 
@@ -50,7 +56,7 @@ def test_non_default_owner(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].after["owner"] == "ACCOUNTADMIN"
 
 
@@ -63,11 +69,11 @@ def test_custom_role_owner(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/CUSTOMROLE")
-    assert plan[1].action == Action.ADD
+    assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/CUSTOMROLE?role=SYSADMIN")
-    assert plan[2].action == Action.ADD
+    assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
     assert plan[2].after["owner"] == "CUSTOMROLE"
 
@@ -93,8 +99,8 @@ def test_transfer_ownership(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.TRANSFER
-    assert plan[0].after["owner"] == "USERADMIN"
+    assert isinstance(plan[0], TransferOwnership)
+    assert plan[0].owner == "USERADMIN"
 
 
 def test_transfer_ownership_with_changes(session_ctx, remote_state):
@@ -110,10 +116,10 @@ def test_transfer_ownership_with_changes(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 2
-    assert plan[0].action == Action.CHANGE
+    assert isinstance(plan[0], UpdateResource)
     assert plan[0].after["comment"] == "This comment has been added"
-    assert plan[1].action == Action.TRANSFER
-    assert plan[1].after["owner"] == "USERADMIN"
+    assert isinstance(plan[1], TransferOwnership)
+    assert plan[1].owner == "USERADMIN"
 
 
 def test_resource_has_custom_role_owner_with_create_priv(session_ctx, remote_state):
@@ -130,7 +136,7 @@ def test_resource_has_custom_role_owner_with_create_priv(session_ctx, remote_sta
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
 
     sql_commands = compile_plan_to_sql(session_ctx, plan)
@@ -148,7 +154,7 @@ def test_resource_is_transferred_to_custom_role_owner(session_ctx, remote_state)
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
 
     sql_commands = compile_plan_to_sql(session_ctx, plan)
@@ -173,7 +179,7 @@ def test_resource_cant_be_created(remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
 
     with pytest.raises(MissingPrivilegeException):
@@ -200,7 +206,7 @@ def test_grant_with_grant_admin_custom_role(remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role_grant/GRANT_ADMIN?role=SYSADMIN")
     compile_plan_to_sql(session_ctx, plan)
 
@@ -234,7 +240,7 @@ def test_tag_reference_with_tag_admin_custom_role():
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:tag_reference/SOME_ROLE?domain=ROLE")
     sql_commands = compile_plan_to_sql(session_ctx, plan)
     assert len(sql_commands) == 3
@@ -280,3 +286,37 @@ def test_owner_is_database_role(session_ctx):
     )
     plan = _plan_for_resources([database_role, schema])
     assert len(plan) == 2
+
+
+def test_blueprint_create_resource_with_database_role_owner(monkeypatch, session_ctx, remote_state):
+    def role_can_execute_change(role, change, role_privileges):
+        if role in ["SYSADMIN", "USERADMIN"]:
+            return True
+        return False
+
+    # Patch the deep function
+    monkeypatch.setattr("titan.blueprint.role_can_execute_change", role_can_execute_change)
+
+    database = res.Database(name="SOME_DATABASE")
+    database_role = res.DatabaseRole(
+        name="SOME_DATABASE_ROLE",
+        database=database,
+    )
+    schema = res.Schema(name="test_schema", database=database, owner=database_role)
+    blueprint = Blueprint(resources=[database, database_role, schema])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 3
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+    assert len(sql_commands) == 8
+    assert sql_commands[0] == "USE SECONDARY ROLES ALL"
+    assert sql_commands[1] == "USE ROLE SYSADMIN"
+    assert sql_commands[2].startswith("CREATE DATABASE SOME_DATABASE")
+    assert sql_commands[3] == "USE ROLE USERADMIN"
+    assert sql_commands[4] == "CREATE DATABASE ROLE SOME_DATABASE.SOME_DATABASE_ROLE"
+    assert sql_commands[5] == "USE ROLE SYSADMIN"
+    assert sql_commands[6].startswith("CREATE SCHEMA SOME_DATABASE.TEST_SCHEMA")
+    assert (
+        sql_commands[7]
+        == "GRANT OWNERSHIP ON SCHEMA SOME_DATABASE.TEST_SCHEMA TO DATABASE ROLE SOME_DATABASE.SOME_DATABASE_ROLE COPY CURRENT GRANTS"
+    )

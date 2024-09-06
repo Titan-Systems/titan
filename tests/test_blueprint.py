@@ -1,9 +1,12 @@
-import os
-
 import pytest
 
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, DuplicateResourceException, InvalidOwnerException, compile_plan_to_sql
+from titan.blueprint import (
+    Blueprint,
+    CreateResource,
+    DuplicateResourceException,
+    compile_plan_to_sql,
+)
 from titan.enums import ResourceType
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
@@ -223,7 +226,7 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
 
     blueprint = Blueprint(
@@ -246,7 +249,7 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:grant/SOME_ROLE?priv=USAGE&on=database/DB")
 
 
@@ -260,7 +263,7 @@ def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
 
 
@@ -274,7 +277,7 @@ def test_blueprint_implied_container_tree(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn.fqn.name == "FUNC"
 
 
@@ -287,13 +290,13 @@ def test_blueprint_chained_ownership(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 4
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
-    assert plan[1].action == Action.ADD
+    assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
-    assert plan[2].action == Action.ADD
+    assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:database/DB")
-    assert plan[3].action == Action.ADD
+    assert isinstance(plan[3], CreateResource)
     assert plan[3].urn == parse_URN("urn::ABCD123:schema/DB.SCHEMA")
 
 
@@ -358,11 +361,11 @@ def test_blueprint_scope_sorting(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
-    assert plan[1].action == Action.ADD
+    assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:schema/DB.SCHEMA")
-    assert plan[2].action == Action.ADD
+    assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:view/DB.SCHEMA.SOME_VIEW")
 
 
@@ -376,11 +379,11 @@ def test_blueprint_reference_sorting(session_ctx, remote_state):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB1")
-    assert plan[1].action == Action.ADD
+    assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:database/DB2")
-    assert plan[2].action == Action.ADD
+    assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:database/DB3")
 
 
@@ -395,11 +398,11 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
 
     plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
-    assert plan[1].action == Action.ADD
+    assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
-    assert plan[2].action == Action.ADD
+    assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:database/DB1")
 
     sql = compile_plan_to_sql(session_ctx, plan)

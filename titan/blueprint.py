@@ -1,5 +1,6 @@
 import json
 import logging
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from queue import Queue
 from typing import Generator, Optional, Union
@@ -27,7 +28,7 @@ from .privs import (
 )
 from .resource_name import ResourceName
 from .resources import Account, Database
-from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer
+from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer, infer_role_type_from_name
 from .resources.tag import Tag, TaggableResource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
@@ -82,20 +83,63 @@ class RunMode(ParseableEnum):
 
 
 @dataclass
-class ResourceChange:
-    action: Action
+class ResourceChange(ABC):
     urn: URN
+
+    @abstractmethod
+    def to_dict(self) -> dict:
+        pass
+
+
+@dataclass
+class CreateResource(ResourceChange):
+    after: dict
+
+    def to_dict(self) -> dict:
+        return {
+            "action": "CREATE",
+            "urn": str(self.urn),
+            "after": self.after,
+        }
+
+
+@dataclass
+class DropResource(ResourceChange):
+    before: dict
+
+    def to_dict(self) -> dict:
+        return {
+            "action": "DROP",
+            "urn": str(self.urn),
+            "before": self.before,
+        }
+
+
+@dataclass
+class UpdateResource(ResourceChange):
     before: dict
     after: dict
     delta: dict
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
-            "action": self.action.value,
+            "action": "UPDATE",
             "urn": str(self.urn),
             "before": self.before,
             "after": self.after,
             "delta": self.delta,
+        }
+
+
+@dataclass
+class TransferOwnership(ResourceChange):
+    owner: str
+
+    def to_dict(self) -> dict:
+        return {
+            "action": "TRANSFER",
+            "urn": str(self.urn),
+            "owner": self.owner,
         }
 
 
@@ -202,24 +246,24 @@ def dump_plan(plan: Plan, format: str = "json"):
         # green_start = "\033[36m"
         # color_end = "\033[0m"
 
-        add_count = len([change for change in plan if change.action == Action.ADD])
-        change_count = len([change for change in plan if change.action == Action.CHANGE])
-        transfer_count = len([change for change in plan if change.action == Action.TRANSFER])
-        remove_count = len([change for change in plan if change.action == Action.REMOVE])
+        create_count = len([change for change in plan if isinstance(change, CreateResource)])
+        update_count = len([change for change in plan if isinstance(change, UpdateResource)])
+        transfer_count = len([change for change in plan if isinstance(change, TransferOwnership)])
+        drop_count = len([change for change in plan if isinstance(change, DropResource)])
 
         output += "\n» titan core\n"
-        output += f"» Plan: {add_count} to add, {change_count} to change, {transfer_count} to transfer, {remove_count} to destroy.\n\n"
+        output += f"» Plan: {create_count} to create, {update_count} to update, {transfer_count} to transfer, {drop_count} to drop.\n\n"
 
         for change in plan:
             action_marker = ""
-            if change.action == Action.ADD:
+            if isinstance(change, CreateResource):
                 action_marker = "+"
-            elif change.action in (Action.CHANGE, Action.TRANSFER):
+            elif isinstance(change, UpdateResource):
                 action_marker = "~"
-            elif change.action == Action.REMOVE:
+            elif isinstance(change, DropResource):
                 action_marker = "-"
             output += f"{action_marker} {change.urn}"
-            if change.action != Action.REMOVE:
+            if isinstance(change, CreateResource):
                 output += " {"
             output += "\n"
             key_lengths = [len(key) for key in change.delta.keys()]
@@ -232,7 +276,7 @@ def dump_plan(plan: Plan, format: str = "json"):
                 if key in change.before:
                     before_value = _render_value(change.before[key]) + " -> "
                 output += f"  {action_marker} {key:<{max_key_length}} = {before_value}{new_value}\n"
-            if change.action != Action.REMOVE:
+            if isinstance(change, CreateResource):
                 output += "}\n"
             output += "\n"
 
@@ -299,7 +343,7 @@ def _walk(resource: Resource) -> Generator[Resource, None, None]:
 
 def _raise_if_plan_would_drop_session_user(session_ctx: dict, plan: Plan):
     for change in plan:
-        if change.urn.resource_type == ResourceType.USER and change.action == Action.REMOVE:
+        if change.urn.resource_type == ResourceType.USER and isinstance(change, DropResource):
             if ResourceName(session_ctx["user"]) == ResourceName(change.urn.fqn.name):
                 raise Exception("Plan would drop the current session user, which is not allowed")
 
@@ -406,11 +450,11 @@ class Blueprint:
         # Run Mode exceptions
         if self._run_mode == RunMode.CREATE_OR_UPDATE:
             for change in plan:
-                if change.action == Action.REMOVE:
+                if isinstance(change, DropResource):
                     exceptions.append(
                         f"Create-or-update mode does not allow resources to be removed (ref: {change.urn})"
                     )
-                if change.action == Action.CHANGE:
+                if isinstance(change, UpdateResource):
                     if "name" in change.delta:
                         exceptions.append(
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
@@ -445,7 +489,7 @@ class Blueprint:
             before = remote_state.get(urn, {})
             after = config.get(urn, {})
 
-            if action == Action.CHANGE:
+            if action == Action.UPDATE:
                 if urn in marked_for_replacement:
                     continue
 
@@ -464,7 +508,7 @@ class Blueprint:
                     raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
                     marked_for_replacement.add(urn)
                 elif change_forces_add:
-                    changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=delta))
+                    changes.append(CreateResource(urn, after))
                     continue
                 elif not change_is_fetchable:
                     # drift on fields that aren't fetchable should be ignored
@@ -473,11 +517,11 @@ class Blueprint:
                 elif change_should_be_ignored:
                     continue
                 else:
-                    changes.append(ResourceChange(action, urn, before, after, delta))
-            elif action == Action.ADD:
-                changes.append(ResourceChange(action=action, urn=urn, before={}, after=after, delta=delta))
-            elif action == Action.REMOVE:
-                changes.append(ResourceChange(action=action, urn=urn, before=before, after={}, delta={}))
+                    changes.append(UpdateResource(urn, before, after, delta))
+            elif action == Action.CREATE:
+                changes.append(CreateResource(urn, after))
+            elif action == Action.DROP:
+                changes.append(DropResource(urn, before))
             elif action == Action.TRANSFER:
                 resource = manifest[urn]
 
@@ -489,7 +533,7 @@ class Blueprint:
                     continue
                 if change_should_be_ignored:
                     continue
-                changes.append(ResourceChange(action=action, urn=urn, before=before, after=after, delta=delta))
+                changes.append(TransferOwnership(urn, after["owner"]))
 
         for urn in marked_for_replacement:
             raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
@@ -855,17 +899,17 @@ class Blueprint:
             self._add(resource)
 
 
-def owner_for_change(change: ResourceChange):
-    if change.action == Action.ADD and "owner" in change.after:
+def owner_for_change(change: ResourceChange) -> Optional[str]:
+    if isinstance(change, CreateResource) and "owner" in change.after:
         return change.after["owner"]
-    elif change.action == Action.CHANGE:
+    elif isinstance(change, UpdateResource) and "owner" in change.after:
         # TRANSFER actions occur strictly after CHANGE actions, so we use the before owner
         # as the role for the change
         return change.before["owner"]
-    elif change.action == Action.REMOVE and "owner" in change.before:
+    elif isinstance(change, DropResource) and "owner" in change.before:
         return change.before["owner"]
-    elif change.action == Action.TRANSFER and "owner" in change.before:
-        return change.before["owner"]
+    elif isinstance(change, TransferOwnership):
+        return change.owner
     else:
         return None
 
@@ -879,7 +923,7 @@ def execution_strategy_for_change(
 
     if resource_type_is_grant(change.urn.resource_type):
 
-        if change.action == Action.ADD and change.urn.resource_type == ResourceType.GRANT:
+        if isinstance(change, CreateResource) and change.urn.resource_type == ResourceType.GRANT:
             execution_role = execution_role_for_priv(change.after["priv"])
             if execution_role and execution_role in usable_roles:
                 return execution_role, False
@@ -915,7 +959,7 @@ def execution_strategy_for_change(
             return alternate_role, True
         # This change cannot be executed
         raise MissingPrivilegeException(
-            f"Owner {change_owner} does not have the required privileges to execute {change.action} on {change.urn}"
+            f"Role {change_owner} does not have the required privileges to execute {change}"
         )
 
     raise NotImplementedError(change)
@@ -976,7 +1020,7 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
 
     resource_name = str(change.urn.fqn)
 
-    if change.action == Action.ADD:
+    if isinstance(change, CreateResource):
 
         # if resource is a grant, check for MANAGE GRANTS
         if resource_type_is_grant(change.urn.resource_type):
@@ -1002,7 +1046,7 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
 
         return False
 
-    elif change.action == Action.CHANGE:
+    elif isinstance(change, UpdateResource):
 
         # If we own the resource, we can always make changes
         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
@@ -1013,11 +1057,11 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
             return True
 
         return False
-    elif change.action == Action.REMOVE:
+    elif isinstance(change, DropResource):
         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
             return True
         return False
-    elif change.action == Action.TRANSFER:
+    elif isinstance(change, TransferOwnership):
         # We must own the resource in order to transfer ownership
         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
             return True
@@ -1058,7 +1102,7 @@ def sql_commands_for_change(
     execution_role, transfer_owner = execution_strategy_for_change(change, usable_roles, default_role, role_privileges)
     before_change_cmd.append(f"USE ROLE {execution_role}")
 
-    if change.action == Action.ADD:
+    if isinstance(change, CreateResource):
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
         change_cmd = lifecycle.create_resource(change.urn, change.after, props)
         if transfer_owner:
@@ -1066,22 +1110,26 @@ def sql_commands_for_change(
                 lifecycle.transfer_resource(
                     change.urn,
                     owner=change.after["owner"],
+                    owner_resource_type=infer_role_type_from_name(change.after["owner"]),
                     copy_current_grants=True,
                 )
             )
-    elif change.action == Action.CHANGE:
+    elif isinstance(change, UpdateResource):
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
         change_cmd = lifecycle.update_resource(change.urn, change.delta, props)
-    elif change.action == Action.REMOVE:
+    elif isinstance(change, DropResource):
         change_cmd = lifecycle.drop_resource(
             change.urn,
             change.before,
             if_exists=True,
         )
-    elif change.action == Action.TRANSFER:
+    elif isinstance(change, TransferOwnership):
+        raise Exception
         change_cmd = lifecycle.transfer_resource(
             change.urn,
-            owner=change.after["owner"],
+            # owner=change.after["owner"],
+            owner=...,
+            owner_resource_type=infer_role_type_from_name(change.after["owner"]),
             copy_current_grants=True,
         )
 
@@ -1106,7 +1154,7 @@ def compile_plan_to_sql(session_ctx, plan: Plan):
         sql_commands.extend(commands)
 
         # Update state
-        if change.action == Action.ADD:
+        if isinstance(change, CreateResource):
             if change.urn.resource_type == ResourceType.ROLE_GRANT:
                 if change.after["to_role"] in usable_roles:
                     usable_roles.append(change.after["role"])

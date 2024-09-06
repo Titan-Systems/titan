@@ -5,10 +5,16 @@ import pytest
 from tests.helpers import safe_fetch
 from titan import data_provider
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, MissingResourceException, compile_plan_to_sql
+from titan.blueprint import (
+    Blueprint,
+    CreateResource,
+    DropResource,
+    MissingResourceException,
+    UpdateResource,
+    compile_plan_to_sql,
+)
 from titan.client import reset_cache
 from titan.enums import ResourceType
-from titan.identifiers import parse_URN
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -127,7 +133,7 @@ def test_blueprint_modify_resource(cursor, suffix, marked_for_cleanup):
     blueprint.add(warehouse)
     plan = blueprint.plan(session)
     assert len(plan) == 1
-    assert plan[0].action == Action.CHANGE
+    assert isinstance(plan[0], UpdateResource)
     assert plan[0].urn.fqn.name == f"MODIFY_ME_{suffix}"
     assert plan[0].delta == {"auto_suspend": 60}
 
@@ -232,7 +238,7 @@ def test_blueprint_all_grant_forces_add(cursor, test_db, role):
     blueprint = Blueprint(name="blueprint", resources=[all_grant])
     plan = blueprint.plan(session)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
 
 
 def test_blueprint_sync_dont_remove_system_schemas(cursor, test_db):
@@ -262,7 +268,7 @@ def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
     )
     plan = blueprint.plan(session)
     assert len(plan) == 1
-    assert plan[0].action == Action.ADD
+    assert isinstance(plan[0], CreateResource)
     assert plan[0].urn.fqn.name == "ABSENT"
 
 
@@ -293,7 +299,7 @@ def test_blueprint_sync_remote_state_contains_extra_resource(cursor, test_db):
     )
     plan = blueprint.plan(session)
     assert len(plan) == 1
-    assert plan[0].action == Action.REMOVE
+    assert isinstance(plan[0], DropResource)
     assert plan[0].urn.fqn.name == "PRESENT"
 
 
@@ -401,3 +407,28 @@ def test_blueprint_account_grants(cursor, suffix, marked_for_cleanup):
     assert grant_data["priv"] == "CREATE DATABASE"
     assert grant_data["on"] == "ACCOUNT"
     assert grant_data["on_type"] == "ACCOUNT"
+
+
+def test_blueprint_create_resource_with_database_role_owner(cursor, suffix, test_db):
+    session = cursor.connection
+
+    database_role = res.DatabaseRole(
+        name=f"TEST_BLUEPRINT_CREATE_RESOURCE_WITH_DATABASE_ROLE_OWNER_{suffix}",
+        database=test_db,
+        owner=TEST_ROLE,
+    )
+    schema = res.Schema(
+        name="test_schema",
+        database=test_db,
+        owner=database_role,
+    )
+    blueprint = Blueprint(resources=[database_role, schema])
+    plan = blueprint.plan(session)
+    assert len(plan) == 2
+
+    blueprint.apply(session, plan)
+
+    schema_data = safe_fetch(cursor, schema.urn)
+    assert schema_data is not None
+    assert schema_data["name"] == schema.name
+    assert schema_data["owner"] == str(database_role.fqn)
