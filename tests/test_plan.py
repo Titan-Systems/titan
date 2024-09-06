@@ -1,7 +1,7 @@
 import pytest
 
 from titan import resources as res
-from titan.blueprint import Action, Blueprint, NonConformingPlanException, RunMode
+from titan.blueprint import Blueprint, CreateResource, DropResource, NonConformingPlanException, RunMode, UpdateResource
 from titan.enums import ResourceType
 from titan.identifiers import parse_URN
 
@@ -29,7 +29,7 @@ def test_plan_add_action(session_ctx, remote_state):
     plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
-    assert change.action == Action.ADD
+    assert isinstance(change, CreateResource)
     assert change.urn == parse_URN("urn::ABCD123:database/NEW_DATABASE")
     assert "name" in change.after
     assert change.after["name"] == "NEW_DATABASE"
@@ -53,7 +53,7 @@ def test_plan_change_action(session_ctx, remote_state):
     plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
-    assert change.action == Action.CHANGE
+    assert isinstance(change, UpdateResource)
     assert change.urn == parse_URN("urn::ABCD123:role/EXISTING_ROLE")
     assert "comment" in change.before
     assert change.before["comment"] == "old comment"
@@ -72,7 +72,7 @@ def test_plan_remove_action(session_ctx, remote_state):
     plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
-    assert change.action == Action.REMOVE
+    assert isinstance(change, DropResource)
     assert change.urn == parse_URN("urn::ABCD123:role/REMOVED_ROLE")
 
 
@@ -87,7 +87,7 @@ def test_plan_no_removes_in_run_mode_create_or_update(session_ctx, remote_state)
     plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
-    assert change.action == Action.REMOVE
+    assert isinstance(change, DropResource)
     assert change.urn == parse_URN("urn::ABCD123:role/REMOVED_ROLE")
     with pytest.raises(NonConformingPlanException):
         bp._raise_for_nonconforming_plan(plan)

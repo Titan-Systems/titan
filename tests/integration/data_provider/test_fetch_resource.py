@@ -12,8 +12,9 @@ from titan import data_provider
 from titan import resources as res
 from titan.client import reset_cache
 from titan.enums import ResourceType
-from titan.identifiers import FQN, URN, parse_FQN, parse_URN
+from titan.identifiers import URN, parse_FQN, parse_URN
 from titan.resource_name import ResourceName
+from titan.resources.resource import ResourcePointer
 
 pytestmark = pytest.mark.requires_snowflake
 
@@ -301,7 +302,7 @@ def test_fetch_grant_with_fully_qualified_ref(cursor, test_db, suffix, marked_fo
     marked_for_cleanup.append(role)
     cursor.execute(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE {role.name}")
     grant = res.Grant.from_sql(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE {role.name}")
-    grant._data.owner = TEST_ROLE
+    grant._data.owner = ResourcePointer(name=TEST_ROLE, resource_type=ResourceType.ROLE)
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
@@ -317,7 +318,7 @@ def test_fetch_grant_with_quoted_ref(cursor, test_db, suffix, marked_for_cleanup
     marked_for_cleanup.append(role)
     cursor.execute(f'GRANT USAGE ON SCHEMA {test_db}."This_is_A_quoted_schema" TO ROLE {role.name}')
     grant = res.Grant.from_sql(f'GRANT USAGE ON SCHEMA {test_db}."This_is_A_quoted_schema" TO ROLE {role.name}')
-    grant._data.owner = TEST_ROLE
+    grant._data.owner = ResourcePointer(name=TEST_ROLE, resource_type=ResourceType.ROLE)
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
     result = data_provider.remove_none_values(result)
