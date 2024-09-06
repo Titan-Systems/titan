@@ -73,3 +73,29 @@ def test_resource_already_belongs_to_container():
 
     with pytest.raises(ResourceHasContainerException):
         schema2.add(view)
+
+
+def test_resource_container_init():
+    # Explicitly set container chain
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCH", database=db)
+    assert schema.container == db
+    assert str(schema.fqn) == "DB.SCH"
+    task = res.Task(name="TASK", database=db, schema=schema)
+    assert task.container == schema
+    assert task.container.container == db
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Implicit container chain
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCH")
+    task = res.Task(name="TASK", database=db, schema=schema)
+    assert task.container == schema
+    assert task.container.container == db
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Init with fully qualified name
+    task = res.Task(name="DB.SCH.TASK")
+    assert task.container.name == "SCH"
+    assert task.container.container.name == "DB"
+    assert str(task.fqn) == "DB.SCH.TASK"
