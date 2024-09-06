@@ -3,15 +3,19 @@ from inflection import pluralize
 from .enums import ResourceType
 from .identifiers import resource_label_for_type
 from .resource_name import ResourceName
-from .resources.resource import ResourcePointer
 from .resources import (
     Database,
     Grant,
+    Resource,
     RoleGrant,
     Schema,
-    Resource,
     User,
 )
+from .resources.resource import ResourcePointer
+
+ALIASES = {
+    "grants_on_all": ResourceType.GRANT_ON_ALL,
+}
 
 
 def resources_from_role_grants_config(role_grants_config: list) -> list:
@@ -115,22 +119,32 @@ def collect_resources_from_config(config: dict):
     users = config.pop("users", [])
 
     resources = []
+    config_blocks = []
 
     for resource_type in Resource.__types__.keys():
         resource_label = pluralize(resource_label_for_type(resource_type))
-        for data in config.pop(resource_label, []):
-            try:
-                requires = data.pop("requires", [])
-                resource_cls = Resource.resolve_resource_cls(resource_type, data)
-                resource = resource_cls(**data)
-                process_requires(resource, requires)
-                resources.append(resource)
-            except Exception as e:
-                print(f"Error processing resource: {data}")
-                raise e
+        block = config.pop(resource_label, [])
+        if block:
+            config_blocks.append((resource_type, block))
+
+    for alias, resource_type in ALIASES.items():
+        if alias in config:
+            config_blocks.append((resource_type, config.pop(alias)))
 
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
+
+    for resource_type, block in config_blocks:
+        for resource_data in block:
+            try:
+                requires = resource_data.pop("requires", [])
+                resource_cls = Resource.resolve_resource_cls(resource_type, resource_data)
+                resource = resource_cls(**resource_data)
+                process_requires(resource, requires)
+                resources.append(resource)
+            except Exception as e:
+                print(f"Error processing resource: {resource_data}")
+                raise e
 
     resources.extend(resources_from_database_config(database_config))
     resources.extend(resources_from_role_grants_config(role_grants))

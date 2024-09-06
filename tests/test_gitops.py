@@ -46,3 +46,29 @@ def test_resource_config(resource_config):
     resource_types = set([resource.resource_type for resource in resources])
     expected_resource_types = set([resource_cls.resource_type for resource_cls, _ in JSON_FIXTURES])
     assert resource_types == expected_resource_types
+
+
+def test_grant_on_all_alias():
+    config_base = {
+        "grant_on_alls": [
+            {
+                "priv": "SELECT",
+                "on_all_tables_in_schema": "sch",
+                "to": "somerole",
+            }
+        ]
+    }
+    config_aliased = {
+        "grants_on_all": [
+            {
+                "priv": "SELECT",
+                "on_all_tables_in_schema": "sch",
+                "to": "somerole",
+            }
+        ]
+    }
+    resources = collect_resources_from_config(config_base)
+    resources_aliased = collect_resources_from_config(config_aliased)
+    assert len(resources) == 1
+    assert len(resources_aliased) == 1
+    assert resources[0]._data == resources_aliased[0]._data
