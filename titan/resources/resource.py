@@ -328,8 +328,8 @@ class Resource(metaclass=_Resource):
             elif isinstance(value, Resource):
                 if getattr(value, "serialize_inline", False):
                     return value.to_dict()
-                if hasattr(value._data, "name"):
-                    return getattr(value._data, "name")
+                elif isinstance(value, NamedResource):
+                    return str(value.fqn)
                 else:
                     raise Exception(f"Cannot serialize {value}")
             elif isinstance(value, ParseableEnum):
@@ -376,10 +376,10 @@ class Resource(metaclass=_Resource):
 
     def _register_scope(self, database=None, schema=None):
         if isinstance(database, str):
-            database: ResourceContainer = ResourcePointer(name=database, resource_type=ResourceType.DATABASE)
+            database = ResourcePointer(name=database, resource_type=ResourceType.DATABASE)
 
         if isinstance(schema, str):
-            schema: ResourceContainer = ResourcePointer(name=schema, resource_type=ResourceType.SCHEMA)
+            schema = ResourcePointer(name=schema, resource_type=ResourceType.SCHEMA)
             if database is not None:
                 database.add(schema)
 
@@ -389,9 +389,15 @@ class Resource(metaclass=_Resource):
             if database is not None:
                 database.add(self)
 
-        if isinstance(self.scope, SchemaScope):
+        elif isinstance(self.scope, SchemaScope):
             if schema is not None:
                 schema.add(self)
+                if database is not None:
+                    if schema.container is None:
+                        database.add(schema)
+                    elif schema.container != database:
+                        raise ResourceHasContainerException(f"Schema {schema} does not belong to database {database}")
+
             elif database is not None:
                 database.find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(self)
 

@@ -73,3 +73,62 @@ def test_resource_already_belongs_to_container():
 
     with pytest.raises(ResourceHasContainerException):
         schema2.add(view)
+
+
+def test_resource_container_init():
+    # Explicitly set container chain - 1st degree links
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCH", database=db)
+    assert schema.container == db
+    assert str(schema.fqn) == "DB.SCH"
+    task = res.Task(name="TASK", schema=schema)
+    assert task.container == schema
+    assert task.container.container == db
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Explicitly set container chain - 2nd degree link
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCH", database=db)
+    assert schema.container == db
+    assert str(schema.fqn) == "DB.SCH"
+    task = res.Task(name="TASK", database=db, schema=schema)
+    assert task.container == schema
+    assert task.container.container == db
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Build container chain bottoms-up
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCH")
+    task = res.Task(name="TASK", database=db, schema=schema)
+    assert task.container == schema
+    assert task.container.container == db
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Init with fully qualified name
+    task = res.Task(name="DB.SCH.TASK")
+    assert task.container.name == "SCH"
+    assert task.container.container.name == "DB"
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Partially qualified name
+    task = res.Task(name="SCH.TASK")
+    assert task.container.name == "SCH"
+    assert str(task.fqn) == "SCH.TASK"
+
+    # Mix string-specified and object-specified container
+    db = "DB"
+    schema = res.Schema(name="SCH", database=db)
+    assert schema.container.name == db
+    assert str(schema.fqn) == "DB.SCH"
+    task = res.Task(name="TASK", database=db, schema=schema)
+    assert task.container == schema
+    assert task.container.container.name == db
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+
+def test_prevent_container_chaining_if_already_set():
+    db1 = res.Database(name="DB1")
+    db2 = res.Database(name="DB2")
+    schema = res.Schema(name="SCH", database=db1)
+    with pytest.raises(ResourceHasContainerException):
+        res.Task(name="TASK", database=db2, schema=schema)
