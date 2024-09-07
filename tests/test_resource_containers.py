@@ -76,7 +76,17 @@ def test_resource_already_belongs_to_container():
 
 
 def test_resource_container_init():
-    # Explicitly set container chain
+    # Explicitly set container chain - 1st degree links
+    db = res.Database(name="DB")
+    schema = res.Schema(name="SCH", database=db)
+    assert schema.container == db
+    assert str(schema.fqn) == "DB.SCH"
+    task = res.Task(name="TASK", schema=schema)
+    assert task.container == schema
+    assert task.container.container == db
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Explicitly set container chain - 2nd degree link
     db = res.Database(name="DB")
     schema = res.Schema(name="SCH", database=db)
     assert schema.container == db
@@ -86,7 +96,7 @@ def test_resource_container_init():
     assert task.container.container == db
     assert str(task.fqn) == "DB.SCH.TASK"
 
-    # Implicit container chain
+    # Build container chain bottoms-up
     db = res.Database(name="DB")
     schema = res.Schema(name="SCH")
     task = res.Task(name="TASK", database=db, schema=schema)
@@ -98,4 +108,19 @@ def test_resource_container_init():
     task = res.Task(name="DB.SCH.TASK")
     assert task.container.name == "SCH"
     assert task.container.container.name == "DB"
+    assert str(task.fqn) == "DB.SCH.TASK"
+
+    # Partially qualified name
+    task = res.Task(name="SCH.TASK")
+    assert task.container.name == "SCH"
+    assert str(task.fqn) == "SCH.TASK"
+
+    #
+    db = "DB"
+    schema = res.Schema(name="SCH", database=db)
+    assert schema.container.name == db
+    assert str(schema.fqn) == "DB.SCH"
+    task = res.Task(name="TASK", database=db, schema=schema)
+    assert task.container == schema
+    assert task.container.container.name == db
     assert str(task.fqn) == "DB.SCH.TASK"

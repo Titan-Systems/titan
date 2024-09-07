@@ -395,7 +395,7 @@ class Resource(metaclass=_Resource):
                 if database is not None:
                     if schema.container is None:
                         database.add(schema)
-                    elif schema.container is not database:
+                    elif schema.container != database:
                         raise ResourceHasContainerException(f"Schema {schema} does not belong to database {database}")
 
             elif database is not None:
