@@ -115,7 +115,7 @@ def test_resource_container_init():
     assert task.container.name == "SCH"
     assert str(task.fqn) == "SCH.TASK"
 
-    #
+    # Mix string-specified and object-specified container
     db = "DB"
     schema = res.Schema(name="SCH", database=db)
     assert schema.container.name == db
@@ -124,3 +124,11 @@ def test_resource_container_init():
     assert task.container == schema
     assert task.container.container.name == db
     assert str(task.fqn) == "DB.SCH.TASK"
+
+
+def test_prevent_container_chaining_if_already_set():
+    db1 = res.Database(name="DB1")
+    db2 = res.Database(name="DB2")
+    schema = res.Schema(name="SCH", database=db1)
+    with pytest.raises(ResourceHasContainerException):
+        res.Task(name="TASK", database=db2, schema=schema)
