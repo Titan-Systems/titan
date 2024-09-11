@@ -1,0 +1,15 @@
+Create a new subclass of Resource.
+
+- You can find the implementation of the Resource class in @resource.py
+- Before you begin, perform research on the new resource type. Use this file's name to understand what resource type is expected. For example, if the name is catalog_integration.py, the resource is called Catalog Integration and the class should be called CatalogIntegration.
+- Use internet search @Web with "snowflake create <resource type>" to find the URL to provide under the Snowflake Docs section. For example, for the Warehouse class you should search "snowflake create warehouse" and find the docs link.
+- Crawl the docs link to determine the features of the resource
+- Each resource has a corresponding SQL statement that starts with CREATE. Use the docs to determine the correct CREATE SQL statement for this resource. For example, the User resource type has a corresponding CREATE SQL statement that starts with "CREATE USER someuser ..."
+- Use @warehouse.py as a good example of what a resource class looks like.
+
+The file should be completed in this order:
+
+- Import statements
+- Enums, if necessary. When generating enums, always subclass the ParseableEnum class.
+- The ResourceSpec class for the resource. This is always anotated with `@dataclass(unsafe_hash=True)`. The name is always the Resource class name with an underscore in front (eg _Warehouse for Warehouse). The ResourceSpec class should then specify each property of the class and its default, if necessary. The first two properties should always be `name: ResourceName` and `owner: Role`.
+- Then comes the Resource class itself. The resource class should always subclass `NamedResource, TaggableResource, Resource`.  Do not write a docstring. Next should always be these class properties, in this order: resource_type, props, scope, spec. Scope should be AccountScope() if the resource can only be created at the account level, SchemaScope() if it can only be created within a schema. Use the docs to determine which. spec should always be set to the ResourceSpec class. Next you should write the __init__ method. The init method should take all the properties you used in the ResourceSpec class, plus additionally `tags: dict[str, str] = None` and `**kwargs`. The first line of __init__ should always be `super().__init__(name, **kwargs)`. Next you should set `self._data` to an instance of the ResourceSpec class. Finally in __init__ you should call `self.set_tags(tags)`.

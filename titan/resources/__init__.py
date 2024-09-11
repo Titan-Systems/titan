@@ -11,6 +11,7 @@ from .dynamic_table import DynamicTable
 from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
+from .external_volume import S3ExternalVolume
 from .failover_group import FailoverGroup
 from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
@@ -20,6 +21,7 @@ from .image_repository import ImageRepository
 from .materialized_view import MaterializedView
 from .network_policy import NetworkPolicy
 from .network_rule import NetworkRule
+from .notebook import Notebook
 from .notification_integration import (
     AWSOutboundNotificationIntegration,
     AzureInboundNotificationIntegration,
@@ -28,7 +30,6 @@ from .notification_integration import (
     GCPInboundNotificationIntegration,
     GCPOutboundNotificationIntegration,
 )
-from .notebook import Notebook
 from .packages_policy import PackagesPolicy
 from .password_policy import PasswordPolicy
 from .pipe import Pipe
@@ -85,7 +86,6 @@ __all__ = [
     "ExternalFunction",
     "ExternalStage",
     "FailoverGroup",
-    "JSONFileFormat",
     "FutureGrant",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
@@ -98,6 +98,7 @@ __all__ = [
     "ImageRepository",
     "InternalStage",
     "JavascriptUDF",
+    "JSONFileFormat",
     "MaterializedView",
     "NetworkPolicy",
     "NetworkRule",
@@ -116,6 +117,7 @@ __all__ = [
     "ResourceMonitor",
     "Role",
     "RoleGrant",
+    "S3ExternalVolume",
     "S3StorageIntegration",
     "Schema",
     "Sequence",

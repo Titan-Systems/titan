@@ -1,0 +1,1 @@
+-- SQL fixture for external_volume

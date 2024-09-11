@@ -40,6 +40,7 @@ setup(
         "pyyaml",
         "snowflake-connector-python>=3.7.0",
         "snowflake-snowpark-python>=1.14.0",
+        "jinja2",
     ],
     extras_require={
         "dev": [

@@ -15,6 +15,7 @@ class _Role(ResourceSpec):
     comment: str = None
 
     def __post_init__(self):
+        super().__post_init__()
         self.owner = ResourcePointer(self.owner, ResourceType.ROLE)
 
 

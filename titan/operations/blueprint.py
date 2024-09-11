@@ -1,11 +1,11 @@
 from titan.blueprint import Blueprint
-from titan.gitops import collect_resources_from_config
+from titan.gitops import collect_blueprint_config
 from titan.operations.connector import connect
 
 
 def blueprint_plan(config, run_mode):
     session = connect()
-    resources = collect_resources_from_config(config)
+    resources = collect_blueprint_config(config)
     blueprint = Blueprint(
         resources=resources,
         run_mode=run_mode,

@@ -1,3 +1,5 @@
+import logging
+
 from inflection import pluralize
 
 from .enums import ResourceType
@@ -13,12 +15,14 @@ from .resources import (
 )
 from .resources.resource import ResourcePointer
 
+logger = logging.getLogger("titan")
+
 ALIASES = {
     "grants_on_all": ResourceType.GRANT_ON_ALL,
 }
 
 
-def resources_from_role_grants_config(role_grants_config: list) -> list:
+def _resources_from_role_grants_config(role_grants_config: list) -> list:
     if len(role_grants_config) == 0:
         return []
     resources = []
@@ -58,7 +62,7 @@ def resources_from_role_grants_config(role_grants_config: list) -> list:
     return resources
 
 
-def resources_from_database_config(databases_config: list) -> list:
+def _resources_from_database_config(databases_config: list) -> list:
     resources = []
     for database in databases_config:
         schemas = database.pop("schemas", [])
@@ -71,7 +75,7 @@ def resources_from_database_config(databases_config: list) -> list:
     return resources
 
 
-def resources_from_grants_config(grants_config: list) -> list:
+def _resources_from_grants_config(grants_config: list) -> list:
     resources = []
     for grant in grants_config:
         if isinstance(grant, dict):
@@ -84,7 +88,7 @@ def resources_from_grants_config(grants_config: list) -> list:
     return resources
 
 
-def resources_from_users_config(users_config: list) -> list:
+def _resources_from_users_config(users_config: list) -> list:
     resources = []
     for user in users_config:
         if isinstance(user, dict):
@@ -110,9 +114,17 @@ def process_requires(resource: Resource, requires: list):
 
 def collect_resources_from_config(config: dict):
     # TODO: ResourcePointers should get resolved to top-level resource configs when possible
+    logger.warning("collect_resources_from_config is deprecated, use collect_blueprint_config instead")
 
     config = config.copy()
+    resources = _resources_for_config(config)
+    if config:
+        raise ValueError(f"Unknown keys in config: {config.keys()}")
+    return resources
 
+
+def _resources_for_config(config: dict):
+    # Special cases
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
     grants = config.pop("grants", [])
@@ -131,9 +143,6 @@ def collect_resources_from_config(config: dict):
         if alias in config:
             config_blocks.append((resource_type, config.pop(alias)))
 
-    if config:
-        raise ValueError(f"Unknown keys in config: {config.keys()}")
-
     for resource_type, block in config_blocks:
         for resource_data in block:
             try:
@@ -146,10 +155,10 @@ def collect_resources_from_config(config: dict):
                 print(f"Error processing resource: {resource_data}")
                 raise e
 
-    resources.extend(resources_from_database_config(database_config))
-    resources.extend(resources_from_role_grants_config(role_grants))
-    resources.extend(resources_from_grants_config(grants))
-    resources.extend(resources_from_users_config(users))
+    resources.extend(_resources_from_database_config(database_config))
+    resources.extend(_resources_from_role_grants_config(role_grants))
+    resources.extend(_resources_from_grants_config(grants))
+    resources.extend(_resources_from_users_config(users))
 
     resource_cache = {}
     for resource in resources:
@@ -173,3 +182,29 @@ def collect_resources_from_config(config: dict):
         #         ref._container = resource_cache[cache_pointer]._container
 
     return resources
+
+
+def collect_blueprint_config(yaml_config: dict) -> dict:
+
+    config = yaml_config.copy()
+
+    vars = config.pop("vars", None)
+
+    allowlist = config.pop("allowlist", None)
+    dry_run = config.pop("dry_run", None)
+    name = config.pop("name", None)
+    run_mode = config.pop("run_mode", None)
+
+    resources = _resources_for_config(config)
+
+    if config:
+        raise ValueError(f"Unknown keys in config: {config.keys()}")
+
+    return {
+        "allowlist": allowlist,
+        "dry_run": dry_run,
+        "name": name,
+        "resources": resources,
+        "run_mode": run_mode,
+        "vars": vars,
+    }

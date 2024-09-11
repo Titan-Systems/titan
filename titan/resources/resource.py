@@ -24,6 +24,7 @@ from ..scope import (
     SchemaScope,
     resource_can_be_contained_in,
 )
+from ..var import VarString, string_contains_var
 
 
 class WrongContainerException(Exception):
@@ -131,9 +132,14 @@ def _coerce_resource_field(field_value, field_type):
     elif issubclass(field_type, Resource):
         return convert_to_resource(field_type, field_value)
     elif field_type is ResourceName:
-        return ResourceName(field_value)
+        return field_value if isinstance(field_value, VarString) else ResourceName(field_value)
     elif field_type is ResourceTags:
         return ResourceTags(field_value)
+    elif field_type is str:
+        if isinstance(field_value, str) and string_contains_var(field_value):
+            return VarString(field_value)
+        else:
+            return field_value
     else:
         # Typecheck all other field types (str, int, etc.)
         if not isinstance(field_value, field_type):
@@ -401,6 +407,15 @@ class Resource(metaclass=_Resource):
             elif database is not None:
                 database.find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(self)
 
+    def _resolve_vars(self, vars: dict):
+        for f in fields(self._data):
+            field_value = getattr(self._data, f.name)
+            if isinstance(field_value, VarString):
+                setattr(self._data, f.name, field_value.to_string(vars))
+
+        if isinstance(self, NamedResource) and isinstance(self._name, VarString):
+            self._name = ResourceName(self._name.to_string(vars))
+
     def to_pointer(self):
         return ResourcePointer(
             name=str(self.fqn),
@@ -483,12 +498,17 @@ class NamedResource:
     >>> tbl = Table(name="DB.SCHEMA.TBL")
     """
 
-    def __init__(self, name: Union[str, ResourceName], **kwargs):
-        if not isinstance(name, (str, ResourceName)):
+    def __init__(self, name: Union[str, ResourceName, VarString], **kwargs):
+        if not isinstance(name, (str, ResourceName, VarString)):
             raise TypeError(f"Expected str or ResourceName for name, got {name} ({type(name).__name__}) instead")
 
-        if isinstance(name, ResourceName):
+        if isinstance(name, (ResourceName, VarString)):
             self._name = name
+            super().__init__(**kwargs)
+            return
+
+        if string_contains_var(name):
+            self._name = VarString(name)
             super().__init__(**kwargs)
             return
 

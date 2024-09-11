@@ -1,0 +1,39 @@
+vars:
+  - name: storage_role_arn
+    type: string
+    default: arn:aws:iam::123456789012:role/some_role_name
+    sensitive: true
+
+roles:
+  - name: iceberg_tutorial_role
+
+role_grants:
+  - role: iceberg_tutorial_role
+    roles:
+      - SYSADMIN
+
+databases:
+  - name: iceberg_tutorial_db
+    owner: iceberg_tutorial_role
+    
+warehouses:
+  - name: iceberg_tutorial_wh
+    owner: iceberg_tutorial_role
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
+
+grants:
+ - GRANT CREATE DATABASE ON ACCOUNT TO ROLE iceberg_tutorial_role
+ - GRANT CREATE WAREHOUSE ON ACCOUNT TO ROLE iceberg_tutorial_role
+ - GRANT CREATE EXTERNAL VOLUME ON ACCOUNT TO ROLE iceberg_tutorial_role
+
+external_volumes:
+  - name: iceberg_external_volume
+    owner: iceberg_tutorial_role
+    storage_locations:
+      - name: my-s3-us-west-2
+        storage_provider: S3
+        storage_base_url: 's3://<my_bucket>/'
+        storage_aws_role_arn: "{{ vars.storage_role_arn }}"
+        storage_aws_external_id: iceberg_table_external_id

@@ -3,6 +3,7 @@ import json
 import pytest
 
 from titan import resources as res
+from titan import var
 from titan.blueprint import (
     Blueprint,
     CreateResource,
@@ -15,6 +16,7 @@ from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
+from titan.var import VarString
 
 
 @pytest.fixture
@@ -553,3 +555,39 @@ def test_blueprint_dump_plan_drop(session_ctx):
 
 """
     )
+
+
+def test_blueprint_vars(session_ctx):
+    blueprint = Blueprint(
+        resources=[res.Role(name="role", comment=var.role_comment)],
+        vars={"role_comment": "var role comment"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1]._data.comment == "var role comment"
+
+    role = res.Role(name="role", comment="some comment {{ var.suffix }}")
+    assert isinstance(role._data.comment, VarString)
+    blueprint = Blueprint(
+        resources=[role],
+        vars={"suffix": "1234"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1]._data.comment == "some comment 1234"
+
+    role = res.Role(name=var.role_name)
+    assert isinstance(role.name, VarString)
+    blueprint = Blueprint(
+        resources=[role],
+        vars={"role_name": "role123"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1].name == "role123"
+
+    role = res.Role(name="role_{{ var.suffix }}")
+    assert isinstance(role.name, VarString)
+    blueprint = Blueprint(
+        resources=[role],
+        vars={"suffix": "5678"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1].name == "role_5678"

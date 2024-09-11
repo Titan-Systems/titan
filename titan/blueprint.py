@@ -203,6 +203,10 @@ class Manifest:
     def refs(self):
         return self._refs
 
+    @property
+    def resources(self):
+        return list(self._data.values())
+
 
 def dump_plan(plan: Plan, format: str = "json"):
     if format == "json":
@@ -410,6 +414,7 @@ class Blueprint:
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
         allowlist: Optional[list[ResourceType]] = None,
+        vars: Optional[dict] = None,
         **kwargs,
     ) -> None:
 
@@ -437,10 +442,11 @@ class Blueprint:
 
         self._finalized = False
         self._staged: list[Resource] = []
-        self._root: Account = None
+        self._root: Optional[Account] = None
         self._run_mode: RunMode = RunMode(run_mode)
         self._dry_run: bool = dry_run
         self._allowlist: list[ResourceType] = [ResourceType(v) for v in allowlist or []]
+        self._vars: dict = vars or {}
 
         if self._run_mode == RunMode.SYNC_ALL:
             logger.warning("Sync All mode is dangerous, please use with caution")
@@ -633,6 +639,10 @@ class Blueprint:
 
         return state
 
+    def _resolve_vars(self):
+        for resource in self._staged:
+            resource._resolve_vars(self._vars)
+
     def _build_resource_graph(self, session_ctx: dict):
         """
         Convert the staged resources into a tree of resources
@@ -796,6 +806,7 @@ class Blueprint:
         if self._finalized:
             raise RuntimeError("Blueprint already finalized")
         self._finalized = True
+        self._resolve_vars()
         self._build_resource_graph(session_ctx)
         self._create_tag_references()
         self._create_ownership_refs(session_ctx)
