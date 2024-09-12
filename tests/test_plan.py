@@ -67,7 +67,7 @@ def test_plan_remove_action(session_ctx, remote_state):
         "comment": "old comment",
         "owner": "USERADMIN",
     }
-    bp = Blueprint(run_mode=RunMode.SYNC_ALL, allowlist=[ResourceType.ROLE])
+    bp = Blueprint(run_mode=RunMode.SYNC, allowlist=[ResourceType.ROLE])
     manifest = bp.generate_manifest(session_ctx)
     plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1

@@ -4,6 +4,7 @@ import os
 import re
 
 from titan import data_provider
+from titan.blueprint import CreateResource, UpdateResource, DropResource, TransferOwnership
 from titan.client import reset_cache
 from titan.parse import _split_statements
 from titan.resource_name import ResourceName
@@ -122,3 +123,16 @@ def get_examples_yml():
 def safe_fetch(cursor, urn):
     reset_cache()
     return data_provider.fetch_resource(cursor, urn)
+
+
+def dump_resource_change(change):
+    if isinstance(change, CreateResource):
+        return f"Create: {change.urn}"
+    elif isinstance(change, UpdateResource):
+        return f"Update: {change.urn}, delta: {change.delta}"
+    elif isinstance(change, DropResource):
+        return f"Drop: {change.urn}"
+    elif isinstance(change, TransferOwnership):
+        return f"Transfer: {change.urn}, from {change.from_owner} to {change.to_owner}"
+    else:
+        return f"Unknown change: {change}"

@@ -8,7 +8,7 @@ from dotenv import dotenv_values
 from titan import resources as res
 from titan.blueprint import Blueprint, print_plan
 from titan.data_provider import fetch_session
-from titan.gitops import collect_resources_from_config
+from titan.gitops import collect_blueprint_config
 
 
 def read_config(file) -> dict:
@@ -29,60 +29,16 @@ def merge_configs(config1: dict, config2: dict) -> dict:
 
 
 def configure_test_account(conn):
-    # "test_account.yml"
     session_ctx = fetch_session(conn)
-
+    config = read_config("test_account.yml")
     is_enterprise = session_ctx["tag_support"]
 
-    # check if account is standard/enterprise, probably by checking tag status, then dynamically pop tag/secret if standard
-
-    allowlist = [
-        "catalog integration",
-        "compute pool",
-        "database role",
-        "database",
-        "grant",
-        "network policy",
-        "network rule",
-        "resource monitor",
-        "role grant",
-        "role",
-        "schema",
-        "security integration",
-        "share",
-        "stage",
-        "storage integration",
-        "stream",
-        "table",
-        "user",
-        "view",
-        "warehouse",
-    ]
-
-    config = read_config("test_account.yml")
-
     if is_enterprise:
-        allowlist.extend(
-            [
-                "secret",
-                "tag",
-                "tag reference",
-            ]
-        )
         config = merge_configs(config, read_config("test_account_enterprise.yml"))
-    # else:
-    #     config.pop("tags", None)
-    #     config.pop("secrets", None)
-    #     config.pop("tag_references", None)
 
-    resources = collect_resources_from_config(config)
+    blueprint_config = collect_blueprint_config(config)
 
-    bp = Blueprint(
-        name="reset-test-account",
-        run_mode="SYNC-ALL",
-        allowlist=allowlist,
-        resources=resources,
-    )
+    bp = Blueprint.from_config(blueprint_config)
     plan = bp.plan(conn)
     print_plan(plan)
     bp.apply(conn, plan)

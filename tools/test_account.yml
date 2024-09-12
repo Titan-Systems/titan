@@ -1,3 +1,27 @@
+name: reset-test-account
+run_mode: SYNC
+allowlist:
+  - "catalog integration"
+  - "compute pool"
+  - "database role"
+  - "database"
+  - "grant"
+  - "network policy"
+  - "network rule"
+  - "resource monitor"
+  - "role grant"
+  - "role"
+  - "schema"
+  - "security integration"
+  - "share"
+  - "stage"
+  - "storage integration"
+  - "stream"
+  - "table"
+  - "user"
+  - "view"
+  - "warehouse"
+
 users:
   - name: static_user
     email: info@applytitan.com

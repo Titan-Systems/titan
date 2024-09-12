@@ -340,7 +340,7 @@ class WarehousePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
-PRIVS_FOR_RESOURCE_TYPE = {
+PRIVS_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {
     ResourceType.ACCOUNT: AccountPriv,
     ResourceType.AGGREGATION_POLICY: None,
     ResourceType.ALERT: AlertPriv,

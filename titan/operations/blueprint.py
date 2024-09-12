@@ -5,11 +5,8 @@ from titan.operations.connector import connect
 
 def blueprint_plan(config, run_mode):
     session = connect()
-    resources = collect_blueprint_config(config)
-    blueprint = Blueprint(
-        resources=resources,
-        run_mode=run_mode,
-    )
+    blueprint_config = collect_blueprint_config(config)
+    blueprint = Blueprint.from_config(blueprint_config)
     plan_obj = blueprint.plan(session)
     return plan_obj
 

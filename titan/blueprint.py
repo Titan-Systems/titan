@@ -15,8 +15,17 @@ from .client import (
     execute,
     reset_cache,
 )
+from .blueprint_config import BlueprintConfig, RunMode
 from .diff import Action, diff
-from .enums import ParseableEnum, ResourceType, resource_type_is_grant
+from .enums import ResourceType, resource_type_is_grant
+from .exceptions import (
+    DuplicateResourceException,
+    MissingResourceException,
+    MissingPrivilegeException,
+    MarkedForReplacementException,
+    NonConformingPlanException,
+    OrphanResourceException,
+)
 from .identifiers import URN, parse_identifier, resource_label_for_type
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
@@ -42,44 +51,6 @@ SYNC_MODE_BLOCKLIST = [
     ResourceType.USER,
     ResourceType.TABLE,
 ]
-
-
-class DuplicateResourceException(Exception):
-    pass
-
-
-class MissingResourceException(Exception):
-    pass
-
-
-class MissingPrivilegeException(Exception):
-    pass
-
-
-class MarkedForReplacementException(Exception):
-    pass
-
-
-class NonConformingPlanException(Exception):
-    pass
-
-
-class ResourceInsertionException(Exception):
-    pass
-
-
-class OrphanResourceException(Exception):
-    pass
-
-
-class InvalidOwnerException(Exception):
-    pass
-
-
-class RunMode(ParseableEnum):
-    CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
-    SYNC = "SYNC"
-    SYNC_ALL = "SYNC-ALL"
 
 
 @dataclass
@@ -415,59 +386,37 @@ class Blueprint:
         dry_run: bool = False,
         allowlist: Optional[list[ResourceType]] = None,
         vars: Optional[dict] = None,
-        **kwargs,
+        vars_spec: Optional[list[dict]] = None,
     ) -> None:
-
-        account = kwargs.pop("account", None)
-        database = kwargs.pop("database", None)
-        schema = kwargs.pop("schema", None)
-        allow_role_switching = kwargs.pop("allow_role_switching", None)
-        ignore_ownership = kwargs.pop("ignore_ownership", None)
-        valid_resource_types = kwargs.pop("valid_resource_types", None)
-
-        if account is not None:
-            raise Exception("account is deprecated, use add instead")
-        if database is not None:
-            raise Exception("database is deprecated, use add instead")
-        if schema is not None:
-            raise Exception("schema is deprecated, use add instead")
-        if allow_role_switching is not None:
-            raise Exception("Role switching must be allowed")
-        if ignore_ownership is not None:
-            # TODO: exception
-            logger.warning("ignore_ownership is deprecated")
-        if valid_resource_types is not None:
-            logger.warning("valid_resource_types is deprecated")
-            allowlist = valid_resource_types
-
+        self._config: BlueprintConfig = BlueprintConfig(
+            name=name,
+            resources=resources,
+            run_mode=run_mode or RunMode.CREATE_OR_UPDATE,
+            dry_run=False if dry_run is None else dry_run,
+            allowlist=allowlist or [],
+            vars=vars or {},
+            vars_spec=vars_spec or [],
+        )
         self._finalized = False
         self._staged: list[Resource] = []
         self._root: Optional[Account] = None
-        self._run_mode: RunMode = RunMode(run_mode)
-        self._dry_run: bool = dry_run
-        self._allowlist: list[ResourceType] = [ResourceType(v) for v in allowlist or []]
-        self._vars: dict = vars or {}
-
-        if self._run_mode == RunMode.SYNC_ALL:
-            logger.warning("Sync All mode is dangerous, please use with caution")
-            if len(self._allowlist) == 0:
-                raise Exception("Sync mode must specify an allowlist")
-        elif self._run_mode == RunMode.SYNC:
-            if len(self._allowlist) == 0:
-                raise Exception("Sync mode must specify an allowlist")
-            for resource_type in self._allowlist:
-                if resource_type in SYNC_MODE_BLOCKLIST:
-                    raise Exception(f"Resource type {resource_type} is not allowed in sync mode")
-
-        self.name = name
-
         self.add(resources or [])
+
+    @classmethod
+    def from_config(cls, config: BlueprintConfig):
+        blueprint = cls.__new__(cls)
+        blueprint._config = config
+        blueprint._staged = []
+        blueprint._root = None
+        blueprint._finalized = False
+        blueprint.add(config.resources or [])
+        return blueprint
 
     def _raise_for_nonconforming_plan(self, plan: Plan):
         exceptions = []
 
         # Run Mode exceptions
-        if self._run_mode == RunMode.CREATE_OR_UPDATE:
+        if self._config.run_mode == RunMode.CREATE_OR_UPDATE:
             for change in plan:
                 if isinstance(change, DropResource):
                     exceptions.append(
@@ -479,7 +428,7 @@ class Blueprint:
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
                         )
 
-        if self._run_mode == RunMode.SYNC:
+        if self._config.run_mode == RunMode.SYNC:
             for change in plan:
                 if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
                     exceptions.append(
@@ -487,9 +436,9 @@ class Blueprint:
                     )
 
         # Valid Resource Types exceptions
-        if self._allowlist:
+        if self._config.allowlist:
             for change in plan:
-                if change.urn.resource_type not in self._allowlist:
+                if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
         if exceptions:
@@ -500,13 +449,13 @@ class Blueprint:
             raise NonConformingPlanException("Non-conforming actions found in plan:\n" + exception_block)
 
     def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
-        config = manifest.to_dict()
+        manifest_dict = manifest.to_dict()
 
         changes: Plan = []
         marked_for_replacement = set()
-        for action, urn, delta in diff(remote_state, config):
+        for action, urn, delta in diff(remote_state, manifest_dict):
             before = remote_state.get(urn, {})
-            after = config.get(urn, {})
+            after = manifest_dict.get(urn, {})
 
             if action == Action.UPDATE:
                 if urn in marked_for_replacement:
@@ -521,6 +470,7 @@ class Blueprint:
                 change_requires_replacement = attr_metadata.triggers_replacement
                 change_forces_add = attr_metadata.forces_add
                 change_is_fetchable = attr_metadata.fetchable
+                change_is_known_after_apply = attr_metadata.known_after_apply
                 change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
 
                 if change_requires_replacement:
@@ -532,6 +482,8 @@ class Blueprint:
                 elif not change_is_fetchable:
                     # drift on fields that aren't fetchable should be ignored
                     # TODO: throw a warning, or have a blueprint runmode that fails on this
+                    continue
+                elif change_is_known_after_apply:
                     continue
                 elif change_should_be_ignored:
                     continue
@@ -592,17 +544,9 @@ class Blueprint:
                 normalized = resource_cls.defaults() | data
             return normalized
 
-        if self._run_mode in (RunMode.SYNC, RunMode.SYNC_ALL):
-            """
-            In sync mode, the remote state is not just the resources that were added to the blueprint,
-            but all resources that exist in Snowflake. This is limited by a few things:
-            - allowlist limits the scope of what resources types are allowed in a blueprint
-            - if database or schema is set, the blueprint only looks at that database or schema
-            """
-            if len(self._allowlist) == 0:
-                raise Exception("Sync mode must specify an allowlist")
+        if self._config.run_mode == RunMode.SYNC:
 
-            for resource_type in self._allowlist:
+            for resource_type in self._config.allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
                     data = data_provider.fetch_resource(session, urn)
@@ -641,7 +585,7 @@ class Blueprint:
 
     def _resolve_vars(self):
         for resource in self._staged:
-            resource._resolve_vars(self._vars)
+            resource._resolve_vars(self._config.vars)
 
     def _build_resource_graph(self, session_ctx: dict):
         """
@@ -844,7 +788,7 @@ class Blueprint:
         self._raise_for_nonconforming_plan(finished_plan)
         return finished_plan
 
-    def apply(self, session, plan: Plan = None):
+    def apply(self, session, plan: Optional[Plan] = None):
         if plan is None:
             plan = self.plan(session)
 
@@ -876,7 +820,7 @@ class Blueprint:
             sql = action_queue.pop(0)
             actions_taken.append(sql)
             try:
-                if not self._dry_run:
+                if not self._config.dry_run:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:

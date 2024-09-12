@@ -101,6 +101,7 @@ def diff(original, new):
             if owner_attr:
                 yield Action.TRANSFER, key, {"owner": owner_attr}
 
+        # I think this is dead code.
         elif isinstance(original[key], list):
 
             for item in original[key]:

@@ -6,6 +6,9 @@ vars:
     type: string
     default: arn:aws:iam::123456789012:role/some_role_name
     sensitive: true
+  - name: storage_base_url
+    type: string
+    default: s3://my-s3-bucket/my-s3-path
 
 roles:
   - name: iceberg_tutorial_role

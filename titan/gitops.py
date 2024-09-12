@@ -2,6 +2,7 @@ import logging
 
 from inflection import pluralize
 
+from .blueprint_config import BlueprintConfig
 from .enums import ResourceType
 from .identifiers import resource_label_for_type
 from .resource_name import ResourceName
@@ -184,7 +185,7 @@ def _resources_for_config(config: dict):
     return resources
 
 
-def collect_blueprint_config(yaml_config: dict) -> dict:
+def collect_blueprint_config(yaml_config: dict) -> BlueprintConfig:
 
     config = yaml_config.copy()
     blueprint_args = {}
@@ -201,9 +202,11 @@ def collect_blueprint_config(yaml_config: dict) -> dict:
     run_mode = config.pop("run_mode", None)
     if run_mode:
         blueprint_args["run_mode"] = run_mode
-    vars = config.pop("vars", None)
-    if vars:
-        blueprint_args["vars"] = vars
+    vars_spec = config.pop("vars", None)
+    if vars_spec:
+        if not isinstance(vars_spec, list):
+            raise ValueError("vars config entry must be a list of dicts")
+        blueprint_args["vars_spec"] = vars_spec
 
     resources = _resources_for_config(config)
     if len(resources) == 0:
@@ -214,4 +217,4 @@ def collect_blueprint_config(yaml_config: dict) -> dict:
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
 
-    return blueprint_args
+    return BlueprintConfig(**blueprint_args)

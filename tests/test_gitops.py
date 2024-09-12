@@ -37,7 +37,7 @@ def resource_config() -> dict:
 
 def test_database_config(database_config):
     blueprint_config = collect_blueprint_config(database_config)
-    assert len(blueprint_config["resources"]) == 2
+    assert len(blueprint_config.resources) == 2
 
 
 @pytest.mark.skip(reason="JSON_FIXTURES doesn't include things like role grants yet")
@@ -69,6 +69,6 @@ def test_grant_on_all_alias():
     }
     blueprint_config = collect_blueprint_config(config_base)
     blueprint_config_aliased = collect_blueprint_config(config_aliased)
-    assert len(blueprint_config["resources"]) == 1
-    assert len(blueprint_config_aliased["resources"]) == 1
-    assert blueprint_config["resources"][0]._data == blueprint_config_aliased["resources"][0]._data
+    assert len(blueprint_config.resources) == 1
+    assert len(blueprint_config_aliased.resources) == 1
+    assert blueprint_config.resources[0]._data == blueprint_config_aliased.resources[0]._data

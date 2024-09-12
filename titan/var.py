@@ -1,4 +1,7 @@
+import jinja2.exceptions
 from jinja2 import Environment, StrictUndefined
+
+from .exceptions import MissingVarException
 
 GLOBAL_JINJA_ENV = Environment(undefined=StrictUndefined)
 
@@ -8,7 +11,10 @@ class VarString:
         self.string = string
 
     def to_string(self, vars: dict):
-        return GLOBAL_JINJA_ENV.from_string(self.string).render(var=vars)
+        try:
+            return GLOBAL_JINJA_ENV.from_string(self.string).render(var=vars)
+        except jinja2.exceptions.UndefinedError:
+            raise MissingVarException(f"Missing var: {self.string}")
 
     def __eq__(self, other: str):
         raise NotImplementedError("VarString does not support equality checks")

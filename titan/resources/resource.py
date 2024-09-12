@@ -423,10 +423,11 @@ class Resource(metaclass=_Resource):
             else:
                 return field_value
 
-        for f in fields(self._data):
-            field_value = getattr(self._data, f.name)
-            new_value = _render_vars(field_value)
-            setattr(self._data, f.name, new_value)
+        if self._data:
+            for f in fields(self._data):
+                field_value = getattr(self._data, f.name)
+                new_value = _render_vars(field_value)
+                setattr(self._data, f.name, new_value)
 
         if isinstance(self, NamedResource) and isinstance(self._name, VarString):
             self._name = ResourceName(self._name.to_string(vars))

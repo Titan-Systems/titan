@@ -1,7 +1,7 @@
 import pytest
 import yaml
 
-from tests.helpers import get_examples_yml
+from tests.helpers import get_examples_yml, dump_resource_change
 
 from titan.blueprint import Blueprint
 from titan.enums import ResourceType
@@ -26,17 +26,20 @@ def test_example(example, cursor, marked_for_cleanup):
     cursor.execute("USE WAREHOUSE CI")
 
     blueprint_config = collect_blueprint_config(example)
-    for resource in blueprint_config["resources"]:
+    for resource in blueprint_config.resources:
         marked_for_cleanup.append(resource)
-    blueprint = Blueprint(**blueprint_config)
+    blueprint = Blueprint.from_config(blueprint_config)
     plan = blueprint.plan(cursor.connection)
     cmds = blueprint.apply(cursor.connection, plan)
     assert cmds
 
-    blueprint = Blueprint(**blueprint_config)
+    blueprint_config = collect_blueprint_config(example)
+    blueprint = Blueprint.from_config(blueprint_config)
     plan = blueprint.plan(cursor.connection)
     unexpected_drift = [change for change in plan if not change_is_expected(change)]
-    assert len(unexpected_drift) == 0
+    if len(unexpected_drift) > 0:
+        debug = "\n".join([dump_resource_change(change) for change in unexpected_drift])
+        assert False, f"Unexpected drift:\n{debug}"
 
 
 def change_is_expected(change):

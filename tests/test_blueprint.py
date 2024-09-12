@@ -12,6 +12,7 @@ from titan.blueprint import (
     dump_plan,
 )
 from titan.enums import ResourceType
+from titan.exceptions import MissingVarException
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
@@ -591,3 +592,29 @@ def test_blueprint_vars(session_ctx):
     )
     manifest = blueprint.generate_manifest(session_ctx)
     assert manifest.resources[1].name == "role_5678"
+
+
+def test_blueprint_vars_spec(session_ctx):
+    blueprint = Blueprint(
+        resources=[res.Role(name="role", comment=var.role_comment)],
+        vars_spec=[
+            {
+                "name": "role_comment",
+                "type": "string",
+                "default": "var role comment",
+            }
+        ],
+    )
+    assert blueprint._config.vars == {"role_comment": "var role comment"}
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1]._data.comment == "var role comment"
+
+    with pytest.raises(MissingVarException):
+        blueprint = Blueprint(
+            resources=[res.Role(name="role", comment=var.role_comment)],
+            vars_spec=[{"name": "role_comment", "type": "string"}],
+        )
+
+    blueprint = Blueprint(resources=[res.Role(name="role", comment=var.role_comment)])
+    with pytest.raises(MissingVarException):
+        blueprint.generate_manifest(session_ctx)
