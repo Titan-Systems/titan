@@ -11,7 +11,7 @@ import pyparsing as pp
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import FQN, URN, parse_identifier, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
-from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..parse import _parse_create_header, _parse_props, resolve_resource_class
 from ..props import Props as ResourceProps
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
@@ -269,7 +269,7 @@ class Resource(metaclass=_Resource):
             # make a new function called _parse_resource_type_from_create
             # resource_cls = Resource.classes[_resolve_resource_class(sql)]
             # raise NotImplementedError
-            resource_type = _resolve_resource_class(sql)
+            resource_type = resolve_resource_class(sql)
             scope = RESOURCE_SCOPES[resource_type]
         else:
             resource_type = resource_cls.resource_type

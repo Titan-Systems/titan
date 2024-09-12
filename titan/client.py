@@ -75,7 +75,8 @@ def execute(
 
     start = time.time()
     try:
-        result = cur.execute(sql_text).fetchall()
+        cur.execute(sql_text)
+        result = cur.fetchall()
         runtime = time.time() - start
         logger.warning(f"{session_header}    \033[94m({len(result)} rows, {runtime:.2f}s)\033[0m")
         if cacheable:

@@ -502,7 +502,7 @@ def is_ownership_priv(priv):
     return str(priv) == "OWNERSHIP"
 
 
-def _all_privs_for_resource_type(resource_type):
+def all_privs_for_resource_type(resource_type):
     all_privs = []
     for priv in PRIVS_FOR_RESOURCE_TYPE[resource_type]:
         priv = str(priv)

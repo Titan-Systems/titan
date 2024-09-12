@@ -155,7 +155,7 @@ def _fail_if_not_granted(result, *args):
 _INDEX = {}
 
 
-def _fetch_grant_to_role(session, role: str, granted_on: str, on_name: str, privilege: str):
+def _fetch_grant_to_role(session, role: ResourceName, granted_on: str, on_name: str, privilege: str):
     grants = _show_grants_to_role(session, role, cacheable=True)
     if id(grants) not in _INDEX:
         local_index = {}
@@ -462,7 +462,7 @@ def _show_resource_parameters(session, type_str: str, fqn: FQN, cacheable: bool 
     return params_result_to_dict(result)
 
 
-def _show_grants_to_role(session, role: str, cacheable: bool = False) -> list:
+def _show_grants_to_role(session, role: ResourceName, cacheable: bool = False) -> list:
     """
     {
         'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
@@ -2177,7 +2177,7 @@ def list_compute_pools(session) -> list[FQN]:
     return [FQN(name=resource_name_from_snowflake_metadata(row["name"])) for row in show_result]
 
 
-def _list_databases(session) -> list[str]:
+def _list_databases(session) -> list[ResourceName]:
     show_result = execute(session, "SHOW DATABASES", cacheable=True)
     databases = []
     for row in show_result:

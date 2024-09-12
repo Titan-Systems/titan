@@ -1,10 +1,8 @@
 import re
-from typing import Callable, Dict, Union
 
 import pyparsing as pp
 
 from .enums import ResourceType, Scope
-from .identifiers import FQN, URN, resource_type_for_label
 from .parse_primitives import FullyQualifiedIdentifier, Identifier
 from .scope import DatabaseScope, SchemaScope
 
@@ -292,7 +290,7 @@ def _resolve_notification_integration(sql):
     #     return "aws_outbound_notification_integration"
 
 
-def _resolve_resource_class(sql):
+def resolve_resource_class(sql):
     create_header = CREATE + pp.Opt(OR_REPLACE) + pp.Opt(TEMPORARY) + pp.Opt(TRANSIENT) + pp.Opt(SECURE)
     sql = _consume_tokens(create_header, sql)
 
@@ -329,7 +327,7 @@ def _resolve_resource_class(sql):
 
 
 class Lexicon:
-    def __init__(self, lexicon: Dict[Union[str, pp.ParserElement], Union[str, Callable[[str], str]]]):
+    def __init__(self, lexicon: dict[str, ResourceType]):
         self._words = []
         self._actions = []
         idx = 0

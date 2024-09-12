@@ -1,5 +1,5 @@
 import logging
-
+from typing import Optional
 from inflection import pluralize
 
 from titan.data_provider import fetch_resource, list_resource
@@ -12,7 +12,7 @@ logger = logging.getLogger("titan")
 
 
 def export_resources(
-    session=None, include: list[ResourceType] = None, exclude: list[ResourceType] = None
+    session=None, include: Optional[list[ResourceType]] = None, exclude: Optional[list[ResourceType]] = None
 ) -> dict[str, list]:
     if session is None:
         session = connect()
