@@ -28,10 +28,10 @@ class _PythonStoredProcedure(ResourceSpec):
     language: Language = Language.PYTHON
     as_: str = None
     comment: str = "user-defined procedure"
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
     execute_as: ExecutionRights = ExecutionRights.OWNER
     external_access_integrations: list = None
-    imports: list = field(default_factory=None, metadata={"triggers_replacement": True})
+    imports: list = field(default=None, metadata={"triggers_replacement": True})
     null_handling: NullHandling = NullHandling.CALLED_ON_NULL_INPUT
     owner: RoleRef = "SYSADMIN"
     secure: bool = False

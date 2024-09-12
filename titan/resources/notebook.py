@@ -20,7 +20,7 @@ from .warehouse import Warehouse
 class _Notebook(ResourceSpec):
     name: ResourceName
     # version: str = None
-    from_: str = field(default_factory=None, metadata={"fetchable": False})
+    from_: str = field(default=None, metadata={"fetchable": False})
     main_file: str = None
     comment: str = None
     default_version: str = None

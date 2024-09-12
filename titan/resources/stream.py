@@ -22,11 +22,11 @@ class _TableStream(ResourceSpec):
     name: ResourceName
     on_table: Table
     owner: RoleRef = "SYSADMIN"
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
-    at: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
-    before: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
+    at: dict[str, str] = field(default=None, metadata={"fetchable": False})
+    before: dict[str, str] = field(default=None, metadata={"fetchable": False})
     append_only: bool = False
-    show_initial_rows: bool = field(default_factory=None, metadata={"fetchable": False})
+    show_initial_rows: bool = field(default=None, metadata={"fetchable": False})
     comment: str = None
 
     def __post_init__(self):
@@ -200,7 +200,7 @@ class _StageStream(ResourceSpec):
     name: ResourceName
     on_stage: str
     owner: RoleRef = "SYSADMIN"
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
     comment: str = None
 
 
@@ -277,11 +277,11 @@ class _ViewStream(ResourceSpec):
     name: ResourceName
     on_view: View
     owner: RoleRef = "SYSADMIN"
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
-    at: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
-    before: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
+    at: dict[str, str] = field(default=None, metadata={"fetchable": False})
+    before: dict[str, str] = field(default=None, metadata={"fetchable": False})
     append_only: bool = False
-    show_initial_rows: bool = field(default_factory=None, metadata={"fetchable": False})
+    show_initial_rows: bool = field(default=None, metadata={"fetchable": False})
     comment: str = None
 
 

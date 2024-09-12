@@ -25,7 +25,7 @@ class _EventTable(ResourceSpec):
     max_data_extension_time_in_days: int = None
     change_tracking: bool = False
     default_ddl_collation: str = None
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
     comment: str = None
     # row_access_policy: str = None
     owner: RoleRef = "SYSADMIN"

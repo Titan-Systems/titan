@@ -29,7 +29,7 @@ class _View(ResourceSpec):
     copy_grants: bool = field(default_factory=False, metadata={"fetchable": False})
     comment: str = None
     # TODO: remove this if parsing is feasible
-    as_: str = field(default_factory=None, metadata={"fetchable": False})
+    as_: str = field(default=None, metadata={"fetchable": False})
 
     def __post_init__(self):
         super().__post_init__()

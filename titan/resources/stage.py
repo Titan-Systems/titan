@@ -50,7 +50,7 @@ class _InternalStage(ResourceSpec):
     name: ResourceName
     owner: RoleRef = "SYSADMIN"
     type: StageType = StageType.INTERNAL
-    encryption: dict[str, EncryptionType] = field(default_factory=None, metadata={"fetchable": False})
+    encryption: dict[str, EncryptionType] = field(default=None, metadata={"fetchable": False})
     directory: dict[str, bool] = None
     comment: str = None
 
@@ -162,8 +162,8 @@ class _ExternalStage(ResourceSpec):
     owner: RoleRef = "SYSADMIN"
     type: StageType = StageType.EXTERNAL
     storage_integration: str = None
-    credentials: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
-    encryption: dict[str, str] = field(default_factory=None, metadata={"fetchable": False})
+    credentials: dict[str, str] = field(default=None, metadata={"fetchable": False})
+    encryption: dict[str, str] = field(default=None, metadata={"fetchable": False})
     directory: dict[str, bool] = None
     comment: str = None
 

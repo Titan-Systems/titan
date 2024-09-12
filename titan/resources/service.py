@@ -22,9 +22,9 @@ from .warehouse import Warehouse
 class _ServiceSpec(ResourceSpec):
     name: ResourceName
     compute_pool: ComputePool
-    stage: str = field(default_factory=None, metadata={"fetchable": False})
-    yaml_file_stage_path: str = field(default_factory=None, metadata={"fetchable": False})
-    specification: str = field(default_factory=None, metadata={"fetchable": False})
+    stage: str = field(default=None, metadata={"fetchable": False})
+    yaml_file_stage_path: str = field(default=None, metadata={"fetchable": False})
+    specification: str = field(default=None, metadata={"fetchable": False})
     external_access_integrations: list[str] = None
     auto_resume: bool = True
     min_instances: int = None
