@@ -4,6 +4,7 @@ import pytest
 
 from titan import resources as res
 from titan import var
+from titan.blueprint_config import BlueprintConfig
 from titan.blueprint import (
     Blueprint,
     CreateResource,
@@ -11,8 +12,8 @@ from titan.blueprint import (
     compile_plan_to_sql,
     dump_plan,
 )
-from titan.enums import ResourceType
-from titan.exceptions import MissingVarException
+from titan.enums import ResourceType, RunMode
+from titan.exceptions import MissingVarException, InvalidResourceException
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
@@ -534,7 +535,7 @@ def test_blueprint_dump_plan_drop(session_ctx):
             "comment": None,
         },
     }
-    blueprint = Blueprint(resources=[], run_mode="SYNC-ALL", allowlist=[ResourceType.ROLE])
+    blueprint = Blueprint(resources=[], run_mode="SYNC", allowlist=[ResourceType.ROLE])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     plan_json_str = dump_plan(plan, format="json")
@@ -618,3 +619,46 @@ def test_blueprint_vars_spec(session_ctx):
     blueprint = Blueprint(resources=[res.Role(name="role", comment=var.role_comment)])
     with pytest.raises(MissingVarException):
         blueprint.generate_manifest(session_ctx)
+
+
+def test_blueprint_allowlist(session_ctx, remote_state):
+    blueprint = Blueprint(
+        resources=[res.Role(name="role1")],
+        allowlist=[ResourceType.ROLE],
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+
+    blueprint = Blueprint(allowlist=["ROLE"])
+    assert blueprint._config.allowlist == [ResourceType.ROLE]
+    with pytest.raises(InvalidResourceException):
+        blueprint.add(res.Database(name="db1"))
+
+    with pytest.raises(InvalidResourceException):
+        blueprint = Blueprint(
+            resources=[res.Role(name="role1")],
+            allowlist=[ResourceType.DATABASE],
+        )
+
+
+def test_blueprint_config_validation():
+    with pytest.raises(ValueError):
+        BlueprintConfig(run_mode=None)
+    with pytest.raises(ValueError):
+        BlueprintConfig(run_mode="non-existent-mode")
+    with pytest.raises(ValueError):
+        BlueprintConfig(run_mode="sync")
+    with pytest.raises(ValueError):
+        BlueprintConfig(allowlist=[])
+
+    bp = Blueprint(run_mode="SYNC", allowlist=["ROLE"])
+    assert bp._config.run_mode == RunMode.SYNC
+    bp = Blueprint(run_mode="CREATE-OR-UPDATE")
+    assert bp._config.run_mode == RunMode.CREATE_OR_UPDATE
+
+    bp = Blueprint(allowlist=["ROLE"])
+    assert bp._config.allowlist == [ResourceType.ROLE]
+
+    with pytest.raises(ValueError):
+        Blueprint(allowlist=["non-existent-resource-type"])

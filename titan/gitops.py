@@ -3,7 +3,7 @@ import logging
 from inflection import pluralize
 
 from .blueprint_config import BlueprintConfig
-from .enums import ResourceType
+from .enums import ResourceType, RunMode
 from .identifiers import resource_label_for_type
 from .resource_name import ResourceName
 from .resources import (
@@ -192,7 +192,7 @@ def collect_blueprint_config(yaml_config: dict) -> BlueprintConfig:
 
     allowlist = config.pop("allowlist", None)
     if allowlist:
-        blueprint_args["allowlist"] = allowlist
+        blueprint_args["allowlist"] = [ResourceType(resource_type) for resource_type in allowlist]
     dry_run = config.pop("dry_run", None)
     if dry_run:
         blueprint_args["dry_run"] = dry_run
@@ -201,7 +201,7 @@ def collect_blueprint_config(yaml_config: dict) -> BlueprintConfig:
         blueprint_args["name"] = name
     run_mode = config.pop("run_mode", None)
     if run_mode:
-        blueprint_args["run_mode"] = run_mode
+        blueprint_args["run_mode"] = RunMode(run_mode)
     vars_spec = config.pop("vars", None)
     if vars_spec:
         if not isinstance(vars_spec, list):

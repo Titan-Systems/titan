@@ -37,6 +37,11 @@ class ParseableEnum(Enum, metaclass=_Parseable):
         return super()._missing_(val)
 
 
+class RunMode(ParseableEnum):
+    CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
+    SYNC = "SYNC"
+
+
 class ResourceType(ParseableEnum):
     EXTERNAL_VOLUME_STORAGE_LOCATION = "EXTERNAL VOLUME STORAGE LOCATION"
     ACCOUNT = "ACCOUNT"

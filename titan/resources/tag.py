@@ -149,7 +149,7 @@ class TaggableResource:
         super().__init__(**kwargs)
         self._tags: Optional[ResourceTags] = None
 
-    def set_tags(self, tags: dict[str, str]):
+    def set_tags(self, tags: Optional[dict[str, str]]):
         if tags is None:
             return
         if self._tags is None:

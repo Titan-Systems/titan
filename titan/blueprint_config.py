@@ -1,14 +1,9 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .enums import ParseableEnum, ResourceType
+from .enums import ResourceType, RunMode
 from .exceptions import MissingVarException, InvalidResourceException
 from .resources.resource import Resource
-
-
-class RunMode(ParseableEnum):
-    CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
-    SYNC = "SYNC"
 
 
 _VAR_TYPE_MAP = {
@@ -28,7 +23,7 @@ class BlueprintConfig:
     resources: Optional[list[Resource]] = None
     run_mode: RunMode = RunMode.CREATE_OR_UPDATE
     dry_run: bool = False
-    allowlist: list[ResourceType] = field(default_factory=list)
+    allowlist: Optional[list[ResourceType]] = None
     vars: dict = field(default_factory=dict)
     vars_spec: list[dict] = field(default_factory=list)
 
@@ -38,12 +33,13 @@ class BlueprintConfig:
             raise ValueError("dry_run must be provided")
         if self.run_mode is None:
             raise ValueError("run_mode must be provided")
-        if self.allowlist is None:
-            raise ValueError("allowlist must be provided")
         if self.vars is None:
             raise ValueError("vars must be provided")
         if self.vars_spec is None:
             raise ValueError("vars_spec must be provided")
+
+        if not isinstance(self.run_mode, RunMode):
+            raise ValueError(f"Invalid run_mode: {self.run_mode}")
 
         if self.run_mode == RunMode.SYNC:
             """
@@ -51,15 +47,19 @@ class BlueprintConfig:
             but all resources that exist in Snowflake. The allowlist is required to limit the scope of
             the sync to a specific set of resources.
             """
-            if len(self.allowlist) == 0:
+            if self.allowlist is None:
                 raise ValueError("Sync mode must specify an allowlist")
 
-        if len(self.allowlist) > 0:
-            for resource in self.resources:
-                if resource.resource_type not in self.allowlist:
-                    raise InvalidResourceException(
-                        f"Resource {resource.urn} of type {resource.type} is not in the allowlist"
-                    )
+        if self.allowlist is not None:
+            if len(self.allowlist) == 0:
+                raise ValueError("Allowlist must have at least one resource type")
+            else:
+                if self.resources:
+                    for resource in self.resources:
+                        if resource.resource_type not in self.allowlist:
+                            raise InvalidResourceException(
+                                f"Resource {resource.urn} of type {resource.resource_type} is not in the allowlist"
+                            )
 
         if self.vars_spec:
             for var in self.vars_spec:

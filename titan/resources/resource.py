@@ -4,7 +4,7 @@ import types
 from dataclasses import dataclass, field, fields
 from inspect import isclass
 from itertools import chain
-from typing import Any, Type, TypedDict, Union, get_args, get_origin
+from typing import Any, Type, TypedDict, Union, get_args, get_origin, Optional
 
 import pyparsing as pp
 
@@ -138,6 +138,10 @@ def _coerce_resource_field(field_value, field_type):
     elif field_type is str:
         if isinstance(field_value, str) and string_contains_var(field_value):
             return VarString(field_value)
+        elif isinstance(field_value, VarString):
+            return field_value
+        elif not isinstance(field_value, str):
+            raise TypeError
         else:
             return field_value
     else:
@@ -472,7 +476,7 @@ class ResourceContainer:
                 self._items[item.resource_type] = []
             self._items[item.resource_type].append(item)
 
-    def items(self, resource_type: ResourceType = None) -> list[Resource]:
+    def items(self, resource_type: Optional[ResourceType] = None) -> list[Resource]:
         if resource_type:
             return self._items.get(resource_type, [])
         else:

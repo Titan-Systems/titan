@@ -3,7 +3,7 @@ import logging
 import json
 import sys
 from functools import cache
-from typing import Optional, Union
+from typing import Optional, Union, TypedDict
 
 import pytz
 from inflection import pluralize
@@ -36,6 +36,22 @@ from .resource_name import ResourceName, attribute_is_resource_name, resource_na
 __this__ = sys.modules[__name__]
 
 logger = logging.getLogger("titan")
+
+
+class SessionContext(TypedDict):
+    account_locator: str
+    account: str
+    available_roles: list[ResourceName]
+    database: str
+    role: str
+    schemas: list[str]
+    secondary_roles: list[str]
+    tag_support: bool
+    tags: list[str]
+    user: str
+    version: str
+    warehouse: str
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]]
 
 
 def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
@@ -441,7 +457,7 @@ def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list
             raise
 
 
-def _show_resource_parameters(session, type_str: str, fqn: FQN, cacheable: bool = True) -> list[dict]:
+def _show_resource_parameters(session, type_str: str, fqn: FQN, cacheable: bool = True) -> dict:
     result = execute(session, f"SHOW PARAMETERS IN {type_str} {fqn}", cacheable=cacheable)
     return params_result_to_dict(result)
 
@@ -493,7 +509,7 @@ def fetch_region(session):
 
 
 @cache
-def fetch_session(session):
+def fetch_session(session) -> SessionContext:
     session_obj = execute(
         session,
         """

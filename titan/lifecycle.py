@@ -385,7 +385,7 @@ def transfer_resource(
 
 def transfer__default(
     urn: URN,
-    owner: str,
+    owner: URN,
     owner_resource_type: ResourceType,
     copy_current_grants: bool = False,
     revoke_current_grants: bool = False,

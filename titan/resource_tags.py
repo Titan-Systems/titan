@@ -1,5 +1,5 @@
 class ResourceTags:
-    def __init__(self, tags: dict[str, str] = None):
+    def __init__(self, tags: dict[str, str]):
         self.tags = {}
         if isinstance(tags, ResourceTags):
             tags = tags.to_dict()

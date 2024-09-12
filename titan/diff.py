@@ -77,37 +77,23 @@ def diff(original, new):
     for key in new_keys - original_keys:
         if isinstance(new[key], dict) and new[key].get("_pointer", False):
             raise Exception(f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {key}")
-        elif isinstance(new[key], list):
-            for item in new[key]:
-                yield Action.CREATE, key, item
-        else:
-            yield Action.CREATE, key, new[key]
+        yield Action.CREATE, key, new[key]
 
     # Resources in both should be compared
     for key in original_keys & new_keys:
-        if isinstance(original[key], dict):
-            # We don't diff resource pointers
-            if new[key].get("_pointer", False):
-                continue
+        if not isinstance(original[key], dict):
+            raise RuntimeError(f"Unexpected type for resource {key}: {type(original[key])}")
 
-            delta = dict_delta(original[key], new[key])
+        # We don't diff resource pointers
+        if new[key].get("_pointer", False):
+            continue
 
-            owner_attr = delta.pop("owner", None)
+        delta = dict_delta(original[key], new[key])
+        owner_attr = delta.pop("owner", None)
 
-            for attr, value in delta.items():
-                yield Action.UPDATE, key, {attr: value}
+        for attr, value in delta.items():
+            yield Action.UPDATE, key, {attr: value}
 
-            # Force the transfer to happen after all other attribute changes
-            if owner_attr:
-                yield Action.TRANSFER, key, {"owner": owner_attr}
-
-        # I think this is dead code.
-        elif isinstance(original[key], list):
-
-            for item in original[key]:
-                if item not in new[key]:
-                    yield Action.DROP, key, item
-
-            for item in new[key]:
-                if item not in original[key]:
-                    yield Action.CREATE, key, item
+        # Force the transfer to happen after all other attribute changes
+        if owner_attr:
+            yield Action.TRANSFER, key, {"owner": owner_attr}

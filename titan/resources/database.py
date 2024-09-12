@@ -1,3 +1,4 @@
+from typing import cast, Union
 from dataclasses import dataclass
 
 from ..enums import ResourceType
@@ -162,5 +163,5 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         return self.items(resource_type=ResourceType.SCHEMA)
 
     @property
-    def public_schema(self) -> Schema:
-        return self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA)
+    def public_schema(self) -> Union[Schema, ResourcePointer]:
+        return cast(Union[Schema, ResourcePointer], self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA))

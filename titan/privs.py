@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-
+from typing import Optional
 from .enums import ParseableEnum, ResourceType
 
 
@@ -340,7 +340,7 @@ class WarehousePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
-PRIVS_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {
+PRIVS_FOR_RESOURCE_TYPE: dict[ResourceType, Optional[type[ParseableEnum]]] = {
     ResourceType.ACCOUNT: AccountPriv,
     ResourceType.AGGREGATION_POLICY: None,
     ResourceType.ALERT: AlertPriv,
