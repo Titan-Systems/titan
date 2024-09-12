@@ -97,9 +97,6 @@ def _desc_type3_result_to_dict(desc_result, lower_properties=False):
         if lower_properties:
             parent_property = parent_property.lower()
             property = property.lower()
-        if parent_property not in result:
-            result[parent_property] = {}
-
         value = row["property_value"]
         if row["property_type"] == "Boolean":
             value = value == "true"
@@ -111,7 +108,13 @@ def _desc_type3_result_to_dict(desc_result, lower_properties=False):
             value = value or None
         elif row["property_type"] == "List":
             value = _parse_list_property(value)
-        result[parent_property][property] = value
+
+        if parent_property:
+            if parent_property not in result:
+                result[parent_property] = {}
+            result[parent_property][property] = value
+        else:
+            result[property] = value
     return result
 
 
@@ -295,6 +298,20 @@ def _parse_packages(packages_str: str) -> Optional[list]:
     if packages_str is None or packages_str == "":
         return None
     return json.loads(packages_str.replace("'", '"'))
+
+
+def _parse_storage_location(storage_location_str: str) -> Optional[dict]:
+    if storage_location_str is None or storage_location_str == "":
+        return None
+    raw_dict = json.loads(storage_location_str)
+    storage_location = {}
+    for key, value in raw_dict.items():
+        key = key.lower()
+        if key == "encryption_type" and value == "NONE":
+            key = "encryption"
+            value = {"type": "NONE"}
+        storage_location[key] = value
+    return storage_location
 
 
 def params_result_to_dict(params_result):
@@ -835,6 +852,36 @@ def fetch_external_access_integration(session, fqn: FQN):
         "allowed_authentication_secrets": properties["allowed_authentication_secrets"] or None,
         "enabled": data["enabled"] == "true",
         "owner": owner,
+        "comment": data["comment"] or None,
+    }
+
+
+def fetch_external_volume(session, fqn: FQN):
+    show_result = _show_resources(session, "EXTERNAL VOLUMES", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple external volumes matching {fqn}")
+
+    data = show_result[0]
+    desc_result = execute(session, f"DESC EXTERNAL VOLUME {fqn}", cacheable=True)
+    properties = _desc_type3_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "VOLUME", fqn)
+
+    storage_locations = []
+    index = 1
+    while True:
+        storage_location = properties["storage_locations"].get(f"storage_location_{index}")
+        if storage_location is None:
+            break
+        storage_locations.append(_parse_storage_location(storage_location))
+        index += 1
+
+    return {
+        "name": _quote_snowflake_identifier(data["name"]),
+        "owner": owner,
+        "storage_locations": storage_locations,
+        "allow_writes": data["allow_writes"] == "true",
         "comment": data["comment"] or None,
     }
 

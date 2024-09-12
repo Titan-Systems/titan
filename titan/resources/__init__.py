@@ -11,7 +11,7 @@ from .dynamic_table import DynamicTable
 from .event_table import EventTable
 from .external_access_integration import ExternalAccessIntegration
 from .external_function import ExternalFunction
-from .external_volume import S3ExternalVolume
+from .external_volume import ExternalVolume
 from .failover_group import FailoverGroup
 from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
@@ -85,6 +85,7 @@ __all__ = [
     "ExternalAccessIntegration",
     "ExternalFunction",
     "ExternalStage",
+    "ExternalVolume",
     "FailoverGroup",
     "FutureGrant",
     "GCPInboundNotificationIntegration",
@@ -117,7 +118,6 @@ __all__ = [
     "ResourceMonitor",
     "Role",
     "RoleGrant",
-    "S3ExternalVolume",
     "S3StorageIntegration",
     "Schema",
     "Sequence",

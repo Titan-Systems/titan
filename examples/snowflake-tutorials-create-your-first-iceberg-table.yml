@@ -1,3 +1,6 @@
+name: snowflake-tutorials-create-your-first-iceberg-table
+run_mode: create-or-update
+
 vars:
   - name: storage_role_arn
     type: string
@@ -34,6 +37,6 @@ external_volumes:
     storage_locations:
       - name: my-s3-us-west-2
         storage_provider: S3
-        storage_base_url: 's3://<my_bucket>/'
+        storage_base_url: "{{ vars.storage_base_url }}"
         storage_aws_role_arn: "{{ vars.storage_role_arn }}"
         storage_aws_external_id: iceberg_table_external_id

@@ -106,6 +106,10 @@ class Props:
 
 
 class BoolProp(Prop):
+    """
+    AUTO_RESUME = { TRUE | FALSE }
+    """
+
     def typecheck(self, prop_value):
         if prop_value.lower() not in ["true", "false"]:
             raise ValueError(f"Invalid boolean value: {prop_value}")
@@ -122,6 +126,10 @@ class BoolProp(Prop):
 
 
 class IntProp(Prop):
+    """
+    AUTO_SUSPEND_SECS = <num>
+    """
+
     def typecheck(self, prop_value):
         try:
             return int(prop_value)
@@ -139,6 +147,10 @@ class IntProp(Prop):
 
 
 class StringProp(Prop):
+    """
+    COMMENT = '<string_literal>'
+    """
+
     def typecheck(self, prop_value):
         return prop_value
 
@@ -153,6 +165,10 @@ class StringProp(Prop):
 
 
 class FlagProp(Prop):
+    """
+    COPY GRANTS
+    """
+
     def __init__(self, label):
         super().__init__(label, eq=False)
         self.parser = Keywords(self.label)("prop_value")
@@ -165,6 +181,10 @@ class FlagProp(Prop):
 
 
 class IdentifierProp(Prop):
+    """
+    WAREHOUSE = <warehouse_name>
+    """
+
     def __init__(self, label, **kwargs):
         super().__init__(label, value_expr=FullyQualifiedIdentifier(), **kwargs)
 
@@ -184,6 +204,10 @@ class IdentifierProp(Prop):
 
 
 class IdentifierListProp(Prop):
+    """
+    EXTERNAL_ACCESS_INTEGRATIONS = ( <name_of_integration> [ , ... ] )
+    """
+
     def __init__(self, label, **kwargs):
         value_expr = pp.delimited_list(pp.Group(FullyQualifiedIdentifier()))
         super().__init__(label, value_expr=value_expr, **kwargs)
@@ -205,6 +229,10 @@ class IdentifierListProp(Prop):
 
 
 class StringListProp(Prop):
+    """
+    PACKAGES = ( '<package_name_and_version>' [ , ... ] )
+    """
+
     def __init__(self, label, **kwargs):
         value_expr = pp.delimited_list(ANY())
         super().__init__(label, value_expr=value_expr, **kwargs)
@@ -224,6 +252,12 @@ class StringListProp(Prop):
 
 
 class PropSet(Prop):
+    """
+    FILE_FORMAT = (
+        { FORMAT_NAME = '<file_format_name>' | TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML | CUSTOM }
+    )
+    """
+
     def __init__(self, label, props: Props):
         value_expr = pp.original_text_for(pp.nested_expr())
         super().__init__(label, value_expr)
@@ -240,6 +274,54 @@ class PropSet(Prop):
         value_str = self.props.render(values)
         value_str = f"({value_str})"
         return f"{self.label}{eq}{value_str}"
+
+
+class PropList(Prop):
+    """
+    STORAGE_LOCATIONS = (
+        (
+            NAME = '<storage_location_name>'
+            STORAGE_BASE_URL = '<protocol>://<bucket>[/<path>/]'
+            ...
+      )
+      [, (...), ...]
+    )
+    """
+
+    def __init__(self, label, prop: Prop):
+        super().__init__(label)
+        self.prop = prop
+
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return ""
+        eq = " = " if self.eq else " "
+        return f"{self.label}{eq}({', '.join(map(self.prop.render, values))})"
+
+
+class StructProp(Prop):
+    """
+    (
+        NAME = '<storage_location_name>'
+        STORAGE_BASE_URL = '<protocol>://<bucket>[/<path>/]'
+        ...
+    )
+    """
+
+    def __init__(self, props: Props, **kwargs):
+        super().__init__(label=None, **kwargs)
+        self.props = props
+        # value_expr = pp.original_text_for(pp.nested_expr())
+        # super().__init__(label, value_expr)
+        # value_expr = pp.delimited_list(ANY() + EQUALS() + ANY(), delim=" ")
+        # super().__init__(label, value_expr=value_expr, eq=False, parens=True, consume="WITH")
+
+    def render(self, value):
+        if value is None:
+            return ""
+        # kv_pairs = " ".join([f"{key} = '{value}'" for key, value in value.items()])
+        kv_pairs = self.props.render(value)
+        return f"({kv_pairs})"
 
 
 class TagsProp(Prop):

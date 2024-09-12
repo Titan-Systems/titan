@@ -8,6 +8,7 @@ from titan.client import reset_cache
 from titan.parse import _split_statements
 from titan.resource_name import ResourceName
 from titan.resources import Resource
+from titan.resources.resource import ResourceSpec
 
 logger = logging.getLogger("titan")
 
@@ -28,12 +29,12 @@ def assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
     assert lhs == rhs
 
 
-def strip_nones_and_unfetchable(spec, data):
+def strip_nones_and_unfetchable(spec: ResourceSpec, data: dict) -> dict:
     data = data_provider.remove_none_values(data)
     keys = set(data.keys())
     for attr in keys:
         attr_metadata = spec.get_metadata(attr)
-        if not attr_metadata.fetchable:
+        if not attr_metadata.fetchable and not attr_metadata.known_after_apply:
             data.pop(attr, None)
     return data
 

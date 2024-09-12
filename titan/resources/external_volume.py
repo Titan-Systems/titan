@@ -1,16 +1,17 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from ..enums import ParseableEnum, ResourceType
+from ..enums import ParseableEnum, ResourceType, EncryptionType
 from ..props import (
-    BoolProp,
+    StructProp,
     EnumProp,
-    IdentifierProp,
+    PropSet,
     Props,
     StringProp,
     TagsProp,
+    PropList,
 )
 from ..resource_name import ResourceName
-from ..scope import AccountScope
+from ..scope import AccountScope, AnonymousScope
 from .resource import NamedResource, Resource, ResourceSpec
 from .role import Role
 from .tag import TaggableResource
@@ -24,11 +25,77 @@ class ExternalVolumeStorageProvider(ParseableEnum):
 
 
 @dataclass(unsafe_hash=True)
-class _S3ExternalVolume(ResourceSpec):
+class _ExternalVolumeStorageLocation(ResourceSpec):
+    name: str
+    storage_provider: ExternalVolumeStorageProvider
+    storage_base_url: str
+    encryption: dict = None
+    storage_aws_role_arn: str = None
+    storage_aws_external_id: str = None
+    # storage_allowed_locations: list[str] = field(default_factory=None, metadata={"known_after_apply": True})
+    storage_aws_iam_user_arn: str = field(default=None, metadata={"known_after_apply": True})
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.encryption is None:
+            self.encryption = {"type": EncryptionType.NONE}
+
+
+class ExternalVolumeStorageLocation(Resource):
+    resource_type = ResourceType.EXTERNAL_VOLUME_STORAGE_LOCATION
+    props = Props(
+        name=StringProp("name"),
+        storage_provider=EnumProp("storage_provider", ExternalVolumeStorageProvider, quoted=True),
+        storage_base_url=StringProp("storage_base_url"),
+        encryption=PropSet(
+            "encryption",
+            Props(
+                type=EnumProp(
+                    "type",
+                    [
+                        EncryptionType.AWS_SSE_S3,
+                        EncryptionType.AWS_SSE_KMS,
+                        EncryptionType.GCS_SSE_KMS,
+                        EncryptionType.NONE,
+                    ],
+                    quoted=True,
+                )
+            ),
+        ),
+        storage_aws_role_arn=StringProp("storage_aws_role_arn"),
+        storage_aws_external_id=StringProp("storage_aws_external_id"),
+    )
+    scope = AnonymousScope()
+    spec = _ExternalVolumeStorageLocation
+    serialize_inline = True
+
+    def __init__(
+        self,
+        name: str,
+        storage_provider: ExternalVolumeStorageProvider,
+        storage_base_url: str,
+        encryption: dict = None,
+        storage_aws_role_arn: str = None,
+        storage_aws_external_id: str = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        print("init")
+        self._data: _ExternalVolumeStorageLocation = _ExternalVolumeStorageLocation(
+            name=name,
+            storage_provider=storage_provider,
+            storage_base_url=storage_base_url,
+            encryption=encryption,
+            storage_aws_role_arn=storage_aws_role_arn,
+            storage_aws_external_id=storage_aws_external_id,
+        )
+
+
+@dataclass(unsafe_hash=True)
+class _ExternalVolume(ResourceSpec):
     name: ResourceName
     owner: Role = "SYSADMIN"
-    volume_type: ExternalVolumeStorageProvider = ExternalVolumeStorageProvider.S3
-    storage_locations: list[dict[str, str]] = None
+    storage_locations: list[ExternalVolumeStorageLocation] = None
     allow_writes: bool = True
     comment: str = None
 
@@ -38,16 +105,18 @@ class _S3ExternalVolume(ResourceSpec):
             raise ValueError("storage_locations is required")
 
 
-class S3ExternalVolume(NamedResource, TaggableResource, Resource):
+class ExternalVolume(NamedResource, TaggableResource, Resource):
     resource_type = ResourceType.EXTERNAL_VOLUME
     props = Props(
-        # volume_type=EnumProp("volume_type", ExternalVolumeType),
-        # storage_locations=ListProp("storage_locations", StringProp("location")),
+        storage_locations=PropList(
+            "storage_locations",
+            StructProp(ExternalVolumeStorageLocation.props),
+        ),
         comment=StringProp("comment"),
         tags=TagsProp(),
     )
     scope = AccountScope()
-    spec = _S3ExternalVolume
+    spec = _ExternalVolume
 
     def __init__(
         self,
@@ -60,7 +129,7 @@ class S3ExternalVolume(NamedResource, TaggableResource, Resource):
         **kwargs,
     ):
         super().__init__(name, **kwargs)
-        self._data: _S3ExternalVolume = _S3ExternalVolume(
+        self._data: _ExternalVolume = _ExternalVolume(
             name=self._name,
             owner=owner,
             storage_locations=storage_locations,

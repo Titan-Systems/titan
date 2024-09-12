@@ -153,11 +153,13 @@ class ResourceSpecMetadata:
     triggers_replacement: bool = False
     forces_add: bool = False
     ignore_changes: bool = False
+    known_after_apply: bool = False
 
 
 @dataclass
 class ResourceSpec:
     def __post_init__(self):
+        print("ok")
         for f in fields(self):
             field_value = getattr(self, f.name)
             if field_value is None:
@@ -311,7 +313,7 @@ class Resource(metaclass=_Resource):
     def __repr__(self):  # pragma: no cover
         if not hasattr(self, "_data"):
             return f"{self.__class__.__name__}(<uninitialized>)"
-        name = getattr(self._data, "name", None)
+        name = getattr(self._data, "name", "<noname>")
         implicit = "~" if self.implicit else ""
         return f"{self.__class__.__name__}({implicit}{name})"
 

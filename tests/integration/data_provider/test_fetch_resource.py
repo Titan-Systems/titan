@@ -34,6 +34,15 @@ def email_address(cursor):
     return user["email"]
 
 
+def _create(cursor, resource):
+    sql = resource.create_sql(if_not_exists=True)
+    try:
+        cursor.execute(sql)
+    except Exception as err:
+        raise Exception(f"Error creating resource: \nQuery: {err.query}\nMsg: {err.msg}") from err
+    return resource
+
+
 def test_fetch_privilege_grant(cursor, suffix, marked_for_cleanup):
     role = res.Role(name=f"grant_role_{suffix}")
     cursor.execute(role.create_sql(if_not_exists=True))
@@ -1194,4 +1203,31 @@ def test_fetch_image_repository(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = strip_nones_and_unfetchable(res.ImageRepository.spec, result)
     data = strip_nones_and_unfetchable(res.ImageRepository.spec, repository.to_dict())
+    assert result == data
+
+
+def test_fetch_external_volume(cursor, suffix, marked_for_cleanup):
+    volume = res.ExternalVolume(
+        name=f"SOME_EXTERNAL_VOLUME_{suffix}",
+        owner=TEST_ROLE,
+        storage_locations=[
+            {
+                "name": "my-s3-us-east-2-a",
+                "storage_provider": "S3",
+                "storage_base_url": "s3://s3-bucket/",
+                "storage_aws_role_arn": "arn:aws:iam::12345678:role/role-name",
+                "storage_aws_external_id": "external-id",
+            }
+        ],
+    )
+    # cursor.execute(volume.create_sql(if_not_exists=True))
+    _create(cursor, volume)
+    marked_for_cleanup.append(volume)
+
+    result = safe_fetch(cursor, volume.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.ExternalVolume.spec, result)
+    data = strip_nones_and_unfetchable(res.ExternalVolume.spec, volume.to_dict())
+    assert len(result["storage_locations"]) == len(data["storage_locations"])
+    assert result["storage_locations"][0] == data["storage_locations"][0]
     assert result == data

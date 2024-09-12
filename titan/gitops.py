@@ -187,24 +187,31 @@ def _resources_for_config(config: dict):
 def collect_blueprint_config(yaml_config: dict) -> dict:
 
     config = yaml_config.copy()
-
-    vars = config.pop("vars", None)
+    blueprint_args = {}
 
     allowlist = config.pop("allowlist", None)
+    if allowlist:
+        blueprint_args["allowlist"] = allowlist
     dry_run = config.pop("dry_run", None)
+    if dry_run:
+        blueprint_args["dry_run"] = dry_run
     name = config.pop("name", None)
+    if name:
+        blueprint_args["name"] = name
     run_mode = config.pop("run_mode", None)
+    if run_mode:
+        blueprint_args["run_mode"] = run_mode
+    vars = config.pop("vars", None)
+    if vars:
+        blueprint_args["vars"] = vars
 
     resources = _resources_for_config(config)
+    if len(resources) == 0:
+        raise ValueError("No resources found in config")
+
+    blueprint_args["resources"] = resources
 
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
 
-    return {
-        "allowlist": allowlist,
-        "dry_run": dry_run,
-        "name": name,
-        "resources": resources,
-        "run_mode": run_mode,
-        "vars": vars,
-    }
+    return blueprint_args

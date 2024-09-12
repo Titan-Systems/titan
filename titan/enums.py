@@ -38,6 +38,7 @@ class ParseableEnum(Enum, metaclass=_Parseable):
 
 
 class ResourceType(ParseableEnum):
+    EXTERNAL_VOLUME_STORAGE_LOCATION = "EXTERNAL VOLUME STORAGE LOCATION"
     ACCOUNT = "ACCOUNT"
     AGGREGATION_POLICY = "AGGREGATION POLICY"
     ALERT = "ALERT"
@@ -359,3 +360,14 @@ def resource_type_is_grant(resource_type: ResourceType) -> bool:
         ResourceType.GRANT_ON_ALL,
         ResourceType.FUTURE_GRANT,
     )
+
+
+class EncryptionType(ParseableEnum):
+    SNOWFLAKE_FULL = "SNOWFLAKE_FULL"
+    SNOWFLAKE_SSE = "SNOWFLAKE_SSE"
+    AWS_CSE = "AWS_CSE"
+    AWS_SSE_S3 = "AWS_SSE_S3"
+    AWS_SSE_KMS = "AWS_SSE_KMS"
+    GCS_SSE_KMS = "GCS_SSE_KMS"
+    AZURE_CSE = "AZURE_CSE"
+    NONE = "NONE"
