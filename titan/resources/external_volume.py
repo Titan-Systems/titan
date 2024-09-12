@@ -32,7 +32,7 @@ class _ExternalVolumeStorageLocation(ResourceSpec):
     encryption: dict = None
     storage_aws_role_arn: str = None
     storage_aws_external_id: str = None
-    # storage_allowed_locations: list[str] = field(default_factory=None, metadata={"known_after_apply": True})
+    storage_allowed_locations: list[str] = field(default=None, metadata={"known_after_apply": True})
     storage_aws_iam_user_arn: str = field(default=None, metadata={"known_after_apply": True})
 
     def __post_init__(self):
@@ -80,7 +80,6 @@ class ExternalVolumeStorageLocation(Resource):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        print("init")
         self._data: _ExternalVolumeStorageLocation = _ExternalVolumeStorageLocation(
             name=name,
             storage_provider=storage_provider,

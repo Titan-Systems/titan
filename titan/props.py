@@ -24,6 +24,12 @@ from .parse import (
 __this__ = sys.modules[__name__]
 
 
+def quote_value(value: str):
+    if value is None or value == "":
+        return "''"
+    return f"$${value}$$"
+
+
 class Prop(ABC):
     """
     A Prop is a named expression that can be parsed from a SQL string.
@@ -160,7 +166,7 @@ class StringProp(Prop):
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
-            f"$${value}$$",
+            quote_value(value),
         )
 
 
@@ -243,7 +249,7 @@ class StringListProp(Prop):
     def render(self, values):
         if values is None or len(values) == 0:
             return ""
-        value_list = ", ".join([f"$${v}$$" for v in values])
+        value_list = ", ".join([quote_value(v) for v in values])
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",

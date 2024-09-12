@@ -37,6 +37,6 @@ external_volumes:
     storage_locations:
       - name: my-s3-us-west-2
         storage_provider: S3
-        storage_base_url: "{{ vars.storage_base_url }}"
-        storage_aws_role_arn: "{{ vars.storage_role_arn }}"
+        storage_base_url: "{{ var.storage_base_url }}"
+        storage_aws_role_arn: "{{ var.storage_role_arn }}"
         storage_aws_external_id: iceberg_table_external_id

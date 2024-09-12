@@ -307,9 +307,9 @@ def _parse_storage_location(storage_location_str: str) -> Optional[dict]:
     storage_location = {}
     for key, value in raw_dict.items():
         key = key.lower()
-        if key == "encryption_type" and value == "NONE":
+        if key == "encryption_type":
             key = "encryption"
-            value = {"type": "NONE"}
+            value = {"type": value}
         storage_location[key] = value
     return storage_location
 

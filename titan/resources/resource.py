@@ -159,7 +159,6 @@ class ResourceSpecMetadata:
 @dataclass
 class ResourceSpec:
     def __post_init__(self):
-        print("ok")
         for f in fields(self):
             field_value = getattr(self, f.name)
             if field_value is None:
@@ -410,10 +409,24 @@ class Resource(metaclass=_Resource):
                 database.find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(self)
 
     def _resolve_vars(self, vars: dict):
+
+        def _render_vars(field_value):
+            if isinstance(field_value, VarString):
+                return field_value.to_string(vars)
+            elif isinstance(field_value, list):
+                return [_render_vars(v) for v in field_value]
+            elif isinstance(field_value, dict):
+                return {k: _render_vars(v) for k, v in field_value.items()}
+            elif isinstance(field_value, Resource) and not isinstance(field_value, ResourcePointer):
+                field_value._resolve_vars(vars)
+                return field_value
+            else:
+                return field_value
+
         for f in fields(self._data):
             field_value = getattr(self._data, f.name)
-            if isinstance(field_value, VarString):
-                setattr(self._data, f.name, field_value.to_string(vars))
+            new_value = _render_vars(field_value)
+            setattr(self._data, f.name, new_value)
 
         if isinstance(self, NamedResource) and isinstance(self._name, VarString):
             self._name = ResourceName(self._name.to_string(vars))

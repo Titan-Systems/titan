@@ -1,4 +1,6 @@
-from jinja2 import Template
+from jinja2 import Environment, StrictUndefined
+
+GLOBAL_JINJA_ENV = Environment(undefined=StrictUndefined)
 
 
 class VarString:
@@ -6,7 +8,7 @@ class VarString:
         self.string = string
 
     def to_string(self, vars: dict):
-        return Template(self.string).render(var=vars)
+        return GLOBAL_JINJA_ENV.from_string(self.string).render(var=vars)
 
     def __eq__(self, other: str):
         raise NotImplementedError("VarString does not support equality checks")

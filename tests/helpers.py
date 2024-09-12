@@ -29,19 +29,19 @@ def assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
     assert lhs == rhs
 
 
-def strip_nones_and_unfetchable(spec: ResourceSpec, data: dict) -> dict:
+def clean_resource_data(spec: ResourceSpec, data: dict) -> dict:
     data = data_provider.remove_none_values(data)
     keys = set(data.keys())
     for attr in keys:
         attr_metadata = spec.get_metadata(attr)
-        if not attr_metadata.fetchable and not attr_metadata.known_after_apply:
+        if not attr_metadata.fetchable or attr_metadata.known_after_apply:
             data.pop(attr, None)
     return data
 
 
 def assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:
-    lhs = strip_nones_and_unfetchable(spec, lhs)
-    rhs = strip_nones_and_unfetchable(spec, rhs)
+    lhs = clean_resource_data(spec, lhs)
+    rhs = clean_resource_data(spec, rhs)
     assert lhs == rhs
 
 

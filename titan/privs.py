@@ -118,6 +118,11 @@ class EventTablePriv(ParseableEnum):
     INSERT = "INSERT"
 
 
+class ExternalVolumePriv(ParseableEnum):
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
 class FailoverGroupPriv(ParseableEnum):
     ALL = "ALL"
     FAILOVER = "FAILOVER"
@@ -353,6 +358,7 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.EVENT_TABLE: EventTablePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.EXTERNAL_FUNCTION: FunctionPriv,
+    ResourceType.EXTERNAL_VOLUME: ExternalVolumePriv,
     ResourceType.FAILOVER_GROUP: FailoverGroupPriv,
     ResourceType.FILE_FORMAT: FileFormatPriv,
     ResourceType.FUNCTION: FunctionPriv,
