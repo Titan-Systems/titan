@@ -783,6 +783,8 @@ def fetch_database(session, fqn: FQN):
         "transient": "TRANSIENT" in options,
         "owner": _get_owner_identifier(data),
         "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
+        "external_volume": params.get("external_volume"),
+        "catalog": params.get("catalog"),
         "default_ddl_collation": params["default_ddl_collation"],
     }
 
@@ -1148,6 +1150,17 @@ def fetch_grant(session, fqn: FQN):
 def fetch_grant_on_all(session, fqn: FQN):
     # All grants are expensive to fetch, so we will assume they are always out of date
     return None
+
+
+def fetch_iceberg_table(session, fqn: FQN):
+    tables = _show_resources(session, "ICEBERG TABLES", fqn)
+    if len(tables) == 0:
+        return None
+    if len(tables) > 1:
+        raise Exception(f"Found multiple iceberg tables matching {fqn}")
+
+    data = tables[0]
+    return {"name": fqn.name, "owner": _get_owner_identifier(data)}
 
 
 def fetch_image_repository(session, fqn: FQN):
@@ -2230,6 +2243,10 @@ def list_dynamic_tables(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "DYNAMIC TABLES")
 
 
+def list_external_volumes(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "EXTERNAL VOLUMES")
+
+
 # def list_future_grants(session) -> list[FQN]:
 #     grants = []
 #     for role in roles:
@@ -2290,6 +2307,10 @@ def list_grants(session) -> list[FQN]:
                 )
             )
     return grants
+
+
+def list_iceberg_tables(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "ICEBERG TABLES")
 
 
 def list_image_repositories(session) -> list[FQN]:

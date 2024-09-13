@@ -53,14 +53,14 @@ from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
-SYNC_MODE_BLOCKLIST = [
-    ResourceType.FUTURE_GRANT,
-    ResourceType.GRANT,
-    ResourceType.GRANT_ON_ALL,
-    ResourceType.ROLE,
-    ResourceType.USER,
-    ResourceType.TABLE,
-]
+# SYNC_MODE_BLOCKLIST = [
+#     ResourceType.FUTURE_GRANT,
+#     ResourceType.GRANT,
+#     ResourceType.GRANT_ON_ALL,
+#     ResourceType.ROLE,
+#     ResourceType.USER,
+#     ResourceType.TABLE,
+# ]
 
 
 @dataclass
@@ -134,7 +134,7 @@ class Manifest:
     def __init__(self, account_locator: str = ""):
         self._account_locator = account_locator
         self._data: dict[URN, Resource] = {}
-        self._refs = []
+        self._refs: list[tuple[URN, URN]] = []
 
     def __getitem__(self, key: URN):
         if isinstance(key, URN):
@@ -353,9 +353,9 @@ def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
 
     def _merge(resource: ResourceContainer, pointer: Union[ResourcePointer, Schema]):
         if pointer.container is not None:
-            # The pointer has a container but the resource does not, merge fails
-            if getattr(resource, "container", None) is None:
-                raise Exception
+            # # The pointer has a container but the resource does not, merge fails
+            # if getattr(resource, "container", None) is None:
+            #     raise Exception(f"Cannot merge pointer {pointer} into resource {resource}")
             pointer.container.remove(pointer)
 
         # Migrate items from pointer to resource
@@ -477,12 +477,12 @@ class Blueprint:
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
                         )
 
-        if self._config.run_mode == RunMode.SYNC:
-            for change in plan:
-                if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
-                    exceptions.append(
-                        f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})"
-                    )
+        # if self._config.run_mode == RunMode.SYNC:
+        #     for change in plan:
+        #         if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
+        #             exceptions.append(
+        #                 f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})"
+        #             )
 
         # Valid Resource Types exceptions
         if self._config.allowlist:
@@ -500,7 +500,9 @@ class Blueprint:
     def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
         manifest_dict = manifest.to_dict()
 
-        changes: Plan = []
+        # changes: Plan = []
+        additive_changes: list[ResourceChange] = []
+        destructive_changes: list[ResourceChange] = []
         marked_for_replacement = set()
         for action, urn, delta in diff(remote_state, manifest_dict):
             before = remote_state.get(urn, {})
@@ -526,7 +528,7 @@ class Blueprint:
                     raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
                     marked_for_replacement.add(urn)
                 elif change_forces_add:
-                    changes.append(CreateResource(urn, after))
+                    additive_changes.append(CreateResource(urn, after))
                     continue
                 elif not change_is_fetchable:
                     # drift on fields that aren't fetchable should be ignored
@@ -537,11 +539,11 @@ class Blueprint:
                 elif change_should_be_ignored:
                     continue
                 else:
-                    changes.append(UpdateResource(urn, before, after, delta))
+                    additive_changes.append(UpdateResource(urn, before, after, delta))
             elif action == Action.CREATE:
-                changes.append(CreateResource(urn, after))
+                additive_changes.append(CreateResource(urn, after))
             elif action == Action.DROP:
-                changes.append(DropResource(urn, before))
+                destructive_changes.append(DropResource(urn, before))
             elif action == Action.TRANSFER:
                 resource = manifest[urn]
 
@@ -553,7 +555,7 @@ class Blueprint:
                     continue
                 if change_should_be_ignored:
                     continue
-                changes.append(TransferOwnership(urn, from_owner=before["owner"], to_owner=after["owner"]))
+                additive_changes.append(TransferOwnership(urn, from_owner=before["owner"], to_owner=after["owner"]))
 
         for urn in marked_for_replacement:
             raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
@@ -567,7 +569,10 @@ class Blueprint:
             resource_set.add(ref[1])
         # Calculate a topological sort order for the URNs
         sort_order = topological_sort(resource_set, set(manifest.refs))
-        return sorted(changes, key=lambda change: sort_order[change.urn])
+        plan = sorted(additive_changes, key=lambda change: sort_order[change.urn]) + sorted(
+            destructive_changes, key=lambda change: -1 * sort_order[change.urn]
+        )
+        return plan
 
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
         state: State = {}
@@ -682,7 +687,7 @@ class Blueprint:
         available_scopes = {}
         for database in databases:
             database_resources = list(database.items())
-            _merge_pointers(database_resources)
+            # _merge_pointers(database_resources)
             for schema in _get_schemas(database):
                 available_scopes[f"{database.name}.{schema.name}"] = schema
 
@@ -804,8 +809,11 @@ class Blueprint:
         if self._finalized:
             raise RuntimeError("Blueprint already finalized")
         self._finalized = True
+        print(">>>>>>>>", str(len(self._staged)))
         self._resolve_vars()
+        print(">>>>>>>>", str(len(self._staged)))
         self._build_resource_graph(session_ctx)
+        print(">>>>>>>>", str(len([r for r in _walk(self._root)])))
         # assert self._root is not None, "Root should be initialized after _build_resource_graph"
         self._create_tag_references()
         self._create_ownership_refs(session_ctx)

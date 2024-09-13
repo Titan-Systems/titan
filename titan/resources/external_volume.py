@@ -121,7 +121,7 @@ class ExternalVolume(NamedResource, Resource):
         self,
         name: str,
         owner: str = "ACCOUNTADMIN",
-        storage_locations: list[dict[str, str]] = None,
+        storage_locations: list[dict] = None,
         allow_writes: bool = True,
         comment: str = None,
         **kwargs,

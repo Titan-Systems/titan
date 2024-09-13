@@ -1,10 +1,11 @@
-from typing import cast, Union
 from dataclasses import dataclass
+from typing import Union, cast
 
 from ..enums import ResourceType
-from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
+from ..props import FlagProp, IdentifierProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
+from .external_volume import ExternalVolume
 from .resource import NamedResource, Resource, ResourceContainer, ResourcePointer, ResourceSpec
 from .role import Role
 from .schema import Schema
@@ -18,6 +19,8 @@ class _Database(ResourceSpec):
     owner: Role = "SYSADMIN"
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
+    external_volume: ExternalVolume = None
+    catalog: str = None
     default_ddl_collation: str = None
     comment: str = None
 
@@ -124,6 +127,8 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
         max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
         default_ddl_collation=StringProp("default_ddl_collation"),
+        external_volume=IdentifierProp("external_volume"),
+        catalog=StringProp("catalog"),
         tags=TagsProp(),
         comment=StringProp("comment"),
     )
@@ -137,6 +142,8 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         owner: str = "SYSADMIN",
         data_retention_time_in_days: int = 1,
         max_data_extension_time_in_days: int = 14,
+        external_volume: str = None,
+        catalog: str = None,
         default_ddl_collation: str = None,
         tags: dict[str, str] = None,
         comment: str = None,
@@ -149,6 +156,8 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
             owner=owner,
             data_retention_time_in_days=data_retention_time_in_days,
             max_data_extension_time_in_days=max_data_extension_time_in_days,
+            external_volume=external_volume,
+            catalog=catalog,
             default_ddl_collation=default_ddl_collation,
             comment=comment,
         )

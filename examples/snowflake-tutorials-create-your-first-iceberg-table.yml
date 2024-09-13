@@ -21,6 +21,8 @@ role_grants:
 databases:
   - name: iceberg_tutorial_db
     owner: iceberg_tutorial_role
+    external_volume: iceberg_external_volume
+    catalog: SNOWFLAKE
     
 warehouses:
   - name: iceberg_tutorial_wh
@@ -43,3 +45,27 @@ external_volumes:
         storage_base_url: "{{ var.storage_base_url }}"
         storage_aws_role_arn: "{{ var.storage_role_arn }}"
         storage_aws_external_id: iceberg_table_external_id
+
+iceberg_tables:
+  - name: customer_iceberg
+    owner: iceberg_tutorial_role
+    catalog: SNOWFLAKE
+    external_volume: iceberg_external_volume
+    base_location: customer_iceberg
+    columns:
+      - name: c_custkey
+        data_type: INTEGER
+      - name: c_name
+        data_type: STRING
+      - name: c_address
+        data_type: STRING
+      - name: c_nationkey
+        data_type: INTEGER
+      - name: c_phone
+        data_type: STRING
+      - name: c_acctbal
+        data_type: INTEGER
+      - name: c_mktsegment
+        data_type: STRING
+      - name: c_comment
+        data_type: STRING

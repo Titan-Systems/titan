@@ -22,7 +22,10 @@ def merge_configs(config1: dict, config2: dict) -> dict:
     merged = config1.copy()
     for key, value in config2.items():
         if key in merged:
-            merged[key] = merged[key] + value
+            if isinstance(merged[key], list):
+                merged[key] = merged[key] + value
+            elif merged[key] is None:
+                merged[key] = value
         else:
             merged[key] = value
     return merged
@@ -31,12 +34,14 @@ def merge_configs(config1: dict, config2: dict) -> dict:
 def configure_test_account(conn):
     session_ctx = fetch_session(conn)
     config = read_config("test_account.yml")
+    vars = dotenv_values(".vars.test_account")
+    print(vars)
     is_enterprise = session_ctx["tag_support"]
 
     if is_enterprise:
         config = merge_configs(config, read_config("test_account_enterprise.yml"))
 
-    blueprint_config = collect_blueprint_config(config)
+    blueprint_config = collect_blueprint_config(config, {"vars": vars})
 
     bp = Blueprint.from_config(blueprint_config)
     plan = bp.plan(conn)

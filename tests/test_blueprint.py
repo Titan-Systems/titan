@@ -254,11 +254,8 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
             res.Grant(priv="USAGE", on_database="DB", to="SOME_ROLE"),
         ],
     )
-    manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
-    assert len(plan) == 1
-    assert isinstance(plan[0], CreateResource)
-    assert plan[0].urn == parse_URN("urn::ABCD123:grant/SOME_ROLE?priv=USAGE&on=database/DB")
+    with pytest.raises(DuplicateResourceException):
+        blueprint.generate_manifest(session_ctx)
 
 
 def test_blueprint_dont_add_public_schema(session_ctx, remote_state):

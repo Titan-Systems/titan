@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from inflection import pluralize
 
@@ -138,6 +139,7 @@ def _resources_for_config(config: dict):
         resource_label = pluralize(resource_label_for_type(resource_type))
         block = config.pop(resource_label, [])
         if block:
+            print(">>>>>>>>>", resource_label, str(len(block)))
             config_blocks.append((resource_type, block))
 
     for alias, resource_type in ALIASES.items():
@@ -185,7 +187,10 @@ def _resources_for_config(config: dict):
     return resources
 
 
-def collect_blueprint_config(yaml_config: dict) -> BlueprintConfig:
+def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict] = None) -> BlueprintConfig:
+
+    if cli_config is None:
+        cli_config = {}
 
     config = yaml_config.copy()
     blueprint_args = {}
@@ -193,20 +198,35 @@ def collect_blueprint_config(yaml_config: dict) -> BlueprintConfig:
     allowlist = config.pop("allowlist", None)
     if allowlist:
         blueprint_args["allowlist"] = [ResourceType(resource_type) for resource_type in allowlist]
+
     dry_run = config.pop("dry_run", None)
     if dry_run:
+        if "dry_run" in cli_config:
+            raise ValueError("Cannot specify both dry_run in yaml and cli")
         blueprint_args["dry_run"] = dry_run
+    elif "dry_run" in cli_config:
+        blueprint_args["dry_run"] = cli_config["dry_run"]
+
     name = config.pop("name", None)
     if name:
         blueprint_args["name"] = name
+
     run_mode = config.pop("run_mode", None)
     if run_mode:
+        if "run_mode" in cli_config:
+            raise ValueError("Cannot specify both run_mode in yaml and cli")
         blueprint_args["run_mode"] = RunMode(run_mode)
+    elif "run_mode" in cli_config:
+        blueprint_args["run_mode"] = cli_config["run_mode"]
+
     vars_spec = config.pop("vars", None)
     if vars_spec:
         if not isinstance(vars_spec, list):
             raise ValueError("vars config entry must be a list of dicts")
         blueprint_args["vars_spec"] = vars_spec
+
+    if "vars" in cli_config:
+        blueprint_args["vars"] = cli_config["vars"]
 
     resources = _resources_for_config(config)
     if len(resources) == 0:

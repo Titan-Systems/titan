@@ -1237,3 +1237,27 @@ def test_fetch_external_volume(cursor, suffix, marked_for_cleanup):
         ExternalVolumeStorageLocation.spec, data_storage_locations[0]
     )
     assert result == data
+
+
+def test_fetch_iceberg_table(cursor, suffix, marked_for_cleanup):
+    table = res.SnowflakeIcebergTable(
+        name=f"SOME_ICEBERG_TABLE_{suffix}",
+        columns=[
+            res.Column(name="ID", data_type="NUMBER(38,0)", not_null=True),
+            res.Column(name="NAME", data_type="VARCHAR(16777216)", not_null=False),
+        ],
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+        owner=TEST_ROLE,
+        catalog="SNOWFLAKE",
+        external_volume="static_external_volume",
+        base_location="some_prefix",
+    )
+    cursor.execute(table.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(table)
+
+    result = safe_fetch(cursor, table.urn)
+    assert result is not None
+    result = strip_nones_and_unfetchable(res.SnowflakeIcebergTable.spec, result)
+    data = strip_nones_and_unfetchable(res.SnowflakeIcebergTable.spec, table.to_dict())
+    assert result == data

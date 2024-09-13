@@ -17,6 +17,7 @@ from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
 from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
+from .iceberg_table import SnowflakeIcebergTable
 from .image_repository import ImageRepository
 from .materialized_view import MaterializedView
 from .network_policy import NetworkPolicy
@@ -123,6 +124,7 @@ __all__ = [
     "Sequence",
     "Service",
     "Share",
+    "SnowflakeIcebergTable",
     "SnowflakePartnerOAuthSecurityIntegration",
     "SnowservicesOAuthSecurityIntegration",
     "StageStream",

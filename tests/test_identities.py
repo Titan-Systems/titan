@@ -77,7 +77,12 @@ def test_data_identity(resource):
             continue
         if _field_type_is_serialized_as_resource_name(field):
             assert _resource_names_are_eq(serialized.pop(field.name), data.pop(field.name))
-
+        if isinstance(serialized.get(field.name, None), list):
+            qqq = serialized.pop(field.name)
+            www = data.pop(field.name)
+            assert len(qqq) == len(www)
+            for lhs, rhs in zip(qqq, www):
+                assert lhs == rhs
     assert serialized == data
 
 

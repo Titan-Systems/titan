@@ -5,7 +5,9 @@ allowlist:
   - "compute pool"
   - "database role"
   - "database"
+  - "external volume"
   - "grant"
+  - "iceberg table"
   - "network policy"
   - "network rule"
   - "resource monitor"
@@ -241,3 +243,12 @@ security_integrations:
     oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
     oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'
     enabled: true
+
+external_volumes:
+  - name: static_external_volume
+    storage_locations:
+      - name: us-west-2
+        storage_provider: S3
+        storage_base_url: "{{ var.storage_base_url }}"
+        storage_aws_role_arn: "{{ var.storage_role_arn }}"
+        storage_aws_external_id: iceberg_table_external_id

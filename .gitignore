@@ -166,3 +166,4 @@ cython_debug/
 .packages/
 .build/
 SCRATCH.md
+.vars.*
