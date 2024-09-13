@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Union, cast
 
 from ..enums import ResourceType
+from ..identifiers import URN, FQN
 from ..props import FlagProp, IdentifierProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
@@ -163,7 +164,7 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         )
         if self._data.name != "SNOWFLAKE":
             self.add(
-                Schema(name="PUBLIC", implicit=True),
+                Schema(name="PUBLIC", implicit=True, owner=owner),
                 # ResourcePointer(resource_type=ResourceType.SCHEMA, name="PUBLIC")
             )
         self.set_tags(tags)
@@ -174,3 +175,11 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
     @property
     def public_schema(self) -> Union[Schema, ResourcePointer]:
         return cast(Union[Schema, ResourcePointer], self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA))
+
+
+def public_schema_urn(database_urn: URN) -> URN:
+    return URN(
+        resource_type=ResourceType.SCHEMA,
+        fqn=FQN(name=ResourceName("PUBLIC"), database=ResourceName(str(database_urn.fqn))),
+        account_locator=database_urn.account_locator,
+    )

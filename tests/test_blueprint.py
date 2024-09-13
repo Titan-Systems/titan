@@ -90,6 +90,8 @@ def test_blueprint_with_database(resource_manifest):
         "name": "DB",
         "owner": "SYSADMIN",
         "comment": None,
+        "catalog": None,
+        "external_volume": None,
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
         "max_data_extension_time_in_days": 14,
@@ -396,9 +398,9 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
 
     role = res.Role(name="SOME_ROLE")
     role_grant = res.RoleGrant(role=role, to_role="SYSADMIN")
-    db1 = res.Database(name="DB1", owner=role)
+    wh = res.Warehouse(name="WH", owner=role)
 
-    blueprint = Blueprint(resources=[db1, role_grant, role])
+    blueprint = Blueprint(resources=[wh, role_grant, role])
     manifest = blueprint.generate_manifest(session_ctx)
 
     plan = blueprint._plan(remote_state, manifest)
@@ -408,7 +410,7 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
     assert isinstance(plan[2], CreateResource)
-    assert plan[2].urn == parse_URN("urn::ABCD123:database/DB1")
+    assert plan[2].urn == parse_URN("urn::ABCD123:warehouse/WH")
 
     sql = compile_plan_to_sql(session_ctx, plan)
     assert len(sql) == 8
@@ -418,8 +420,8 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert sql[3] == "USE ROLE SECURITYADMIN"
     assert sql[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
     assert sql[5] == f"USE ROLE {session_ctx['role']}"
-    assert sql[6] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    assert sql[7] == "GRANT OWNERSHIP ON DATABASE DB1 TO ROLE SOME_ROLE COPY CURRENT GRANTS"
+    assert sql[6].startswith("CREATE WAREHOUSE WH")
+    assert sql[7] == "GRANT OWNERSHIP ON WAREHOUSE WH TO ROLE SOME_ROLE COPY CURRENT GRANTS"
 
 
 def test_blueprint_dump_plan_create(session_ctx, remote_state):

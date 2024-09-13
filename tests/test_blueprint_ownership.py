@@ -102,6 +102,10 @@ def test_transfer_ownership(session_ctx, remote_state):
     assert isinstance(plan[0], TransferOwnership)
     assert plan[0].from_owner == "ACCOUNTADMIN"
     assert plan[0].to_owner == "USERADMIN"
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+    assert sql_commands[0] == "USE SECONDARY ROLES ALL"
+    assert sql_commands[1] == "USE ROLE ACCOUNTADMIN"
+    assert sql_commands[2] == "GRANT OWNERSHIP ON ROLE TEST_ROLE TO ROLE USERADMIN COPY CURRENT GRANTS"
 
 
 def test_transfer_ownership_with_changes(session_ctx, remote_state):
@@ -122,6 +126,12 @@ def test_transfer_ownership_with_changes(session_ctx, remote_state):
     assert isinstance(plan[1], TransferOwnership)
     assert plan[1].from_owner == "ACCOUNTADMIN"
     assert plan[1].to_owner == "USERADMIN"
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+    assert sql_commands[0] == "USE SECONDARY ROLES ALL"
+    assert sql_commands[1] == "USE ROLE ACCOUNTADMIN"
+    assert sql_commands[2] == "ALTER ROLE TEST_ROLE SET COMMENT = $$This comment has been added$$"
+    assert sql_commands[3] == "USE ROLE ACCOUNTADMIN"
+    assert sql_commands[4] == "GRANT OWNERSHIP ON ROLE TEST_ROLE TO ROLE USERADMIN COPY CURRENT GRANTS"
 
 
 def test_resource_has_custom_role_owner_with_create_priv(session_ctx, remote_state):
@@ -322,3 +332,30 @@ def test_blueprint_create_resource_with_database_role_owner(monkeypatch, session
         sql_commands[7]
         == "GRANT OWNERSHIP ON SCHEMA SOME_DATABASE.TEST_SCHEMA TO DATABASE ROLE SOME_DATABASE.SOME_DATABASE_ROLE COPY CURRENT GRANTS"
     )
+
+
+def test_database_with_custom_owner_modifies_public_schema_owner(monkeypatch, session_ctx, remote_state):
+    def role_can_execute_change(role, change, role_privileges):
+        if role in ["ACCOUNTADMIN", "USERADMIN"]:
+            return True
+        return False
+
+    monkeypatch.setattr("titan.blueprint.role_can_execute_change", role_can_execute_change)
+    role = res.Role(name="CUSTOM_ROLE")
+    role_grant = res.RoleGrant(role=role, to_role="SYSADMIN")
+    database = res.Database(name="SOME_DATABASE", owner=role)
+    blueprint = Blueprint(resources=[database, role, role_grant])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 3
+    sql_commands = compile_plan_to_sql(session_ctx, plan)
+    assert len(sql_commands) == 9
+    assert sql_commands[0] == "USE SECONDARY ROLES ALL"
+    assert sql_commands[1] == "USE ROLE USERADMIN"
+    assert sql_commands[2] == "CREATE ROLE CUSTOM_ROLE"
+    assert sql_commands[3] == "USE ROLE SECURITYADMIN"
+    assert sql_commands[4] == "GRANT ROLE CUSTOM_ROLE TO ROLE SYSADMIN"
+    assert sql_commands[5] == "USE ROLE USERADMIN"
+    assert sql_commands[6].startswith("CREATE DATABASE SOME_DATABASE")
+    assert sql_commands[7] == "GRANT OWNERSHIP ON DATABASE SOME_DATABASE TO ROLE CUSTOM_ROLE COPY CURRENT GRANTS"
+    assert sql_commands[8] == "GRANT OWNERSHIP ON SCHEMA SOME_DATABASE.PUBLIC TO ROLE CUSTOM_ROLE COPY CURRENT GRANTS"

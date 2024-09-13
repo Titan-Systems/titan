@@ -40,6 +40,7 @@ from .privs import (
 from .resource_name import ResourceName
 from .resource_tags import ResourceTags
 from .resources import Database, DatabaseRole, Role, RoleGrant, Schema
+from .resources.database import public_schema_urn
 from .resources.resource import (
     RESOURCE_SCOPES,
     NamedResource,
@@ -398,7 +399,7 @@ def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
                     primary = cast(Schema, namespace[resource_id])
                     secondary = cast(Schema, resource)
                     _merge(primary, secondary)
-                    namespace[resource_id] = resource
+                    namespace[resource_id] = primary
                 else:
                     raise DuplicateResourceException(
                         f"Duplicate resource found: {resource} and {namespace[resource_id]}"
@@ -555,7 +556,13 @@ class Blueprint:
                     continue
                 if change_should_be_ignored:
                     continue
-                additive_changes.append(TransferOwnership(urn, from_owner=before["owner"], to_owner=after["owner"]))
+                additive_changes.append(
+                    TransferOwnership(
+                        urn,
+                        from_owner=before["owner"],
+                        to_owner=after["owner"],
+                    )
+                )
 
         for urn in marked_for_replacement:
             raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
@@ -774,7 +781,7 @@ class Blueprint:
                 if isinstance(owner, str):
                     raise RuntimeError(f"Owner of {resource} is a string, {owner}")
 
-                owner = cast(Union[Role, DatabaseRole], owner)
+                owner = cast(ResourcePointer, owner)
 
                 # Skip Snowflake-owned system resources (like INFORMATION_SCHEMA) that are owned by blank
                 if owner.name == "":
@@ -821,13 +828,11 @@ class Blueprint:
         for resource in _walk(self._root):
             resource._finalized = True
 
-    def generate_manifest(self, session_ctx: dict = {}) -> Manifest:
+    def generate_manifest(self, session_ctx: SessionContext) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])
         self._finalize(session_ctx)
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                if resource.implicit:
-                    continue
                 manifest.add(resource)
             else:
                 raise RuntimeError(f"Unexpected object found in blueprint: {resource}")
@@ -836,6 +841,9 @@ class Blueprint:
 
     def plan(self, session) -> Plan:
         reset_cache()
+        logger.debug("Using blueprint vars:")
+        for key in self._config.vars.keys():
+            logger.debug(f"  {key}")
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = self.fetch_remote_state(session, manifest)
@@ -935,8 +943,8 @@ def execution_strategy_for_change(
     change: ResourceChange,
     available_roles: list[ResourceName],
     default_role: str,
-    role_privileges: dict[str, list[GrantedPrivilege]],
-) -> tuple[str, bool]:
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
+) -> tuple[ResourceName, bool]:
 
     if resource_type_is_grant(change.urn.resource_type):
 
@@ -946,7 +954,7 @@ def execution_strategy_for_change(
                 return execution_role, False
 
         if "SECURITYADMIN" in available_roles:
-            return "SECURITYADMIN", False
+            return ResourceName("SECURITYADMIN"), False
         alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
         if alternate_role:
             return alternate_role, False
@@ -957,7 +965,7 @@ def execution_strategy_for_change(
         # 1. You have the global APPLY TAGS priv on the account (given to ACCOUNTADMIN by default)
         # 2. You have APPLY privilege on the TAG object AND you have ownership of the tagged object
         if "ACCOUNTADMIN" in available_roles:
-            return "ACCOUNTADMIN", False
+            return ResourceName("ACCOUNTADMIN"), False
         alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
         if alternate_role:
             return alternate_role, False
@@ -984,9 +992,9 @@ def execution_strategy_for_change(
 
 # NOTE: this is in a hot loop and maybe should be cached
 def role_can_execute_change(
-    role: str,
+    role: ResourceName,
     change: ResourceChange,
-    role_privileges: dict[str, list[GrantedPrivilege]],
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ):
 
     # Assume ACCOUNTADMIN can do anything
@@ -1007,9 +1015,9 @@ def role_can_execute_change(
 
 def find_role_to_execute_change(
     change: ResourceChange,
-    available_roles: list[str],
+    available_roles: list[ResourceName],
     default_role: str,
-    role_privileges: dict[str, list[GrantedPrivilege]],
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ):
     # Check default role first
     sorted_roles = sorted(available_roles, key=lambda role: (role != default_role))
@@ -1089,7 +1097,7 @@ def sql_commands_for_change(
     change: ResourceChange,
     available_roles: list[ResourceName],
     default_role: str,
-    role_privileges: dict[str, list[GrantedPrivilege]],
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ):
     """
     In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
@@ -1136,6 +1144,18 @@ def sql_commands_for_change(
                     copy_current_grants=True,
                 )
             )
+            # SPECIAL CASE: when creating a database with a custom owner that we will transfer ownership to,
+            # we also need to transfer ownership of the public schema to that role. This replicates the behavior
+            # if we were to create the database with a custom owner directly
+            if change.urn.resource_type == ResourceType.DATABASE:
+                after_change_cmd.append(
+                    lifecycle.transfer_resource(
+                        public_schema_urn(change.urn),
+                        owner=change.after["owner"],
+                        owner_resource_type=infer_role_type_from_name(change.after["owner"]),
+                        copy_current_grants=True,
+                    )
+                )
     elif isinstance(change, UpdateResource):
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
         change_cmd = lifecycle.update_resource(change.urn, change.delta, props)
@@ -1146,12 +1166,10 @@ def sql_commands_for_change(
             if_exists=True,
         )
     elif isinstance(change, TransferOwnership):
-        raise Exception
         change_cmd = lifecycle.transfer_resource(
             change.urn,
-            # owner=change.after["owner"],
-            owner=...,
-            owner_resource_type=infer_role_type_from_name(change.after["owner"]),
+            owner=change.to_owner,
+            owner_resource_type=infer_role_type_from_name(change.to_owner),
             copy_current_grants=True,
         )
 

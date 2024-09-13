@@ -1258,6 +1258,6 @@ def test_fetch_iceberg_table(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, table.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.SnowflakeIcebergTable.spec, result)
-    data = strip_nones_and_unfetchable(res.SnowflakeIcebergTable.spec, table.to_dict())
+    result = clean_resource_data(res.SnowflakeIcebergTable.spec, result)
+    data = clean_resource_data(res.SnowflakeIcebergTable.spec, table.to_dict())
     assert result == data

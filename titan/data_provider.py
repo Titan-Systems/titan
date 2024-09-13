@@ -544,7 +544,7 @@ def fetch_session(session) -> SessionContext:
         else:
             raise
 
-    available_roles = [ResourceName(name=role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
+    available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
 
     role_privileges = {}
     for role in available_roles:
@@ -1160,7 +1160,24 @@ def fetch_iceberg_table(session, fqn: FQN):
         raise Exception(f"Found multiple iceberg tables matching {fqn}")
 
     data = tables[0]
-    return {"name": fqn.name, "owner": _get_owner_identifier(data)}
+    columns = fetch_columns(session, "ICEBERG TABLE", fqn)
+    show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
+    params = params_result_to_dict(show_params_result)
+    return {
+        "name": fqn.name,
+        "owner": data["owner"],
+        "columns": columns,
+        "external_volume": data["external_volume_name"],
+        "catalog": data["catalog_name"],
+        "base_location": data["base_location"].rstrip("/"),
+        "catalog_sync": params["catalog_sync"] or None,
+        "storage_serialization_policy": params["storage_serialization_policy"],
+        "data_retention_time_in_days": params["data_retention_time_in_days"],
+        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
+        # "change_tracking": data["change_tracking"],
+        "default_ddl_collation": params["default_ddl_collation"] or None,
+        "comment": data["comment"] or None,
+    }
 
 
 def fetch_image_repository(session, fqn: FQN):
@@ -1954,7 +1971,6 @@ def fetch_table(session, fqn: FQN):
         raise Exception(f"Found multiple tables matching {fqn}")
 
     columns = fetch_columns(session, "TABLE", fqn)
-    # columns = _fetch_columns_for_table(session, fqn)
 
     data = tables[0]
     show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")

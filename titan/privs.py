@@ -22,6 +22,9 @@ class GrantedPrivilege:
         else:
             return cls(privilege=privilege, on=granted_on)
 
+    def __repr__(self):  # pragma: no cover
+        return f"GrantedPrivilege({str(self.privilege)} on={self.on})"
+
 
 class AccountPriv(Priv):
     ALL = "ALL"

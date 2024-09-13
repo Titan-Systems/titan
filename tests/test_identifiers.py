@@ -77,6 +77,25 @@ def test_resource_name_equality():
     assert rn1 != rn2
 
 
+def test_resource_name_string_comparison():
+    assert "FOO" in [ResourceName("foo"), ResourceName("bar")]
+    assert ResourceName("FOO") in ["foo", "bar"]
+    assert "FOO" == ResourceName("FOO")
+    assert "FOO" == ResourceName("foo")
+    assert "foo" == ResourceName("FOO")
+    assert "foo" == ResourceName("foo")
+    assert ResourceName("FOO") == "FOO"
+    assert ResourceName("foo") == "FOO"
+    assert ResourceName("FOO") == "foo"
+    assert ResourceName("foo") == "foo"
+
+    # Quoted identifiers
+    assert ResourceName('"FOO"') == ResourceName("FOO")
+    assert ResourceName('"FOO"') == ResourceName("foo")
+    assert ResourceName('"FOO"') == "foo"
+    assert ResourceName('"FOO"') == "FOO"
+
+
 def test_parse_fully_qualified_schema():
     sch = res.Schema(name="DB.SCHEMA")
     assert sch.name == "SCHEMA"

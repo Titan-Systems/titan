@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..enums import ParseableEnum, ResourceType
 from ..props import (
@@ -33,10 +33,11 @@ class _SnowflakeIcebergTable(ResourceSpec):
     catalog: str = "SNOWFLAKE"
     base_location: str = None
     catalog_sync: str = None
-    storage_serialization_policy: StorageSerializationPolicy = None
-    data_retention_time_in_days: int = None
-    max_data_extension_time_in_days: int = None
-    change_tracking: bool = None
+    storage_serialization_policy: StorageSerializationPolicy = StorageSerializationPolicy.OPTIMIZED
+    data_retention_time_in_days: int = 1
+    max_data_extension_time_in_days: int = 14
+    # Snowflake does not currently provide a way to check if change tracking is enabled for iceberg tables
+    change_tracking: bool = field(default=None, metadata={"fetchable": False})
     default_ddl_collation: str = None
     comment: str = None
 
@@ -77,9 +78,9 @@ class SnowflakeIcebergTable(NamedResource, TaggableResource, Resource):
         catalog: str = "SNOWFLAKE",
         base_location: str = None,
         catalog_sync: str = None,
-        storage_serialization_policy: str = None,
-        data_retention_time_in_days: int = None,
-        max_data_extension_time_in_days: int = None,
+        storage_serialization_policy: str = "OPTIMIZED",
+        data_retention_time_in_days: int = 1,
+        max_data_extension_time_in_days: int = 14,
         change_tracking: bool = None,
         default_ddl_collation: str = None,
         comment: str = None,
@@ -102,4 +103,6 @@ class SnowflakeIcebergTable(NamedResource, TaggableResource, Resource):
             default_ddl_collation=default_ddl_collation,
             comment=comment,
         )
+        if self._data.external_volume:
+            self._requires(self._data.external_volume)
         self.set_tags(tags)

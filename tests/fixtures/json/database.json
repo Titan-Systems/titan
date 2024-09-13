@@ -6,6 +6,6 @@
     "max_data_extension_time_in_days": 14,
     "external_volume": null,
     "catalog": null,
-    "default_ddl_collation": "en-US",
+    "default_ddl_collation": "en",
     "comment": "This is a test database"
 }

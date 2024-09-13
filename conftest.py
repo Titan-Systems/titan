@@ -1,8 +1,9 @@
-import pytest
 import os
 import uuid
 
+import pytest
 import snowflake.connector
+from dotenv import dotenv_values
 
 from titan.enums import ResourceType
 
@@ -36,6 +37,14 @@ def pytest_collection_modifyitems(items):
     for item in items:
         if not item.get_closest_marker("enterprise"):
             item.add_marker("standard")
+
+
+@pytest.fixture(scope="session")
+def blueprint_vars():
+    if os.path.exists(".vars.test_account"):
+        return dotenv_values(".vars.test_account")
+    else:
+        return {key[4:].lower(): value for key, value in os.environ.items() if key.startswith("VAR_")}
 
 
 @pytest.fixture(scope="session")

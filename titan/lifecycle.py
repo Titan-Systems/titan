@@ -270,6 +270,15 @@ def update_table(urn: URN, data: dict, props: Props) -> str:
         return update__default(urn, {attr: new_value}, props)
 
 
+def update_iceberg_table(urn: URN, data: dict, props: Props) -> str:
+    attr, new_value = data.popitem()
+    attr = attr.lower()
+    if attr == "columns":
+        raise NotImplementedError(data)
+    else:
+        return update__default(urn, {attr: new_value}, props)
+
+
 ################ Drop functions
 
 
@@ -369,7 +378,7 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
 
 def transfer_resource(
     urn: URN,
-    owner: URN,
+    owner: str,
     owner_resource_type: ResourceType,
     copy_current_grants: bool = False,
     revoke_current_grants: bool = False,
@@ -385,7 +394,7 @@ def transfer_resource(
 
 def transfer__default(
     urn: URN,
-    owner: URN,
+    owner: str,
     owner_resource_type: ResourceType,
     copy_current_grants: bool = False,
     revoke_current_grants: bool = False,

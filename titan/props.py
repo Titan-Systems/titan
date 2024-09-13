@@ -102,12 +102,15 @@ class Props:
         return json.dumps(self, default=lambda obj: obj.__dict__)
 
     def render(self, data):
+        data = data.copy()
         rendered = []
         for prop_kwarg, prop in self.props.items():
-            value = data.get(prop_kwarg)
+            value = data.pop(prop_kwarg, None)
             if value is None:
                 continue
             rendered.append(prop.render(value))
+        # if data:
+        #     raise RuntimeError(f"Attempted to render unknown properties: {data}")
         return tidy_sql(rendered)
 
 

@@ -329,7 +329,9 @@ class Resource(metaclass=_Resource):
         return hash(URN.from_resource(self, ""))
 
     def to_dict(self):
-        serialized = {}
+        serialized: dict[str, Any] = {}
+        if self.implicit:
+            serialized["_implicit"] = True
 
         def _serialize(field, value):
             if field.name == "owner":

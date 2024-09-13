@@ -9,6 +9,8 @@ vars:
   - name: storage_base_url
     type: string
     default: s3://my-s3-bucket/my-s3-path
+  - name: storage_aws_external_id
+    type: string
 
 roles:
   - name: iceberg_tutorial_role
@@ -44,10 +46,12 @@ external_volumes:
         storage_provider: S3
         storage_base_url: "{{ var.storage_base_url }}"
         storage_aws_role_arn: "{{ var.storage_role_arn }}"
-        storage_aws_external_id: iceberg_table_external_id
+        storage_aws_external_id: "{{ var.storage_aws_external_id }}"
 
 iceberg_tables:
   - name: customer_iceberg
+    database: iceberg_tutorial_db
+    schema: public
     owner: iceberg_tutorial_role
     catalog: SNOWFLAKE
     external_volume: iceberg_external_volume

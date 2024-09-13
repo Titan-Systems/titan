@@ -1,8 +1,7 @@
 import pytest
 import yaml
 
-from tests.helpers import get_examples_yml, dump_resource_change
-
+from tests.helpers import dump_resource_change, get_examples_yml
 from titan.blueprint import Blueprint
 from titan.enums import ResourceType
 from titan.gitops import collect_blueprint_config
@@ -22,10 +21,10 @@ def example(request):
 
 @pytest.mark.enterprise
 @pytest.mark.requires_snowflake
-def test_example(example, cursor, marked_for_cleanup):
+def test_example(example, cursor, marked_for_cleanup, blueprint_vars):
     cursor.execute("USE WAREHOUSE CI")
 
-    blueprint_config = collect_blueprint_config(example)
+    blueprint_config = collect_blueprint_config(example, {"vars": blueprint_vars})
     for resource in blueprint_config.resources:
         marked_for_cleanup.append(resource)
     blueprint = Blueprint.from_config(blueprint_config)
@@ -33,7 +32,7 @@ def test_example(example, cursor, marked_for_cleanup):
     cmds = blueprint.apply(cursor.connection, plan)
     assert cmds
 
-    blueprint_config = collect_blueprint_config(example)
+    blueprint_config = collect_blueprint_config(example, {"vars": blueprint_vars})
     blueprint = Blueprint.from_config(blueprint_config)
     plan = blueprint.plan(cursor.connection)
     unexpected_drift = [change for change in plan if not change_is_expected(change)]
