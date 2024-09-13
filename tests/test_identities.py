@@ -24,15 +24,17 @@ def resource(request):
     yield resource_cls, data
 
 
-def _resource_field_type_is_resource(field):
+def _field_type_is_serialized_as_resource_name(field):
     if field.type is RoleRef:
         return True
     elif isinstance(field.type, str) and field.name == "owner" and field.type == "Role":
         return True
     elif issubclass(field.type, Resource):
-        return True
-    elif get_origin(field.type) is list and issubclass(get_args(field.type)[0], Resource):
-        return True
+        return field.type.serialize_inline is False
+    elif get_origin(field.type) is list:
+        field_item_type = get_args(field.type)[0]
+        if issubclass(field_item_type, Resource):
+            return field_item_type.serialize_inline is False
 
     return False
 
@@ -73,7 +75,7 @@ def test_data_identity(resource):
     for field in fields(instance._data):
         if field.name in ["name", "columns", "args"]:
             continue
-        if _resource_field_type_is_resource(field):
+        if _field_type_is_serialized_as_resource_name(field):
             assert _resource_names_are_eq(serialized.pop(field.name), data.pop(field.name))
 
     assert serialized == data

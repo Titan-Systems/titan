@@ -4,16 +4,17 @@ import pytest
 
 from titan import resources as res
 from titan import var
-from titan.blueprint_config import BlueprintConfig
 from titan.blueprint import (
     Blueprint,
     CreateResource,
     DuplicateResourceException,
+    _merge_pointers,
     compile_plan_to_sql,
     dump_plan,
 )
+from titan.blueprint_config import BlueprintConfig
 from titan.enums import ResourceType, RunMode
-from titan.exceptions import MissingVarException, InvalidResourceException
+from titan.exceptions import InvalidResourceException, MissingVarException, DuplicateResourceException
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
@@ -662,3 +663,30 @@ def test_blueprint_config_validation():
 
     with pytest.raises(ValueError):
         Blueprint(allowlist=["non-existent-resource-type"])
+
+
+def test_merge_account_scoped_resources():
+    resources = [
+        res.Database(name="DB1"),
+        ResourcePointer(name="DB1", resource_type=ResourceType.DATABASE),
+    ]
+    merged = _merge_pointers(resources)
+    assert len(merged) == 1
+    assert isinstance(merged[0], res.Database)
+    assert merged[0].name == "DB1"
+
+    resources = [
+        res.Database(name="DB1"),
+        res.Database(name="DB2"),
+    ]
+    merged = _merge_pointers(resources)
+    assert len(merged) == 2
+
+
+def test_merge_account_scoped_resources_fail():
+    resources = [
+        res.Database(name="DB1"),
+        res.Database(name="DB1", comment="namespace conflict"),
+    ]
+    with pytest.raises(DuplicateResourceException):
+        _merge_pointers(resources)

@@ -32,8 +32,8 @@ class _ExternalVolumeStorageLocation(ResourceSpec):
     encryption: dict = None
     storage_aws_role_arn: str = None
     storage_aws_external_id: str = None
-    storage_allowed_locations: list[str] = field(default=None, metadata={"known_after_apply": True})
-    storage_aws_iam_user_arn: str = field(default=None, metadata={"known_after_apply": True})
+    # storage_allowed_locations: list[str] = field(default=None, metadata={"known_after_apply": True})
+    # storage_aws_iam_user_arn: str = field(default=None, metadata={"known_after_apply": True})
 
     def __post_init__(self):
         super().__post_init__()
@@ -59,7 +59,8 @@ class ExternalVolumeStorageLocation(Resource):
                         EncryptionType.NONE,
                     ],
                     quoted=True,
-                )
+                ),
+                kms_key_id=StringProp("kms_key_id"),
             ),
         ),
         storage_aws_role_arn=StringProp("storage_aws_role_arn"),
@@ -93,7 +94,7 @@ class ExternalVolumeStorageLocation(Resource):
 @dataclass(unsafe_hash=True)
 class _ExternalVolume(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: Role = "ACCOUNTADMIN"
     storage_locations: list[ExternalVolumeStorageLocation] = None
     allow_writes: bool = True
     comment: str = None
@@ -104,7 +105,7 @@ class _ExternalVolume(ResourceSpec):
             raise ValueError("storage_locations is required")
 
 
-class ExternalVolume(NamedResource, TaggableResource, Resource):
+class ExternalVolume(NamedResource, Resource):
     resource_type = ResourceType.EXTERNAL_VOLUME
     props = Props(
         storage_locations=PropList(
@@ -112,7 +113,6 @@ class ExternalVolume(NamedResource, TaggableResource, Resource):
             StructProp(ExternalVolumeStorageLocation.props),
         ),
         comment=StringProp("comment"),
-        tags=TagsProp(),
     )
     scope = AccountScope()
     spec = _ExternalVolume
@@ -120,11 +120,10 @@ class ExternalVolume(NamedResource, TaggableResource, Resource):
     def __init__(
         self,
         name: str,
-        owner: str = "SYSADMIN",
+        owner: str = "ACCOUNTADMIN",
         storage_locations: list[dict[str, str]] = None,
         allow_writes: bool = True,
         comment: str = None,
-        tags: dict[str, str] = None,
         **kwargs,
     ):
         super().__init__(name, **kwargs)
@@ -135,4 +134,3 @@ class ExternalVolume(NamedResource, TaggableResource, Resource):
             allow_writes=allow_writes,
             comment=comment,
         )
-        self.set_tags(tags)

@@ -295,8 +295,12 @@ class PropList(Prop):
     """
 
     def __init__(self, label, prop: Prop):
-        super().__init__(label)
+        value_expr = pp.nested_expr(content=pp.delimited_list(pp.original_text_for(pp.nested_expr())))
+        super().__init__(label, value_expr)
         self.prop = prop
+
+    def typecheck(self, items: list[list[str]]):
+        return [self.prop.parse(item) for item in items[0]]
 
     def render(self, values):
         if values is None or len(values) == 0:
@@ -315,12 +319,13 @@ class StructProp(Prop):
     """
 
     def __init__(self, props: Props, **kwargs):
-        super().__init__(label=None, **kwargs)
+        value_expr = pp.original_text_for(pp.nested_expr())
+        super().__init__(label=None, value_expr=value_expr, eq=False, **kwargs)
         self.props = props
-        # value_expr = pp.original_text_for(pp.nested_expr())
-        # super().__init__(label, value_expr)
-        # value_expr = pp.delimited_list(ANY() + EQUALS() + ANY(), delim=" ")
-        # super().__init__(label, value_expr=value_expr, eq=False, parens=True, consume="WITH")
+
+    def typecheck(self, payload):
+        payload = payload.strip("()")
+        return _parse_props(self.props, payload)
 
     def render(self, value):
         if value is None:

@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from queue import Queue
-from typing import Generator, Optional, Union, cast
+from typing import Any, Generator, Optional, Sequence, Union, cast
 
 import snowflake.connector
 
@@ -39,7 +39,7 @@ from .privs import (
 )
 from .resource_name import ResourceName
 from .resource_tags import ResourceTags
-from .resources import Database, DatabaseRole, Schema, Role, RoleGrant
+from .resources import Database, DatabaseRole, Role, RoleGrant, Schema
 from .resources.resource import (
     RESOURCE_SCOPES,
     NamedResource,
@@ -346,45 +346,65 @@ def _raise_if_plan_would_drop_session_user(session_ctx: SessionContext, plan: Pl
                 raise Exception("Plan would drop the current session user, which is not allowed")
 
 
-def _merge_pointers(resources: list[Resource]) -> list[Resource]:
-    namespace = {}
+def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
+    namespace: dict[Any, Resource] = {}
+    # Push pointers to the end
     resources = sorted(resources, key=lambda resource: isinstance(resource, ResourcePointer))
 
-    def _merge(primary: ResourceContainer, secondary: ResourcePointer):
-        if secondary.container is not None:
-            if getattr(primary, "container", None) is None:
+    def _merge(resource: ResourceContainer, pointer: Union[ResourcePointer, Schema]):
+        if pointer.container is not None:
+            # The pointer has a container but the resource does not, merge fails
+            if getattr(resource, "container", None) is None:
                 raise Exception
-            secondary.container.remove(secondary)
+            pointer.container.remove(pointer)
 
-        for item in secondary.items():
-            secondary.remove(item)
-            primary.add(item)
+        # Migrate items from pointer to resource
+        for item in pointer.items():
+            pointer.remove(item)
+            resource.add(item)
 
-    for resource in resources:
-        if isinstance(resource, NamedResource):
-            resource_id = (resource.resource_type, resource.name)
+    for resource_or_pointer in resources:
+        # Create a unique identifier for the resource
+        if isinstance(resource_or_pointer, NamedResource):
+            resource_id = (resource_or_pointer.resource_type, resource_or_pointer.name)
         else:
-            resource_id = str(resource.urn)
-        if isinstance(resource, ResourcePointer):
+            resource_id = str(resource_or_pointer.urn)
+
+        # If the resource is a pointer, attempt to merge it to an existing resource
+        if isinstance(resource_or_pointer, ResourcePointer):
+            pointer = resource_or_pointer
             if resource_id in namespace:
-                primary = namespace[resource_id]
-                _merge(primary, resource)
+                primary = cast(ResourceContainer, namespace[resource_id])
+                _merge(primary, pointer)
+            else:
+                namespace[resource_id] = pointer
+        else:
+            resource = resource_or_pointer
+            # We found a potentially conflicting resource
+            if resource_id in namespace:
+
+                # Throw away duplicate resources when the object id is the same
+                if namespace[resource_id] is resource:
+                    continue
+
+                # When one resource is implicit (eg a database's PUBLIC schema), we merge it into the implicit resource.
+                # This allows users to explicitly define a PUBLIC schema and have everything just work.
+                if resource.implicit:
+                    # a little hacky since schemas are the only resource capable of being implicit
+                    primary = cast(Schema, resource)
+                    secondary = cast(Schema, namespace[resource_id])
+                    _merge(primary, secondary)
+                elif namespace[resource_id].implicit:
+                    primary = cast(Schema, namespace[resource_id])
+                    secondary = cast(Schema, resource)
+                    _merge(primary, secondary)
+                    namespace[resource_id] = resource
+                else:
+                    raise DuplicateResourceException(
+                        f"Duplicate resource found: {resource} and {namespace[resource_id]}"
+                    )
             else:
                 namespace[resource_id] = resource
-        else:
-            if resource_id in namespace and namespace[resource_id] != resource:
-
-                if resource.implicit or namespace[resource_id].implicit:
-                    primary, secondary = resource, namespace[resource_id]
-                    if namespace[resource_id].implicit:
-                        primary, secondary = secondary, primary
-                    if isinstance(primary, ResourceContainer) and isinstance(secondary, ResourcePointer):
-                        _merge(primary, secondary)
-                    else:
-                        raise Exception(f"Cannot merge {primary} and {secondary}")
-                    continue
-                raise DuplicateResourceException(f"Duplicate resource found: {resource} and {namespace[resource_id]}")
-            namespace[resource_id] = resource
 
     return list(namespace.values())
 

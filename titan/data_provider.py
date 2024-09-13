@@ -324,9 +324,15 @@ def _parse_storage_location(storage_location_str: str) -> Optional[dict]:
     for key, value in raw_dict.items():
         key = key.lower()
         if key == "encryption_type":
-            key = "encryption"
-            value = {"type": value}
-        storage_location[key] = value
+            storage_location["encryption"] = {"type": value}
+        elif key in (
+            "name",
+            "storage_provider",
+            "storage_base_url",
+            "storage_aws_role_arn",
+            "storage_aws_external_id",
+        ):
+            storage_location[key] = value
     return storage_location
 
 
