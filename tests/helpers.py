@@ -30,7 +30,7 @@ def assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
     assert lhs == rhs
 
 
-def clean_resource_data(spec: ResourceSpec, data: dict) -> dict:
+def clean_resource_data(spec: type[ResourceSpec], data: dict) -> dict:
     data = data_provider.remove_none_values(data)
     keys = set(data.keys())
     for attr in keys:

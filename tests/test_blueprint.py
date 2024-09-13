@@ -200,9 +200,9 @@ def test_blueprint_with_udf(resource_manifest):
 
 def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     role = res.Role("SOME_ROLE")
-    db = res.Database("DB", owner=role)
+    wh = res.Warehouse("WH", owner=role)
     grant = res.RoleGrant(role=role, to_role="SYSADMIN")
-    blueprint = Blueprint(name="blueprint", resources=[db, role, grant])
+    blueprint = Blueprint(name="blueprint", resources=[wh, role, grant])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
 
@@ -210,7 +210,7 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert plan_urns == [
         parse_URN("urn::ABCD123:role/SOME_ROLE"),
         parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN"),
-        parse_URN("urn::ABCD123:database/DB"),
+        parse_URN("urn::ABCD123:warehouse/WH"),
     ]
 
     changes = compile_plan_to_sql(session_ctx, plan)
@@ -221,8 +221,8 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert changes[3] == "USE ROLE SECURITYADMIN"
     assert changes[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
     assert changes[5] == f"USE ROLE {session_ctx['role']}"
-    assert changes[6] == "CREATE DATABASE DB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    assert changes[7] == "GRANT OWNERSHIP ON DATABASE DB TO ROLE SOME_ROLE COPY CURRENT GRANTS"
+    assert changes[6].startswith("CREATE WAREHOUSE WH")
+    assert changes[7] == "GRANT OWNERSHIP ON WAREHOUSE WH TO ROLE SOME_ROLE COPY CURRENT GRANTS"
 
 
 def test_blueprint_deduplicate_resources(session_ctx, remote_state):

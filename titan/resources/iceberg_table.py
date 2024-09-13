@@ -87,7 +87,15 @@ class SnowflakeIcebergTable(NamedResource, TaggableResource, Resource):
         tags: dict[str, str] = None,
         **kwargs,
     ):
+
+        if "lifecycle" not in kwargs:
+            lifecycle = {
+                "ignore_changes": "columns",
+            }
+            kwargs["lifecycle"] = lifecycle
+
         super().__init__(name, **kwargs)
+
         self._data: _SnowflakeIcebergTable = _SnowflakeIcebergTable(
             name=self._name,
             columns=columns,

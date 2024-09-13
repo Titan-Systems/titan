@@ -129,6 +129,13 @@ class Table(NamedResource, TaggableResource, Resource):
         comment: str = None,
         **kwargs,
     ):
+
+        if "lifecycle" not in kwargs:
+            lifecycle = {
+                "ignore_changes": "columns",
+            }
+            kwargs["lifecycle"] = lifecycle
+
         super().__init__(name, **kwargs)
         self._data = _Table(
             name=self._name,
