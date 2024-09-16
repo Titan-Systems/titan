@@ -5,6 +5,7 @@ from tests.helpers import clean_resource_data
 
 from titan import data_provider
 from titan import resources as res
+from titan.enums import DataType
 from titan.client import reset_cache
 
 pytestmark = pytest.mark.requires_snowflake
@@ -79,15 +80,32 @@ def test_fetch_table_transient(cursor, test_db, suffix):
 def test_fetch_column_data_type_synonyms(cursor, test_db, suffix):
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute("USE SCHEMA PUBLIC")
+
+    columns = []
+
+    # for i, data_type in enumerate(
+    #     (
+
+    #         "NUMERIC(38,0)",
+    #         "NUMERIC(2,1)",
+    #         "NUMERIC(7, 0)",
+
+    #     )
+    # ):
+    for i, data_type in enumerate(DataType.__members__.values()):
+        columns.append(res.Column(name=f"ID_{i}", data_type=str(data_type)))
     table = res.Table(
         name=f"TABLE_{suffix}",
         database=test_db,
         schema="PUBLIC",
         owner=TEST_ROLE,
-        columns=[res.Column(name="ID", data_type="INT")],
+        columns=columns,
     )
     cursor.execute(table.create_sql(if_not_exists=True))
     result = safe_fetch(cursor, table.urn)
     assert result is not None
-    result = clean_resource_data(res.Table.spec, result)
-    assert result == clean_resource_data(res.Table.spec, table.to_dict())
+    data_columns = table.to_dict()["columns"]
+    result_columns = result["columns"]
+    assert len(result_columns) == len(data_columns)
+    for result_column, data_column in zip(result_columns, data_columns):
+        assert data_column["data_type"] == result_column["data_type"]

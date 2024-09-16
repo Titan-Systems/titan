@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from ..enums import DataType, ResourceType
+from ..data_types import convert_to_canonical_data_type
+from ..enums import ResourceType
 from ..parse import _parse_column, _parse_props
 from ..props import FlagProp, Props, StringProp, TagsProp
 from ..resource_tags import ResourceTags
@@ -21,10 +22,7 @@ class _Column(ResourceSpec):
 
     def __post_init__(self):
         super().__post_init__()
-        try:
-            self.data_type = DataType(self.data_type).value
-        except ValueError:
-            self.data_type = self.data_type.upper()
+        self.data_type = convert_to_canonical_data_type(self.data_type)
 
 
 class Column(Resource):
@@ -59,7 +57,7 @@ class Column(Resource):
     def __init__(
         self,
         name: str,
-        data_type: DataType,
+        data_type: str,
         collate: str = None,
         comment: str = None,
         not_null: bool = False,

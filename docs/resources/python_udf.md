@@ -21,7 +21,7 @@ python_udf = PythonUDF(
     returns="string",
     runtime_version="3.8",
     handler="process_data",
-    args=[{"name": "input_data", "data_type": "string"}],
+    args=[{"name": "input_data", "type": "string"}],
     as_="process_data_function",
     comment="This function processes data.",
     copy_grants=False,
@@ -47,7 +47,7 @@ python_udfs:
     handler: process_data
     args:
       - name: input_data
-        data_type: string
+        type: string
     as_: process_data_function
     comment: This function processes data.
     copy_grants: false

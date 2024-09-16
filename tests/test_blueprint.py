@@ -140,7 +140,7 @@ def test_blueprint_with_table(resource_manifest):
         "columns": [
             {
                 "name": "ID",
-                "data_type": "INT",
+                "data_type": "NUMBER(38,0)",
                 "collate": None,
                 "comment": None,
                 "constraint": None,

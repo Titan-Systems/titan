@@ -6,7 +6,7 @@ from dataclasses import fields
 from typing import get_args, get_origin
 
 from tests.helpers import get_json_fixtures
-
+from titan.data_types import convert_to_canonical_data_type
 from titan.resources import Resource
 from titan.resource_name import ResourceName
 from titan.role_ref import RoleRef
@@ -63,6 +63,10 @@ def test_data_identity(resource):
         for lhs, rhs in zip(lhs_cols, rhs_cols):
             if "name" in lhs:
                 assert _resource_names_are_eq(lhs.pop("name"), rhs.pop("name"))
+            if "data_type" in lhs:
+                assert convert_to_canonical_data_type(lhs.pop("data_type")) == convert_to_canonical_data_type(
+                    rhs.pop("data_type")
+                )
             assert lhs == rhs
     if "args" in serialized:
         lhs_args = serialized.pop("args", []) or []
