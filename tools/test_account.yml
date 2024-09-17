@@ -40,6 +40,12 @@ users:
         - owner
   - name: TITAN_CI
     type: SERVICE
+  - name: STATIC_USER_KEYPAIR
+    type: SERVICE
+    rsa_public_key: "{{ var.rsa_public_key }}"
+  - name: STATIC_USER_MFA
+    type: PERSON
+    password: "{{ var.static_user_mfa_password }}"
 
 roles:
   - name: CI

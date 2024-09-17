@@ -1204,7 +1204,6 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
                     role_privileges[grantee_role] = []
                 for priv in change.after["_privs"]:
                     if change.after["on_type"] is None:
-                        print(change)
                         raise
                     role_privileges[grantee_role].append(
                         GrantedPrivilege.from_grant(

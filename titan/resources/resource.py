@@ -2,9 +2,10 @@ import difflib
 import sys
 import types
 from dataclasses import dataclass, field, fields
+from enum import Enum
 from inspect import isclass
 from itertools import chain
-from typing import Any, Type, TypedDict, Union, get_args, get_origin, Optional
+from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
 
 import pyparsing as pp
 
@@ -106,7 +107,11 @@ def _coerce_resource_field(field_value, field_type):
 
     # Coerce enums
     elif issubclass(field_type, ParseableEnum):
-        return field_type(field_value)
+        try:
+            new_value = field_type(field_value)
+        except ValueError:
+            raise TypeError
+        return new_value
 
     # Coerce args
     elif field_type is Arg:
@@ -173,9 +178,14 @@ class ResourceSpec:
                     setattr(self, f.name, new_value)
                 except TypeError as err:
                     human_readable_classname = self.__class__.__name__[1:]
-                    raise TypeError(
-                        f"Expected {human_readable_classname}.{f.name} to be {f.type}, got {repr(field_value)} instead"
-                    ) from err
+                    if issubclass(f.type, Enum):
+                        raise TypeError(
+                            f"Expected {human_readable_classname}.{f.name} to be one of ({', '.join(f.type.__members__.keys())}), got {repr(field_value)} instead"
+                        ) from err
+                    else:
+                        raise TypeError(
+                            f"Expected {human_readable_classname}.{f.name} to be {f.type}, got {repr(field_value)} instead"
+                        ) from err
 
     @classmethod
     def get_metadata(cls, field_name: str) -> ResourceSpecMetadata:

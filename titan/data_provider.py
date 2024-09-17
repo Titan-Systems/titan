@@ -2060,6 +2060,8 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         login_name = data["login_name"]
         must_change_password = data["must_change_password"] == "true"
 
+    rsa_public_key = properties["rsa_public_key"] if properties["rsa_public_key"] != "null" else None
+
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "login_name": login_name,
@@ -2078,6 +2080,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         "default_secondary_roles": data["default_secondary_roles"] or None,
         "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
         "type": user_type,
+        "rsa_public_key": rsa_public_key,
         "owner": _get_owner_identifier(data),
     }
 

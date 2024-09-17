@@ -113,22 +113,36 @@ def test_database_scoped_resource_with_inline_referenced_parent(session_ctx):
 
 
 def test_resource_merging(session_ctx):
+    db = res.Database("SOME_DATABASE")
     schema = res.Schema("SOME_DATABASE.SOME_SCHEMA")
-    blueprint = Blueprint(
-        resources=[
-            res.Database("SOME_DATABASE"),
-            schema,
-        ]
-    )
 
     assert schema.container is not None
     assert isinstance(schema.container, ResourcePointer)
     assert schema.container.name == "SOME_DATABASE"
     assert schema.container.resource_type == ResourceType.DATABASE
 
+    blueprint = Blueprint(resources=[db, schema])
+
     assert session_ctx.get("database") is None
     blueprint._finalize(session_ctx)
-    assert len(list(_walk(blueprint._root))) == 4
+    resources = list(_walk(blueprint._root))
+    assert len(resources) == 4
     assert schema.container is not None
     assert isinstance(schema.container, res.Database)
     assert schema.container.name == "SOME_DATABASE"
+
+    assert resources[0].resource_type == ResourceType.ACCOUNT
+    assert resources[1].resource_type == ResourceType.DATABASE
+    assert resources[1].name == "SOME_DATABASE"
+    assert resources[2].resource_type == ResourceType.SCHEMA
+    assert resources[2].name == "SOME_SCHEMA"
+
+
+def test_resource_merging_public_schema(session_ctx):
+    db = res.Database("SOME_DATABASE")
+    schema = res.Schema("PUBLIC", database=db, comment="This is a test")
+    blueprint = Blueprint(resources=[db, schema])
+
+    blueprint._finalize(session_ctx)
+    resources = list(_walk(blueprint._root))
+    assert len(resources) == 4

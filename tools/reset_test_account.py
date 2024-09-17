@@ -34,7 +34,7 @@ def merge_configs(config1: dict, config2: dict) -> dict:
 def configure_test_account(conn):
     session_ctx = fetch_session(conn)
     config = read_config("test_account.yml")
-    vars = dotenv_values(".vars.test_account")
+    vars = dotenv_values("env/.vars.test_account")
     print(vars)
     is_enterprise = session_ctx["tag_support"]
 
@@ -114,7 +114,7 @@ def get_connection(env_vars):
 def configure_test_accounts():
 
     for account in ["aws.standard", "aws.enterprise"]:
-        env_vars = dotenv_values(f".env.{account}")
+        env_vars = dotenv_values(f"env/.env.{account}")
         conn = get_connection(env_vars)
         try:
             configure_test_account(conn)

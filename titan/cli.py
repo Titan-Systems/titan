@@ -6,6 +6,7 @@ import yaml
 from titan.blueprint import dump_plan
 from titan.operations.blueprint import blueprint_apply, blueprint_plan
 from titan.operations.export import export_resources
+from titan.operations.connector import connect, get_env_vars
 
 from .identifiers import resource_type_for_label
 
@@ -165,6 +166,19 @@ def export(resource, export_all, exclude, out, format):
             f.write(output)
     else:
         print(output)
+
+
+@titan_cli.command("connect")
+def cli_connect():
+    """Test the connection to Snowflake"""
+    env_vars = get_env_vars()
+    if not env_vars:
+        raise click.UsageError("No environment variables found. Please set the environment variables and try again.")
+    for key, value in env_vars.items():
+        value_inspect = "********" if key in ["password", "mfa_passcode"] else value
+        print(f"SNOWFLAKE_{key.upper()}={value_inspect}")
+    session = connect()
+    print(f"Connection successful as user {session.user}")
 
 
 if __name__ == "__main__":
