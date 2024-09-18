@@ -3,7 +3,7 @@ import logging
 import json
 import sys
 from functools import cache
-from typing import Optional, Union
+from typing import Optional, Union, TypedDict
 
 import pytz
 from inflection import pluralize
@@ -36,6 +36,22 @@ from .resource_name import ResourceName, attribute_is_resource_name, resource_na
 __this__ = sys.modules[__name__]
 
 logger = logging.getLogger("titan")
+
+
+class SessionContext(TypedDict):
+    account_locator: str
+    account: str
+    available_roles: list[ResourceName]
+    database: str
+    role: str
+    schemas: list[str]
+    secondary_roles: list[str]
+    tag_support: bool
+    tags: list[str]
+    user: str
+    version: str
+    warehouse: str
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]]
 
 
 def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
@@ -97,9 +113,6 @@ def _desc_type3_result_to_dict(desc_result, lower_properties=False):
         if lower_properties:
             parent_property = parent_property.lower()
             property = property.lower()
-        if parent_property not in result:
-            result[parent_property] = {}
-
         value = row["property_value"]
         if row["property_type"] == "Boolean":
             value = value == "true"
@@ -111,7 +124,13 @@ def _desc_type3_result_to_dict(desc_result, lower_properties=False):
             value = value or None
         elif row["property_type"] == "List":
             value = _parse_list_property(value)
-        result[parent_property][property] = value
+
+        if parent_property:
+            if parent_property not in result:
+                result[parent_property] = {}
+            result[parent_property][property] = value
+        else:
+            result[property] = value
     return result
 
 
@@ -136,7 +155,7 @@ def _fail_if_not_granted(result, *args):
 _INDEX = {}
 
 
-def _fetch_grant_to_role(session, role: str, granted_on: str, on_name: str, privilege: str):
+def _fetch_grant_to_role(session, role: ResourceName, granted_on: str, on_name: str, privilege: str):
     grants = _show_grants_to_role(session, role, cacheable=True)
     if id(grants) not in _INDEX:
         local_index = {}
@@ -297,6 +316,26 @@ def _parse_packages(packages_str: str) -> Optional[list]:
     return json.loads(packages_str.replace("'", '"'))
 
 
+def _parse_storage_location(storage_location_str: str) -> Optional[dict]:
+    if storage_location_str is None or storage_location_str == "":
+        return None
+    raw_dict = json.loads(storage_location_str)
+    storage_location = {}
+    for key, value in raw_dict.items():
+        key = key.lower()
+        if key == "encryption_type":
+            storage_location["encryption"] = {"type": value}
+        elif key in (
+            "name",
+            "storage_provider",
+            "storage_base_url",
+            "storage_aws_role_arn",
+            "storage_aws_external_id",
+        ):
+            storage_location[key] = value
+    return storage_location
+
+
 def params_result_to_dict(params_result):
     params = {}
     for param in params_result:
@@ -424,12 +463,12 @@ def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list
             raise
 
 
-def _show_resource_parameters(session, type_str: str, fqn: FQN, cacheable: bool = True) -> list[dict]:
+def _show_resource_parameters(session, type_str: str, fqn: FQN, cacheable: bool = True) -> dict:
     result = execute(session, f"SHOW PARAMETERS IN {type_str} {fqn}", cacheable=cacheable)
     return params_result_to_dict(result)
 
 
-def _show_grants_to_role(session, role: str, cacheable: bool = False) -> list:
+def _show_grants_to_role(session, role: ResourceName, cacheable: bool = False) -> list:
     """
     {
         'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
@@ -476,7 +515,7 @@ def fetch_region(session):
 
 
 @cache
-def fetch_session(session):
+def fetch_session(session) -> SessionContext:
     session_obj = execute(
         session,
         """
@@ -505,7 +544,7 @@ def fetch_session(session):
         else:
             raise
 
-    available_roles = [ResourceName(name=role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
+    available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
 
     role_privileges = {}
     for role in available_roles:
@@ -744,6 +783,8 @@ def fetch_database(session, fqn: FQN):
         "transient": "TRANSIENT" in options,
         "owner": _get_owner_identifier(data),
         "max_data_extension_time_in_days": params.get("max_data_extension_time_in_days"),
+        "external_volume": params.get("external_volume"),
+        "catalog": params.get("catalog"),
         "default_ddl_collation": params["default_ddl_collation"],
     }
 
@@ -839,6 +880,36 @@ def fetch_external_access_integration(session, fqn: FQN):
     }
 
 
+def fetch_external_volume(session, fqn: FQN):
+    show_result = _show_resources(session, "EXTERNAL VOLUMES", fqn)
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple external volumes matching {fqn}")
+
+    data = show_result[0]
+    desc_result = execute(session, f"DESC EXTERNAL VOLUME {fqn}", cacheable=True)
+    properties = _desc_type3_result_to_dict(desc_result, lower_properties=True)
+    owner = _fetch_owner(session, "VOLUME", fqn)
+
+    storage_locations = []
+    index = 1
+    while True:
+        storage_location = properties["storage_locations"].get(f"storage_location_{index}")
+        if storage_location is None:
+            break
+        storage_locations.append(_parse_storage_location(storage_location))
+        index += 1
+
+    return {
+        "name": _quote_snowflake_identifier(data["name"]),
+        "owner": owner,
+        "storage_locations": storage_locations,
+        "allow_writes": data["allow_writes"] == "true",
+        "comment": data["comment"] or None,
+    }
+
+
 def fetch_file_format(session, fqn: FQN):
     show_result = _show_resources(session, "FILE FORMATS", fqn)
     if len(show_result) == 0:
@@ -920,12 +991,11 @@ def fetch_file_format(session, fqn: FQN):
 
 
 def fetch_function(session, fqn: FQN):
-    show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
-    udfs = _filter_result(show_result, name=fqn.name)
+    udfs = _show_resources(session, "USER FUNCTIONS", fqn)
     if len(udfs) == 0:
         return None
     if len(udfs) > 1:
-        raise Exception(f"Found multiple roles matching {fqn}")
+        raise Exception(f"Found multiple functions matching {fqn}")
 
     data = udfs[0]
     inputs, output = data["arguments"].split(" RETURN ")
@@ -1079,6 +1149,34 @@ def fetch_grant(session, fqn: FQN):
 def fetch_grant_on_all(session, fqn: FQN):
     # All grants are expensive to fetch, so we will assume they are always out of date
     return None
+
+
+def fetch_iceberg_table(session, fqn: FQN):
+    tables = _show_resources(session, "ICEBERG TABLES", fqn)
+    if len(tables) == 0:
+        return None
+    if len(tables) > 1:
+        raise Exception(f"Found multiple iceberg tables matching {fqn}")
+
+    data = tables[0]
+    columns = fetch_columns(session, "ICEBERG TABLE", fqn)
+    show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
+    params = params_result_to_dict(show_params_result)
+    return {
+        "name": fqn.name,
+        "owner": data["owner"],
+        "columns": columns,
+        "external_volume": data["external_volume_name"],
+        "catalog": data["catalog_name"],
+        "base_location": data["base_location"].rstrip("/"),
+        "catalog_sync": params["catalog_sync"] or None,
+        "storage_serialization_policy": params["storage_serialization_policy"],
+        "data_retention_time_in_days": params["data_retention_time_in_days"],
+        "max_data_extension_time_in_days": params["max_data_extension_time_in_days"],
+        # "change_tracking": data["change_tracking"],
+        "default_ddl_collation": params["default_ddl_collation"] or None,
+        "comment": data["comment"] or None,
+    }
 
 
 def fetch_image_repository(session, fqn: FQN):
@@ -1872,7 +1970,6 @@ def fetch_table(session, fqn: FQN):
         raise Exception(f"Found multiple tables matching {fqn}")
 
     columns = fetch_columns(session, "TABLE", fqn)
-    # columns = _fetch_columns_for_table(session, fqn)
 
     data = tables[0]
     show_params_result = execute(session, f"SHOW PARAMETERS FOR TABLE {fqn}")
@@ -1962,6 +2059,8 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         login_name = data["login_name"]
         must_change_password = data["must_change_password"] == "true"
 
+    rsa_public_key = properties["rsa_public_key"] if properties["rsa_public_key"] != "null" else None
+
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "login_name": login_name,
@@ -1980,6 +2079,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         "default_secondary_roles": data["default_secondary_roles"] or None,
         "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
         "type": user_type,
+        "rsa_public_key": rsa_public_key,
         "owner": _get_owner_identifier(data),
     }
 
@@ -2114,7 +2214,7 @@ def list_compute_pools(session) -> list[FQN]:
     return [FQN(name=resource_name_from_snowflake_metadata(row["name"])) for row in show_result]
 
 
-def _list_databases(session) -> list[str]:
+def _list_databases(session) -> list[ResourceName]:
     show_result = execute(session, "SHOW DATABASES", cacheable=True)
     databases = []
     for row in show_result:
@@ -2159,6 +2259,10 @@ def list_database_roles(session) -> list[FQN]:
 
 def list_dynamic_tables(session) -> list[FQN]:
     return list_schema_scoped_resource(session, "DYNAMIC TABLES")
+
+
+def list_external_volumes(session) -> list[FQN]:
+    return list_account_scoped_resource(session, "EXTERNAL VOLUMES")
 
 
 # def list_future_grants(session) -> list[FQN]:
@@ -2221,6 +2325,10 @@ def list_grants(session) -> list[FQN]:
                 )
             )
     return grants
+
+
+def list_iceberg_tables(session) -> list[FQN]:
+    return list_schema_scoped_resource(session, "ICEBERG TABLES")
 
 
 def list_image_repositories(session) -> list[FQN]:

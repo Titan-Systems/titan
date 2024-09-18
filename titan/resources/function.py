@@ -28,7 +28,7 @@ class _JavascriptUDF(ResourceSpec):
     as_: str
     language: Language = Language.JAVASCRIPT
     comment: str = None
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
     external_access_integrations: list[str] = None
     handler: str = None
     imports: list[str] = None
@@ -157,7 +157,7 @@ class _PythonUDF(ResourceSpec):
     language: Language = Language.PYTHON
     as_: str = None
     comment: str = None
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
     external_access_integrations: list[str] = None
     imports: list[str] = None
     null_handling: NullHandling = None

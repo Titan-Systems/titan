@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-
+from typing import Optional
 from .enums import ParseableEnum, ResourceType
 
 
@@ -21,6 +21,9 @@ class GrantedPrivilege:
             return cls(privilege=priv, on=name)
         else:
             return cls(privilege=privilege, on=granted_on)
+
+    def __repr__(self):  # pragma: no cover
+        return f"GrantedPrivilege({str(self.privilege)} on={self.on})"
 
 
 class AccountPriv(Priv):
@@ -82,14 +85,14 @@ class AccountPriv(Priv):
     RESOLVE_ALL = "RESOLVE ALL"
 
 
-class AlertPriv(ParseableEnum):
+class AlertPriv(Priv):
     ALL = "ALL"
     MONITOR = "MONITOR"
     OPERATE = "OPERATE"
     OWNERSHIP = "OWNERSHIP"
 
 
-class DatabasePriv(ParseableEnum):
+class DatabasePriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     CREATE_DATABASE_ROLE = "CREATE DATABASE ROLE"
@@ -102,23 +105,28 @@ class DatabasePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
-class DatabaseRolePriv(ParseableEnum):
+class DatabaseRolePriv(Priv):
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
 
-class DirectoryTablePriv(ParseableEnum):
+class DirectoryTablePriv(Priv):
     OWNERSHIP = "OWNERSHIP"
 
 
-class EventTablePriv(ParseableEnum):
+class EventTablePriv(Priv):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     SELECT = "SELECT"
     INSERT = "INSERT"
 
 
-class FailoverGroupPriv(ParseableEnum):
+class ExternalVolumePriv(Priv):
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
+class FailoverGroupPriv(Priv):
     ALL = "ALL"
     FAILOVER = "FAILOVER"
     MODIFY = "MODIFY"
@@ -127,26 +135,38 @@ class FailoverGroupPriv(ParseableEnum):
     REPLICATE = "REPLICATE"
 
 
-class FileFormatPriv(ParseableEnum):
+class FileFormatPriv(Priv):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
 
-class FunctionPriv(ParseableEnum):
+class FunctionPriv(Priv):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
 
-class IntegrationPriv(ParseableEnum):
+class IcebergTablePriv(Priv):
+    ALL = "ALL"
+    APPLYBUDGET = "APPLYBUDGET"
+    DELETE = "DELETE"
+    INSERT = "INSERT"
+    OWNERSHIP = "OWNERSHIP"
+    REFERENCES = "REFERENCES"
+    SELECT = "SELECT"
+    TRUNCATE = "TRUNCATE"
+    UPDATE = "UPDATE"
+
+
+class IntegrationPriv(Priv):
     ALL = "ALL"
     USAGE = "USAGE"
     USE_ANY_ROLE = "USE_ANY_ROLE"
     OWNERSHIP = "OWNERSHIP"
 
 
-class MaterializedViewPriv(ParseableEnum):
+class MaterializedViewPriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     OWNERSHIP = "OWNERSHIP"
@@ -154,28 +174,28 @@ class MaterializedViewPriv(ParseableEnum):
     SELECT = "SELECT"
 
 
-class NetworkPolicyPriv(ParseableEnum):
+class NetworkPolicyPriv(Priv):
     OWNERSHIP = "OWNERSHIP"
 
 
-class NetworkRulePriv(ParseableEnum):
+class NetworkRulePriv(Priv):
     OWNERSHIP = "OWNERSHIP"
 
 
-class NotebookPriv(ParseableEnum):
+class NotebookPriv(Priv):
     OWNERSHIP = "OWNERSHIP"
 
 
-class PackagesPolicyPriv(ParseableEnum):
+class PackagesPolicyPriv(Priv):
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
 
-class PasswordPolicyPriv(ParseableEnum):
+class PasswordPolicyPriv(Priv):
     OWNERSHIP = "OWNERSHIP"
 
 
-class PipePriv(ParseableEnum):
+class PipePriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     MONITOR = "MONITOR"
@@ -183,13 +203,13 @@ class PipePriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
-class ProcedurePriv(ParseableEnum):
+class ProcedurePriv(Priv):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
 
-class ReplicationGroupPriv(ParseableEnum):
+class ReplicationGroupPriv(Priv):
     ALL = "ALL"
     MODIFY = "MODIFY"
     MONITOR = "MONITOR"
@@ -197,12 +217,12 @@ class ReplicationGroupPriv(ParseableEnum):
     REPLICATE = "REPLICATE"
 
 
-class RolePriv(ParseableEnum):
+class RolePriv(Priv):
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
 
-class SchemaPriv(ParseableEnum):
+class SchemaPriv(Priv):
     ALL = "ALL"
     ADD_SEARCH_OPTIMIZATION = "ADD SEARCH OPTIMIZATION"
     APPLYBUDGET = "APPLYBUDGET"
@@ -251,19 +271,19 @@ class SchemaPriv(ParseableEnum):
     USAGE = "USAGE"
 
 
-class SecretPriv(ParseableEnum):
+class SecretPriv(Priv):
     OWNERSHIP = "OWNERSHIP"
     READ = "READ"
     USAGE = "USAGE"
 
 
-class SequencePriv(ParseableEnum):
+class SequencePriv(Priv):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     USAGE = "USAGE"
 
 
-class StagePriv(ParseableEnum):
+class StagePriv(Priv):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     READ = "READ"
@@ -271,13 +291,13 @@ class StagePriv(ParseableEnum):
     WRITE = "WRITE"
 
 
-class StreamPriv(ParseableEnum):
+class StreamPriv(Priv):
     ALL = "ALL"
     OWNERSHIP = "OWNERSHIP"
     SELECT = "SELECT"
 
 
-class TablePriv(ParseableEnum):
+class TablePriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     DELETE = "DELETE"
@@ -291,13 +311,13 @@ class TablePriv(ParseableEnum):
     UPDATE = "UPDATE"
 
 
-class TagPriv(ParseableEnum):
+class TagPriv(Priv):
     APPLY = "APPLY"
     OWNERSHIP = "OWNERSHIP"
     READ = "READ"
 
 
-class TaskPriv(ParseableEnum):
+class TaskPriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     MONITOR = "MONITOR"
@@ -305,13 +325,13 @@ class TaskPriv(ParseableEnum):
     OWNERSHIP = "OWNERSHIP"
 
 
-class UserPriv(ParseableEnum):
+class UserPriv(Priv):
     ALL = "ALL"
     MONITOR = "MONITOR"
     OWNERSHIP = "OWNERSHIP"
 
 
-class ViewPriv(ParseableEnum):
+class ViewPriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     DELETE = "DELETE"
@@ -325,7 +345,7 @@ class ViewPriv(ParseableEnum):
     UPDATE = "UPDATE"
 
 
-class WarehousePriv(ParseableEnum):
+class WarehousePriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
     MODIFY = "MODIFY"
@@ -335,7 +355,7 @@ class WarehousePriv(ParseableEnum):
     USAGE = "USAGE"
 
 
-PRIVS_FOR_RESOURCE_TYPE = {
+PRIVS_FOR_RESOURCE_TYPE: dict[ResourceType, Optional[type[Priv]]] = {
     ResourceType.ACCOUNT: AccountPriv,
     ResourceType.AGGREGATION_POLICY: None,
     ResourceType.ALERT: AlertPriv,
@@ -353,6 +373,7 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.EVENT_TABLE: EventTablePriv,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: IntegrationPriv,
     ResourceType.EXTERNAL_FUNCTION: FunctionPriv,
+    ResourceType.EXTERNAL_VOLUME: ExternalVolumePriv,
     ResourceType.FAILOVER_GROUP: FailoverGroupPriv,
     ResourceType.FILE_FORMAT: FileFormatPriv,
     ResourceType.FUNCTION: FunctionPriv,
@@ -361,6 +382,7 @@ PRIVS_FOR_RESOURCE_TYPE = {
     ResourceType.GRANT_ON_ALL: None,
     ResourceType.GRANT: None,
     ResourceType.HYBRID_TABLE: None,
+    ResourceType.ICEBERG_TABLE: IcebergTablePriv,
     ResourceType.IMAGE_REPOSITORY: None,
     ResourceType.INTEGRATION: IntegrationPriv,
     ResourceType.MATERIALIZED_VIEW: MaterializedViewPriv,
@@ -496,9 +518,10 @@ def is_ownership_priv(priv):
     return str(priv) == "OWNERSHIP"
 
 
-def _all_privs_for_resource_type(resource_type):
+def all_privs_for_resource_type(resource_type):
     all_privs = []
-    for priv in PRIVS_FOR_RESOURCE_TYPE[resource_type]:
+    privs = PRIVS_FOR_RESOURCE_TYPE[resource_type] or []
+    for priv in privs:
         priv = str(priv)
         if priv != "ALL" and priv != "OWNERSHIP":
             all_privs.append(priv)
@@ -507,7 +530,7 @@ def _all_privs_for_resource_type(resource_type):
 
 def execution_role_for_priv(priv: str):
     try:
-        priv = AccountPriv(priv)
+        account_priv = AccountPriv(priv)
     except ValueError:
         return None
-    return GLOBAL_PRIV_DEFAULT_OWNERS.get(priv)
+    return GLOBAL_PRIV_DEFAULT_OWNERS.get(account_priv)

@@ -1,3 +1,5 @@
+# type: ignore
+
 import yaml
 
 from functools import cache

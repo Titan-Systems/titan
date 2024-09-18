@@ -248,7 +248,7 @@ def test_blueprint_sync_dont_remove_system_schemas(cursor, test_db):
         resources=[
             res.Schema(name="INFORMATION_SCHEMA", database=test_db),
         ],
-        run_mode="sync-all",
+        run_mode="sync",
         allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
@@ -263,7 +263,7 @@ def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
             res.Schema(name="ABSENT", database=test_db),
             res.Schema(name="INFORMATION_SCHEMA", database=test_db),
         ],
-        run_mode="sync-all",
+        run_mode="sync",
         allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
@@ -281,7 +281,7 @@ def test_blueprint_sync_plan_matches_remote_state(cursor, test_db):
             res.Schema(name="PRESENT", database=test_db, owner=TEST_ROLE),
             res.Schema(name="INFORMATION_SCHEMA", database=test_db),
         ],
-        run_mode="sync-all",
+        run_mode="sync",
         allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
@@ -294,7 +294,7 @@ def test_blueprint_sync_remote_state_contains_extra_resource(cursor, test_db):
     blueprint = Blueprint(
         name="blueprint",
         resources=[res.Schema(name="INFORMATION_SCHEMA", database=test_db)],
-        run_mode="sync-all",
+        run_mode="sync",
         allowlist=[ResourceType.SCHEMA],
     )
     plan = blueprint.plan(session)
@@ -349,7 +349,7 @@ def test_blueprint_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cl
 def test_blueprint_with_nested_database(cursor):
     session = cursor.connection
     bp = Blueprint(name="failing-reference")
-    schema = res.Schema(name="static_database.public")
+    schema = res.Schema(name="static_database.static_schema")
     bp.add(res.FutureGrant(priv="SELECT", on_future_views_in=schema, to="STATIC_ROLE"))
     plan = bp.plan(session)
     assert len(plan) == 1

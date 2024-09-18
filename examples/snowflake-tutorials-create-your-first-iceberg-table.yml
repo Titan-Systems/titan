@@ -1,0 +1,75 @@
+name: snowflake-tutorials-create-your-first-iceberg-table
+run_mode: create-or-update
+
+vars:
+  - name: storage_role_arn
+    type: string
+    default: arn:aws:iam::123456789012:role/some_role_name
+    sensitive: true
+  - name: storage_base_url
+    type: string
+    default: s3://my-s3-bucket/my-s3-path
+  - name: storage_aws_external_id
+    type: string
+
+roles:
+  - name: iceberg_tutorial_role
+
+role_grants:
+  - role: iceberg_tutorial_role
+    roles:
+      - SYSADMIN
+
+databases:
+  - name: iceberg_tutorial_db
+    owner: iceberg_tutorial_role
+    external_volume: iceberg_external_volume
+    catalog: SNOWFLAKE
+    
+warehouses:
+  - name: iceberg_tutorial_wh
+    owner: iceberg_tutorial_role
+    warehouse_size: XSMALL
+    auto_suspend: 60
+    auto_resume: true
+
+grants:
+ - GRANT CREATE DATABASE ON ACCOUNT TO ROLE iceberg_tutorial_role
+ - GRANT CREATE WAREHOUSE ON ACCOUNT TO ROLE iceberg_tutorial_role
+ - GRANT CREATE EXTERNAL VOLUME ON ACCOUNT TO ROLE iceberg_tutorial_role
+
+external_volumes:
+  - name: iceberg_external_volume
+    owner: iceberg_tutorial_role
+    storage_locations:
+      - name: my-s3-us-west-2
+        storage_provider: S3
+        storage_base_url: "{{ var.storage_base_url }}"
+        storage_aws_role_arn: "{{ var.storage_role_arn }}"
+        storage_aws_external_id: "{{ var.storage_aws_external_id }}"
+
+iceberg_tables:
+  - name: customer_iceberg
+    database: iceberg_tutorial_db
+    schema: public
+    owner: iceberg_tutorial_role
+    catalog: SNOWFLAKE
+    external_volume: iceberg_external_volume
+    base_location: customer_iceberg
+    columns:
+      - name: c_custkey
+        data_type: INTEGER
+      - name: c_name
+        data_type: STRING
+      - name: c_address
+        data_type: STRING
+      - name: c_nationkey
+        data_type: INTEGER
+      - name: c_phone
+        data_type: STRING
+      - name: c_acctbal
+        data_type: INTEGER
+      - name: c_mktsegment
+        data_type: STRING
+      - name: c_comment
+        data_type: STRING

@@ -28,7 +28,7 @@ def test_fetch_on_future_schemas_in_database(cursor):
 
 
 def test_fetch_on_future_tables_in_schema(cursor):
-    schema = res.Schema(name="PUBLIC", database="STATIC_DATABASE")
+    schema = res.Schema(name="STATIC_SCHEMA", database="STATIC_DATABASE")
     future_grant = res.FutureGrant(priv="SELECT", to=TEST_ROLE, on_future_tables_in=schema)
     cursor.execute(future_grant.create_sql())
 
@@ -36,7 +36,7 @@ def test_fetch_on_future_tables_in_schema(cursor):
     assert result is not None
     assert result["on_type"] == "TABLE"
     assert result["in_type"] == "SCHEMA"
-    assert result["in_name"] == "STATIC_DATABASE.PUBLIC"
+    assert result["in_name"] == "STATIC_DATABASE.STATIC_SCHEMA"
     assert result["priv"] == "SELECT"
     assert_resource_dicts_eq_ignore_nulls(result, future_grant.to_dict())
 

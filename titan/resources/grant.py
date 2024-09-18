@@ -7,7 +7,7 @@ from inflection import singularize
 from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN, parse_FQN, resource_label_for_type, resource_type_for_label
 from ..parse import _parse_grant, format_collection_string
-from ..privs import _all_privs_for_resource_type
+from ..privs import all_privs_for_resource_type
 from ..props import FlagProp, IdentifierProp, Props
 from ..resource_name import ResourceName
 from ..scope import AccountScope
@@ -27,7 +27,7 @@ class _Grant(ResourceSpec):
     on_type: ResourceType
     to: Role
     grant_option: bool = False
-    owner: Role = field(default_factory=None, metadata={"fetchable": False})
+    owner: Role = field(default=None, metadata={"fetchable": False})
     _privs: list[str] = field(default_factory=list, metadata={"forces_add": True})
 
     def __post_init__(self):
@@ -41,7 +41,7 @@ class _Grant(ResourceSpec):
             raise ValueError("on_type must be set")
         if not self._privs:
             if self.priv == "ALL":
-                self._privs = sorted(_all_privs_for_resource_type(self.on_type))
+                self._privs = sorted(all_privs_for_resource_type(self.on_type))
             else:
                 self._privs = [self.priv]
 

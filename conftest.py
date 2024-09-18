@@ -1,8 +1,9 @@
-import pytest
 import os
 import uuid
 
+import pytest
 import snowflake.connector
+from dotenv import dotenv_values
 
 from titan.enums import ResourceType
 
@@ -36,6 +37,17 @@ def pytest_collection_modifyitems(items):
     for item in items:
         if not item.get_closest_marker("enterprise"):
             item.add_marker("standard")
+
+
+@pytest.fixture(scope="session")
+def blueprint_vars():
+    if os.path.exists("env/.vars.test_account"):
+        vars = dotenv_values("env/.vars.test_account")
+        vars.pop("rsa_public_key", None)
+        vars.pop("static_user_mfa_password", None)
+        return vars
+    else:
+        return {key[4:].lower(): value for key, value in os.environ.items() if key.startswith("VAR_")}
 
 
 @pytest.fixture(scope="session")
@@ -73,7 +85,7 @@ def cursor(suffix, test_db, marked_for_cleanup):
                 try:
                     cur.execute(res.drop_sql(if_exists=True))
                 except snowflake.connector.errors.ProgrammingError as err:
-                    if err.errno == 2003:
+                    if err.errno in (2003, 393950):
                         pass
                     else:
                         raise

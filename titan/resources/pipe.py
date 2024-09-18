@@ -18,7 +18,7 @@ class _Pipe(ResourceSpec):
     name: ResourceName
     as_: str
     owner: RoleRef = "SYSADMIN"
-    auto_ingest: bool = field(default_factory=None, metadata={"fetchable": False})
+    auto_ingest: bool = field(default=None, metadata={"fetchable": False})
     error_integration: str = None
     aws_sns_topic: str = None
     integration: str = None

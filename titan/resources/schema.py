@@ -113,8 +113,8 @@ class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
             comment = "Views describing the contents of schemas in this database"
             owner = ""
 
-        # if self._name in SYSTEM_SCHEMAS:
-        #     self.implicit = True
+        if self._name == "PUBLIC" and not self.implicit:
+            raise ValueError("PUBLIC schema is implicit and must not be explicitly created")
 
         self._data: _Schema = _Schema(
             name=self._name,

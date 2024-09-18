@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 
 from ..enums import ResourceType
-from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
+from ..identifiers import FQN, URN
+from ..props import FlagProp, IdentifierProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
-from .resource import NamedResource, Resource, ResourceContainer, ResourcePointer, ResourceSpec
+from .external_volume import ExternalVolume
+from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
 from .role import Role
 from .schema import Schema
 from .tag import TaggableResource
@@ -17,6 +19,8 @@ class _Database(ResourceSpec):
     owner: Role = "SYSADMIN"
     data_retention_time_in_days: int = 1
     max_data_extension_time_in_days: int = 14
+    external_volume: ExternalVolume = None
+    catalog: str = None
     default_ddl_collation: str = None
     comment: str = None
 
@@ -123,6 +127,8 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         data_retention_time_in_days=IntProp("data_retention_time_in_days"),
         max_data_extension_time_in_days=IntProp("max_data_extension_time_in_days"),
         default_ddl_collation=StringProp("default_ddl_collation"),
+        external_volume=IdentifierProp("external_volume"),
+        catalog=StringProp("catalog"),
         tags=TagsProp(),
         comment=StringProp("comment"),
     )
@@ -136,6 +142,8 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         owner: str = "SYSADMIN",
         data_retention_time_in_days: int = 1,
         max_data_extension_time_in_days: int = 14,
+        external_volume: str = None,
+        catalog: str = None,
         default_ddl_collation: str = None,
         tags: dict[str, str] = None,
         comment: str = None,
@@ -148,14 +156,14 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
             owner=owner,
             data_retention_time_in_days=data_retention_time_in_days,
             max_data_extension_time_in_days=max_data_extension_time_in_days,
+            external_volume=external_volume,
+            catalog=catalog,
             default_ddl_collation=default_ddl_collation,
             comment=comment,
         )
         if self._data.name != "SNOWFLAKE":
-            self.add(
-                Schema(name="PUBLIC", implicit=True),
-                # ResourcePointer(resource_type=ResourceType.SCHEMA, name="PUBLIC")
-            )
+            self._public_schema = Schema(name="PUBLIC", implicit=True, owner=owner)
+            self.add(self._public_schema)
         self.set_tags(tags)
 
     def schemas(self):
@@ -163,4 +171,12 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
 
     @property
     def public_schema(self) -> Schema:
-        return self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA)
+        return self._public_schema
+
+
+def public_schema_urn(database_urn: URN) -> URN:
+    return URN(
+        resource_type=ResourceType.SCHEMA,
+        fqn=FQN(name=ResourceName("PUBLIC"), database=ResourceName(str(database_urn.fqn))),
+        account_locator=database_urn.account_locator,
+    )

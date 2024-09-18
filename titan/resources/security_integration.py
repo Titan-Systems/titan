@@ -37,8 +37,8 @@ class _SnowflakePartnerOAuthSecurityIntegration(ResourceSpec):
     type: SecurityIntegrationType = SecurityIntegrationType.OAUTH
     enabled: bool = True
     oauth_client: OAuthClient = None
-    oauth_client_secret: str = field(default_factory=None, metadata={"fetchable": False})
-    oauth_redirect_uri: str = field(default_factory=None, metadata={"fetchable": False})
+    oauth_client_secret: str = field(default=None, metadata={"fetchable": False})
+    oauth_redirect_uri: str = field(default=None, metadata={"fetchable": False})
     oauth_issue_refresh_tokens: bool = True
     oauth_refresh_token_validity: int = 7776000
     comment: str = None
@@ -220,7 +220,7 @@ class _APIAuthenticationSecurityIntegration(ResourceSpec):
     oauth_token_endpoint: str = None
     oauth_client_auth_method: str = "CLIENT_SECRET_POST"
     oauth_client_id: str = None
-    oauth_client_secret: str = field(default_factory=None, metadata={"fetchable": False})
+    oauth_client_secret: str = field(default=None, metadata={"fetchable": False})
     oauth_grant: str = None
     oauth_access_token_validity: int = None
     oauth_allowed_scopes: list[str] = None

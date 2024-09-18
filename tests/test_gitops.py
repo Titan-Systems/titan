@@ -2,7 +2,7 @@ import pytest
 from inflection import pluralize
 
 from tests.helpers import get_json_fixtures
-from titan.gitops import collect_resources_from_config
+from titan.gitops import collect_blueprint_config
 from titan.identifiers import resource_label_for_type
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -36,13 +36,13 @@ def resource_config() -> dict:
 
 
 def test_database_config(database_config):
-    resources = collect_resources_from_config(database_config)
-    assert len(resources) == 2
+    blueprint_config = collect_blueprint_config(database_config)
+    assert len(blueprint_config.resources) == 2
 
 
 @pytest.mark.skip(reason="JSON_FIXTURES doesn't include things like role grants yet")
 def test_resource_config(resource_config):
-    resources = collect_resources_from_config(resource_config)
+    resources = collect_blueprint_config(resource_config)
     resource_types = set([resource.resource_type for resource in resources])
     expected_resource_types = set([resource_cls.resource_type for resource_cls, _ in JSON_FIXTURES])
     assert resource_types == expected_resource_types
@@ -67,8 +67,8 @@ def test_grant_on_all_alias():
             }
         ]
     }
-    resources = collect_resources_from_config(config_base)
-    resources_aliased = collect_resources_from_config(config_aliased)
-    assert len(resources) == 1
-    assert len(resources_aliased) == 1
-    assert resources[0]._data == resources_aliased[0]._data
+    blueprint_config = collect_blueprint_config(config_base)
+    blueprint_config_aliased = collect_blueprint_config(config_aliased)
+    assert len(blueprint_config.resources) == 1
+    assert len(blueprint_config_aliased.resources) == 1
+    assert blueprint_config.resources[0]._data == blueprint_config_aliased.resources[0]._data

@@ -2,16 +2,17 @@ import difflib
 import sys
 import types
 from dataclasses import dataclass, field, fields
+from enum import Enum
 from inspect import isclass
 from itertools import chain
-from typing import Any, Type, TypedDict, Union, get_args, get_origin
+from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
 
 import pyparsing as pp
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..identifiers import FQN, URN, parse_identifier, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
-from ..parse import _parse_create_header, _parse_props, _resolve_resource_class
+from ..parse import _parse_create_header, _parse_props, resolve_resource_class
 from ..props import Props as ResourceProps
 from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
@@ -24,6 +25,7 @@ from ..scope import (
     SchemaScope,
     resource_can_be_contained_in,
 )
+from ..var import VarString, string_contains_var
 
 
 class WrongContainerException(Exception):
@@ -105,7 +107,11 @@ def _coerce_resource_field(field_value, field_type):
 
     # Coerce enums
     elif issubclass(field_type, ParseableEnum):
-        return field_type(field_value)
+        try:
+            new_value = field_type(field_value)
+        except ValueError:
+            raise TypeError
+        return new_value
 
     # Coerce args
     elif field_type is Arg:
@@ -131,9 +137,18 @@ def _coerce_resource_field(field_value, field_type):
     elif issubclass(field_type, Resource):
         return convert_to_resource(field_type, field_value)
     elif field_type is ResourceName:
-        return ResourceName(field_value)
+        return field_value if isinstance(field_value, VarString) else ResourceName(field_value)
     elif field_type is ResourceTags:
         return ResourceTags(field_value)
+    elif field_type is str:
+        if isinstance(field_value, str) and string_contains_var(field_value):
+            return VarString(field_value)
+        elif isinstance(field_value, VarString):
+            return field_value
+        elif not isinstance(field_value, str):
+            raise TypeError
+        else:
+            return field_value
     else:
         # Typecheck all other field types (str, int, etc.)
         if not isinstance(field_value, field_type):
@@ -147,6 +162,7 @@ class ResourceSpecMetadata:
     triggers_replacement: bool = False
     forces_add: bool = False
     ignore_changes: bool = False
+    known_after_apply: bool = False
 
 
 @dataclass
@@ -162,9 +178,14 @@ class ResourceSpec:
                     setattr(self, f.name, new_value)
                 except TypeError as err:
                     human_readable_classname = self.__class__.__name__[1:]
-                    raise TypeError(
-                        f"Expected {human_readable_classname}.{f.name} to be {f.type}, got {repr(field_value)} instead"
-                    ) from err
+                    if issubclass(f.type, Enum):
+                        raise TypeError(
+                            f"Expected {human_readable_classname}.{f.name} to be one of ({', '.join(f.type.__members__.keys())}), got {repr(field_value)} instead"
+                        ) from err
+                    else:
+                        raise TypeError(
+                            f"Expected {human_readable_classname}.{f.name} to be {f.type}, got {repr(field_value)} instead"
+                        ) from err
 
     @classmethod
     def get_metadata(cls, field_name: str) -> ResourceSpecMetadata:
@@ -258,7 +279,7 @@ class Resource(metaclass=_Resource):
             # make a new function called _parse_resource_type_from_create
             # resource_cls = Resource.classes[_resolve_resource_class(sql)]
             # raise NotImplementedError
-            resource_type = _resolve_resource_class(sql)
+            resource_type = resolve_resource_class(sql)
             scope = RESOURCE_SCOPES[resource_type]
         else:
             resource_type = resource_cls.resource_type
@@ -305,7 +326,7 @@ class Resource(metaclass=_Resource):
     def __repr__(self):  # pragma: no cover
         if not hasattr(self, "_data"):
             return f"{self.__class__.__name__}(<uninitialized>)"
-        name = getattr(self._data, "name", None)
+        name = getattr(self._data, "name", "<noname>")
         implicit = "~" if self.implicit else ""
         return f"{self.__class__.__name__}({implicit}{name})"
 
@@ -318,7 +339,9 @@ class Resource(metaclass=_Resource):
         return hash(URN.from_resource(self, ""))
 
     def to_dict(self):
-        serialized = {}
+        serialized: dict[str, Any] = {}
+        if self.implicit:
+            serialized["_implicit"] = True
 
         def _serialize(field, value):
             if field.name == "owner":
@@ -401,6 +424,30 @@ class Resource(metaclass=_Resource):
             elif database is not None:
                 database.find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(self)
 
+    def _resolve_vars(self, vars: dict):
+
+        def _render_vars(field_value):
+            if isinstance(field_value, VarString):
+                return field_value.to_string(vars)
+            elif isinstance(field_value, list):
+                return [_render_vars(v) for v in field_value]
+            elif isinstance(field_value, dict):
+                return {k: _render_vars(v) for k, v in field_value.items()}
+            elif isinstance(field_value, Resource) and not isinstance(field_value, ResourcePointer):
+                field_value._resolve_vars(vars)
+                return field_value
+            else:
+                return field_value
+
+        if self._data:
+            for f in fields(self._data):
+                field_value = getattr(self._data, f.name)
+                new_value = _render_vars(field_value)
+                setattr(self._data, f.name, new_value)
+
+        if isinstance(self, NamedResource) and isinstance(self._name, VarString):
+            self._name = ResourceName(self._name.to_string(vars))
+
     def to_pointer(self):
         return ResourcePointer(
             name=str(self.fqn),
@@ -441,7 +488,7 @@ class ResourceContainer:
                 self._items[item.resource_type] = []
             self._items[item.resource_type].append(item)
 
-    def items(self, resource_type: ResourceType = None) -> list[Resource]:
+    def items(self, resource_type: Optional[ResourceType] = None) -> list[Resource]:
         if resource_type:
             return self._items.get(resource_type, [])
         else:
@@ -483,12 +530,17 @@ class NamedResource:
     >>> tbl = Table(name="DB.SCHEMA.TBL")
     """
 
-    def __init__(self, name: Union[str, ResourceName], **kwargs):
-        if not isinstance(name, (str, ResourceName)):
+    def __init__(self, name: Union[str, ResourceName, VarString], **kwargs):
+        if not isinstance(name, (str, ResourceName, VarString)):
             raise TypeError(f"Expected str or ResourceName for name, got {name} ({type(name).__name__}) instead")
 
-        if isinstance(name, ResourceName):
+        if isinstance(name, (ResourceName, VarString)):
             self._name = name
+            super().__init__(**kwargs)
+            return
+
+        if string_contains_var(name):
+            self._name = VarString(name)
             super().__init__(**kwargs)
             return
 

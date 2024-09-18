@@ -23,7 +23,7 @@ class _MaterializedView(ResourceSpec):
     name: ResourceName
     owner: RoleRef = "SYSADMIN"
     secure: bool = False
-    columns: list[Column] = field(default_factory=None, metadata={"ignore_changes": True})
+    columns: list[Column] = field(default=None, metadata={"ignore_changes": True})
     copy_grants: bool = False
     cluster_by: list[str] = None
     comment: str = None

@@ -2,11 +2,6 @@ databases:
   - name: DOTA
     comment: "This database is dedicated to storing and processing Dota 2 game replay data."
 
-schemas:
-  - name: PUBLIC
-    database: DOTA
-    comment: "Default public schema for Dota 2 game data."
-
 tables:
   - name: RAW
     database: DOTA

@@ -23,7 +23,7 @@ class _APIIntegration(ResourceSpec):
     enabled: bool
     api_allowed_prefixes: list[str]
     api_blocked_prefixes: list[str] = None
-    api_key: str = field(default_factory=None, metadata={"fetchable": False})
+    api_key: str = field(default=None, metadata={"fetchable": False})
     owner: Role = "ACCOUNTADMIN"
     comment: str = None
 

@@ -4,10 +4,12 @@ import os
 import re
 
 from titan import data_provider
+from titan.blueprint import CreateResource, UpdateResource, DropResource, TransferOwnership
 from titan.client import reset_cache
 from titan.parse import _split_statements
 from titan.resource_name import ResourceName
 from titan.resources import Resource
+from titan.resources.resource import ResourceSpec
 
 logger = logging.getLogger("titan")
 
@@ -28,19 +30,19 @@ def assert_resource_dicts_eq_ignore_nulls(lhs: dict, rhs: dict) -> None:
     assert lhs == rhs
 
 
-def strip_nones_and_unfetchable(spec, data):
+def clean_resource_data(spec: type[ResourceSpec], data: dict) -> dict:
     data = data_provider.remove_none_values(data)
     keys = set(data.keys())
     for attr in keys:
         attr_metadata = spec.get_metadata(attr)
-        if not attr_metadata.fetchable:
+        if not attr_metadata.fetchable or attr_metadata.known_after_apply:
             data.pop(attr, None)
     return data
 
 
 def assert_resource_dicts_eq_ignore_nulls_and_unfetchable(spec, lhs: dict, rhs: dict) -> None:
-    lhs = strip_nones_and_unfetchable(spec, lhs)
-    rhs = strip_nones_and_unfetchable(spec, rhs)
+    lhs = clean_resource_data(spec, lhs)
+    rhs = clean_resource_data(spec, rhs)
     assert lhs == rhs
 
 
@@ -121,3 +123,16 @@ def get_examples_yml():
 def safe_fetch(cursor, urn):
     reset_cache()
     return data_provider.fetch_resource(cursor, urn)
+
+
+def dump_resource_change(change):
+    if isinstance(change, CreateResource):
+        return f"Create: {change.urn}"
+    elif isinstance(change, UpdateResource):
+        return f"Update: {change.urn}, delta: {change.delta}"
+    elif isinstance(change, DropResource):
+        return f"Drop: {change.urn}"
+    elif isinstance(change, TransferOwnership):
+        return f"Transfer: {change.urn}, from {change.from_owner} to {change.to_owner}"
+    else:
+        return f"Unknown change: {change}"

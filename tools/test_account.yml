@@ -1,3 +1,29 @@
+name: reset-test-account
+run_mode: SYNC
+allowlist:
+  - "catalog integration"
+  - "compute pool"
+  - "database role"
+  - "database"
+  - "external volume"
+  - "grant"
+  - "iceberg table"
+  - "network policy"
+  - "network rule"
+  - "resource monitor"
+  - "role grant"
+  - "role"
+  - "schema"
+  - "security integration"
+  - "share"
+  - "stage"
+  - "storage integration"
+  - "stream"
+  - "table"
+  - "user"
+  - "view"
+  - "warehouse"
+
 users:
   - name: static_user
     email: info@applytitan.com
@@ -14,6 +40,15 @@ users:
         - owner
   - name: TITAN_CI
     type: SERVICE
+  - name: STATIC_USER_KEYPAIR
+    type: SERVICE
+    rsa_public_key: "{{ var.rsa_public_key }}"
+  - name: STATIC_USER_MFA
+    type: PERSON
+    password: "{{ var.static_user_mfa_password }}"
+    lifecycle:
+      ignore_changes:
+        - password
 
 roles:
   - name: CI
@@ -36,8 +71,6 @@ roles:
 
 databases:
   - name: static_database
-    schemas:
-      - name: public
   - name: static_database_the_second
 
 database_roles:
@@ -217,3 +250,12 @@ security_integrations:
     oauth_client_secret: 'eb9vaXsrcEvrFdfcvCaoijhilj4fc'
     oauth_token_endpoint: 'https://myinstance.service-now.com/oauth_token.do'
     enabled: true
+
+external_volumes:
+  - name: static_external_volume
+    storage_locations:
+      - name: us-west-2
+        storage_provider: S3
+        storage_base_url: "{{ var.storage_base_url }}"
+        storage_aws_role_arn: "{{ var.storage_role_arn }}"
+        storage_aws_external_id: iceberg_table_external_id

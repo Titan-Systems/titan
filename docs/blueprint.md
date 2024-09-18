@@ -26,8 +26,7 @@ bp.apply(session, plan)
 ## Blueprint parameters
 - **run_mode** (`str`): Defines how the blueprint interacts with the Snowflake account
   - **create-or-update** (*default*): Resources are either created or updated, no resources are destroyed
-  - **sync**: Synchronizes your account to match the blueprint strictly. Resources not defined in the blueprint but present in your account will be dropped. This mode does not affect users, roles, grants, or tables for safety reasons.
-  - **sync-all**: ⚠️`DANGEROUS`⚠️ A mode that acts like `sync` but without restrictions, potentially leading to account lockout.
+  - **sync**: Modifies your Snowflake account to match the blueprint exactly. When in use, `allowlist` must be specified. ⚠️`WARNING`⚠️: Resources not defined in the blueprint but present in your account will be dropped.
 - **resources** (`list[Resource]`): List of resources initialized in the blueprint.
 - **allowlist** (`list[str]`): Specifies the allowed resource types in the blueprint.
 - **dry_run** (`bool`): `apply()` will return a list of SQL commands that would be executed without applying them.

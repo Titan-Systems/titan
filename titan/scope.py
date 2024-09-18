@@ -45,6 +45,11 @@ class TableScope(ResourceScope):
         # )
 
 
+class AnonymousScope(ResourceScope):
+    def fully_qualified_name(self, _, resource_name: ResourceName) -> FQN:
+        return FQN(name=resource_name)
+
+
 def resource_can_be_contained_in(resource, container):
     container_type = container.__class__.__name__
     if container_type == "ResourcePointer":

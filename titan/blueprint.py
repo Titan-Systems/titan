@@ -3,11 +3,12 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from queue import Queue
-from typing import Generator, Optional, Union
+from typing import Any, Generator, Optional, Sequence, Union, cast
 
 import snowflake.connector
 
 from . import data_provider, lifecycle
+from .blueprint_config import BlueprintConfig
 from .client import (
     ALREADY_EXISTS_ERR,
     DOES_NOT_EXIST_ERR,
@@ -15,8 +16,18 @@ from .client import (
     execute,
     reset_cache,
 )
+from .data_provider import SessionContext
 from .diff import Action, diff
-from .enums import ParseableEnum, ResourceType, resource_type_is_grant
+from .enums import ResourceType, RunMode, resource_type_is_grant
+from .exceptions import (
+    DuplicateResourceException,
+    InvalidResourceException,
+    MarkedForReplacementException,
+    MissingPrivilegeException,
+    MissingResourceException,
+    NonConformingPlanException,
+    OrphanResourceException,
+)
 from .identifiers import URN, parse_identifier, resource_label_for_type
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
@@ -27,59 +38,30 @@ from .privs import (
     is_ownership_priv,
 )
 from .resource_name import ResourceName
-from .resources import Account, Database
-from .resources.resource import RESOURCE_SCOPES, Resource, ResourceContainer, ResourcePointer, infer_role_type_from_name
+from .resource_tags import ResourceTags
+from .resources import Database, DatabaseRole, Role, RoleGrant, Schema
+from .resources.database import public_schema_urn
+from .resources.resource import (
+    RESOURCE_SCOPES,
+    NamedResource,
+    Resource,
+    ResourceContainer,
+    ResourcePointer,
+    infer_role_type_from_name,
+)
 from .resources.tag import Tag, TaggableResource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
-SYNC_MODE_BLOCKLIST = [
-    ResourceType.FUTURE_GRANT,
-    ResourceType.GRANT,
-    ResourceType.GRANT_ON_ALL,
-    ResourceType.ROLE,
-    ResourceType.USER,
-    ResourceType.TABLE,
-]
-
-
-class DuplicateResourceException(Exception):
-    pass
-
-
-class MissingResourceException(Exception):
-    pass
-
-
-class MissingPrivilegeException(Exception):
-    pass
-
-
-class MarkedForReplacementException(Exception):
-    pass
-
-
-class NonConformingPlanException(Exception):
-    pass
-
-
-class ResourceInsertionException(Exception):
-    pass
-
-
-class OrphanResourceException(Exception):
-    pass
-
-
-class InvalidOwnerException(Exception):
-    pass
-
-
-class RunMode(ParseableEnum):
-    CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
-    SYNC = "SYNC"
-    SYNC_ALL = "SYNC-ALL"
+# SYNC_MODE_BLOCKLIST = [
+#     ResourceType.FUTURE_GRANT,
+#     ResourceType.GRANT,
+#     ResourceType.GRANT_ON_ALL,
+#     ResourceType.ROLE,
+#     ResourceType.USER,
+#     ResourceType.TABLE,
+# ]
 
 
 @dataclass
@@ -153,7 +135,7 @@ class Manifest:
     def __init__(self, account_locator: str = ""):
         self._account_locator = account_locator
         self._data: dict[URN, Resource] = {}
-        self._refs = []
+        self._refs: list[tuple[URN, URN]] = []
 
     def __getitem__(self, key: URN):
         if isinstance(key, URN):
@@ -202,6 +184,10 @@ class Manifest:
     @property
     def refs(self):
         return self._refs
+
+    @property
+    def resources(self):
+        return list(self._data.values())
 
 
 def dump_plan(plan: Plan, format: str = "json"):
@@ -341,8 +327,8 @@ def _split_by_scope(
 
     for resource in resources:
         root = resource
-        while root.container is not None:
-            root = root.container
+        while getattr(root, "container", None) is not None:
+            root = getattr(root, "container")
         route(root)
     return org_scoped, acct_scoped, db_scoped, schema_scoped
 
@@ -354,51 +340,83 @@ def _walk(resource: Resource) -> Generator[Resource, None, None]:
             yield from _walk(item)
 
 
-def _raise_if_plan_would_drop_session_user(session_ctx: dict, plan: Plan):
+def _raise_if_plan_would_drop_session_user(session_ctx: SessionContext, plan: Plan):
     for change in plan:
         if change.urn.resource_type == ResourceType.USER and isinstance(change, DropResource):
             if ResourceName(session_ctx["user"]) == ResourceName(change.urn.fqn.name):
                 raise Exception("Plan would drop the current session user, which is not allowed")
 
 
-def _merge_pointers(resources: list[Resource]) -> list[Resource]:
-    namespace = {}
+def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
+    """
+    It is expected in yaml-defined blueprints that all resources are defined with static strings, instead
+    of using object references.
+
+    """
+
+    namespace: dict[Any, Resource] = {}
+    # Push pointers to the end
     resources = sorted(resources, key=lambda resource: isinstance(resource, ResourcePointer))
 
-    def _merge(primary: Resource, secondary: ResourcePointer):
-        if secondary.container is not None:
-            if primary.container is None:
-                raise Exception
-            secondary.container.remove(secondary)
+    def _merge(resource: ResourceContainer, pointer: ResourcePointer):
+        if pointer.container is not None:
+            # # The pointer has a container but the resource does not, merge fails
+            # if getattr(resource, "container", None) is None:
+            #     raise Exception(f"Cannot merge pointer {pointer} into resource {resource}")
+            pointer.container.remove(pointer)
 
-        for item in secondary.items():
-            secondary.remove(item)
-            primary.add(item)
+        # Migrate items from pointer to resource
+        for item in pointer.items():
+            pointer.remove(item)
+            resource.add(item)
 
-    for resource in resources:
-        if hasattr(resource, "name"):
-            resource_id = (resource.resource_type, resource.name)
+    for resource_or_pointer in resources:
+        # Create a unique identifier for the resource
+        if isinstance(resource_or_pointer, NamedResource):
+            resource_id = (resource_or_pointer.resource_type, resource_or_pointer.name)
         else:
-            resource_id = str(resource.urn)
-        if isinstance(resource, ResourcePointer):
+            resource_id = str(resource_or_pointer.urn)
+
+        # If the resource is a pointer, attempt to merge it to an existing resource
+        if isinstance(resource_or_pointer, ResourcePointer):
+            pointer = resource_or_pointer
             if resource_id in namespace:
-                primary = namespace[resource_id]
-                _merge(primary, resource)
+                primary = cast(ResourceContainer, namespace[resource_id])
+                _merge(primary, pointer)
+            else:
+                namespace[resource_id] = pointer
+        else:
+            resource = resource_or_pointer
+            # We found a potentially conflicting resource
+            if resource_id in namespace:
+
+                # Throw away duplicate resources when the object id is the same
+                if namespace[resource_id] is resource:
+                    continue
+                else:
+                    raise DuplicateResourceException(
+                        f"Duplicate resource found: {resource} and {namespace[resource_id]}"
+                    )
             else:
                 namespace[resource_id] = resource
-        else:
-            if resource_id in namespace and namespace[resource_id] != resource:
-
-                if resource.implicit or namespace[resource_id].implicit:
-                    primary, secondary = resource, namespace[resource_id]
-                    if namespace[resource_id].implicit:
-                        primary, secondary = secondary, primary
-                    _merge(primary, secondary)
-                    continue
-                raise DuplicateResourceException(f"Duplicate resource found: {resource} and {namespace[resource_id]}")
-            namespace[resource_id] = resource
 
     return list(namespace.values())
+
+
+def _get_databases(resource: ResourceContainer) -> list[Union[Database, ResourcePointer]]:
+    return cast(list[Union[Database, ResourcePointer]], resource.items(resource_type=ResourceType.DATABASE))
+
+
+def _get_schemas(resource: ResourceContainer) -> list[Union[Schema, ResourcePointer]]:
+    return cast(list[Union[Schema, ResourcePointer]], resource.items(resource_type=ResourceType.SCHEMA))
+
+
+def _get_public_schema(resource: ResourceContainer) -> Union[Schema, ResourcePointer]:
+    return cast(Union[Schema, ResourcePointer], resource.find(name="PUBLIC", resource_type=ResourceType.SCHEMA))
+
+
+def _get_role_grants(resource: ResourceContainer) -> list[RoleGrant]:
+    return cast(list[RoleGrant], resource.items(resource_type=ResourceType.ROLE_GRANT))
 
 
 class Blueprint:
@@ -409,59 +427,39 @@ class Blueprint:
         resources: Optional[list[Resource]] = None,
         run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
-        allowlist: Optional[list[ResourceType]] = None,
-        **kwargs,
+        allowlist: Optional[list] = None,
+        vars: Optional[dict] = None,
+        vars_spec: Optional[list[dict]] = None,
     ) -> None:
-
-        account = kwargs.pop("account", None)
-        database = kwargs.pop("database", None)
-        schema = kwargs.pop("schema", None)
-        allow_role_switching = kwargs.pop("allow_role_switching", None)
-        ignore_ownership = kwargs.pop("ignore_ownership", None)
-        valid_resource_types = kwargs.pop("valid_resource_types", None)
-
-        if account is not None:
-            raise Exception("account is deprecated, use add instead")
-        if database is not None:
-            raise Exception("database is deprecated, use add instead")
-        if schema is not None:
-            raise Exception("schema is deprecated, use add instead")
-        if allow_role_switching is not None:
-            raise Exception("Role switching must be allowed")
-        if ignore_ownership is not None:
-            # TODO: exception
-            logger.warning("ignore_ownership is deprecated")
-        if valid_resource_types is not None:
-            logger.warning("valid_resource_types is deprecated")
-            allowlist = valid_resource_types
-
-        self._finalized = False
+        self._config: BlueprintConfig = BlueprintConfig(
+            name=name,
+            resources=resources,
+            run_mode=RunMode(run_mode) if run_mode else RunMode.CREATE_OR_UPDATE,
+            dry_run=False if dry_run is None else dry_run,
+            allowlist=[ResourceType(item) for item in allowlist] if allowlist else None,
+            vars=vars or {},
+            vars_spec=vars_spec or [],
+        )
+        self._finalized: bool = False
         self._staged: list[Resource] = []
-        self._root: Account = None
-        self._run_mode: RunMode = RunMode(run_mode)
-        self._dry_run: bool = dry_run
-        self._allowlist: list[ResourceType] = [ResourceType(v) for v in allowlist or []]
-
-        if self._run_mode == RunMode.SYNC_ALL:
-            logger.warning("Sync All mode is dangerous, please use with caution")
-            if len(self._allowlist) == 0:
-                raise Exception("Sync mode must specify an allowlist")
-        elif self._run_mode == RunMode.SYNC:
-            if len(self._allowlist) == 0:
-                raise Exception("Sync mode must specify an allowlist")
-            for resource_type in self._allowlist:
-                if resource_type in SYNC_MODE_BLOCKLIST:
-                    raise Exception(f"Resource type {resource_type} is not allowed in sync mode")
-
-        self.name = name
-
+        self._root: ResourcePointer = ResourcePointer(name="MISSING", resource_type=ResourceType.ACCOUNT)
         self.add(resources or [])
+
+    @classmethod
+    def from_config(cls, config: BlueprintConfig):
+        blueprint = cls.__new__(cls)
+        blueprint._config = config
+        blueprint._staged = []
+        blueprint._root = ResourcePointer(name="MISSING", resource_type=ResourceType.ACCOUNT)
+        blueprint._finalized = False
+        blueprint.add(config.resources or [])
+        return blueprint
 
     def _raise_for_nonconforming_plan(self, plan: Plan):
         exceptions = []
 
         # Run Mode exceptions
-        if self._run_mode == RunMode.CREATE_OR_UPDATE:
+        if self._config.run_mode == RunMode.CREATE_OR_UPDATE:
             for change in plan:
                 if isinstance(change, DropResource):
                     exceptions.append(
@@ -473,17 +471,17 @@ class Blueprint:
                             f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
                         )
 
-        if self._run_mode == RunMode.SYNC:
-            for change in plan:
-                if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
-                    exceptions.append(
-                        f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})"
-                    )
+        # if self._config.run_mode == RunMode.SYNC:
+        #     for change in plan:
+        #         if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
+        #             exceptions.append(
+        #                 f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})"
+        #             )
 
         # Valid Resource Types exceptions
-        if self._allowlist:
+        if self._config.allowlist:
             for change in plan:
-                if change.urn.resource_type not in self._allowlist:
+                if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
         if exceptions:
@@ -494,13 +492,15 @@ class Blueprint:
             raise NonConformingPlanException("Non-conforming actions found in plan:\n" + exception_block)
 
     def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
-        config = manifest.to_dict()
+        manifest_dict = manifest.to_dict()
 
-        changes: Plan = []
+        # changes: Plan = []
+        additive_changes: list[ResourceChange] = []
+        destructive_changes: list[ResourceChange] = []
         marked_for_replacement = set()
-        for action, urn, delta in diff(remote_state, config):
+        for action, urn, delta in diff(remote_state, manifest_dict):
             before = remote_state.get(urn, {})
-            after = config.get(urn, {})
+            after = manifest_dict.get(urn, {})
 
             if action == Action.UPDATE:
                 if urn in marked_for_replacement:
@@ -515,26 +515,29 @@ class Blueprint:
                 change_requires_replacement = attr_metadata.triggers_replacement
                 change_forces_add = attr_metadata.forces_add
                 change_is_fetchable = attr_metadata.fetchable
+                change_is_known_after_apply = attr_metadata.known_after_apply
                 change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
 
                 if change_requires_replacement:
                     raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
                     marked_for_replacement.add(urn)
                 elif change_forces_add:
-                    changes.append(CreateResource(urn, after))
+                    additive_changes.append(CreateResource(urn, after))
                     continue
                 elif not change_is_fetchable:
                     # drift on fields that aren't fetchable should be ignored
                     # TODO: throw a warning, or have a blueprint runmode that fails on this
                     continue
+                elif change_is_known_after_apply:
+                    continue
                 elif change_should_be_ignored:
                     continue
                 else:
-                    changes.append(UpdateResource(urn, before, after, delta))
+                    additive_changes.append(UpdateResource(urn, before, after, delta))
             elif action == Action.CREATE:
-                changes.append(CreateResource(urn, after))
+                additive_changes.append(CreateResource(urn, after))
             elif action == Action.DROP:
-                changes.append(DropResource(urn, before))
+                destructive_changes.append(DropResource(urn, before))
             elif action == Action.TRANSFER:
                 resource = manifest[urn]
 
@@ -546,7 +549,13 @@ class Blueprint:
                     continue
                 if change_should_be_ignored:
                     continue
-                changes.append(TransferOwnership(urn, from_owner=before["owner"], to_owner=after["owner"]))
+                additive_changes.append(
+                    TransferOwnership(
+                        urn,
+                        from_owner=before["owner"],
+                        to_owner=after["owner"],
+                    )
+                )
 
         for urn in marked_for_replacement:
             raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
@@ -560,7 +569,10 @@ class Blueprint:
             resource_set.add(ref[1])
         # Calculate a topological sort order for the URNs
         sort_order = topological_sort(resource_set, set(manifest.refs))
-        return sorted(changes, key=lambda change: sort_order[change.urn])
+        plan = sorted(additive_changes, key=lambda change: sort_order[change.urn]) + sorted(
+            destructive_changes, key=lambda change: -1 * sort_order[change.urn]
+        )
+        return plan
 
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
         state: State = {}
@@ -586,24 +598,18 @@ class Blueprint:
                 normalized = resource_cls.defaults() | data
             return normalized
 
-        if self._run_mode in (RunMode.SYNC, RunMode.SYNC_ALL):
-            """
-            In sync mode, the remote state is not just the resources that were added to the blueprint,
-            but all resources that exist in Snowflake. This is limited by a few things:
-            - allowlist limits the scope of what resources types are allowed in a blueprint
-            - if database or schema is set, the blueprint only looks at that database or schema
-            """
-            if len(self._allowlist) == 0:
-                raise Exception("Sync mode must specify an allowlist")
-
-            for resource_type in self._allowlist:
-                for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
-                    urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
-                    data = data_provider.fetch_resource(session, urn)
-                    if data is None:
-                        raise Exception(f"Resource {urn} not found")
-                    normalized_data = _normalize(urn, data)
-                    state[urn] = normalized_data
+        if self._config.run_mode == RunMode.SYNC:
+            if self._config.allowlist:
+                for resource_type in self._config.allowlist:
+                    for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
+                        urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
+                        data = data_provider.fetch_resource(session, urn)
+                        if data is None:
+                            raise Exception(f"Resource {urn} not found")
+                        normalized_data = _normalize(urn, data)
+                        state[urn] = normalized_data
+            else:
+                raise RuntimeError("Sync mode requires an allowlist")
 
         for urn in manifest.urns:
             data = data_provider.fetch_resource(session, urn)
@@ -633,12 +639,16 @@ class Blueprint:
 
         return state
 
+    def _resolve_vars(self):
+        for resource in self._staged:
+            resource._resolve_vars(self._config.vars)
+
     def _build_resource_graph(self, session_ctx: dict):
         """
         Convert the staged resources into a tree of resources
         """
         org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
-        self._staged = None
+        self._staged = []
 
         # Create root node of the resource graph
         if len(org_scoped) > 0:
@@ -654,7 +664,7 @@ class Blueprint:
             self._root.add(resource)
 
         # List all databases connected to root
-        databases: list[Union[Database, ResourcePointer]] = self._root.items(resource_type=ResourceType.DATABASE)
+        databases = _get_databases(self._root)
 
         # If the user didn't stage a database, create one from session context
         if len(databases) == 0 and (len(db_scoped) + len(schema_scoped) > 0):
@@ -664,7 +674,7 @@ class Blueprint:
                 )
             logger.warning(f"No database found in config, using database {session_ctx['database']} from session")
             self._root.add(ResourcePointer(name=session_ctx["database"], resource_type=ResourceType.DATABASE))
-            databases = self._root.items(resource_type=ResourceType.DATABASE)
+            databases = _get_databases(self._root)
 
         # Attach parentless schemas to the default database, if there is one
         for resource in db_scoped:
@@ -678,7 +688,7 @@ class Blueprint:
         for database in databases:
             database_resources = list(database.items())
             _merge_pointers(database_resources)
-            for schema in database.items(resource_type=ResourceType.SCHEMA):
+            for schema in _get_schemas(database):
                 available_scopes[f"{database.name}.{schema.name}"] = schema
 
         for resource in schema_scoped:
@@ -686,9 +696,9 @@ class Blueprint:
             if resource.container is None:
                 if len(databases) == 1:
                     logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
-                    databases[0].find(name="PUBLIC", resource_type=ResourceType.SCHEMA).add(resource)
+                    _get_public_schema(databases[0]).add(resource)
                 else:
-                    raise Exception(f"No schema for resource {repr(resource)} found")
+                    raise OrphanResourceException(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
                 schema_pointer = resource.container
 
@@ -700,7 +710,9 @@ class Blueprint:
                     if len(databases) == 1:
                         databases[0].add(schema_pointer)
                     else:
-                        raise Exception(f"No database for resource {resource} schema={resource.container}")
+                        raise OrphanResourceException(
+                            f"No database for resource {resource} schema={resource.container}"
+                        )
                 elif isinstance(schema_pointer.container, ResourcePointer):
                     expected_scope = f"{schema_pointer.container.name}.{schema_pointer.name}"
                     if expected_scope in available_scopes:
@@ -748,7 +760,7 @@ class Blueprint:
                     else:
                         # We couldn't resolve the tag, so just use the tag name as is
                         new_tags[tag_name] = tag_value
-            resource._tags = new_tags
+            resource._tags = ResourceTags(new_tags)
             tag_ref = resource.create_tag_reference()
             if tag_ref:
                 self._root.add(tag_ref)
@@ -758,21 +770,24 @@ class Blueprint:
             if isinstance(resource, ResourcePointer):
                 continue
             if hasattr(resource._data, "owner"):
+                owner = getattr(resource._data, "owner")
 
                 # Misconfigured resource, owner should always be a Role
-                if isinstance(resource._data.owner, str):
-                    raise RuntimeError(f"Owner of {resource} is a string, {resource._data.owner}")
+                if isinstance(owner, str):
+                    raise RuntimeError(f"Owner of {resource} is a string, {owner}")
+
+                owner = cast(ResourcePointer, owner)
 
                 # Skip Snowflake-owned system resources (like INFORMATION_SCHEMA) that are owned by blank
-                if resource._data.owner.name == "":
+                if owner.name == "":
                     continue
 
                 # Require that a resource's owner role exists in remote state or has been added to the blueprint
-                resource.requires(resource._data.owner)
+                resource.requires(owner)
 
-                if resource._data.owner.name not in session_ctx["available_roles"]:
-                    for role_grant in self._root.items(ResourceType.ROLE_GRANT):
-                        if role_grant.role.name != resource._data.owner.name:
+                if owner.name not in session_ctx["available_roles"]:
+                    for role_grant in _get_role_grants(self._root):
+                        if role_grant.role.name != owner.name:
                             continue
                         if role_grant._data.to_role is None:
                             continue
@@ -796,6 +811,7 @@ class Blueprint:
         if self._finalized:
             raise RuntimeError("Blueprint already finalized")
         self._finalized = True
+        self._resolve_vars()
         self._build_resource_graph(session_ctx)
         self._create_tag_references()
         self._create_ownership_refs(session_ctx)
@@ -803,13 +819,11 @@ class Blueprint:
         for resource in _walk(self._root):
             resource._finalized = True
 
-    def generate_manifest(self, session_ctx: dict = {}) -> Manifest:
+    def generate_manifest(self, session_ctx: SessionContext) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])
         self._finalize(session_ctx)
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                if resource.implicit:
-                    continue
                 manifest.add(resource)
             else:
                 raise RuntimeError(f"Unexpected object found in blueprint: {resource}")
@@ -818,6 +832,9 @@ class Blueprint:
 
     def plan(self, session) -> Plan:
         reset_cache()
+        logger.debug("Using blueprint vars:")
+        for key in self._config.vars.keys():
+            logger.debug(f"  {key}")
         session_ctx = data_provider.fetch_session(session)
         manifest = self.generate_manifest(session_ctx)
         remote_state = self.fetch_remote_state(session, manifest)
@@ -833,7 +850,7 @@ class Blueprint:
         self._raise_for_nonconforming_plan(finished_plan)
         return finished_plan
 
-    def apply(self, session, plan: Plan = None):
+    def apply(self, session, plan: Optional[Plan] = None):
         if plan is None:
             plan = self.plan(session)
 
@@ -865,7 +882,7 @@ class Blueprint:
             sql = action_queue.pop(0)
             actions_taken.append(sql)
             try:
-                if not self._dry_run:
+                if not self._config.dry_run:
                     execute(session, sql)
             except snowflake.connector.errors.ProgrammingError as err:
                 if err.errno == ALREADY_EXISTS_ERR:
@@ -887,6 +904,8 @@ class Blueprint:
             raise Exception(f"Expected a Resource, got {type(resource)} -> {resource}")
         if resource._finalized:
             raise Exception("Cannot add a finalized resource to a blueprint")
+        if self._config.allowlist and resource.resource_type not in self._config.allowlist:
+            raise InvalidResourceException(f"Resource {resource} is not in the allowlist")
         self._staged.append(resource)
 
     def add(self, *resources):
@@ -913,21 +932,21 @@ def owner_for_change(change: ResourceChange) -> Optional[str]:
 
 def execution_strategy_for_change(
     change: ResourceChange,
-    usable_roles: list[str],
+    available_roles: list[ResourceName],
     default_role: str,
-    role_privileges: dict[str, list[dict]],
-) -> tuple[str, bool]:
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
+) -> tuple[ResourceName, bool]:
 
     if resource_type_is_grant(change.urn.resource_type):
 
         if isinstance(change, CreateResource) and change.urn.resource_type == ResourceType.GRANT:
             execution_role = execution_role_for_priv(change.after["priv"])
-            if execution_role and execution_role in usable_roles:
+            if execution_role and execution_role in available_roles:
                 return execution_role, False
 
-        if "SECURITYADMIN" in usable_roles:
-            return "SECURITYADMIN", False
-        alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
+        if "SECURITYADMIN" in available_roles:
+            return ResourceName("SECURITYADMIN"), False
+        alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
         if alternate_role:
             return alternate_role, False
         raise MissingPrivilegeException(f"{change} requires a role with MANAGE GRANTS privilege")
@@ -936,9 +955,9 @@ def execution_strategy_for_change(
         # There are two ways you can create a tag reference:
         # 1. You have the global APPLY TAGS priv on the account (given to ACCOUNTADMIN by default)
         # 2. You have APPLY privilege on the TAG object AND you have ownership of the tagged object
-        if "ACCOUNTADMIN" in usable_roles:
-            return "ACCOUNTADMIN", False
-        alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
+        if "ACCOUNTADMIN" in available_roles:
+            return ResourceName("ACCOUNTADMIN"), False
+        alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
         if alternate_role:
             return alternate_role, False
         raise MissingPrivilegeException(f"{change} requires a role with APPLY TAGS privilege")
@@ -947,11 +966,11 @@ def execution_strategy_for_change(
 
     if change_owner:
         # If we can use the owner of the change, use that
-        if change_owner in usable_roles and role_can_execute_change(change_owner, change, role_privileges):
+        if change_owner in available_roles and role_can_execute_change(change_owner, change, role_privileges):
             return change_owner, False
 
         # See if there is another role we can use to execute the change
-        alternate_role = find_role_to_execute_change(change, usable_roles, default_role, role_privileges)
+        alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
         if alternate_role:
             return alternate_role, True
         # This change cannot be executed
@@ -964,9 +983,9 @@ def execution_strategy_for_change(
 
 # NOTE: this is in a hot loop and maybe should be cached
 def role_can_execute_change(
-    role: str,
+    role: ResourceName,
     change: ResourceChange,
-    role_privileges: dict[str, list[GrantedPrivilege]],
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ):
 
     # Assume ACCOUNTADMIN can do anything
@@ -987,12 +1006,12 @@ def role_can_execute_change(
 
 def find_role_to_execute_change(
     change: ResourceChange,
-    usable_roles: list[str],
+    available_roles: list[ResourceName],
     default_role: str,
-    role_privileges: dict[str, list[GrantedPrivilege]],
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ):
     # Check default role first
-    sorted_roles = sorted(usable_roles, key=lambda role: (role != default_role))
+    sorted_roles = sorted(available_roles, key=lambda role: (role != default_role))
     for role in sorted_roles:
         if role_can_execute_change(role, change, role_privileges):
             return role
@@ -1067,9 +1086,9 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
 
 def sql_commands_for_change(
     change: ResourceChange,
-    usable_roles: list[str],
+    available_roles: list[ResourceName],
     default_role: str,
-    role_privileges: dict[str, list[GrantedPrivilege]],
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ):
     """
     In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
@@ -1096,7 +1115,12 @@ def sql_commands_for_change(
     change_cmd = None
     after_change_cmd = []
 
-    execution_role, transfer_owner = execution_strategy_for_change(change, usable_roles, default_role, role_privileges)
+    execution_role, transfer_owner = execution_strategy_for_change(
+        change,
+        available_roles,
+        default_role,
+        role_privileges,
+    )
     before_change_cmd.append(f"USE ROLE {execution_role}")
 
     if isinstance(change, CreateResource):
@@ -1111,6 +1135,18 @@ def sql_commands_for_change(
                     copy_current_grants=True,
                 )
             )
+            # SPECIAL CASE: when creating a database with a custom owner that we will transfer ownership to,
+            # we also need to transfer ownership of the public schema to that role. This replicates the behavior
+            # if we were to create the database with a custom owner directly
+            if change.urn.resource_type == ResourceType.DATABASE:
+                after_change_cmd.append(
+                    lifecycle.transfer_resource(
+                        public_schema_urn(change.urn),
+                        owner=change.after["owner"],
+                        owner_resource_type=infer_role_type_from_name(change.after["owner"]),
+                        copy_current_grants=True,
+                    )
+                )
     elif isinstance(change, UpdateResource):
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
         change_cmd = lifecycle.update_resource(change.urn, change.delta, props)
@@ -1121,30 +1157,28 @@ def sql_commands_for_change(
             if_exists=True,
         )
     elif isinstance(change, TransferOwnership):
-        raise Exception
         change_cmd = lifecycle.transfer_resource(
             change.urn,
-            # owner=change.after["owner"],
-            owner=...,
-            owner_resource_type=infer_role_type_from_name(change.after["owner"]),
+            owner=change.to_owner,
+            owner_resource_type=infer_role_type_from_name(change.to_owner),
             copy_current_grants=True,
         )
 
     return before_change_cmd + [change_cmd] + after_change_cmd
 
 
-def compile_plan_to_sql(session_ctx, plan: Plan):
+def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
     sql_commands = []
 
     sql_commands.append("USE SECONDARY ROLES ALL")
-    usable_roles = session_ctx["available_roles"]
+    available_roles = session_ctx["available_roles"]
     default_role = session_ctx["role"]
     role_privileges = session_ctx["role_privileges"]
     for change in plan:
         # Generate SQL commands
         commands = sql_commands_for_change(
             change,
-            usable_roles,
+            available_roles,
             default_role,
             role_privileges,
         )
@@ -1153,15 +1187,14 @@ def compile_plan_to_sql(session_ctx, plan: Plan):
         # Update state
         if isinstance(change, CreateResource):
             if change.urn.resource_type == ResourceType.ROLE_GRANT:
-                if change.after["to_role"] in usable_roles:
-                    usable_roles.append(change.after["role"])
+                if change.after["to_role"] in available_roles:
+                    available_roles.append(change.after["role"])
             elif change.urn.resource_type == ResourceType.GRANT:
                 grantee_role = change.after["to"]
                 if grantee_role not in role_privileges:
                     role_privileges[grantee_role] = []
                 for priv in change.after["_privs"]:
                     if change.after["on_type"] is None:
-                        print(change)
                         raise
                     role_privileges[grantee_role].append(
                         GrantedPrivilege.from_grant(
@@ -1174,7 +1207,7 @@ def compile_plan_to_sql(session_ctx, plan: Plan):
                 # When creating any other resource type, creating implies ownership
                 resource_priv_types = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]
                 if resource_priv_types and "OWNERSHIP" in resource_priv_types:
-                    ownership_priv = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]("OWNERSHIP")
+                    ownership_priv = resource_priv_types("OWNERSHIP")
                     owner_role = str(change.after["owner"])
                     if owner_role not in role_privileges:
                         role_privileges[owner_role] = []

@@ -33,7 +33,7 @@ class _ComputePool(ResourceSpec):
     max_nodes: int = None
     instance_family: InstanceFamily = None
     auto_resume: bool = True
-    initially_suspended: bool = field(default_factory=None, metadata={"fetchable": False})
+    initially_suspended: bool = field(default=None, metadata={"fetchable": False})
     auto_suspend_secs: int = 3600
     comment: str = None
 

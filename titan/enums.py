@@ -37,7 +37,13 @@ class ParseableEnum(Enum, metaclass=_Parseable):
         return super()._missing_(val)
 
 
+class RunMode(ParseableEnum):
+    CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
+    SYNC = "SYNC"
+
+
 class ResourceType(ParseableEnum):
+    EXTERNAL_VOLUME_STORAGE_LOCATION = "EXTERNAL VOLUME STORAGE LOCATION"
     ACCOUNT = "ACCOUNT"
     AGGREGATION_POLICY = "AGGREGATION POLICY"
     ALERT = "ALERT"
@@ -55,6 +61,7 @@ class ResourceType(ParseableEnum):
     EVENT_TABLE = "EVENT TABLE"
     EXTERNAL_ACCESS_INTEGRATION = "EXTERNAL ACCESS INTEGRATION"
     EXTERNAL_FUNCTION = "EXTERNAL FUNCTION"
+    EXTERNAL_VOLUME = "EXTERNAL VOLUME"
     FAILOVER_GROUP = "FAILOVER GROUP"
     FILE_FORMAT = "FILE FORMAT"
     FUNCTION = "FUNCTION"
@@ -63,6 +70,7 @@ class ResourceType(ParseableEnum):
     GRANT = "GRANT"
     GRANT_ON_ALL = "GRANT ON ALL"
     HYBRID_TABLE = "HYBRID TABLE"
+    ICEBERG_TABLE = "ICEBERG TABLE"
     IMAGE_REPOSITORY = "IMAGE REPOSITORY"
     INTEGRATION = "INTEGRATION"
     MATERIALIZED_VIEW = "MATERIALIZED VIEW"
@@ -358,3 +366,14 @@ def resource_type_is_grant(resource_type: ResourceType) -> bool:
         ResourceType.GRANT_ON_ALL,
         ResourceType.FUTURE_GRANT,
     )
+
+
+class EncryptionType(ParseableEnum):
+    SNOWFLAKE_FULL = "SNOWFLAKE_FULL"
+    SNOWFLAKE_SSE = "SNOWFLAKE_SSE"
+    AWS_CSE = "AWS_CSE"
+    AWS_SSE_S3 = "AWS_SSE_S3"
+    AWS_SSE_KMS = "AWS_SSE_KMS"
+    GCS_SSE_KMS = "GCS_SSE_KMS"
+    AZURE_CSE = "AZURE_CSE"
+    NONE = "NONE"

@@ -24,7 +24,7 @@ class _PasswordSecret(ResourceSpec):
     name: ResourceName
     secret_type: SecretType = SecretType.PASSWORD
     username: str = None
-    password: str = field(default_factory=None, metadata={"fetchable": False})
+    password: str = field(default=None, metadata={"fetchable": False})
     comment: str = None
     owner: RoleRef = "SYSADMIN"
 
@@ -104,7 +104,7 @@ class PasswordSecret(NamedResource, Resource):
 class _GenericSecret(ResourceSpec):
     name: ResourceName
     secret_type: SecretType = SecretType.GENERIC_STRING
-    secret_string: str = field(default_factory=None, metadata={"fetchable": False})
+    secret_string: str = field(default=None, metadata={"fetchable": False})
     comment: str = None
     owner: RoleRef = "SYSADMIN"
 
@@ -180,7 +180,7 @@ class _OAuthSecret(ResourceSpec):
     api_authentication: str
     secret_type: SecretType = SecretType.OAUTH2
     oauth_scopes: list[str] = None
-    oauth_refresh_token: str = field(default_factory=None, metadata={"fetchable": False})
+    oauth_refresh_token: str = field(default=None, metadata={"fetchable": False})
     oauth_refresh_token_expiry_time: str = None
     comment: str = None
     owner: RoleRef = "SYSADMIN"

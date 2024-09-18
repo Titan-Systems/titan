@@ -3,18 +3,23 @@ import json
 import pytest
 
 from titan import resources as res
+from titan import var
 from titan.blueprint import (
     Blueprint,
     CreateResource,
     DuplicateResourceException,
+    _merge_pointers,
     compile_plan_to_sql,
     dump_plan,
 )
-from titan.enums import ResourceType
+from titan.blueprint_config import BlueprintConfig
+from titan.enums import ResourceType, RunMode
+from titan.exceptions import InvalidResourceException, MissingVarException, DuplicateResourceException
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
+from titan.var import VarString
 
 
 @pytest.fixture
@@ -85,6 +90,8 @@ def test_blueprint_with_database(resource_manifest):
         "name": "DB",
         "owner": "SYSADMIN",
         "comment": None,
+        "catalog": None,
+        "external_volume": None,
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
         "max_data_extension_time_in_days": 14,
@@ -133,7 +140,7 @@ def test_blueprint_with_table(resource_manifest):
         "columns": [
             {
                 "name": "ID",
-                "data_type": "INT",
+                "data_type": "NUMBER(38,0)",
                 "collate": None,
                 "comment": None,
                 "constraint": None,
@@ -193,9 +200,9 @@ def test_blueprint_with_udf(resource_manifest):
 
 def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     role = res.Role("SOME_ROLE")
-    db = res.Database("DB", owner=role)
+    wh = res.Warehouse("WH", owner=role)
     grant = res.RoleGrant(role=role, to_role="SYSADMIN")
-    blueprint = Blueprint(name="blueprint", resources=[db, role, grant])
+    blueprint = Blueprint(name="blueprint", resources=[wh, role, grant])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
 
@@ -203,7 +210,7 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert plan_urns == [
         parse_URN("urn::ABCD123:role/SOME_ROLE"),
         parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN"),
-        parse_URN("urn::ABCD123:database/DB"),
+        parse_URN("urn::ABCD123:warehouse/WH"),
     ]
 
     changes = compile_plan_to_sql(session_ctx, plan)
@@ -214,8 +221,8 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     assert changes[3] == "USE ROLE SECURITYADMIN"
     assert changes[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
     assert changes[5] == f"USE ROLE {session_ctx['role']}"
-    assert changes[6] == "CREATE DATABASE DB DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    assert changes[7] == "GRANT OWNERSHIP ON DATABASE DB TO ROLE SOME_ROLE COPY CURRENT GRANTS"
+    assert changes[6].startswith("CREATE WAREHOUSE WH")
+    assert changes[7] == "GRANT OWNERSHIP ON WAREHOUSE WH TO ROLE SOME_ROLE COPY CURRENT GRANTS"
 
 
 def test_blueprint_deduplicate_resources(session_ctx, remote_state):
@@ -249,11 +256,8 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
             res.Grant(priv="USAGE", on_database="DB", to="SOME_ROLE"),
         ],
     )
-    manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
-    assert len(plan) == 1
-    assert isinstance(plan[0], CreateResource)
-    assert plan[0].urn == parse_URN("urn::ABCD123:grant/SOME_ROLE?priv=USAGE&on=database/DB")
+    with pytest.raises(DuplicateResourceException):
+        blueprint.generate_manifest(session_ctx)
 
 
 def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
@@ -394,9 +398,9 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
 
     role = res.Role(name="SOME_ROLE")
     role_grant = res.RoleGrant(role=role, to_role="SYSADMIN")
-    db1 = res.Database(name="DB1", owner=role)
+    wh = res.Warehouse(name="WH", owner=role)
 
-    blueprint = Blueprint(resources=[db1, role_grant, role])
+    blueprint = Blueprint(resources=[wh, role_grant, role])
     manifest = blueprint.generate_manifest(session_ctx)
 
     plan = blueprint._plan(remote_state, manifest)
@@ -406,7 +410,7 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
     assert isinstance(plan[2], CreateResource)
-    assert plan[2].urn == parse_URN("urn::ABCD123:database/DB1")
+    assert plan[2].urn == parse_URN("urn::ABCD123:warehouse/WH")
 
     sql = compile_plan_to_sql(session_ctx, plan)
     assert len(sql) == 8
@@ -416,8 +420,8 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert sql[3] == "USE ROLE SECURITYADMIN"
     assert sql[4] == "GRANT ROLE SOME_ROLE TO ROLE SYSADMIN"
     assert sql[5] == f"USE ROLE {session_ctx['role']}"
-    assert sql[6] == "CREATE DATABASE DB1 DATA_RETENTION_TIME_IN_DAYS = 1 MAX_DATA_EXTENSION_TIME_IN_DAYS = 14"
-    assert sql[7] == "GRANT OWNERSHIP ON DATABASE DB1 TO ROLE SOME_ROLE COPY CURRENT GRANTS"
+    assert sql[6].startswith("CREATE WAREHOUSE WH")
+    assert sql[7] == "GRANT OWNERSHIP ON WAREHOUSE WH TO ROLE SOME_ROLE COPY CURRENT GRANTS"
 
 
 def test_blueprint_dump_plan_create(session_ctx, remote_state):
@@ -531,7 +535,7 @@ def test_blueprint_dump_plan_drop(session_ctx):
             "comment": None,
         },
     }
-    blueprint = Blueprint(resources=[], run_mode="SYNC-ALL", allowlist=[ResourceType.ROLE])
+    blueprint = Blueprint(resources=[], run_mode="SYNC", allowlist=[ResourceType.ROLE])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     plan_json_str = dump_plan(plan, format="json")
@@ -553,3 +557,135 @@ def test_blueprint_dump_plan_drop(session_ctx):
 
 """
     )
+
+
+def test_blueprint_vars(session_ctx):
+    blueprint = Blueprint(
+        resources=[res.Role(name="role", comment=var.role_comment)],
+        vars={"role_comment": "var role comment"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1]._data.comment == "var role comment"
+
+    role = res.Role(name="role", comment="some comment {{ var.suffix }}")
+    assert isinstance(role._data.comment, VarString)
+    blueprint = Blueprint(
+        resources=[role],
+        vars={"suffix": "1234"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1]._data.comment == "some comment 1234"
+
+    role = res.Role(name=var.role_name)
+    assert isinstance(role.name, VarString)
+    blueprint = Blueprint(
+        resources=[role],
+        vars={"role_name": "role123"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1].name == "role123"
+
+    role = res.Role(name="role_{{ var.suffix }}")
+    assert isinstance(role.name, VarString)
+    blueprint = Blueprint(
+        resources=[role],
+        vars={"suffix": "5678"},
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1].name == "role_5678"
+
+
+def test_blueprint_vars_spec(session_ctx):
+    blueprint = Blueprint(
+        resources=[res.Role(name="role", comment=var.role_comment)],
+        vars_spec=[
+            {
+                "name": "role_comment",
+                "type": "string",
+                "default": "var role comment",
+            }
+        ],
+    )
+    assert blueprint._config.vars == {"role_comment": "var role comment"}
+    manifest = blueprint.generate_manifest(session_ctx)
+    assert manifest.resources[1]._data.comment == "var role comment"
+
+    with pytest.raises(MissingVarException):
+        blueprint = Blueprint(
+            resources=[res.Role(name="role", comment=var.role_comment)],
+            vars_spec=[{"name": "role_comment", "type": "string"}],
+        )
+
+    blueprint = Blueprint(resources=[res.Role(name="role", comment=var.role_comment)])
+    with pytest.raises(MissingVarException):
+        blueprint.generate_manifest(session_ctx)
+
+
+def test_blueprint_allowlist(session_ctx, remote_state):
+    blueprint = Blueprint(
+        resources=[res.Role(name="role1")],
+        allowlist=[ResourceType.ROLE],
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+
+    blueprint = Blueprint(allowlist=["ROLE"])
+    assert blueprint._config.allowlist == [ResourceType.ROLE]
+    with pytest.raises(InvalidResourceException):
+        blueprint.add(res.Database(name="db1"))
+
+    with pytest.raises(InvalidResourceException):
+        blueprint = Blueprint(
+            resources=[res.Role(name="role1")],
+            allowlist=[ResourceType.DATABASE],
+        )
+
+
+def test_blueprint_config_validation():
+    with pytest.raises(ValueError):
+        BlueprintConfig(run_mode=None)
+    with pytest.raises(ValueError):
+        BlueprintConfig(run_mode="non-existent-mode")
+    with pytest.raises(ValueError):
+        BlueprintConfig(run_mode="sync")
+    with pytest.raises(ValueError):
+        BlueprintConfig(allowlist=[])
+
+    bp = Blueprint(run_mode="SYNC", allowlist=["ROLE"])
+    assert bp._config.run_mode == RunMode.SYNC
+    bp = Blueprint(run_mode="CREATE-OR-UPDATE")
+    assert bp._config.run_mode == RunMode.CREATE_OR_UPDATE
+
+    bp = Blueprint(allowlist=["ROLE"])
+    assert bp._config.allowlist == [ResourceType.ROLE]
+
+    with pytest.raises(ValueError):
+        Blueprint(allowlist=["non-existent-resource-type"])
+
+
+def test_merge_account_scoped_resources():
+    resources = [
+        res.Database(name="DB1"),
+        ResourcePointer(name="DB1", resource_type=ResourceType.DATABASE),
+    ]
+    merged = _merge_pointers(resources)
+    assert len(merged) == 1
+    assert isinstance(merged[0], res.Database)
+    assert merged[0].name == "DB1"
+
+    resources = [
+        res.Database(name="DB1"),
+        res.Database(name="DB2"),
+    ]
+    merged = _merge_pointers(resources)
+    assert len(merged) == 2
+
+
+def test_merge_account_scoped_resources_fail():
+    resources = [
+        res.Database(name="DB1"),
+        res.Database(name="DB1", comment="namespace conflict"),
+    ]
+    with pytest.raises(DuplicateResourceException):
+        _merge_pointers(resources)

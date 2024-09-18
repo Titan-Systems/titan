@@ -1,10 +1,8 @@
 import re
-from typing import Callable, Dict, Union
 
 import pyparsing as pp
 
 from .enums import ResourceType, Scope
-from .identifiers import FQN, URN, resource_type_for_label
 from .parse_primitives import FullyQualifiedIdentifier, Identifier
 from .scope import DatabaseScope, SchemaScope
 
@@ -292,7 +290,7 @@ def _resolve_notification_integration(sql):
     #     return "aws_outbound_notification_integration"
 
 
-def _resolve_resource_class(sql):
+def resolve_resource_class(sql):
     create_header = CREATE + pp.Opt(OR_REPLACE) + pp.Opt(TEMPORARY) + pp.Opt(TRANSIENT) + pp.Opt(SECURE)
     sql = _consume_tokens(create_header, sql)
 
@@ -329,7 +327,7 @@ def _resolve_resource_class(sql):
 
 
 class Lexicon:
-    def __init__(self, lexicon: Dict[Union[str, pp.ParserElement], Union[str, Callable[[str], str]]]):
+    def __init__(self, lexicon: dict[str, ResourceType]):
         self._words = []
         self._actions = []
         idx = 0
@@ -475,9 +473,12 @@ def _parse_column(sql):
     constraint = Keyword("UNIQUE") ^ Keywords("PRIMARY KEY") ^ (Keyword("CONSTRAINT").suppress() + ANY())
     # TODO: rest of column properties
     constraint = constraint.set_parse_action(lambda toks: toks[0])("constraint")
+
+    data_type = (Identifier("type_name") + pp.Optional(_in_parens(pp.Word(pp.nums + ",")))("type_params"))("data_type")
+
     column = (
         Identifier("name")
-        + pp.ungroup((ANY() + _in_parens(ANY())) ^ ANY())("data_type")
+        + data_type
         + pp.Opt(collate)
         + pp.Opt(comment)
         + pp.Opt(not_null)
@@ -486,14 +487,23 @@ def _parse_column(sql):
     )
     try:
         results = column.parse_string(sql, parse_all=True)
-        return results.as_dict()
+        results = results.as_dict()
+        # Recombine data type
+        type_name = results.pop("type_name")
+        type_params = ""
+        if "type_params" in results:
+            type_params = results.pop("type_params")
+            if type_params:
+                type_params = f"({type_params[0]})"
+        results["data_type"] = f"{type_name}{type_params}"
+        return results
     except pp.ParseException as err:
         raise pp.ParseException("Failed to parse column") from err
 
 
 def _parse_table_schema(sql):
     columns_blob, start, end = _first_match(pp.original_text_for(pp.nested_expr()), sql)
-    columns_blob = columns_blob[0].strip("()")
+    columns_blob = columns_blob[0][1:-1]  # .strip("()")
     columns = []
     while columns_blob:
         col = _parse_column(columns_blob)

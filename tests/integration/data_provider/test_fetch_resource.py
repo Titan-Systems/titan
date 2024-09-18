@@ -6,7 +6,7 @@ from tests.helpers import (
     assert_resource_dicts_eq_ignore_nulls,
     assert_resource_dicts_eq_ignore_nulls_and_unfetchable,
     safe_fetch,
-    strip_nones_and_unfetchable,
+    clean_resource_data,
 )
 from titan import data_provider
 from titan import resources as res
@@ -34,13 +34,22 @@ def email_address(cursor):
     return user["email"]
 
 
+def create(cursor, resource):
+    sql = resource.create_sql(if_not_exists=True)
+    try:
+        cursor.execute(sql)
+    except Exception as err:
+        raise Exception(f"Error creating resource: \nQuery: {err.query}\nMsg: {err.msg}") from err
+    return resource
+
+
 def test_fetch_privilege_grant(cursor, suffix, marked_for_cleanup):
     role = res.Role(name=f"grant_role_{suffix}")
-    cursor.execute(role.create_sql(if_not_exists=True))
+    create(cursor, role)
     marked_for_cleanup.append(role)
 
     grant = res.Grant(priv="usage", on_type="database", on="STATIC_DATABASE", to=role)
-    cursor.execute(grant.create_sql(if_not_exists=True))
+    create(cursor, grant)
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
@@ -91,7 +100,7 @@ def test_fetch_enterprise_schema(cursor, account_locator, test_db):
 
 def test_fetch_grant_on_account(cursor, suffix):
     role = res.Role(name=f"TEST_ACCOUNT_GRANTS_ROLE_{suffix}")
-    cursor.execute(role.create_sql(if_not_exists=True))
+    create(cursor, role)
     cursor.execute(f"GRANT AUDIT ON ACCOUNT TO ROLE {role.name}")
     cursor.execute(f"GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE {role.name}")
 
@@ -120,7 +129,7 @@ def test_fetch_database(cursor, suffix, marked_for_cleanup):
         owner=TEST_ROLE,
         transient=True,
     )
-    cursor.execute(database.create_sql(if_not_exists=True))
+    create(cursor, database)
     marked_for_cleanup.append(database)
 
     result = safe_fetch(cursor, database.urn)
@@ -159,7 +168,7 @@ def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(external_stage.create_sql(if_not_exists=True))
+    create(cursor, external_stage)
     marked_for_cleanup.append(external_stage)
 
     result = safe_fetch(cursor, external_stage.urn)
@@ -174,7 +183,7 @@ def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
         schema="PUBLIC",
         directory={"enable": True},
     )
-    cursor.execute(external_stage.create_sql(if_not_exists=True))
+    create(cursor, external_stage)
     marked_for_cleanup.append(external_stage)
 
     result = safe_fetch(cursor, external_stage.urn)
@@ -189,7 +198,7 @@ def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(internal_stage.create_sql(if_not_exists=True))
+    create(cursor, internal_stage)
     marked_for_cleanup.append(internal_stage)
 
     result = safe_fetch(cursor, internal_stage.urn)
@@ -203,7 +212,7 @@ def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(internal_stage.create_sql(if_not_exists=True))
+    create(cursor, internal_stage)
     marked_for_cleanup.append(internal_stage)
 
     result = safe_fetch(cursor, internal_stage.urn)
@@ -223,7 +232,7 @@ def test_fetch_csv_file_format(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(csv_file_format.create_sql(if_not_exists=True))
+    create(cursor, csv_file_format)
     marked_for_cleanup.append(csv_file_format)
 
     result = safe_fetch(cursor, csv_file_format.urn)
@@ -236,7 +245,7 @@ def test_fetch_csv_file_format(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(csv_file_format.create_sql(if_not_exists=True))
+    create(cursor, csv_file_format)
     marked_for_cleanup.append(csv_file_format)
 
     result = safe_fetch(cursor, csv_file_format.urn)
@@ -250,7 +259,7 @@ def test_fetch_resource_monitor(cursor, marked_for_cleanup):
         credit_quota=1000,
         start_timestamp="2049-01-01 00:00",
     )
-    cursor.execute(resource_monitor.create_sql(if_not_exists=True))
+    create(cursor, resource_monitor)
     marked_for_cleanup.append(resource_monitor)
 
     result = safe_fetch(cursor, resource_monitor.urn)
@@ -266,7 +275,7 @@ def test_fetch_email_notification_integration(cursor, email_address, marked_for_
         allowed_recipients=[email_address],
         comment="Example email notification integration",
     )
-    cursor.execute(email_notification_integration.create_sql(if_not_exists=True))
+    create(cursor, email_notification_integration)
     marked_for_cleanup.append(email_notification_integration)
 
     result = safe_fetch(cursor, email_notification_integration.urn)
@@ -285,7 +294,7 @@ def test_fetch_event_table(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(event_table.create_sql(if_not_exists=True))
+    create(cursor, event_table)
     marked_for_cleanup.append(event_table)
 
     result = safe_fetch(cursor, event_table.urn)
@@ -298,7 +307,7 @@ def test_fetch_grant_with_fully_qualified_ref(cursor, test_db, suffix, marked_fo
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute(f"CREATE SCHEMA if not exists {test_db}.my_schema")
     role = res.Role(name=f"test_role_grant_{suffix}")
-    cursor.execute(role.create_sql(if_not_exists=True))
+    create(cursor, role)
     marked_for_cleanup.append(role)
     cursor.execute(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE {role.name}")
     grant = res.Grant.from_sql(f"GRANT USAGE ON SCHEMA {test_db}.my_schema TO ROLE {role.name}")
@@ -314,7 +323,7 @@ def test_fetch_grant_with_quoted_ref(cursor, test_db, suffix, marked_for_cleanup
     cursor.execute(f"USE DATABASE {test_db}")
     cursor.execute(f'CREATE SCHEMA if not exists {test_db}."This_is_A_quoted_schema"')
     role = res.Role(name=f"test_role_grant_quoted_{suffix}")
-    cursor.execute(role.create_sql(if_not_exists=True))
+    create(cursor, role)
     marked_for_cleanup.append(role)
     cursor.execute(f'GRANT USAGE ON SCHEMA {test_db}."This_is_A_quoted_schema" TO ROLE {role.name}')
     grant = res.Grant.from_sql(f'GRANT USAGE ON SCHEMA {test_db}."This_is_A_quoted_schema" TO ROLE {role.name}')
@@ -340,7 +349,7 @@ def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
         schema="PUBLIC",
     )
     cursor.execute(f"CREATE TABLE {test_db}.PUBLIC.pipe_destination (id INT)")
-    cursor.execute(pipe.create_sql(if_not_exists=True))
+    create(cursor, pipe)
     marked_for_cleanup.append(pipe)
 
     result = safe_fetch(cursor, pipe.urn)
@@ -359,7 +368,7 @@ def test_fetch_view(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(view.create_sql(if_not_exists=True))
+    create(cursor, view)
     marked_for_cleanup.append(view)
 
     result = safe_fetch(cursor, view.urn)
@@ -378,7 +387,7 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
         allowed_values=["SOME_VALUE"],
         owner=TEST_ROLE,
     )
-    cursor.execute(tag.create_sql(if_not_exists=True))
+    create(cursor, tag)
     marked_for_cleanup.append(tag)
 
     result = safe_fetch(cursor, tag.urn)
@@ -393,7 +402,7 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
         comment="Tag for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(tag.create_sql(if_not_exists=True))
+    create(cursor, tag)
     marked_for_cleanup.append(tag)
 
     result = safe_fetch(cursor, tag.urn)
@@ -404,7 +413,7 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
 
 def test_fetch_role(cursor, suffix, marked_for_cleanup):
     role = res.Role(name=f"ANOTHER_ROLE_{suffix}", owner=TEST_ROLE)
-    cursor.execute(role.create_sql(if_not_exists=True))
+    create(cursor, role)
     marked_for_cleanup.append(role)
 
     result = safe_fetch(cursor, role.urn)
@@ -415,26 +424,26 @@ def test_fetch_role(cursor, suffix, marked_for_cleanup):
 def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
     parent = res.Role(name=f"PARENT_ROLE_{suffix}", owner=TEST_ROLE)
     child = res.Role(name=f"CHILD_ROLE_{suffix}", owner=TEST_ROLE)
-    cursor.execute(parent.create_sql(if_not_exists=True))
-    cursor.execute(child.create_sql(if_not_exists=True))
+    create(cursor, parent)
+    create(cursor, child)
     marked_for_cleanup.append(parent)
     marked_for_cleanup.append(child)
 
     # Role-to-role grant
     grant = res.RoleGrant(role=child, to_role=parent)
-    cursor.execute(grant.create_sql(if_not_exists=True))
+    create(cursor, grant)
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
     assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
 
     user = res.User(name=f"ROLE_RECIPIENT_USER_{suffix}", owner=TEST_ROLE)
-    cursor.execute(user.create_sql(if_not_exists=True))
+    create(cursor, user)
     marked_for_cleanup.append(user)
 
     # Role-to-user grant
     grant = res.RoleGrant(role=child, to_user=user)
-    cursor.execute(grant.create_sql(if_not_exists=True))
+    create(cursor, grant)
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
     assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
@@ -445,13 +454,13 @@ def test_fetch_user(cursor, suffix, marked_for_cleanup):
         name=f"SOME_USER_{suffix}@applytitan.com",
         owner=TEST_ROLE,
     )
-    cursor.execute(user.create_sql(if_not_exists=True))
+    create(cursor, user)
     marked_for_cleanup.append(user)
 
     result = safe_fetch(cursor, user.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.User.spec, result)
-    data = strip_nones_and_unfetchable(res.User.spec, user.to_dict())
+    result = clean_resource_data(res.User.spec, result)
+    data = clean_resource_data(res.User.spec, user.to_dict())
     assert result == data
 
     user = res.User(
@@ -459,13 +468,13 @@ def test_fetch_user(cursor, suffix, marked_for_cleanup):
         owner=TEST_ROLE,
         type="PERSON",
     )
-    cursor.execute(user.create_sql(if_not_exists=True))
+    create(cursor, user)
     marked_for_cleanup.append(user)
 
     result = safe_fetch(cursor, user.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.User.spec, result)
-    data = strip_nones_and_unfetchable(res.User.spec, user.to_dict())
+    result = clean_resource_data(res.User.spec, result)
+    data = clean_resource_data(res.User.spec, user.to_dict())
     assert result == data
 
 
@@ -481,7 +490,7 @@ def test_fetch_glue_catalog_integration(cursor, marked_for_cleanup):
         comment="Integration for AWS Glue with Snowflake.",
         owner=TEST_ROLE,
     )
-    cursor.execute(catalog_integration.create_sql(if_not_exists=True))
+    create(cursor, catalog_integration)
     marked_for_cleanup.append(catalog_integration)
 
     result = safe_fetch(cursor, catalog_integration.urn)
@@ -498,7 +507,7 @@ def test_fetch_object_store_catalog_integration(cursor, marked_for_cleanup):
         comment="Catalog integration for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(catalog_integration.create_sql(if_not_exists=True))
+    create(cursor, catalog_integration)
     marked_for_cleanup.append(catalog_integration)
 
     result = safe_fetch(cursor, catalog_integration.urn)
@@ -512,7 +521,7 @@ def test_fetch_share(cursor, suffix, marked_for_cleanup):
         comment="Share for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(share.create_sql(if_not_exists=True))
+    create(cursor, share)
     marked_for_cleanup.append(share)
 
     result = safe_fetch(cursor, share.urn)
@@ -529,7 +538,7 @@ def test_fetch_s3_storage_integration(cursor, suffix, marked_for_cleanup):
         storage_allowed_locations=["s3://mybucket1/path1/", "s3://mybucket2/path2/"],
         owner=TEST_ROLE,
     )
-    cursor.execute(storage_integration.create_sql(if_not_exists=True))
+    create(cursor, storage_integration)
     marked_for_cleanup.append(storage_integration)
 
     result = safe_fetch(cursor, storage_integration.urn)
@@ -544,7 +553,7 @@ def test_fetch_gcs_storage_integration(cursor, suffix, marked_for_cleanup):
         storage_allowed_locations=["gcs://mybucket1/path1/", "gcs://mybucket2/path2/"],
         owner=TEST_ROLE,
     )
-    cursor.execute(storage_integration.create_sql(if_not_exists=True))
+    create(cursor, storage_integration)
     marked_for_cleanup.append(storage_integration)
 
     result = safe_fetch(cursor, storage_integration.urn)
@@ -563,7 +572,7 @@ def test_fetch_azure_storage_integration(cursor, suffix, marked_for_cleanup):
         ],
         owner=TEST_ROLE,
     )
-    cursor.execute(storage_integration.create_sql(if_not_exists=True))
+    create(cursor, storage_integration)
     marked_for_cleanup.append(storage_integration)
 
     result = safe_fetch(cursor, storage_integration.urn)
@@ -582,7 +591,7 @@ def test_fetch_alert(cursor, suffix, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(alert.create_sql(if_not_exists=True))
+    create(cursor, alert)
     marked_for_cleanup.append(alert)
 
     result = safe_fetch(cursor, alert.urn)
@@ -604,7 +613,7 @@ def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(dynamic_table.create_sql(if_not_exists=True))
+    create(cursor, dynamic_table)
     marked_for_cleanup.append(dynamic_table)
 
     result = safe_fetch(cursor, dynamic_table.urn)
@@ -624,13 +633,13 @@ def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(function.create_sql(if_not_exists=True))
+    create(cursor, function)
     marked_for_cleanup.append(function)
 
     result = safe_fetch(cursor, function.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.JavascriptUDF.spec, result)
-    data = strip_nones_and_unfetchable(res.JavascriptUDF.spec, function.to_dict())
+    result = clean_resource_data(res.JavascriptUDF.spec, result)
+    data = clean_resource_data(res.JavascriptUDF.spec, function.to_dict())
     assert result == data
 
 
@@ -653,7 +662,7 @@ def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(password_policy.create_sql(if_not_exists=True))
+    create(cursor, password_policy)
     marked_for_cleanup.append(password_policy)
 
     result = safe_fetch(cursor, password_policy.urn)
@@ -684,8 +693,8 @@ def test_fetch_python_stored_procedure(cursor, suffix, test_db, marked_for_clean
 
     result = safe_fetch(cursor, procedure.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.PythonStoredProcedure.spec, result)
-    data = strip_nones_and_unfetchable(res.PythonStoredProcedure.spec, procedure.to_dict())
+    result = clean_resource_data(res.PythonStoredProcedure.spec, result)
+    data = clean_resource_data(res.PythonStoredProcedure.spec, procedure.to_dict())
     assert result == data
 
 
@@ -699,7 +708,7 @@ def test_fetch_schema(cursor, test_db, marked_for_cleanup):
         owner=TEST_ROLE,
         database=test_db,
     )
-    cursor.execute(schema.create_sql(if_not_exists=True))
+    create(cursor, schema)
     marked_for_cleanup.append(schema)
 
     result = safe_fetch(cursor, schema.urn)
@@ -717,7 +726,7 @@ def test_fetch_sequence(cursor, suffix, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(sequence.create_sql(if_not_exists=True))
+    create(cursor, sequence)
     marked_for_cleanup.append(sequence)
 
     result = safe_fetch(cursor, sequence.urn)
@@ -735,7 +744,7 @@ def test_fetch_task(cursor, suffix, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(task.create_sql(if_not_exists=True))
+    create(cursor, task)
     marked_for_cleanup.append(task)
 
     result = safe_fetch(cursor, task.urn)
@@ -754,7 +763,7 @@ def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
         comment="Network rule for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(network_rule.create_sql(if_not_exists=True))
+    create(cursor, network_rule)
     marked_for_cleanup.append(network_rule)
 
     result = safe_fetch(cursor, network_rule.urn)
@@ -771,7 +780,7 @@ def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
         comment="Network rule for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(network_rule.create_sql(if_not_exists=True))
+    create(cursor, network_rule)
     marked_for_cleanup.append(network_rule)
 
     result = safe_fetch(cursor, network_rule.urn)
@@ -791,13 +800,13 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
         owner=TEST_ROLE,
     )
 
-    cursor.execute(api_integration.create_sql(if_not_exists=True))
+    create(cursor, api_integration)
     marked_for_cleanup.append(api_integration)
 
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.APIIntegration.spec, result)
-    data = strip_nones_and_unfetchable(res.APIIntegration.spec, api_integration.to_dict())
+    result = clean_resource_data(res.APIIntegration.spec, result)
+    data = clean_resource_data(res.APIIntegration.spec, api_integration.to_dict())
     assert result == data
 
     api_integration = res.APIIntegration(
@@ -812,13 +821,13 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
         owner=TEST_ROLE,
     )
 
-    cursor.execute(api_integration.create_sql(if_not_exists=True))
+    create(cursor, api_integration)
     marked_for_cleanup.append(api_integration)
 
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.APIIntegration.spec, result)
-    data = strip_nones_and_unfetchable(res.APIIntegration.spec, api_integration.to_dict())
+    result = clean_resource_data(res.APIIntegration.spec, result)
+    data = clean_resource_data(res.APIIntegration.spec, api_integration.to_dict())
     assert result == data
 
 
@@ -828,7 +837,7 @@ def test_fetch_database_role(cursor, suffix, test_db, marked_for_cleanup):
         database=test_db,
         owner=TEST_ROLE,
     )
-    cursor.execute(database_role.create_sql(if_not_exists=True))
+    create(cursor, database_role)
     marked_for_cleanup.append(database_role)
 
     result = safe_fetch(cursor, database_role.urn)
@@ -844,7 +853,7 @@ def test_fetch_packages_policy(cursor, suffix, marked_for_cleanup):
         comment="Example packages policy",
         owner=TEST_ROLE,
     )
-    cursor.execute(packages_policy.create_sql(if_not_exists=True))
+    create(cursor, packages_policy)
     marked_for_cleanup.append(packages_policy)
 
     result = safe_fetch(cursor, packages_policy.urn)
@@ -861,7 +870,7 @@ def test_fetch_aggregation_policy(cursor, suffix, test_db, marked_for_cleanup):
         database=test_db,
         schema="PUBLIC",
     )
-    cursor.execute(aggregation_policy.create_sql(if_not_exists=True))
+    create(cursor, aggregation_policy)
     marked_for_cleanup.append(aggregation_policy)
 
     result = safe_fetch(cursor, aggregation_policy.urn)
@@ -879,13 +888,13 @@ def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
         auto_suspend_secs=60,
         comment="Compute Pool comment",
     )
-    cursor.execute(compute_pool.create_sql(if_not_exists=True))
+    create(cursor, compute_pool)
     marked_for_cleanup.append(compute_pool)
 
     result = safe_fetch(cursor, compute_pool.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.ComputePool.spec, result)
-    data = strip_nones_and_unfetchable(res.ComputePool.spec, compute_pool.to_dict())
+    result = clean_resource_data(res.ComputePool.spec, result)
+    data = clean_resource_data(res.ComputePool.spec, compute_pool.to_dict())
     assert result == data
 
 
@@ -897,7 +906,7 @@ def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
         auto_resume=True,
         owner=TEST_ROLE,
     )
-    cursor.execute(warehouse.create_sql(if_not_exists=True))
+    create(cursor, warehouse)
     marked_for_cleanup.append(warehouse)
 
     result = safe_fetch(cursor, warehouse.urn)
@@ -913,7 +922,7 @@ def test_fetch_password_secret(cursor, suffix, marked_for_cleanup):
         comment="Password secret for accessing external database",
         owner=TEST_ROLE,
     )
-    cursor.execute(secret.create_sql(if_not_exists=True))
+    create(cursor, secret)
     marked_for_cleanup.append(secret)
 
     result = safe_fetch(cursor, secret.urn)
@@ -928,7 +937,7 @@ def test_fetch_generic_secret(cursor, suffix, marked_for_cleanup):
         comment="Generic secret for various purposes",
         owner=TEST_ROLE,
     )
-    cursor.execute(secret.create_sql(if_not_exists=True))
+    create(cursor, secret)
     marked_for_cleanup.append(secret)
 
     result = safe_fetch(cursor, secret.urn)
@@ -943,7 +952,7 @@ def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
         comment="OAuth secret for accessing external API",
         owner=TEST_ROLE,
     )
-    cursor.execute(secret.create_sql(if_not_exists=True))
+    create(cursor, secret)
     marked_for_cleanup.append(secret)
 
     result = safe_fetch(cursor, secret.urn)
@@ -958,7 +967,7 @@ def test_fetch_oauth_secret(cursor, suffix, marked_for_cleanup):
         comment="OAuth secret for accessing external API",
         owner=TEST_ROLE,
     )
-    cursor.execute(secret.create_sql(if_not_exists=True))
+    create(cursor, secret)
     marked_for_cleanup.append(secret)
 
     result = safe_fetch(cursor, secret.urn)
@@ -974,7 +983,7 @@ def test_fetch_snowservices_oauth_security_integration(cursor, suffix, marked_fo
         oauth_client="snowservices_ingress",
         enabled=True,
     )
-    cursor.execute(security_integration.create_sql(if_not_exists=True))
+    create(cursor, security_integration)
     marked_for_cleanup.append(security_integration)
 
     result = safe_fetch(cursor, security_integration.urn)
@@ -992,13 +1001,13 @@ def test_fetch_api_authentication_security_integration(cursor, suffix, marked_fo
         oauth_token_endpoint="https://myinstance.service-now.com/oauth_token.do",
         enabled=True,
     )
-    cursor.execute(security_integration.create_sql(if_not_exists=True))
+    create(cursor, security_integration)
     marked_for_cleanup.append(security_integration)
 
     result = safe_fetch(cursor, security_integration.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.APIAuthenticationSecurityIntegration.spec, result)
-    data = strip_nones_and_unfetchable(res.APIAuthenticationSecurityIntegration.spec, security_integration.to_dict())
+    result = clean_resource_data(res.APIAuthenticationSecurityIntegration.spec, result)
+    data = clean_resource_data(res.APIAuthenticationSecurityIntegration.spec, security_integration.to_dict())
     assert result == data
 
 
@@ -1013,7 +1022,7 @@ def test_fetch_table_stream(cursor, suffix, marked_for_cleanup):
         comment=None,
         owner=TEST_ROLE,
     )
-    cursor.execute(stream.create_sql(if_not_exists=True))
+    create(cursor, stream)
     marked_for_cleanup.append(stream)
 
     result = safe_fetch(cursor, stream.urn)
@@ -1032,7 +1041,7 @@ def test_fetch_view_stream(cursor, suffix, marked_for_cleanup):
         comment=None,
         owner=TEST_ROLE,
     )
-    cursor.execute(stream.create_sql(if_not_exists=True))
+    create(cursor, stream)
     marked_for_cleanup.append(stream)
 
     result = safe_fetch(cursor, stream.urn)
@@ -1049,7 +1058,7 @@ def test_fetch_stage_stream(cursor, suffix, marked_for_cleanup):
         comment=None,
         owner=TEST_ROLE,
     )
-    cursor.execute(stream.create_sql(if_not_exists=True))
+    create(cursor, stream)
     marked_for_cleanup.append(stream)
 
     result = safe_fetch(cursor, stream.urn)
@@ -1066,13 +1075,13 @@ def test_fetch_authentication_policies(cursor, suffix, marked_for_cleanup):
         comment="Authentication policy for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(policy.create_sql(if_not_exists=True))
+    create(cursor, policy)
     marked_for_cleanup.append(policy)
 
     result = safe_fetch(cursor, policy.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, result)
-    data = strip_nones_and_unfetchable(res.AuthenticationPolicy.spec, policy.to_dict())
+    result = clean_resource_data(res.AuthenticationPolicy.spec, result)
+    data = clean_resource_data(res.AuthenticationPolicy.spec, policy.to_dict())
     assert result == data
 
 
@@ -1083,13 +1092,13 @@ def test_fetch_external_access_integration(cursor, suffix, marked_for_cleanup):
         comment="External access integration for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(integration.create_sql(if_not_exists=True))
+    create(cursor, integration)
     marked_for_cleanup.append(integration)
 
     result = safe_fetch(cursor, integration.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, result)
-    data = strip_nones_and_unfetchable(res.ExternalAccessIntegration.spec, integration.to_dict())
+    result = clean_resource_data(res.ExternalAccessIntegration.spec, result)
+    data = clean_resource_data(res.ExternalAccessIntegration.spec, integration.to_dict())
     assert result == data
 
 
@@ -1099,13 +1108,13 @@ def test_fetch_parquet_file_format(cursor, suffix, marked_for_cleanup):
         compression="SNAPPY",
         owner=TEST_ROLE,
     )
-    cursor.execute(file_format.create_sql(if_not_exists=True))
+    create(cursor, file_format)
     marked_for_cleanup.append(file_format)
 
     result = safe_fetch(cursor, file_format.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.ParquetFileFormat.spec, result)
-    data = strip_nones_and_unfetchable(res.ParquetFileFormat.spec, file_format.to_dict())
+    result = clean_resource_data(res.ParquetFileFormat.spec, result)
+    data = clean_resource_data(res.ParquetFileFormat.spec, file_format.to_dict())
     assert result == data
 
 
@@ -1114,13 +1123,13 @@ def test_fetch_json_file_format(cursor, suffix, marked_for_cleanup):
         name=f"SOME_JSON_FILE_FORMAT_{suffix}",
         owner=TEST_ROLE,
     )
-    cursor.execute(file_format.create_sql(if_not_exists=True))
+    create(cursor, file_format)
     marked_for_cleanup.append(file_format)
 
     result = safe_fetch(cursor, file_format.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.JSONFileFormat.spec, result)
-    data = strip_nones_and_unfetchable(res.JSONFileFormat.spec, file_format.to_dict())
+    result = clean_resource_data(res.JSONFileFormat.spec, result)
+    data = clean_resource_data(res.JSONFileFormat.spec, file_format.to_dict())
     assert result == data
 
 
@@ -1131,13 +1140,13 @@ def test_fetch_notebook(cursor, suffix, marked_for_cleanup):
         comment="This is a test notebook",
         owner=TEST_ROLE,
     )
-    cursor.execute(notebook.create_sql(if_not_exists=True))
+    create(cursor, notebook)
     marked_for_cleanup.append(notebook)
 
     result = safe_fetch(cursor, notebook.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.Notebook.spec, result)
-    data = strip_nones_and_unfetchable(res.Notebook.spec, notebook.to_dict())
+    result = clean_resource_data(res.Notebook.spec, result)
+    data = clean_resource_data(res.Notebook.spec, notebook.to_dict())
     assert result == data
 
 
@@ -1151,13 +1160,13 @@ def test_fetch_network_policy(cursor, suffix, marked_for_cleanup):
         comment="Network policy for testing",
         owner=TEST_ROLE,
     )
-    cursor.execute(policy.create_sql(if_not_exists=True))
+    create(cursor, policy)
     marked_for_cleanup.append(policy)
 
     result = safe_fetch(cursor, policy.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.NetworkPolicy.spec, result)
-    data = strip_nones_and_unfetchable(res.NetworkPolicy.spec, policy.to_dict())
+    result = clean_resource_data(res.NetworkPolicy.spec, result)
+    data = clean_resource_data(res.NetworkPolicy.spec, policy.to_dict())
     assert result == data
 
 
@@ -1172,13 +1181,13 @@ def test_fetch_table(cursor, suffix, marked_for_cleanup):
         schema="PUBLIC",
         owner=TEST_ROLE,
     )
-    cursor.execute(table.create_sql(if_not_exists=True))
+    create(cursor, table)
     marked_for_cleanup.append(table)
 
     result = safe_fetch(cursor, table.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.Table.spec, result)
-    data = strip_nones_and_unfetchable(res.Table.spec, table.to_dict())
+    result = clean_resource_data(res.Table.spec, result)
+    data = clean_resource_data(res.Table.spec, table.to_dict())
     assert result == data
 
 
@@ -1187,11 +1196,68 @@ def test_fetch_image_repository(cursor, suffix, marked_for_cleanup):
         name=f"SOME_IMAGE_REPOSITORY_{suffix}",
         owner=TEST_ROLE,
     )
-    cursor.execute(repository.create_sql(if_not_exists=True))
+    create(cursor, repository)
     marked_for_cleanup.append(repository)
 
     result = safe_fetch(cursor, repository.urn)
     assert result is not None
-    result = strip_nones_and_unfetchable(res.ImageRepository.spec, result)
-    data = strip_nones_and_unfetchable(res.ImageRepository.spec, repository.to_dict())
+    result = clean_resource_data(res.ImageRepository.spec, result)
+    data = clean_resource_data(res.ImageRepository.spec, repository.to_dict())
+    assert result == data
+
+
+def test_fetch_external_volume(cursor, suffix, marked_for_cleanup):
+    from titan.resources.external_volume import ExternalVolumeStorageLocation
+
+    volume = res.ExternalVolume(
+        name=f"SOME_EXTERNAL_VOLUME_{suffix}",
+        owner=TEST_ROLE,
+        storage_locations=[
+            {
+                "name": "my-s3-us-east-2-a",
+                "storage_provider": "S3",
+                "storage_base_url": "s3://s3-bucket/",
+                "storage_aws_role_arn": "arn:aws:iam::12345678:role/role-name",
+                "storage_aws_external_id": "external-id",
+                "encryption": {"type": "AWS_SSE_S3"},
+            }
+        ],
+    )
+    create(cursor, volume)
+    marked_for_cleanup.append(volume)
+
+    result = safe_fetch(cursor, volume.urn)
+    assert result is not None
+    result = clean_resource_data(res.ExternalVolume.spec, result)
+    data = clean_resource_data(res.ExternalVolume.spec, volume.to_dict())
+    result_storage_locations = result.pop("storage_locations")
+    data_storage_locations = data.pop("storage_locations")
+    assert len(result_storage_locations) == len(data_storage_locations)
+    assert clean_resource_data(ExternalVolumeStorageLocation.spec, result_storage_locations[0]) == clean_resource_data(
+        ExternalVolumeStorageLocation.spec, data_storage_locations[0]
+    )
+    assert result == data
+
+
+def test_fetch_iceberg_table(cursor, suffix, marked_for_cleanup):
+    table = res.SnowflakeIcebergTable(
+        name=f"SOME_ICEBERG_TABLE_{suffix}",
+        columns=[
+            res.Column(name="ID", data_type="NUMBER(38,0)", not_null=True),
+            res.Column(name="NAME", data_type="VARCHAR(16777216)", not_null=False),
+        ],
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+        owner=TEST_ROLE,
+        catalog="SNOWFLAKE",
+        external_volume="static_external_volume",
+        base_location="some_prefix",
+    )
+    cursor.execute(table.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(table)
+
+    result = safe_fetch(cursor, table.urn)
+    assert result is not None
+    result = clean_resource_data(res.SnowflakeIcebergTable.spec, result)
+    data = clean_resource_data(res.SnowflakeIcebergTable.spec, table.to_dict())
     assert result == data

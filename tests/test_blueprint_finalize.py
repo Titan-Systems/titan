@@ -113,22 +113,26 @@ def test_database_scoped_resource_with_inline_referenced_parent(session_ctx):
 
 
 def test_resource_merging(session_ctx):
+    db = res.Database("SOME_DATABASE")
     schema = res.Schema("SOME_DATABASE.SOME_SCHEMA")
-    blueprint = Blueprint(
-        resources=[
-            res.Database("SOME_DATABASE"),
-            schema,
-        ]
-    )
 
     assert schema.container is not None
     assert isinstance(schema.container, ResourcePointer)
     assert schema.container.name == "SOME_DATABASE"
     assert schema.container.resource_type == ResourceType.DATABASE
 
+    blueprint = Blueprint(resources=[db, schema])
+
     assert session_ctx.get("database") is None
     blueprint._finalize(session_ctx)
-    assert len(list(_walk(blueprint._root))) == 4
+    resources = list(_walk(blueprint._root))
+    assert len(resources) == 4
     assert schema.container is not None
     assert isinstance(schema.container, res.Database)
     assert schema.container.name == "SOME_DATABASE"
+
+
+def test_public_schema_raises_error():
+    db = res.Database("SOME_DATABASE")
+    with pytest.raises(ValueError):
+        res.Schema("PUBLIC", database=db, comment="This is a test")

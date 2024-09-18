@@ -2,7 +2,7 @@ import pytest
 
 from titan import resources as res
 from titan.enums import ResourceType
-from titan.privs import _all_privs_for_resource_type
+from titan.privs import all_privs_for_resource_type
 from titan.identifiers import URN
 from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
@@ -61,7 +61,7 @@ def test_grant_all():
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
     assert grant.to.name == "SOMEROLE"
-    assert grant._data._privs == _all_privs_for_resource_type(ResourceType.WAREHOUSE)
+    assert grant._data._privs == all_privs_for_resource_type(ResourceType.WAREHOUSE)
     assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=ALL&on=warehouse/SOMEWH"
 
 

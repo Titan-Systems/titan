@@ -24,6 +24,12 @@ from .parse import (
 __this__ = sys.modules[__name__]
 
 
+def quote_value(value: str):
+    if value is None or value == "":
+        return "''"
+    return f"$${value}$$"
+
+
 class Prop(ABC):
     """
     A Prop is a named expression that can be parsed from a SQL string.
@@ -96,16 +102,23 @@ class Props:
         return json.dumps(self, default=lambda obj: obj.__dict__)
 
     def render(self, data):
+        data = data.copy()
         rendered = []
         for prop_kwarg, prop in self.props.items():
-            value = data.get(prop_kwarg)
+            value = data.pop(prop_kwarg, None)
             if value is None:
                 continue
             rendered.append(prop.render(value))
+        # if data:
+        #     raise RuntimeError(f"Attempted to render unknown properties: {data}")
         return tidy_sql(rendered)
 
 
 class BoolProp(Prop):
+    """
+    AUTO_RESUME = { TRUE | FALSE }
+    """
+
     def typecheck(self, prop_value):
         if prop_value.lower() not in ["true", "false"]:
             raise ValueError(f"Invalid boolean value: {prop_value}")
@@ -122,6 +135,10 @@ class BoolProp(Prop):
 
 
 class IntProp(Prop):
+    """
+    AUTO_SUSPEND_SECS = <num>
+    """
+
     def typecheck(self, prop_value):
         try:
             return int(prop_value)
@@ -139,6 +156,10 @@ class IntProp(Prop):
 
 
 class StringProp(Prop):
+    """
+    COMMENT = '<string_literal>'
+    """
+
     def typecheck(self, prop_value):
         return prop_value
 
@@ -148,11 +169,15 @@ class StringProp(Prop):
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
-            f"$${value}$$",
+            quote_value(value),
         )
 
 
 class FlagProp(Prop):
+    """
+    COPY GRANTS
+    """
+
     def __init__(self, label):
         super().__init__(label, eq=False)
         self.parser = Keywords(self.label)("prop_value")
@@ -165,6 +190,10 @@ class FlagProp(Prop):
 
 
 class IdentifierProp(Prop):
+    """
+    WAREHOUSE = <warehouse_name>
+    """
+
     def __init__(self, label, **kwargs):
         super().__init__(label, value_expr=FullyQualifiedIdentifier(), **kwargs)
 
@@ -184,6 +213,10 @@ class IdentifierProp(Prop):
 
 
 class IdentifierListProp(Prop):
+    """
+    EXTERNAL_ACCESS_INTEGRATIONS = ( <name_of_integration> [ , ... ] )
+    """
+
     def __init__(self, label, **kwargs):
         value_expr = pp.delimited_list(pp.Group(FullyQualifiedIdentifier()))
         super().__init__(label, value_expr=value_expr, **kwargs)
@@ -205,6 +238,10 @@ class IdentifierListProp(Prop):
 
 
 class StringListProp(Prop):
+    """
+    PACKAGES = ( '<package_name_and_version>' [ , ... ] )
+    """
+
     def __init__(self, label, **kwargs):
         value_expr = pp.delimited_list(ANY())
         super().__init__(label, value_expr=value_expr, **kwargs)
@@ -215,7 +252,7 @@ class StringListProp(Prop):
     def render(self, values):
         if values is None or len(values) == 0:
             return ""
-        value_list = ", ".join([f"$${v}$$" for v in values])
+        value_list = ", ".join([quote_value(v) for v in values])
         return tidy_sql(
             self.label.upper(),
             "=" if self.eq else "",
@@ -224,6 +261,12 @@ class StringListProp(Prop):
 
 
 class PropSet(Prop):
+    """
+    FILE_FORMAT = (
+        { FORMAT_NAME = '<file_format_name>' | TYPE = { CSV | JSON | AVRO | ORC | PARQUET | XML | CUSTOM }
+    )
+    """
+
     def __init__(self, label, props: Props):
         value_expr = pp.original_text_for(pp.nested_expr())
         super().__init__(label, value_expr)
@@ -240,6 +283,59 @@ class PropSet(Prop):
         value_str = self.props.render(values)
         value_str = f"({value_str})"
         return f"{self.label}{eq}{value_str}"
+
+
+class PropList(Prop):
+    """
+    STORAGE_LOCATIONS = (
+        (
+            NAME = '<storage_location_name>'
+            STORAGE_BASE_URL = '<protocol>://<bucket>[/<path>/]'
+            ...
+      )
+      [, (...), ...]
+    )
+    """
+
+    def __init__(self, label, prop: Prop):
+        value_expr = pp.nested_expr(content=pp.delimited_list(pp.original_text_for(pp.nested_expr())))
+        super().__init__(label, value_expr)
+        self.prop = prop
+
+    def typecheck(self, items: list[list[str]]):
+        return [self.prop.parse(item) for item in items[0]]
+
+    def render(self, values):
+        if values is None or len(values) == 0:
+            return ""
+        eq = " = " if self.eq else " "
+        return f"{self.label}{eq}({', '.join(map(self.prop.render, values))})"
+
+
+class StructProp(Prop):
+    """
+    (
+        NAME = '<storage_location_name>'
+        STORAGE_BASE_URL = '<protocol>://<bucket>[/<path>/]'
+        ...
+    )
+    """
+
+    def __init__(self, props: Props, **kwargs):
+        value_expr = pp.original_text_for(pp.nested_expr())
+        super().__init__(label=None, value_expr=value_expr, eq=False, **kwargs)
+        self.props = props
+
+    def typecheck(self, payload):
+        payload = payload.strip("()")
+        return _parse_props(self.props, payload)
+
+    def render(self, value):
+        if value is None:
+            return ""
+        # kv_pairs = " ".join([f"{key} = '{value}'" for key, value in value.items()])
+        kv_pairs = self.props.render(value)
+        return f"({kv_pairs})"
 
 
 class TagsProp(Prop):

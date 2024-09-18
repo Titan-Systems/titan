@@ -33,7 +33,7 @@ class _Table(ResourceSpec):
     max_data_extension_time_in_days: int = None
     change_tracking: bool = False
     default_ddl_collation: str = None
-    copy_grants: bool = field(default_factory=None, metadata={"fetchable": False})
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
     row_access_policy: dict[str, list] = None
     owner: RoleRef = "SYSADMIN"
     comment: str = None
@@ -129,6 +129,13 @@ class Table(NamedResource, TaggableResource, Resource):
         comment: str = None,
         **kwargs,
     ):
+
+        if "lifecycle" not in kwargs:
+            lifecycle = {
+                "ignore_changes": "columns",
+            }
+            kwargs["lifecycle"] = lifecycle
+
         super().__init__(name, **kwargs)
         self._data = _Table(
             name=self._name,
@@ -187,8 +194,8 @@ class Table(NamedResource, TaggableResource, Resource):
 # @dataclass(unsafe_hash=True)
 # class _CreateTableAsSelect(ResourceSpec):
 #     name: str
-#     as_: str = field(default_factory=None, metadata={"triggers_replacement": True})
-#     columns: list[Column] = field(default_factory=None, metadata={"triggers_replacement": True})
+#     as_: str = field(default=None, metadata={"triggers_replacement": True})
+#     columns: list[Column] = field(default=None, metadata={"triggers_replacement": True})
 #     cluster_by: list[str] = None
 #     copy_grants: bool = False
 #     row_access_policy: dict[str, list] = None

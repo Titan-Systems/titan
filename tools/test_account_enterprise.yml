@@ -1,3 +1,10 @@
+name: reset-test-account
+run_mode: SYNC
+allowlist:
+  - "secret"
+  - "tag"
+  - "tag reference"
+
 grants:
   - GRANT APPLY AGGREGATION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY PROJECTION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE

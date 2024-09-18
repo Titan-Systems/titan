@@ -6,8 +6,19 @@ import yaml
 from titan.blueprint import dump_plan
 from titan.operations.blueprint import blueprint_apply, blueprint_plan
 from titan.operations.export import export_resources
+from titan.operations.connector import connect, get_env_vars
 
 from .identifiers import resource_type_for_label
+
+
+class JsonParamType(click.ParamType):
+    name = "json"
+
+    def convert(self, value, param, ctx):
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            self.fail(f"'{value}' is not a valid JSON string", param, ctx)
 
 
 def load_config(config_file):
@@ -32,19 +43,24 @@ def titan_cli():
 @click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
 @click.option("--json", "json_output", is_flag=True, help="Output plan in machine-readable JSON format")
 @click.option("--out", "output_file", type=str, help="Write plan to a file", metavar="<filename>")
+@click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
 @click.option(
     "--mode",
     "run_mode",
-    type=click.Choice(["CREATE-OR-UPDATE"]),
+    type=click.Choice(["CREATE-OR-UPDATE", "SYNC"]),
     metavar="<run_mode>",
-    default="CREATE-OR-UPDATE",
     show_default=True,
-    help="Run strategy",
+    help="Run mode",
 )
-def plan(config_file, json_output, output_file, run_mode):
+def plan(config_file, json_output, output_file, vars: dict, run_mode):
     """Generate an execution plan based on your configuration"""
-    config = load_config(config_file)
-    plan_obj = blueprint_plan(config, run_mode)
+    yaml_config = load_config(config_file)
+    cli_config = {}
+    if vars:
+        cli_config["vars"] = vars
+    if run_mode:
+        cli_config["run_mode"] = run_mode
+    plan_obj = blueprint_plan(yaml_config, cli_config)
     output = None
     if json_output:
         output = dump_plan(plan_obj, format="json")
@@ -60,26 +76,32 @@ def plan(config_file, json_output, output_file, run_mode):
 @titan_cli.command("apply", no_args_is_help=True)
 @click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
 @click.option("--plan", "plan_file", type=str, help="Path to plan JSON file", metavar="<filename>")
+@click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
 @click.option(
     "--mode",
     "run_mode",
-    type=click.Choice(["CREATE-OR-UPDATE"]),
-    default="CREATE-OR-UPDATE",
+    type=click.Choice(["CREATE-OR-UPDATE", "SYNC"]),
     metavar="<run_mode>",
     show_default=True,
-    help="Run strategy",
+    help="Run mode",
 )
 @click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes")
-def apply(config_file, plan_file, run_mode, dry_run):
-    """Apply a plan to Titan resources"""
+def apply(config_file, plan_file, vars, run_mode, dry_run):
+    """Apply an execution plan to a Snowflake account"""
     if config_file and plan_file:
         raise click.UsageError("Cannot specify both --config and --plan.")
     if not config_file and not plan_file:
         raise click.UsageError("Either --config or --plan must be specified.")
     if config_file:
-        config = load_config(config_file)
-        plan_obj = blueprint_plan(config, run_mode)
-        blueprint_apply(plan_obj, run_mode, dry_run)
+        yaml_config = load_config(config_file)
+        cli_config = {}
+        if vars:
+            cli_config["vars"] = vars
+        if run_mode:
+            cli_config["run_mode"] = run_mode
+        if dry_run:
+            cli_config["dry_run"] = dry_run
+        blueprint_apply(yaml_config, cli_config)
     else:
         plan_obj = load_plan(plan_file)
         blueprint_apply(plan_obj, run_mode, dry_run)
@@ -144,6 +166,19 @@ def export(resource, export_all, exclude, out, format):
             f.write(output)
     else:
         print(output)
+
+
+@titan_cli.command("connect")
+def cli_connect():
+    """Test the connection to Snowflake"""
+    env_vars = get_env_vars()
+    if not env_vars:
+        raise click.UsageError("No environment variables found. Please set the environment variables and try again.")
+    for key, value in env_vars.items():
+        value_inspect = "********" if key in ["password", "mfa_passcode"] else value
+        print(f"SNOWFLAKE_{key.upper()}={value_inspect}")
+    session = connect()
+    print(f"Connection successful as user {session.user}")
 
 
 if __name__ == "__main__":
