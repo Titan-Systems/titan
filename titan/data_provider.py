@@ -991,12 +991,11 @@ def fetch_file_format(session, fqn: FQN):
 
 
 def fetch_function(session, fqn: FQN):
-    show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT", cacheable=True)
-    udfs = _filter_result(show_result, name=fqn.name)
+    udfs = _show_resources(session, "USER FUNCTIONS", fqn)
     if len(udfs) == 0:
         return None
     if len(udfs) > 1:
-        raise Exception(f"Found multiple roles matching {fqn}")
+        raise Exception(f"Found multiple functions matching {fqn}")
 
     data = udfs[0]
     inputs, output = data["arguments"].split(" RETURN ")
