@@ -349,7 +349,7 @@ def test_blueprint_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cl
 def test_blueprint_with_nested_database(cursor):
     session = cursor.connection
     bp = Blueprint(name="failing-reference")
-    schema = res.Schema(name="static_database.public")
+    schema = res.Schema(name="static_database.static_schema")
     bp.add(res.FutureGrant(priv="SELECT", on_future_views_in=schema, to="STATIC_ROLE"))
     plan = bp.plan(session)
     assert len(plan) == 1

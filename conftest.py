@@ -41,8 +41,11 @@ def pytest_collection_modifyitems(items):
 
 @pytest.fixture(scope="session")
 def blueprint_vars():
-    if os.path.exists(".vars.test_account"):
-        return dotenv_values(".vars.test_account")
+    if os.path.exists("env/.vars.test_account"):
+        vars = dotenv_values("env/.vars.test_account")
+        vars.pop("rsa_public_key", None)
+        vars.pop("static_user_mfa_password", None)
+        return vars
     else:
         return {key[4:].lower(): value for key, value in os.environ.items() if key.startswith("VAR_")}
 

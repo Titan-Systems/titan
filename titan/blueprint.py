@@ -348,11 +348,17 @@ def _raise_if_plan_would_drop_session_user(session_ctx: SessionContext, plan: Pl
 
 
 def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
+    """
+    It is expected in yaml-defined blueprints that all resources are defined with static strings, instead
+    of using object references.
+
+    """
+
     namespace: dict[Any, Resource] = {}
     # Push pointers to the end
     resources = sorted(resources, key=lambda resource: isinstance(resource, ResourcePointer))
 
-    def _merge(resource: ResourceContainer, pointer: Union[ResourcePointer, Schema]):
+    def _merge(resource: ResourceContainer, pointer: ResourcePointer):
         if pointer.container is not None:
             # # The pointer has a container but the resource does not, merge fails
             # if getattr(resource, "container", None) is None:
@@ -387,19 +393,6 @@ def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
                 # Throw away duplicate resources when the object id is the same
                 if namespace[resource_id] is resource:
                     continue
-
-                # When one resource is implicit (eg a database's PUBLIC schema), we merge it into the implicit resource.
-                # This allows users to explicitly define a PUBLIC schema and have everything just work.
-                if resource.implicit:
-                    # a little hacky since schemas are the only resource capable of being implicit
-                    primary = cast(Schema, resource)
-                    secondary = cast(Schema, namespace[resource_id])
-                    _merge(primary, secondary)
-                elif namespace[resource_id].implicit:
-                    primary = cast(Schema, namespace[resource_id])
-                    secondary = cast(Schema, resource)
-                    _merge(primary, secondary)
-                    namespace[resource_id] = primary
                 else:
                     raise DuplicateResourceException(
                         f"Duplicate resource found: {resource} and {namespace[resource_id]}"
@@ -694,7 +687,7 @@ class Blueprint:
         available_scopes = {}
         for database in databases:
             database_resources = list(database.items())
-            # _merge_pointers(database_resources)
+            _merge_pointers(database_resources)
             for schema in _get_schemas(database):
                 available_scopes[f"{database.name}.{schema.name}"] = schema
 
@@ -705,7 +698,7 @@ class Blueprint:
                     logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
                     _get_public_schema(databases[0]).add(resource)
                 else:
-                    raise Exception(f"No schema for resource {repr(resource)} found")
+                    raise OrphanResourceException(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
                 schema_pointer = resource.container
 
@@ -717,7 +710,9 @@ class Blueprint:
                     if len(databases) == 1:
                         databases[0].add(schema_pointer)
                     else:
-                        raise Exception(f"No database for resource {resource} schema={resource.container}")
+                        raise OrphanResourceException(
+                            f"No database for resource {resource} schema={resource.container}"
+                        )
                 elif isinstance(schema_pointer.container, ResourcePointer):
                     expected_scope = f"{schema_pointer.container.name}.{schema_pointer.name}"
                     if expected_scope in available_scopes:

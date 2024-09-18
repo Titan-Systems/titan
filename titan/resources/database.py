@@ -1,13 +1,12 @@
 from dataclasses import dataclass
-from typing import Union, cast
 
 from ..enums import ResourceType
-from ..identifiers import URN, FQN
+from ..identifiers import FQN, URN
 from ..props import FlagProp, IdentifierProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
 from .external_volume import ExternalVolume
-from .resource import NamedResource, Resource, ResourceContainer, ResourcePointer, ResourceSpec
+from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
 from .role import Role
 from .schema import Schema
 from .tag import TaggableResource
@@ -163,18 +162,16 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
             comment=comment,
         )
         if self._data.name != "SNOWFLAKE":
-            self.add(
-                Schema(name="PUBLIC", implicit=True, owner=owner),
-                # ResourcePointer(resource_type=ResourceType.SCHEMA, name="PUBLIC")
-            )
+            self._public_schema = Schema(name="PUBLIC", implicit=True, owner=owner)
+            self.add(self._public_schema)
         self.set_tags(tags)
 
     def schemas(self):
         return self.items(resource_type=ResourceType.SCHEMA)
 
     @property
-    def public_schema(self) -> Union[Schema, ResourcePointer]:
-        return cast(Union[Schema, ResourcePointer], self.find(name="PUBLIC", resource_type=ResourceType.SCHEMA))
+    def public_schema(self) -> Schema:
+        return self._public_schema
 
 
 def public_schema_urn(database_urn: URN) -> URN:
