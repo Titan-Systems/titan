@@ -139,7 +139,6 @@ def _resources_for_config(config: dict):
         resource_label = pluralize(resource_label_for_type(resource_type))
         block = config.pop(resource_label, [])
         if block:
-            print(">>>>>>>>>", resource_label, str(len(block)))
             config_blocks.append((resource_type, block))
 
     for alias, resource_type in ALIASES.items():

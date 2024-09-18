@@ -811,12 +811,8 @@ class Blueprint:
         if self._finalized:
             raise RuntimeError("Blueprint already finalized")
         self._finalized = True
-        print(">>>>>>>>", str(len(self._staged)))
         self._resolve_vars()
-        print(">>>>>>>>", str(len(self._staged)))
         self._build_resource_graph(session_ctx)
-        print(">>>>>>>>", str(len([r for r in _walk(self._root)])))
-        # assert self._root is not None, "Root should be initialized after _build_resource_graph"
         self._create_tag_references()
         self._create_ownership_refs(session_ctx)
         self._create_grandparent_refs()
