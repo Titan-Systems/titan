@@ -52,6 +52,9 @@ grants:
   - to_role: reporter
     priv: usage
     on_database: analytics
+  - to_role: transformer
+    priv: usage
+    on_database: raw
 
 users:
   - name: admin
