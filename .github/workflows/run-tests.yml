@@ -84,9 +84,9 @@ jobs:
         TEST_SNOWFLAKE_ACCOUNT: ${{ secrets.TEST_SNOWFLAKE_ACCOUNT }}
         TEST_SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
         TEST_SNOWFLAKE_PASSWORD: ${{ secrets.TEST_SNOWFLAKE_PASSWORD }}
-        VAR_STORAGE_BASE_URL: ${{ secrets.storage_base_url }}
-        VAR_STORAGE_ROLE_ARN: ${{ secrets.storage_role_arn }}
-        VAR_STORAGE_AWS_EXTERNAL_ID: ${{ secrets.storage_aws_external_id }}
+        VAR_STORAGE_BASE_URL: ${{ secrets.VAR_STORAGE_BASE_URL }}
+        VAR_STORAGE_ROLE_ARN: ${{ secrets.VAR_STORAGE_ROLE_ARN }}
+        VAR_STORAGE_AWS_EXTERNAL_ID: ${{ secrets.VAR_STORAGE_AWS_EXTERNAL_ID }}
         TEST_SNOWFLAKE_ROLE: ACCOUNTADMIN
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4
