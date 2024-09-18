@@ -46,6 +46,9 @@ users:
   - name: STATIC_USER_MFA
     type: PERSON
     password: "{{ var.static_user_mfa_password }}"
+    lifecycle:
+      ignore_changes:
+        - password
 
 roles:
   - name: CI
@@ -68,8 +71,6 @@ roles:
 
 databases:
   - name: static_database
-    schemas:
-      - name: public
   - name: static_database_the_second
 
 database_roles:
