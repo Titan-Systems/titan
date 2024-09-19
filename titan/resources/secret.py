@@ -291,7 +291,7 @@ class OAuthSecret(NamedResource, Resource):
             owner=owner,
         )
 
-    def to_dict(self):
+    def to_dict(self, _=None):
         data = super().to_dict()
         if data["oauth_scopes"]:
             data.pop("oauth_refresh_token")

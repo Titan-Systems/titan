@@ -467,7 +467,7 @@ class Blueprint:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
             if account_edition_is_standard:
-                if AccountEdition.STANDARD not in change.resource_cls.edition:
+                if change.resource_cls and AccountEdition.STANDARD not in change.resource_cls.edition:
                     exceptions.append(f"Resource {change.urn} requires enterprise edition or higher")
 
         if exceptions:

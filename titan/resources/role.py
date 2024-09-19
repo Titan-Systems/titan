@@ -142,7 +142,7 @@ class DatabaseRole(NamedResource, TaggableResource, Resource):
         )
         self.set_tags(tags)
 
-    def to_dict(self):
+    def to_dict(self, _=None):
         data = super().to_dict()
         data["database"] = self.container.name
         return data

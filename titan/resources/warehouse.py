@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 
 from ..enums import AccountEdition, ParseableEnum, ResourceType, WarehouseSize
 from ..props import (
@@ -202,9 +203,11 @@ class Warehouse(NamedResource, TaggableResource, Resource):
         )
         self.set_tags(tags)
 
-    def to_dict(self, session_ctx: dict):
-        d = super().to_dict(session_ctx)
-        account_edition_is_standard = session_ctx["tag_support"] is False
+    def to_dict(self, session_ctx: Optional[dict] = None):
+        if session_ctx is None:
+            session_ctx = {}
+        d = super().to_dict()
+        account_edition_is_standard = session_ctx.get("tag_support", True) is False
         if account_edition_is_standard:
             del d["max_cluster_count"]
             del d["min_cluster_count"]

@@ -622,7 +622,7 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
     def resource_type(self):
         return self._resource_type
 
-    def to_dict(self):
+    def to_dict(self, _=None):
         return {
             "_pointer": True,
             "name": self.name,

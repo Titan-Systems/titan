@@ -28,6 +28,7 @@ def session_ctx() -> dict:
             "PUBLIC",
         ],
         "role_privileges": {},
+        "tag_support": True,
     }
 
 
@@ -43,7 +44,7 @@ def test_default_owner(session_ctx, remote_state):
     assert warehouse._data.owner.name == "SYSADMIN"
     blueprint = Blueprint(resources=[warehouse])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].after["owner"] == "SYSADMIN"
@@ -54,7 +55,7 @@ def test_non_default_owner(session_ctx, remote_state):
     assert warehouse._data.owner.name == "ACCOUNTADMIN"
     blueprint = Blueprint(resources=[warehouse])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].after["owner"] == "ACCOUNTADMIN"
@@ -67,7 +68,7 @@ def test_custom_role_owner(session_ctx, remote_state):
     assert warehouse._data.owner.name == "CUSTOMROLE"
     blueprint = Blueprint(resources=[role, grant, warehouse])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 3
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/CUSTOMROLE")
@@ -97,7 +98,7 @@ def test_transfer_ownership(session_ctx, remote_state):
     role = res.Role(name="test_role", owner="USERADMIN")
     blueprint = Blueprint(resources=[role])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], TransferOwnership)
     assert plan[0].from_owner == "ACCOUNTADMIN"
@@ -119,7 +120,7 @@ def test_transfer_ownership_with_changes(session_ctx, remote_state):
     role = res.Role(name="test_role", comment="This comment has been added", owner="USERADMIN")
     blueprint = Blueprint(resources=[role])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 2
     assert isinstance(plan[0], UpdateResource)
     assert plan[0].after["comment"] == "This comment has been added"
@@ -146,7 +147,7 @@ def test_resource_has_custom_role_owner_with_create_priv(session_ctx, remote_sta
     warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
     blueprint = Blueprint(resources=[warehouse])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
@@ -164,7 +165,7 @@ def test_resource_is_transferred_to_custom_role_owner(session_ctx, remote_state)
     warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
     blueprint = Blueprint(resources=[warehouse])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
@@ -185,11 +186,12 @@ def test_resource_cant_be_created(remote_state):
             "TEST_ROLE",
         ],
         "role_privileges": {},
+        "tag_support": True,
     }
     warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
     blueprint = Blueprint(resources=[warehouse])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
@@ -216,7 +218,7 @@ def test_grant_with_grant_admin_custom_role(remote_state):
     grant = res.RoleGrant(role="GRANT_ADMIN", to_role="SYSADMIN")
     blueprint = Blueprint(resources=[grant])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role_grant/GRANT_ADMIN?role=SYSADMIN")
@@ -250,7 +252,7 @@ def test_tag_reference_with_tag_admin_custom_role():
     )
     blueprint = Blueprint(resources=[tag_reference])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:tag_reference/SOME_ROLE?domain=ROLE")
@@ -271,7 +273,7 @@ def test_owner_is_database_role(session_ctx):
     def _plan_for_resources(resources):
         blueprint = Blueprint(resources=resources)
         manifest = blueprint.generate_manifest(session_ctx)
-        return blueprint._plan(remote_state, manifest)
+        return blueprint._plan(session_ctx, remote_state, manifest)
 
     # Specify owner as a string
     database_role = res.DatabaseRole(
@@ -317,7 +319,7 @@ def test_blueprint_create_resource_with_database_role_owner(monkeypatch, session
     schema = res.Schema(name="test_schema", database=database, owner=database_role)
     blueprint = Blueprint(resources=[database, database_role, schema])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 3
     sql_commands = compile_plan_to_sql(session_ctx, plan)
     assert len(sql_commands) == 8
@@ -346,7 +348,7 @@ def test_database_with_custom_owner_modifies_public_schema_owner(monkeypatch, se
     database = res.Database(name="SOME_DATABASE", owner=role)
     blueprint = Blueprint(resources=[database, role, role_grant])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(remote_state, manifest)
+    plan = blueprint._plan(session_ctx, remote_state, manifest)
     assert len(plan) == 3
     sql_commands = compile_plan_to_sql(session_ctx, plan)
     assert len(sql_commands) == 9
