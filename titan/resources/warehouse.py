@@ -34,9 +34,9 @@ class _Warehouse(ResourceSpec):
     owner: Role = "SYSADMIN"
     warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
-    max_cluster_count: int = None
-    min_cluster_count: int = None
-    scaling_policy: WarehouseScalingPolicy = None
+    max_cluster_count: int = 1
+    min_cluster_count: int = 1
+    scaling_policy: WarehouseScalingPolicy = WarehouseScalingPolicy.STANDARD
     auto_suspend: int = 600
     auto_resume: bool = True
     initially_suspended: bool = None
@@ -157,9 +157,9 @@ class Warehouse(NamedResource, TaggableResource, Resource):
         owner: str = "SYSADMIN",
         warehouse_type: WarehouseType = "STANDARD",
         warehouse_size: WarehouseSize = WarehouseSize.XSMALL,
-        max_cluster_count: int = None,
-        min_cluster_count: int = None,
-        scaling_policy: WarehouseScalingPolicy = None,
+        max_cluster_count: int = 1,
+        min_cluster_count: int = 1,
+        scaling_policy: WarehouseScalingPolicy = "STANDARD",
         auto_suspend: int = 600,
         auto_resume: bool = True,
         initially_suspended: bool = None,

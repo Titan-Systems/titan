@@ -911,7 +911,9 @@ def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, warehouse.urn)
     assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, warehouse.to_dict())
+    result = clean_resource_data(res.Warehouse.spec, result)
+    data = clean_resource_data(res.Warehouse.spec, warehouse.to_dict())
+    assert result == data
 
 
 def test_fetch_password_secret(cursor, suffix, marked_for_cleanup):
