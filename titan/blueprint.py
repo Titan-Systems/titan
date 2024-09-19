@@ -18,7 +18,7 @@ from .client import (
 )
 from .data_provider import SessionContext
 from .diff import Action, diff
-from .enums import ResourceType, RunMode, resource_type_is_grant
+from .enums import AccountEdition, ResourceType, RunMode, resource_type_is_grant
 from .exceptions import (
     DuplicateResourceException,
     InvalidResourceException,
@@ -54,19 +54,11 @@ from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
 logger = logging.getLogger("titan")
 
-# SYNC_MODE_BLOCKLIST = [
-#     ResourceType.FUTURE_GRANT,
-#     ResourceType.GRANT,
-#     ResourceType.GRANT_ON_ALL,
-#     ResourceType.ROLE,
-#     ResourceType.USER,
-#     ResourceType.TABLE,
-# ]
-
 
 @dataclass
 class ResourceChange(ABC):
     urn: URN
+    resource_cls: type[Resource]
 
     @abstractmethod
     def to_dict(self) -> dict:
@@ -156,8 +148,6 @@ class Manifest:
             resource=resource,
         )
 
-        # resource_data = resource.to_dict()
-
         if urn in self._data:
             # if resource_data != self._data[urn]:
             if not isinstance(resource, ResourcePointer):
@@ -174,8 +164,8 @@ class Manifest:
         else:
             raise Exception("Manifest keys must be URNs")
 
-    def to_dict(self):
-        return {k: v.to_dict() for k, v in self._data.items()}
+    def to_dict(self, session_ctx: SessionContext):
+        return {k: v.to_dict(session_ctx) for k, v in self._data.items()}
 
     @property
     def urns(self) -> list[URN]:
@@ -455,34 +445,30 @@ class Blueprint:
         blueprint.add(config.resources or [])
         return blueprint
 
-    def _raise_for_nonconforming_plan(self, plan: Plan):
+    def _raise_for_nonconforming_plan(self, session_ctx: SessionContext, plan: Plan):
         exceptions = []
 
-        # Run Mode exceptions
-        if self._config.run_mode == RunMode.CREATE_OR_UPDATE:
-            for change in plan:
+        # If the account doesn't support tags, assume the account is standard edition or trial
+        account_edition_is_standard = session_ctx["tag_support"] is False
+
+        for change in plan:
+            # Run Mode exceptions
+            if self._config.run_mode == RunMode.CREATE_OR_UPDATE:
                 if isinstance(change, DropResource):
                     exceptions.append(
                         f"Create-or-update mode does not allow resources to be removed (ref: {change.urn})"
                     )
-                if isinstance(change, UpdateResource):
-                    if "name" in change.delta:
-                        exceptions.append(
-                            f"Create-or-update mode does not allow renaming resources (ref: {change.urn})"
-                        )
-
-        # if self._config.run_mode == RunMode.SYNC:
-        #     for change in plan:
-        #         if change.urn.resource_type in SYNC_MODE_BLOCKLIST:
-        #             exceptions.append(
-        #                 f"Sync mode does not allow changes to {change.urn.resource_type} (ref: {change.urn})"
-        #             )
-
-        # Valid Resource Types exceptions
-        if self._config.allowlist:
-            for change in plan:
+            if isinstance(change, UpdateResource):
+                if "name" in change.delta:
+                    exceptions.append(f"Create-or-update mode does not allow renaming resources (ref: {change.urn})")
+            # Valid Resource Types exceptions
+            if self._config.allowlist:
                 if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
+
+            if account_edition_is_standard:
+                if AccountEdition.STANDARD not in change.resource_cls.edition:
+                    exceptions.append(f"Resource {change.urn} requires enterprise edition or higher")
 
         if exceptions:
             if len(exceptions) > 5:
@@ -491,8 +477,8 @@ class Blueprint:
                 exception_block = "\n".join(exceptions)
             raise NonConformingPlanException("Non-conforming actions found in plan:\n" + exception_block)
 
-    def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
-        manifest_dict = manifest.to_dict()
+    def _plan(self, session_ctx: SessionContext, remote_state: State, manifest: Manifest) -> Plan:
+        manifest_dict = manifest.to_dict(session_ctx)
 
         # changes: Plan = []
         additive_changes: list[ResourceChange] = []
@@ -522,7 +508,7 @@ class Blueprint:
                     raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
                     marked_for_replacement.add(urn)
                 elif change_forces_add:
-                    additive_changes.append(CreateResource(urn, after))
+                    additive_changes.append(CreateResource(urn, resource.__class__, after))
                     continue
                 elif not change_is_fetchable:
                     # drift on fields that aren't fetchable should be ignored
@@ -533,11 +519,12 @@ class Blueprint:
                 elif change_should_be_ignored:
                     continue
                 else:
-                    additive_changes.append(UpdateResource(urn, before, after, delta))
+                    additive_changes.append(UpdateResource(urn, resource.__class__, before, after, delta))
             elif action == Action.CREATE:
-                additive_changes.append(CreateResource(urn, after))
+                resource = manifest[urn]
+                additive_changes.append(CreateResource(urn, resource.__class__, after))
             elif action == Action.DROP:
-                destructive_changes.append(DropResource(urn, before))
+                destructive_changes.append(DropResource(urn, None, before))
             elif action == Action.TRANSFER:
                 resource = manifest[urn]
 
@@ -552,6 +539,7 @@ class Blueprint:
                 additive_changes.append(
                     TransferOwnership(
                         urn,
+                        resource.__class__,
                         from_owner=before["owner"],
                         to_owner=after["owner"],
                     )
@@ -632,7 +620,7 @@ class Blueprint:
                 data = None
 
             if data is None and not is_public_schema:
-                logger.error(manifest.to_dict())
+                logger.error(manifest.to_dict(session_ctx))
                 raise MissingResourceException(
                     f"Resource {reference} required by {parent} not found or failed to fetch"
                 )
@@ -839,7 +827,7 @@ class Blueprint:
         manifest = self.generate_manifest(session_ctx)
         remote_state = self.fetch_remote_state(session, manifest)
         try:
-            finished_plan = self._plan(remote_state, manifest)
+            finished_plan = self._plan(session_ctx, remote_state, manifest)
         except Exception as e:
             logger.error("~" * 80 + "REMOTE STATE")
             logger.error(remote_state)
@@ -847,7 +835,7 @@ class Blueprint:
             logger.error(manifest)
 
             raise e
-        self._raise_for_nonconforming_plan(finished_plan)
+        self._raise_for_nonconforming_plan(session_ctx, finished_plan)
         return finished_plan
 
     def apply(self, session, plan: Optional[Plan] = None):

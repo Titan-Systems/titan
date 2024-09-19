@@ -2137,14 +2137,11 @@ def fetch_warehouse(session, fqn: FQN):
     else:
         query_accel = False
 
-    return {
+    warehouse_dict = {
         "name": _quote_snowflake_identifier(data["name"]),
         "owner": _get_owner_identifier(data),
         "warehouse_type": data["type"],
         "warehouse_size": str(WarehouseSize(data["size"])),
-        "max_cluster_count": data["max_cluster_count"],
-        "min_cluster_count": data["min_cluster_count"],
-        "scaling_policy": data["scaling_policy"],
         "auto_suspend": data["auto_suspend"],
         "auto_resume": data["auto_resume"] == "true",
         "comment": data["comment"] or None,
@@ -2153,6 +2150,13 @@ def fetch_warehouse(session, fqn: FQN):
         "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
         "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
     }
+    if "max_cluster_count" in data:
+        warehouse_dict["max_cluster_count"] = data["max_cluster_count"]
+    if "min_cluster_count" in data:
+        warehouse_dict["min_cluster_count"] = data["min_cluster_count"]
+    if "scaling_policy" in data:
+        warehouse_dict["scaling_policy"] = data["scaling_policy"]
+    return warehouse_dict
 
 
 ################ List functions

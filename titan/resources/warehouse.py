@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-from ..enums import ParseableEnum, ResourceType, WarehouseSize
+from ..enums import AccountEdition, ParseableEnum, ResourceType, WarehouseSize
 from ..props import (
     BoolProp,
     EnumProp,
@@ -34,9 +34,16 @@ class _Warehouse(ResourceSpec):
     owner: Role = "SYSADMIN"
     warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
-    max_cluster_count: int = 1
-    min_cluster_count: int = 1
-    scaling_policy: WarehouseScalingPolicy = WarehouseScalingPolicy.STANDARD
+    max_cluster_count: int = field(
+        default=1, metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}}
+    )
+    min_cluster_count: int = field(
+        default=1, metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}}
+    )
+    scaling_policy: WarehouseScalingPolicy = field(
+        default=WarehouseScalingPolicy.STANDARD,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
     auto_suspend: int = 600
     auto_resume: bool = True
     initially_suspended: bool = None
@@ -194,3 +201,12 @@ class Warehouse(NamedResource, TaggableResource, Resource):
             statement_timeout_in_seconds=statement_timeout_in_seconds,
         )
         self.set_tags(tags)
+
+    def to_dict(self, session_ctx: dict):
+        d = super().to_dict(session_ctx)
+        account_edition_is_standard = session_ctx["tag_support"] is False
+        if account_edition_is_standard:
+            del d["max_cluster_count"]
+            del d["min_cluster_count"]
+            del d["scaling_policy"]
+        return d

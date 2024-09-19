@@ -163,6 +163,9 @@ class ResourceSpecMetadata:
     forces_add: bool = False
     ignore_changes: bool = False
     known_after_apply: bool = False
+    edition: set[AccountEdition] = field(
+        default_factory=lambda: {AccountEdition.STANDARD, AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
+    )
 
 
 @dataclass
@@ -338,7 +341,10 @@ class Resource(metaclass=_Resource):
     def __hash__(self):
         return hash(URN.from_resource(self, ""))
 
-    def to_dict(self):
+    def to_dict(self, session_ctx: Optional[dict] = None):
+        if session_ctx is None:
+            session_ctx = {}
+
         serialized: dict[str, Any] = {}
         if self.implicit:
             serialized["_implicit"] = True

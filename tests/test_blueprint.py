@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 
 import pytest
 
@@ -14,7 +15,12 @@ from titan.blueprint import (
 )
 from titan.blueprint_config import BlueprintConfig
 from titan.enums import ResourceType, RunMode
-from titan.exceptions import InvalidResourceException, MissingVarException, DuplicateResourceException
+from titan.exceptions import (
+    DuplicateResourceException,
+    InvalidResourceException,
+    MissingVarException,
+    NonConformingPlanException,
+)
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
@@ -689,3 +695,13 @@ def test_merge_account_scoped_resources_fail():
     ]
     with pytest.raises(DuplicateResourceException):
         _merge_pointers(resources)
+
+
+def test_blueprint_edition_checks(session_ctx, remote_state):
+    session_ctx = deepcopy(session_ctx)
+    session_ctx["tag_support"] = False
+    blueprint = Blueprint(resources=[res.Database(name="DB1"), res.Tag(name="TAG1")])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    with pytest.raises(NonConformingPlanException):
+        blueprint._raise_for_nonconforming_plan(session_ctx, plan)
