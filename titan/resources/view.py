@@ -26,7 +26,7 @@ class _View(ResourceSpec):
     recursive: bool = None
     columns: list[dict] = None
     change_tracking: bool = False
-    copy_grants: bool = field(default_factory=False, metadata={"fetchable": False})
+    copy_grants: bool = field(default=False, metadata={"fetchable": False})
     comment: str = None
     # TODO: remove this if parsing is feasible
     as_: str = field(default=None, metadata={"fetchable": False})
@@ -111,6 +111,12 @@ class View(NamedResource, TaggableResource, Resource):
         as_: str = None,
         **kwargs,
     ):
+        if "lifecycle" not in kwargs:
+            lifecycle = {
+                "ignore_changes": "columns",
+            }
+            kwargs["lifecycle"] = lifecycle
+
         super().__init__(name, **kwargs)
         self._data: _View = _View(
             name=self._name,

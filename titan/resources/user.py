@@ -24,7 +24,7 @@ class _User(ResourceSpec):
     name: ResourceName
     owner: Role = "USERADMIN"
     password: str = None
-    login_name: str = None
+    login_name: ResourceName = None
     display_name: str = None
     first_name: str = None
     middle_name: str = None
@@ -67,7 +67,7 @@ class _User(ResourceSpec):
 
         else:
             if self.login_name is None or self.login_name == "":
-                self.login_name = self.name._name.upper()
+                self.login_name = ResourceName(str(self.name).upper())
             if self.display_name is None:
                 self.display_name = self.name._name
             if self.must_change_password is None:

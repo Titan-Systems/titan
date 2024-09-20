@@ -27,6 +27,8 @@ def resource(request):
 def _field_type_is_serialized_as_resource_name(field):
     if field.type is RoleRef:
         return True
+    if field.type is ResourceName:
+        return True
     elif isinstance(field.type, str) and field.name == "owner" and field.type == "Role":
         return True
     elif issubclass(field.type, Resource):

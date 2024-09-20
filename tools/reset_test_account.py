@@ -114,6 +114,7 @@ def get_connection(env_vars):
 def configure_test_accounts():
 
     for account in ["aws.standard", "aws.enterprise"]:
+        print(">>>>>>>>>>>>>>>>", account)
         env_vars = dotenv_values(f"env/.env.{account}")
         conn = get_connection(env_vars)
         try:

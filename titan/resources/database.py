@@ -168,6 +168,7 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
                 owner=owner,
                 data_retention_time_in_days=data_retention_time_in_days,
                 max_data_extension_time_in_days=max_data_extension_time_in_days,
+                default_ddl_collation=default_ddl_collation,
             )
             self.add(self._public_schema)
         self.set_tags(tags)

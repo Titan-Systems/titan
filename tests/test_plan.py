@@ -27,7 +27,7 @@ def remote_state() -> dict:
 def test_plan_add_action(session_ctx, remote_state):
     bp = Blueprint(resources=[res.Database(name="NEW_DATABASE")])
     manifest = bp.generate_manifest(session_ctx)
-    plan = bp._plan(session_ctx, remote_state, manifest)
+    plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
     assert isinstance(change, CreateResource)
@@ -51,7 +51,7 @@ def test_plan_change_action(session_ctx, remote_state):
         ]
     )
     manifest = bp.generate_manifest(session_ctx)
-    plan = bp._plan(session_ctx, remote_state, manifest)
+    plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
     assert isinstance(change, UpdateResource)
@@ -70,7 +70,7 @@ def test_plan_remove_action(session_ctx, remote_state):
     }
     bp = Blueprint(run_mode=RunMode.SYNC, allowlist=[ResourceType.ROLE])
     manifest = bp.generate_manifest(session_ctx)
-    plan = bp._plan(session_ctx, remote_state, manifest)
+    plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
     assert isinstance(change, DropResource)
@@ -85,7 +85,7 @@ def test_plan_no_removes_in_run_mode_create_or_update(session_ctx, remote_state)
     }
     bp = Blueprint(run_mode=RunMode.CREATE_OR_UPDATE)
     manifest = bp.generate_manifest(session_ctx)
-    plan = bp._plan(session_ctx, remote_state, manifest)
+    plan = bp._plan(remote_state, manifest)
     assert len(plan) == 1
     change = plan[0]
     assert isinstance(change, DropResource)

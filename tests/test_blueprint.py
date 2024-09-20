@@ -93,7 +93,7 @@ def test_blueprint_with_database(resource_manifest):
 
     db_urn = parse_URN("urn::ABCD123:database/DB")
     assert db_urn in resource_manifest
-    assert resource_manifest[db_urn].to_dict() == {
+    assert resource_manifest[db_urn].data == {
         "name": "DB",
         "owner": "SYSADMIN",
         "comment": None,
@@ -109,7 +109,7 @@ def test_blueprint_with_database(resource_manifest):
 def test_blueprint_with_schema(resource_manifest):
     schema_urn = parse_URN("urn::ABCD123:schema/DB.SCHEMA")
     assert schema_urn in resource_manifest
-    assert resource_manifest[schema_urn].to_dict() == {
+    assert resource_manifest[schema_urn].data == {
         "comment": None,
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
@@ -124,7 +124,7 @@ def test_blueprint_with_schema(resource_manifest):
 def test_blueprint_with_view(resource_manifest):
     view_urn = parse_URN("urn::ABCD123:view/DB.SCHEMA.VIEW")
     assert view_urn in resource_manifest
-    assert resource_manifest[view_urn].to_dict() == {
+    assert resource_manifest[view_urn].data == {
         "as_": "SELECT 1",
         "change_tracking": False,
         "columns": None,
@@ -141,7 +141,7 @@ def test_blueprint_with_view(resource_manifest):
 def test_blueprint_with_table(resource_manifest):
     table_urn = parse_URN("urn::ABCD123:table/DB.SCHEMA.TABLE")
     assert table_urn in resource_manifest
-    assert resource_manifest[table_urn].to_dict() == {
+    assert resource_manifest[table_urn].data == {
         "name": "TABLE",
         "owner": "SYSADMIN",
         "columns": [
@@ -184,7 +184,7 @@ def test_blueprint_with_udf(resource_manifest):
         account_locator="ABCD123",
     )
     assert udf_urn in resource_manifest
-    assert resource_manifest[udf_urn].to_dict() == {
+    assert resource_manifest[udf_urn].data == {
         "name": "SOMEUDF",
         "owner": "SYSADMIN",
         "returns": "VARCHAR",
@@ -211,7 +211,7 @@ def test_blueprint_resource_owned_by_plan_role(session_ctx, remote_state):
     grant = res.RoleGrant(role=role, to_role="SYSADMIN")
     blueprint = Blueprint(name="blueprint", resources=[wh, role, grant])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
 
     plan_urns = [change.urn for change in plan]
     assert plan_urns == [
@@ -241,7 +241,7 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
         ],
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
@@ -275,7 +275,7 @@ def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
         resources=[db, public],
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
@@ -289,7 +289,7 @@ def test_blueprint_implied_container_tree(session_ctx, remote_state):
     )
     blueprint = Blueprint(name="blueprint", resources=[func])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn.fqn.name == "FUNC"
@@ -302,7 +302,7 @@ def test_blueprint_chained_ownership(session_ctx, remote_state):
     schema = res.Schema("SCHEMA", database=db, owner=role)
     blueprint = Blueprint(name="blueprint", resources=[db, schema, role_grant, role])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 4
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
@@ -363,7 +363,7 @@ def test_blueprint_polymorphic_resource_resolution(session_ctx, remote_state):
         ],
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 9
 
 
@@ -373,7 +373,7 @@ def test_blueprint_scope_sorting(session_ctx, remote_state):
     view = res.View(name="SOME_VIEW", schema=schema, as_="SELECT 1")
     blueprint = Blueprint(name="blueprint", resources=[view, schema, db])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
@@ -391,7 +391,7 @@ def test_blueprint_reference_sorting(session_ctx, remote_state):
     db3.requires(db2)
     blueprint = Blueprint(resources=[db3, db1, db2])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB1")
@@ -410,7 +410,7 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     blueprint = Blueprint(resources=[wh, role_grant, role])
     manifest = blueprint.generate_manifest(session_ctx)
 
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 3
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
@@ -434,7 +434,7 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
 def test_blueprint_dump_plan_create(session_ctx, remote_state):
     blueprint = Blueprint(resources=[res.Role("role1")])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     plan_json_str = dump_plan(plan, format="json")
     assert json.loads(plan_json_str) == [
         {
@@ -471,7 +471,7 @@ def test_blueprint_dump_plan_update(session_ctx):
     }
     blueprint = Blueprint(resources=[res.Role("role1", comment="new")])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     plan_json_str = dump_plan(plan, format="json")
     assert json.loads(plan_json_str) == [
         {
@@ -508,7 +508,7 @@ def test_blueprint_dump_plan_transfer(session_ctx):
     }
     blueprint = Blueprint(resources=[res.Role("role1", owner="USERADMIN")])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     plan_json_str = dump_plan(plan, format="json")
     assert json.loads(plan_json_str) == [
         {
@@ -544,7 +544,7 @@ def test_blueprint_dump_plan_drop(session_ctx):
     }
     blueprint = Blueprint(resources=[], run_mode="SYNC", allowlist=[ResourceType.ROLE])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     plan_json_str = dump_plan(plan, format="json")
     assert json.loads(plan_json_str) == [
         {
@@ -572,7 +572,7 @@ def test_blueprint_vars(session_ctx):
         vars={"role_comment": "var role comment"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1]._data.comment == "var role comment"
+    assert manifest.resources[1].data["comment"] == "var role comment"
 
     role = res.Role(name="role", comment="some comment {{ var.suffix }}")
     assert isinstance(role._data.comment, VarString)
@@ -581,7 +581,7 @@ def test_blueprint_vars(session_ctx):
         vars={"suffix": "1234"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1]._data.comment == "some comment 1234"
+    assert manifest.resources[1].data["comment"] == "some comment 1234"
 
     role = res.Role(name=var.role_name)
     assert isinstance(role.name, VarString)
@@ -590,7 +590,7 @@ def test_blueprint_vars(session_ctx):
         vars={"role_name": "role123"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1].name == "role123"
+    assert manifest.resources[1].data["name"] == "role123"
 
     role = res.Role(name="role_{{ var.suffix }}")
     assert isinstance(role.name, VarString)
@@ -599,7 +599,7 @@ def test_blueprint_vars(session_ctx):
         vars={"suffix": "5678"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1].name == "role_5678"
+    assert manifest.resources[1].data["name"] == "role_5678"
 
 
 def test_blueprint_vars_spec(session_ctx):
@@ -615,7 +615,7 @@ def test_blueprint_vars_spec(session_ctx):
     )
     assert blueprint._config.vars == {"role_comment": "var role comment"}
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1]._data.comment == "var role comment"
+    assert manifest.resources[1].data["comment"] == "var role comment"
 
     with pytest.raises(MissingVarException):
         blueprint = Blueprint(
@@ -634,7 +634,7 @@ def test_blueprint_allowlist(session_ctx, remote_state):
         allowlist=[ResourceType.ROLE],
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     assert len(plan) == 1
 
     blueprint = Blueprint(allowlist=["ROLE"])
@@ -703,6 +703,23 @@ def test_blueprint_edition_checks(session_ctx, remote_state):
     session_ctx["tag_support"] = False
     blueprint = Blueprint(resources=[res.Database(name="DB1"), res.Tag(name="TAG1")])
     manifest = blueprint.generate_manifest(session_ctx)
-    plan = blueprint._plan(session_ctx, remote_state, manifest)
+    plan = blueprint._plan(remote_state, manifest)
     with pytest.raises(NonConformingPlanException):
         blueprint._raise_for_nonconforming_plan(session_ctx, plan)
+
+
+def test_blueprint_warehouse_scaling_policy_doesnt_render_in_standard_edition(session_ctx, remote_state):
+    session_ctx = deepcopy(session_ctx)
+    session_ctx["tag_support"] = False
+    wh = res.Warehouse(name="WH", warehouse_size="XSMALL")
+    blueprint = Blueprint(resources=[wh])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert isinstance(plan[0], CreateResource)
+    sql = compile_plan_to_sql(session_ctx, plan)
+    assert len(sql) == 3
+    assert sql[0] == "USE SECONDARY ROLES ALL"
+    assert sql[1] == "USE ROLE SYSADMIN"
+    assert sql[2].startswith("CREATE WAREHOUSE WH")
+    assert "scaling_policy" not in sql[2]

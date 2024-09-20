@@ -35,12 +35,8 @@ class _Warehouse(ResourceSpec):
     owner: Role = "SYSADMIN"
     warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
-    max_cluster_count: int = field(
-        default=1, metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}}
-    )
-    min_cluster_count: int = field(
-        default=1, metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}}
-    )
+    max_cluster_count: int = 1
+    min_cluster_count: int = 1
     scaling_policy: WarehouseScalingPolicy = field(
         default=WarehouseScalingPolicy.STANDARD,
         metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
@@ -202,14 +198,3 @@ class Warehouse(NamedResource, TaggableResource, Resource):
             statement_timeout_in_seconds=statement_timeout_in_seconds,
         )
         self.set_tags(tags)
-
-    def to_dict(self, session_ctx: Optional[dict] = None):
-        if session_ctx is None:
-            session_ctx = {}
-        d = super().to_dict()
-        account_edition_is_standard = session_ctx.get("tag_support", True) is False
-        if account_edition_is_standard:
-            del d["max_cluster_count"]
-            del d["min_cluster_count"]
-            del d["scaling_policy"]
-        return d

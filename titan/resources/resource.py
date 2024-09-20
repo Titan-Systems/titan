@@ -1,7 +1,7 @@
 import difflib
 import sys
 import types
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field, fields, asdict
 from enum import Enum
 from inspect import isclass
 from itertools import chain
@@ -14,7 +14,7 @@ from ..identifiers import FQN, URN, parse_identifier, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
 from ..parse import _parse_create_header, _parse_props, resolve_resource_class
 from ..props import Props as ResourceProps
-from ..resource_name import ResourceName
+from ..resource_name import ResourceName, attribute_is_resource_name
 from ..resource_tags import ResourceTags
 from ..role_ref import RoleRef
 from ..scope import (
@@ -64,7 +64,7 @@ class Returns(TypedDict):
 
 
 @dataclass
-class LifecycleConfig:
+class ResourceLifecycleConfig:
     ignore_changes: list[str] = field(default_factory=list)
     prevent_destroy: bool = False
 
@@ -170,6 +170,40 @@ class ResourceSpecMetadata:
 
 @dataclass
 class ResourceSpec:
+    def to_dict(self):
+        dict_: dict[str, Any] = {}
+
+        def _serialize_field(field, value):
+            if field.name == "owner":
+                return str(value.fqn)
+            elif isinstance(value, ResourcePointer):
+                return str(value.fqn)
+            elif isinstance(value, Resource):
+                if getattr(value, "serialize_inline", False):
+                    return value.to_dict()
+                elif isinstance(value, NamedResource):
+                    return str(value.fqn)
+                else:
+                    raise Exception(f"Cannot serialize {value}")
+            elif isinstance(value, ParseableEnum):
+                return str(value)
+            elif isinstance(value, list):
+                return [_serialize_field(field, v) for v in value]
+            elif isinstance(value, dict):
+                return {k: _serialize_field(field, v) for k, v in value.items()}
+            elif isinstance(value, ResourceName):
+                return str(value)
+            elif isinstance(value, ResourceTags):
+                return value.tags
+            else:
+                return value
+
+        for f in fields(self):
+            value = getattr(self, f.name)
+            dict_[f.name] = _serialize_field(f, value)
+
+        return dict_
+
     def __post_init__(self):
         for f in fields(self):
             field_value = getattr(self, f.name)
@@ -237,7 +271,7 @@ class Resource(metaclass=_Resource):
         self._data: ResourceSpec = None
         self._container: "ResourceContainer" = None
         self._finalized = False
-        self.lifecycle = LifecycleConfig(**lifecycle) if lifecycle else LifecycleConfig()
+        self.lifecycle = ResourceLifecycleConfig(**lifecycle) if lifecycle else ResourceLifecycleConfig()
         self.implicit = implicit
         self.refs: set[Resource] = set()
 
@@ -379,6 +413,9 @@ class Resource(metaclass=_Resource):
             serialized[f.name] = _serialize(f, value)
 
         return serialized
+
+    def eject(self):
+        return self._data.to_dict()
 
     def create_sql(self, **kwargs):
         return create_resource(

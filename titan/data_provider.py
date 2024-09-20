@@ -592,7 +592,10 @@ def fetch_session(session) -> SessionContext:
 
 def fetch_account(session, fqn: FQN):
     # raise NotImplementedError()
-    return {}
+    return {
+        "name": None,
+        "locator": None,
+    }
 
 
 def fetch_aggregation_policy(session, fqn: FQN):
@@ -2116,6 +2119,7 @@ def fetch_view(session, fqn: FQN):
 
 
 def fetch_warehouse(session, fqn: FQN):
+    session_ctx = fetch_session(session)
     try:
         show_result = _show_resources(session, "WAREHOUSES", fqn)
     except ProgrammingError:
@@ -2150,11 +2154,9 @@ def fetch_warehouse(session, fqn: FQN):
         "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
         "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
     }
-    if "max_cluster_count" in data:
+    if session_ctx["tag_support"]:
         warehouse_dict["max_cluster_count"] = data["max_cluster_count"]
-    if "min_cluster_count" in data:
         warehouse_dict["min_cluster_count"] = data["min_cluster_count"]
-    if "scaling_policy" in data:
         warehouse_dict["scaling_policy"] = data["scaling_policy"]
     return warehouse_dict
 

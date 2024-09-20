@@ -17,7 +17,6 @@ from .client import (
     reset_cache,
 )
 from .data_provider import SessionContext
-from .diff import Action, diff
 from .enums import AccountEdition, ResourceType, RunMode, resource_type_is_grant
 from .exceptions import (
     DuplicateResourceException,
@@ -47,6 +46,7 @@ from .resources.resource import (
     Resource,
     ResourceContainer,
     ResourcePointer,
+    ResourceLifecycleConfig,
     infer_role_type_from_name,
 )
 from .resources.tag import Tag, TaggableResource
@@ -58,7 +58,6 @@ logger = logging.getLogger("titan")
 @dataclass
 class ResourceChange(ABC):
     urn: URN
-    resource_cls: type[Resource]
 
     @abstractmethod
     def to_dict(self) -> dict:
@@ -67,6 +66,7 @@ class ResourceChange(ABC):
 
 @dataclass
 class CreateResource(ResourceChange):
+    resource_cls: type[Resource]
     after: dict
 
     def to_dict(self) -> dict:
@@ -91,6 +91,7 @@ class DropResource(ResourceChange):
 
 @dataclass
 class UpdateResource(ResourceChange):
+    resource_cls: type[Resource]
     before: dict
     after: dict
     delta: dict
@@ -107,6 +108,7 @@ class UpdateResource(ResourceChange):
 
 @dataclass
 class TransferOwnership(ResourceChange):
+    resource_cls: type[Resource]
     from_owner: str
     to_owner: str
 
@@ -123,21 +125,30 @@ State = dict[URN, dict]
 Plan = list[ResourceChange]
 
 
+@dataclass
+class ManifestResource:
+    urn: URN
+    resource_cls: type[Resource]
+    data: dict[str, Any]
+    implicit: bool
+    lifecycle: ResourceLifecycleConfig
+
+
 class Manifest:
     def __init__(self, account_locator: str = ""):
         self._account_locator = account_locator
-        self._data: dict[URN, Resource] = {}
+        self._resources: dict[URN, Union[ManifestResource, ResourcePointer]] = {}
         self._refs: list[tuple[URN, URN]] = []
 
     def __getitem__(self, key: URN):
         if isinstance(key, URN):
-            return self._data[key]
+            return self._resources[key]
         else:
             raise Exception("Manifest keys must be URNs")
 
     def __contains__(self, key):
         if isinstance(key, URN):
-            return key in self._data
+            return key in self._resources
         else:
             raise Exception("Manifest keys must be URNs")
 
@@ -148,28 +159,47 @@ class Manifest:
             resource=resource,
         )
 
-        if urn in self._data:
+        if urn in self._resources:
             # if resource_data != self._data[urn]:
             if not isinstance(resource, ResourcePointer):
                 logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {resource}")
             return
-        self._data[urn] = resource
+        if isinstance(resource, ResourcePointer):
+            self._resources[urn] = resource
+        else:
+            self._resources[urn] = ManifestResource(
+                urn,
+                resource.__class__,
+                resource.eject(),
+                resource.implicit,
+                resource.lifecycle,
+            )
         for ref in resource.refs:
             ref_urn = URN.from_resource(account_locator=self._account_locator, resource=ref)
             self._refs.append((urn, ref_urn))
 
     def get(self, key: URN, default=None):
         if isinstance(key, URN):
-            return self._data.get(key, default)
+            return self._resources.get(key, default)
         else:
             raise Exception("Manifest keys must be URNs")
 
-    def to_dict(self, session_ctx: SessionContext):
-        return {k: v.to_dict(session_ctx) for k, v in self._data.items()}
+    # def to_dict(self, session_ctx: SessionContext):
+    #     return {k: v.to_dict(session_ctx) for k, v in self._data.items()}
+
+    def items(self):
+        return self._resources.items()
+
+    def __repr__(self):
+        contents = ""
+        for urn, resource in self._resources.items():
+            contents += f"[{urn}] =>\n"
+            contents += f"  {resource}\n"
+        return f"Manifest({len(self._resources)} resources)\n{contents}"
 
     @property
     def urns(self) -> list[URN]:
-        return list(self._data.keys())
+        return list(self._resources.keys())
 
     @property
     def refs(self):
@@ -177,7 +207,7 @@ class Manifest:
 
     @property
     def resources(self):
-        return list(self._data.values())
+        return list(self._resources.values())
 
 
 def dump_plan(plan: Plan, format: str = "json"):
@@ -461,13 +491,15 @@ class Blueprint:
             if isinstance(change, UpdateResource):
                 if "name" in change.delta:
                     exceptions.append(f"Create-or-update mode does not allow renaming resources (ref: {change.urn})")
+                if change.resource_cls.resource_type == ResourceType.GRANT:
+                    exceptions.append(f"Grants cannot be updated (ref: {change.urn})")
             # Valid Resource Types exceptions
             if self._config.allowlist:
                 if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
             if account_edition_is_standard:
-                if change.resource_cls and AccountEdition.STANDARD not in change.resource_cls.edition:
+                if isinstance(change, CreateResource) and AccountEdition.STANDARD not in change.resource_cls.edition:
                     exceptions.append(f"Resource {change.urn} requires enterprise edition or higher")
 
         if exceptions:
@@ -477,78 +509,15 @@ class Blueprint:
                 exception_block = "\n".join(exceptions)
             raise NonConformingPlanException("Non-conforming actions found in plan:\n" + exception_block)
 
-    def _plan(self, session_ctx: SessionContext, remote_state: State, manifest: Manifest) -> Plan:
-        manifest_dict = manifest.to_dict(session_ctx)
-
-        # changes: Plan = []
+    def _plan(self, remote_state: State, manifest: Manifest) -> Plan:
         additive_changes: list[ResourceChange] = []
         destructive_changes: list[ResourceChange] = []
-        marked_for_replacement = set()
-        for action, urn, delta in diff(remote_state, manifest_dict):
-            before = remote_state.get(urn, {})
-            after = manifest_dict.get(urn, {})
 
-            if action == Action.UPDATE:
-                if urn in marked_for_replacement:
-                    continue
-
-                resource = manifest[urn]
-
-                # TODO: if the attr is marked as must_replace, then instead we yield a rename, add, remove
-                attr = list(delta.keys())[0]
-                attr_metadata = resource.spec.get_metadata(attr)
-
-                change_requires_replacement = attr_metadata.triggers_replacement
-                change_forces_add = attr_metadata.forces_add
-                change_is_fetchable = attr_metadata.fetchable
-                change_is_known_after_apply = attr_metadata.known_after_apply
-                change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
-
-                if change_requires_replacement:
-                    raise MarkedForReplacementException(f"Resource {urn} is marked for replacement due to {attr}")
-                    marked_for_replacement.add(urn)
-                elif change_forces_add:
-                    additive_changes.append(CreateResource(urn, resource.__class__, after))
-                    continue
-                elif not change_is_fetchable:
-                    # drift on fields that aren't fetchable should be ignored
-                    # TODO: throw a warning, or have a blueprint runmode that fails on this
-                    continue
-                elif change_is_known_after_apply:
-                    continue
-                elif change_should_be_ignored:
-                    continue
-                else:
-                    additive_changes.append(UpdateResource(urn, resource.__class__, before, after, delta))
-            elif action == Action.CREATE:
-                resource = manifest[urn]
-                additive_changes.append(CreateResource(urn, resource.__class__, after))
-            elif action == Action.DROP:
-                destructive_changes.append(DropResource(urn, None, before))
-            elif action == Action.TRANSFER:
-                resource = manifest[urn]
-
-                attr = list(delta.keys())[0]
-                attr_metadata = resource.spec.get_metadata(attr)
-                change_is_fetchable = attr_metadata.fetchable
-                change_should_be_ignored = attr in resource.lifecycle.ignore_changes or attr_metadata.ignore_changes
-                if not change_is_fetchable:
-                    continue
-                if change_should_be_ignored:
-                    continue
-                additive_changes.append(
-                    TransferOwnership(
-                        urn,
-                        resource.__class__,
-                        from_owner=before["owner"],
-                        to_owner=after["owner"],
-                    )
-                )
-
-        for urn in marked_for_replacement:
-            raise MarkedForReplacementException(f"Resource {urn} is marked for replacement")
-            # changes.append(ResourceChange(action=Action.REMOVE, urn=urn, before=before, after={}, delta={}))
-            # changes.append(ResourceChange(action=Action.ADD, urn=urn, before={}, after=after, delta=after))
+        for resource_change in diff(remote_state, manifest):
+            if isinstance(resource_change, (CreateResource, UpdateResource, TransferOwnership)):
+                additive_changes.append(resource_change)
+            elif isinstance(resource_change, DropResource):
+                destructive_changes.append(resource_change)
 
         # Generate a list of all URNs
         resource_set = set(manifest.urns + list(remote_state.keys()))
@@ -566,26 +535,6 @@ class Blueprint:
         state: State = {}
         session_ctx = data_provider.fetch_session(session)
 
-        def _normalize(urn: URN, data: dict) -> dict:
-            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
-            if urn.resource_type == ResourceType.FUTURE_GRANT:
-                normalized = data
-            elif isinstance(data, list):
-                raise Exception(f"Fetching list of {urn.resource_type} is not supported yet")
-            else:
-                # There is an edge case here where the resource spec doesnt have defaults specified.
-                # Instead of throwing an error, dataclass will provide a dataclass._MISSINGFIELD object
-                # That is bad.
-                # The answer is not that defaults should be added. The root cause is that data_provider
-                # method return raw dicts that aren't type checked against their corresponding
-                # Resource spec.
-                # I have considered tightly coupling the data provider to the resource spec, but I don't think
-                # the complexity is worth it.
-                # Another solution would be to build in automatic tests to check that the data_provider
-                # returns data that matches the spec.
-                normalized = resource_cls.defaults() | data
-            return normalized
-
         if self._config.run_mode == RunMode.SYNC:
             if self._config.allowlist:
                 for resource_type in self._config.allowlist:
@@ -593,17 +542,21 @@ class Blueprint:
                         urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
                         data = data_provider.fetch_resource(session, urn)
                         if data is None:
-                            raise Exception(f"Resource {urn} not found")
-                        normalized_data = _normalize(urn, data)
-                        state[urn] = normalized_data
+                            raise MissingResourceException(f"Resource could not be found: {urn}")
+                        resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+                        state[urn] = resource_cls.spec(**data).to_dict()
             else:
                 raise RuntimeError("Sync mode requires an allowlist")
 
-        for urn in manifest.urns:
+        for urn, manifest_item in manifest.items():
             data = data_provider.fetch_resource(session, urn)
             if data is not None:
-                normalized_data = _normalize(urn, data)
-                state[urn] = normalized_data
+                if isinstance(manifest_item, ResourcePointer):
+                    resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+                else:
+                    resource_cls = manifest_item.resource_cls
+
+                state[urn] = resource_cls.spec(**data).to_dict()
 
         # check for existence of resource refs
         for parent, reference in manifest.refs:
@@ -620,7 +573,7 @@ class Blueprint:
                 data = None
 
             if data is None and not is_public_schema:
-                logger.error(manifest.to_dict(session_ctx))
+                # logger.error(manifest.to_dict(session_ctx))
                 raise MissingResourceException(
                     f"Resource {reference} required by {parent} not found or failed to fetch"
                 )
@@ -795,6 +748,10 @@ class Blueprint:
             if isinstance(resource.scope, SchemaScope):
                 resource.requires(resource.container.container)
 
+    def _finalize_resources(self):
+        for resource in _walk(self._root):
+            resource._finalized = True
+
     def _finalize(self, session_ctx):
         if self._finalized:
             raise RuntimeError("Blueprint already finalized")
@@ -804,8 +761,7 @@ class Blueprint:
         self._create_tag_references()
         self._create_ownership_refs(session_ctx)
         self._create_grandparent_refs()
-        for resource in _walk(self._root):
-            resource._finalized = True
+        self._finalize_resources()
 
     def generate_manifest(self, session_ctx: SessionContext) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])
@@ -827,7 +783,7 @@ class Blueprint:
         manifest = self.generate_manifest(session_ctx)
         remote_state = self.fetch_remote_state(session, manifest)
         try:
-            finished_plan = self._plan(session_ctx, remote_state, manifest)
+            finished_plan = self._plan(remote_state, manifest)
         except Exception as e:
             logger.error("~" * 80 + "REMOTE STATE")
             logger.error(remote_state)
@@ -1112,8 +1068,8 @@ def sql_commands_for_change(
     before_change_cmd.append(f"USE ROLE {execution_role}")
 
     if isinstance(change, CreateResource):
-        props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
-        change_cmd = lifecycle.create_resource(change.urn, change.after, props)
+        # props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+        change_cmd = lifecycle.create_resource(change.urn, change.after, change.resource_cls.props)
         if transfer_owner:
             after_change_cmd.append(
                 lifecycle.transfer_resource(
@@ -1172,8 +1128,8 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
         )
         sql_commands.extend(commands)
 
-        # Update state
         if isinstance(change, CreateResource):
+
             if change.urn.resource_type == ResourceType.ROLE_GRANT:
                 if change.after["to_role"] in available_roles:
                     available_roles.append(change.after["role"])
@@ -1260,3 +1216,98 @@ def topological_sort(resource_set: set, references: set):
     if len(nodes) != len(resource_set):
         raise Exception("Graph is not a DAG")
     return {value: index for index, value in enumerate(nodes)}
+
+
+def diff(remote_state: State, manifest: Manifest):
+
+    def _diff_resource_data(lhs: dict, rhs: dict) -> dict:
+
+        if not isinstance(lhs, dict) or not isinstance(rhs, dict):
+            raise TypeError("diff_resources requires two dictionaries")
+
+        delta = {}
+        for field_name in lhs.keys():
+            lhs_value = lhs[field_name]
+            rhs_value = rhs[field_name]
+            if lhs_value != rhs_value:
+                delta[field_name] = rhs_value
+        return delta
+
+    state_urns = set(remote_state.keys())
+    manifest_urns = set(manifest.urns)
+
+    # Resources in remote state but not in the manifest should be removed
+    for urn in state_urns - manifest_urns:
+        yield DropResource(urn, remote_state[urn])
+
+    # Resources in the manifest but not in remote state should be added
+    for urn in manifest_urns - state_urns:
+        manifest_item = manifest[urn]
+        if isinstance(manifest_item, ResourcePointer):
+            raise MissingResourceException(
+                f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {urn}"
+            )
+        elif isinstance(manifest_item, ManifestResource):
+            # We don't create implicit resources
+            if manifest[urn].implicit:
+                continue
+            yield CreateResource(urn, manifest_item.resource_cls, manifest_item.data)
+        else:
+            raise Exception(f"Unknown type in manifest: {manifest_item}")
+
+    # Resources in both should be compared
+    for urn in state_urns & manifest_urns:
+        manifest_item = manifest[urn]
+
+        # We don't diff resource pointers
+        if isinstance(manifest_item, ResourcePointer):
+            continue
+
+        delta = _diff_resource_data(remote_state[urn], manifest_item.data)
+        owner_attr = delta.pop("owner", None)
+
+        # TODO: do we care about implicit resources?
+        ignore_fields = set()
+        for attr in delta.keys():
+            attr_metadata = manifest_item.resource_cls.spec.get_metadata(attr)
+            change_requires_replacement = attr_metadata.triggers_replacement
+            # change_forces_add = attr_metadata.forces_add
+            change_is_fetchable = attr_metadata.fetchable
+            change_is_known_after_apply = attr_metadata.known_after_apply
+            change_should_be_ignored = attr in manifest_item.lifecycle.ignore_changes or attr_metadata.ignore_changes
+            if change_requires_replacement:
+                raise Exception("Come back to this")
+            elif not change_is_fetchable:
+                ignore_fields.add(attr)
+            elif change_is_known_after_apply:
+                ignore_fields.add(attr)
+            elif change_should_be_ignored:
+                ignore_fields.add(attr)
+
+        delta = {k: v for k, v in delta.items() if k not in ignore_fields}
+        if delta:
+            yield UpdateResource(
+                urn,
+                manifest_item.resource_cls,
+                remote_state[urn],
+                manifest_item.data,
+                delta,
+            )
+
+        # Force transfers to occur after all other attribute changes
+        if owner_attr:
+            owner_metadata = manifest_item.resource_cls.spec.get_metadata("owner")
+            owner_is_fetchable = owner_metadata.fetchable
+            owner_changes_should_be_ignored = (
+                "owner" in manifest_item.lifecycle.ignore_changes or owner_metadata.ignore_changes
+            )
+
+            if not owner_is_fetchable or owner_changes_should_be_ignored:
+                continue
+
+            yield TransferOwnership(
+                urn,
+                manifest_item.resource_cls,
+                from_owner=remote_state[urn]["owner"],
+                to_owner=manifest_item.data["owner"],
+            )

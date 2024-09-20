@@ -78,6 +78,18 @@ class Role(NamedResource, TaggableResource, Resource):
         self.set_tags(tags)
 
 
+@dataclass(unsafe_hash=True)
+class _DatabaseRole(ResourceSpec):
+    name: ResourceName
+    database: ResourceName
+    owner: ResourceName = "USERADMIN"
+    comment: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.owner = ResourcePointer(self.owner, ResourceType.ROLE)
+
+
 class DatabaseRole(NamedResource, TaggableResource, Resource):
     """
     Description:
@@ -123,7 +135,7 @@ class DatabaseRole(NamedResource, TaggableResource, Resource):
         comment=StringProp("comment"),
     )
     scope = DatabaseScope()
-    spec = _Role
+    spec = _DatabaseRole
 
     def __init__(
         self,
@@ -135,14 +147,10 @@ class DatabaseRole(NamedResource, TaggableResource, Resource):
         **kwargs,
     ):
         super().__init__(name, database=database, **kwargs)
-        self._data: _Role = _Role(
+        self._data: _DatabaseRole = _DatabaseRole(
             name=self._name,
+            database=self.container.name,
             owner=owner,
             comment=comment,
         )
         self.set_tags(tags)
-
-    def to_dict(self, _=None):
-        data = super().to_dict()
-        data["database"] = self.container.name
-        return data
