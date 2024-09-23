@@ -615,8 +615,7 @@ def fetch_aggregation_policy(session, fqn: FQN):
 
 
 def fetch_alert(session, fqn: FQN):
-    show_result = execute(session, "SHOW ALERTS", cacheable=True)
-    alerts = _filter_result(show_result, name=fqn.name)
+    alerts = _show_resources(session, "ALERTS", fqn)
     if len(alerts) == 0:
         return None
     if len(alerts) > 1:
@@ -815,8 +814,7 @@ def fetch_database_role(session, fqn: FQN):
 
 
 def fetch_dynamic_table(session, fqn: FQN):
-    show_result = execute(session, f"SHOW DYNAMIC TABLES LIKE '{fqn.name}'")
-
+    show_result = _show_resources(session, "DYNAMIC TABLES", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -1001,9 +999,9 @@ def fetch_function(session, fqn: FQN):
         raise Exception(f"Found multiple functions matching {fqn}")
 
     data = udfs[0]
-    inputs, output = data["arguments"].split(" RETURN ")
+    _, returns = data["arguments"].split(" RETURN ")
     try:
-        desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+        desc_result = execute(session, f"DESC FUNCTION {fqn}", cacheable=True)
     except ProgrammingError as err:
         if err.errno == DOES_NOT_EXIST_ERR:
             return None
@@ -1016,7 +1014,7 @@ def fetch_function(session, fqn: FQN):
             "name": _quote_snowflake_identifier(data["name"]),
             "secure": data["is_secure"] == "Y",
             "args": _parse_signature(properties["signature"]),
-            "returns": output,
+            "returns": returns,
             "language": data["language"],
             "comment": None if data["description"] == "user-defined function" else data["description"],
             "volatility": properties["volatility"],
@@ -1028,7 +1026,7 @@ def fetch_function(session, fqn: FQN):
             "name": _quote_snowflake_identifier(data["name"]),
             "secure": data["is_secure"] == "Y",
             "args": _parse_signature(properties["signature"]),
-            "returns": output,
+            "returns": returns,
             "language": data["language"],
             "comment": None if data["description"] == "user-defined function" else data["description"],
             "volatility": properties["volatility"],
@@ -2063,16 +2061,18 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         must_change_password = data["must_change_password"] == "true"
 
     rsa_public_key = properties["rsa_public_key"] if properties["rsa_public_key"] != "null" else None
+    middle_name = properties["middle_name"] if properties["middle_name"] != "null" else None
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "login_name": login_name,
         "display_name": display_name,
         "first_name": data["first_name"] or None,
+        "middle_name": middle_name,
         "last_name": data["last_name"] or None,
         "email": data["email"] or None,
         "mins_to_unlock": data["mins_to_unlock"] or None,
-        "days_to_expiry": data["days_to_expiry"] or None,
+        # "days_to_expiry": data["days_to_expiry"] or None,
         "comment": data["comment"] or None,
         "disabled": data["disabled"] == "true",
         "must_change_password": must_change_password,
@@ -2119,7 +2119,6 @@ def fetch_view(session, fqn: FQN):
 
 
 def fetch_warehouse(session, fqn: FQN):
-    session_ctx = fetch_session(session)
     try:
         show_result = _show_resources(session, "WAREHOUSES", fqn)
     except ProgrammingError:
@@ -2135,6 +2134,9 @@ def fetch_warehouse(session, fqn: FQN):
     show_params_result = execute(session, f"SHOW PARAMETERS FOR WAREHOUSE {fqn}")
     params = params_result_to_dict(show_params_result)
 
+    resource_monitor = None if data["resource_monitor"] == "null" else data["resource_monitor"]
+
+    # Enterprise edition features
     query_accel = data.get("enable_query_acceleration")
     if query_accel:
         query_accel = query_accel == "true"
@@ -2149,15 +2151,17 @@ def fetch_warehouse(session, fqn: FQN):
         "auto_suspend": data["auto_suspend"],
         "auto_resume": data["auto_resume"] == "true",
         "comment": data["comment"] or None,
+        "resource_monitor": resource_monitor,
         "enable_query_acceleration": query_accel,
+        "query_acceleration_max_scale_factor": data.get("query_acceleration_max_scale_factor", None),
+        "max_cluster_count": data.get("max_cluster_count", None),
+        "min_cluster_count": data.get("min_cluster_count", None),
+        "scaling_policy": data.get("scaling_policy", None),
         "max_concurrency_level": params["max_concurrency_level"],
         "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
         "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
     }
-    if session_ctx["tag_support"]:
-        warehouse_dict["max_cluster_count"] = data["max_cluster_count"]
-        warehouse_dict["min_cluster_count"] = data["min_cluster_count"]
-        warehouse_dict["scaling_policy"] = data["scaling_policy"]
+
     return warehouse_dict
 
 

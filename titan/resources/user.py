@@ -1,5 +1,5 @@
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..enums import ParseableEnum, ResourceType
 from ..props import BoolProp, EnumProp, IntProp, Props, StringListProp, StringProp, TagsProp
@@ -23,7 +23,7 @@ class UserType(ParseableEnum):
 class _User(ResourceSpec):
     name: ResourceName
     owner: Role = "USERADMIN"
-    password: str = None
+    password: str = field(default=None, metadata={"fetchable": False})
     login_name: ResourceName = None
     display_name: str = None
     first_name: str = None
@@ -32,7 +32,7 @@ class _User(ResourceSpec):
     email: str = None
     must_change_password: bool = None
     disabled: bool = False
-    days_to_expiry: int = None
+    days_to_expiry: int = field(default=None, metadata={"known_after_apply": True})
     mins_to_unlock: int = None
     default_warehouse: str = None
     default_namespace: str = None

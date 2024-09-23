@@ -13,6 +13,7 @@ from ..props import (
 from ..resource_name import ResourceName
 from ..role_ref import RoleRef
 from ..scope import SchemaScope
+from .column import Column
 from .resource import NamedResource, Resource, ResourceSpec
 from .tag import TaggableResource
 
@@ -24,12 +25,12 @@ class _View(ResourceSpec):
     secure: bool = False
     volatile: bool = None
     recursive: bool = None
-    columns: list[dict] = None
+    columns: list[Column] = None
     change_tracking: bool = False
     copy_grants: bool = field(default=False, metadata={"fetchable": False})
     comment: str = None
     # TODO: remove this if parsing is feasible
-    as_: str = field(default=None, metadata={"fetchable": False})
+    as_: str = None  # field(default=None, metadata={"fetchable": False})
 
     def __post_init__(self):
         super().__post_init__()

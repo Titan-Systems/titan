@@ -1,12 +1,11 @@
 from dataclasses import dataclass
 
-from ..builtins import SYSTEM_SCHEMAS
 from ..enums import ResourceType
 from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import DatabaseScope
 from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
-from ..role_ref import RoleRef
 from .tag import TaggableResource
 
 
@@ -20,13 +19,6 @@ class _Schema(ResourceSpec):
     default_ddl_collation: str = None
     owner: RoleRef = "SYSADMIN"
     comment: str = None
-
-    def __post_init__(self):
-        super().__post_init__()
-        if self.transient and self.data_retention_time_in_days is not None:
-            raise ValueError("Transient schema can't have data retention time")
-        elif not self.transient and self.data_retention_time_in_days is None:
-            self.data_retention_time_in_days = 1
 
 
 class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
@@ -99,7 +91,7 @@ class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
         name: str,
         transient: bool = False,
         managed_access: bool = False,
-        data_retention_time_in_days: int = None,
+        data_retention_time_in_days: int = 1,
         max_data_extension_time_in_days: int = 14,
         default_ddl_collation: str = None,
         tags: dict[str, str] = None,

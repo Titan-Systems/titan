@@ -66,12 +66,13 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
 
     try:
         create(cursor, resource)
+        marked_for_cleanup.append(resource)
     except snowflake.connector.errors.ProgrammingError as err:
         if err.errno == UNSUPPORTED_FEATURE:
             pytest.skip(f"{resource.resource_type} is not supported")
         else:
             raise
-    marked_for_cleanup.append(resource)
+
     list_resources = data_provider.list_resource(cursor, resource_label_for_type(resource.resource_type))
     assert len(list_resources) > 0
     assert resource.fqn in list_resources

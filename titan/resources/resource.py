@@ -142,6 +142,13 @@ def _coerce_resource_field(field_value, field_type):
             raise TypeError
         else:
             return field_value
+    elif field_type is float:
+        if isinstance(field_value, float):
+            return field_value
+        elif isinstance(field_value, int):
+            return float(field_value)
+        else:
+            raise TypeError
     else:
         # Typecheck all other field types (str, int, etc.)
         if not isinstance(field_value, field_type):
