@@ -12,7 +12,7 @@
     "resource_monitor": null,
     "comment": "My XSMALL warehouse",
     "enable_query_acceleration": false,
-    "query_acceleration_max_scale_factor": null,
+    "query_acceleration_max_scale_factor": 1,
     "max_concurrency_level": 8,
     "statement_queued_timeout_in_seconds": 0,
     "statement_timeout_in_seconds": 172800

@@ -12,10 +12,52 @@ from ..props import (
 )
 from ..resource_name import ResourceName
 from ..role_ref import RoleRef
-from ..scope import SchemaScope
-from .column import ColumnDefinition
+from ..scope import SchemaScope, TableScope
 from .resource import NamedResource, Resource, ResourceSpec
 from .tag import TaggableResource
+
+
+@dataclass(unsafe_hash=True)
+class _ViewColumn(ResourceSpec):
+    name: ResourceName
+    comment: str = None
+    data_type: str = field(default=None, metadata={"known_after_apply": True})
+    not_null: bool = False
+    default: str = None
+    constraint: str = None
+    collate: str = None
+
+
+class ViewColumn(NamedResource, Resource):
+    resource_type = ResourceType.COLUMN
+    props = Props(
+        comment=StringProp("comment", eq=False),
+    )
+    scope = TableScope()
+    spec = _ViewColumn
+    serialize_inline = True
+
+    def __init__(
+        self,
+        name: str,
+        comment: str = None,
+        data_type: str = None,
+        not_null: bool = False,
+        default: str = None,
+        constraint: str = None,
+        collate: str = None,
+        **kwargs,
+    ):
+        super().__init__(name, **kwargs)
+        self._data: _ViewColumn = _ViewColumn(
+            name=self._name,
+            comment=comment,
+            data_type=data_type,
+            not_null=not_null,
+            default=default,
+            constraint=constraint,
+            collate=collate,
+        )
 
 
 @dataclass(unsafe_hash=True)
@@ -25,7 +67,7 @@ class _View(ResourceSpec):
     secure: bool = False
     volatile: bool = None
     recursive: bool = None
-    columns: list[ColumnDefinition] = None
+    columns: list[ViewColumn] = None
     change_tracking: bool = False
     copy_grants: bool = field(default=False, metadata={"fetchable": False})
     comment: str = None

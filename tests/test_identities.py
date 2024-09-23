@@ -7,6 +7,7 @@ from typing import get_args, get_origin
 
 from tests.helpers import get_json_fixtures
 from titan.data_types import convert_to_canonical_data_type
+from titan.enums import AccountEdition
 from titan.resources import Resource
 from titan.resource_name import ResourceName
 from titan.role_ref import RoleRef
@@ -65,7 +66,7 @@ def test_data_identity(resource):
         for lhs, rhs in zip(lhs_cols, rhs_cols):
             if "name" in lhs:
                 assert _resource_names_are_eq(lhs.pop("name"), rhs.pop("name"))
-            if "data_type" in lhs:
+            if "data_type" in lhs and "data_type" in rhs:
                 assert convert_to_canonical_data_type(lhs.pop("data_type")) == convert_to_canonical_data_type(
                     rhs.pop("data_type")
                 )
@@ -92,13 +93,13 @@ def test_data_identity(resource):
     assert serialized == data
 
 
-def test_sql_identity(resource):
+def test_sql_identity(resource: tuple[type[Resource], dict]):
     resource_cls, data = resource
     instance = resource_cls(**data)
-    sql = instance.create_sql()
+    sql = instance.create_sql(AccountEdition.ENTERPRISE)
     new = resource_cls.from_sql(sql)
-    new_dict = new.to_dict()
-    instance_dict = instance.to_dict()
+    new_dict = new.to_dict(AccountEdition.ENTERPRISE)
+    instance_dict = instance.to_dict(AccountEdition.ENTERPRISE)
     if "name" in new_dict:
         assert ResourceName(new_dict.pop("name")) == ResourceName(instance_dict.pop("name"))
 

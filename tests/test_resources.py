@@ -10,6 +10,7 @@ from titan.resource_name import ResourceName
 from titan.resource_tags import ResourceTags
 from titan.resources.resource import ResourcePointer
 from titan.resources.user import UserType
+from titan.resources.view import ViewColumn
 
 SQL_FIXTURES = list(get_sql_fixtures())
 
@@ -40,8 +41,11 @@ def test_view_fails_with_empty_columns():
 
 
 def test_view_with_columns():
-    view = res.View.from_sql("CREATE VIEW MY_VIEW (COL1) AS SELECT 1")
-    assert view._data.columns == [{"name": "COL1"}]
+    view = res.View.from_sql("CREATE VIEW MY_VIEW (col1) AS SELECT 1")
+    assert isinstance(view._data.columns[0], ViewColumn)
+    assert view._data.columns[0].name == "COL1"
+    assert view._data.columns[0]._data.data_type is None
+    assert view._data.columns[0]._data.comment is None
 
 
 def test_enum_field_serialization():
