@@ -204,10 +204,6 @@ class ResourceSpec:
             field_metadata = ResourceSpecMetadata(**f.metadata)
             if account_edition not in field_metadata.edition:
                 if value != f.default and value is not None:
-                    # print(">>>>>>", value)
-                    # print(">>>>>>", f)
-                    # print(">>>>>>", f.default)
-                    # print(">>>>>>", f.type)
                     raise WrongEditionException(
                         f"Field {self.__class__.__name__}.{f.name} is not supported in edition {account_edition}. Supported editions: {field_metadata.edition}"
                     )
