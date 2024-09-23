@@ -10,7 +10,7 @@ from titan.resources import Resource
 
 pytestmark = pytest.mark.requires_snowflake
 
-TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
+TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE", "ACCOUNTADMIN")
 TEST_USER = os.environ.get("TEST_SNOWFLAKE_USER")
 
 

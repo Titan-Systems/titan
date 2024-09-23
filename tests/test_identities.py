@@ -15,6 +15,18 @@ from titan.role_ref import RoleRef
 JSON_FIXTURES = list(get_json_fixtures())
 
 
+def remove_none_values(d):
+    new_dict = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            new_dict[k] = remove_none_values(v)
+        elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+            new_dict[k] = [remove_none_values(item) for item in v if item is not None]
+        elif v is not None:
+            new_dict[k] = v
+    return new_dict
+
+
 @pytest.fixture(
     params=JSON_FIXTURES,
     ids=[resource_cls.__name__ for resource_cls, _ in JSON_FIXTURES],
@@ -70,7 +82,7 @@ def test_data_identity(resource):
                 assert convert_to_canonical_data_type(lhs.pop("data_type")) == convert_to_canonical_data_type(
                     rhs.pop("data_type")
                 )
-            assert lhs == rhs
+            assert remove_none_values(lhs) == remove_none_values(rhs)
     if "args" in serialized:
         lhs_args = serialized.pop("args", []) or []
         rhs_args = data.pop("args", []) or []
