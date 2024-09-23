@@ -5,15 +5,16 @@ import pytest
 from tests.helpers import (
     assert_resource_dicts_eq_ignore_nulls,
     assert_resource_dicts_eq_ignore_nulls_and_unfetchable,
-    safe_fetch,
     clean_resource_data,
+    safe_fetch,
 )
 from titan import data_provider
 from titan import resources as res
 from titan.client import reset_cache
-from titan.enums import ResourceType
+from titan.enums import AccountEdition, ResourceType
 from titan.identifiers import URN, parse_FQN, parse_URN
 from titan.resource_name import ResourceName
+from titan.resources import Resource
 from titan.resources.resource import ResourcePointer
 
 pytestmark = pytest.mark.requires_snowflake
@@ -34,8 +35,10 @@ def email_address(cursor):
     return user["email"]
 
 
-def create(cursor, resource):
-    sql = resource.create_sql(if_not_exists=True)
+def create(cursor, resource: Resource):
+    session_ctx = data_provider.fetch_session(cursor.connection)
+    account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+    sql = resource.create_sql(account_edition=account_edition, if_not_exists=True)
     try:
         cursor.execute(sql)
     except Exception as err:

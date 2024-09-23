@@ -7,8 +7,9 @@ from inflection import pluralize
 from tests.helpers import get_json_fixtures
 from titan import data_provider
 from titan.client import UNSUPPORTED_FEATURE
+from titan.enums import AccountEdition
 from titan.identifiers import resource_label_for_type
-from titan.resources import Database
+from titan.resources import Database, Resource
 from titan.scope import DatabaseScope, SchemaScope
 
 pytestmark = pytest.mark.requires_snowflake
@@ -35,6 +36,17 @@ def resource(request, suffix):
     yield res
 
 
+def create(cursor, resource: Resource):
+    session_ctx = data_provider.fetch_session(cursor.connection)
+    account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+    sql = resource.create_sql(account_edition=account_edition, if_not_exists=True)
+    try:
+        cursor.execute(sql)
+    except Exception as err:
+        raise Exception(f"Error creating resource: \nQuery: {err.query}\nMsg: {err.msg}") from err
+    return resource
+
+
 @pytest.fixture(scope="session")
 def list_resources_database(cursor, suffix, marked_for_cleanup):
     db = Database(name=f"list_resources_test_database_{suffix}")
@@ -53,8 +65,7 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
         pytest.skip(f"{resource.resource_type} is not supported")
 
     try:
-        create_sql = resource.create_sql(if_not_exists=True)
-        cursor.execute(create_sql)
+        create(cursor, resource)
     except snowflake.connector.errors.ProgrammingError as err:
         if err.errno == UNSUPPORTED_FEATURE:
             pytest.skip(f"{resource.resource_type} is not supported")
