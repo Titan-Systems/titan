@@ -28,7 +28,7 @@ class _Grant(ResourceSpec):
     to: Role
     grant_option: bool = False
     owner: Role = field(default=None, metadata={"fetchable": False})
-    _privs: list[str] = field(default_factory=list, metadata={"forces_add": True})
+    _privs: list[str] = field(default_factory=list, metadata={"triggers_create": True})
 
     def __post_init__(self):
         super().__post_init__()

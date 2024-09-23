@@ -231,7 +231,7 @@ def test_blueprint_missing_database_inferred_from_session_context(cursor):
     blueprint.plan(session)
 
 
-def test_blueprint_all_grant_forces_add(cursor, test_db, role):
+def test_blueprint_all_grant_triggers_create(cursor, test_db, role):
     cursor.execute(f"GRANT USAGE ON DATABASE {test_db} TO ROLE {role.name}")
     session = cursor.connection
     all_grant = res.Grant(priv="ALL", on_database=test_db, to=role, owner=TEST_ROLE)

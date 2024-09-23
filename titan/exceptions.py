@@ -36,3 +36,15 @@ class InvalidOwnerException(Exception):
 
 class InvalidResourceException(Exception):
     pass
+
+
+class WrongContainerException(Exception):
+    pass
+
+
+class WrongEditionException(Exception):
+    pass
+
+
+class ResourceHasContainerException(Exception):
+    pass

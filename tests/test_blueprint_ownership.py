@@ -213,6 +213,7 @@ def test_grant_with_grant_admin_custom_role(remote_state):
                 GrantedPrivilege(privilege=AccountPriv.MANAGE_GRANTS, on="ABCD123"),
             ]
         },
+        "tag_support": True,
     }
 
     grant = res.RoleGrant(role="GRANT_ADMIN", to_role="SYSADMIN")
@@ -238,6 +239,7 @@ def test_tag_reference_with_tag_admin_custom_role():
                 GrantedPrivilege(privilege=AccountPriv.APPLY_TAG, on="ABCD123"),
             ]
         },
+        "tag_support": True,
         "tags": ["tags.tags.cost_center"],
     }
 

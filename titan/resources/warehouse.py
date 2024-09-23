@@ -35,8 +35,14 @@ class _Warehouse(ResourceSpec):
     owner: Role = "SYSADMIN"
     warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
-    max_cluster_count: int = 1
-    min_cluster_count: int = 1
+    max_cluster_count: int = field(
+        default=1,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
+    min_cluster_count: int = field(
+        default=1,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
     scaling_policy: WarehouseScalingPolicy = field(
         default=WarehouseScalingPolicy.STANDARD,
         metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},

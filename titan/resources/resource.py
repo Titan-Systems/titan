@@ -1,7 +1,7 @@
 import difflib
 import sys
 import types
-from dataclasses import dataclass, field, fields, asdict
+from dataclasses import dataclass, field, fields
 from enum import Enum
 from inspect import isclass
 from itertools import chain
@@ -10,11 +10,12 @@ from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
 import pyparsing as pp
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
+from ..exceptions import ResourceHasContainerException, WrongContainerException, WrongEditionException
 from ..identifiers import FQN, URN, parse_identifier, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
 from ..parse import _parse_create_header, _parse_props, resolve_resource_class
 from ..props import Props as ResourceProps
-from ..resource_name import ResourceName, attribute_is_resource_name
+from ..resource_name import ResourceName
 from ..resource_tags import ResourceTags
 from ..role_ref import RoleRef
 from ..scope import (
@@ -26,14 +27,6 @@ from ..scope import (
     resource_can_be_contained_in,
 )
 from ..var import VarString, string_contains_var
-
-
-class WrongContainerException(Exception):
-    pass
-
-
-class ResourceHasContainerException(Exception):
-    pass
 
 
 def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
@@ -160,7 +153,7 @@ def _coerce_resource_field(field_value, field_type):
 class ResourceSpecMetadata:
     fetchable: bool = True
     triggers_replacement: bool = False
-    forces_add: bool = False
+    triggers_create: bool = False
     ignore_changes: bool = False
     known_after_apply: bool = False
     edition: set[AccountEdition] = field(
@@ -170,7 +163,8 @@ class ResourceSpecMetadata:
 
 @dataclass
 class ResourceSpec:
-    def to_dict(self):
+
+    def to_dict(self, account_edition: AccountEdition):
         dict_: dict[str, Any] = {}
 
         def _serialize_field(field, value):
@@ -180,7 +174,7 @@ class ResourceSpec:
                 return str(value.fqn)
             elif isinstance(value, Resource):
                 if getattr(value, "serialize_inline", False):
-                    return value.to_dict()
+                    return value.to_dict(account_edition)
                 elif isinstance(value, NamedResource):
                     return str(value.fqn)
                 else:
@@ -200,6 +194,14 @@ class ResourceSpec:
 
         for f in fields(self):
             value = getattr(self, f.name)
+            field_metadata = ResourceSpecMetadata(**f.metadata)
+            if account_edition not in field_metadata.edition:
+                if value != f.default:
+                    raise WrongEditionException(
+                        f"Field {self.__class__.__name__}.{f.name} is not supported in edition {account_edition}. Supported editions: {field_metadata.edition}"
+                    )
+                else:
+                    continue
             dict_[f.name] = _serialize_field(f, value)
 
         return dict_
@@ -375,58 +377,27 @@ class Resource(metaclass=_Resource):
     def __hash__(self):
         return hash(URN.from_resource(self, ""))
 
-    def to_dict(self, session_ctx: Optional[dict] = None):
-        if session_ctx is None:
-            session_ctx = {}
+    def to_dict(self, account_edition: Optional[AccountEdition] = None):
+        return self._data.to_dict(account_edition or AccountEdition.ENTERPRISE)
 
-        serialized: dict[str, Any] = {}
-        if self.implicit:
-            serialized["_implicit"] = True
-
-        def _serialize(field, value):
-            if field.name == "owner":
-                return str(value.fqn)
-            elif isinstance(value, ResourcePointer):
-                return str(value.fqn)
-            elif isinstance(value, Resource):
-                if getattr(value, "serialize_inline", False):
-                    return value.to_dict()
-                elif isinstance(value, NamedResource):
-                    return str(value.fqn)
-                else:
-                    raise Exception(f"Cannot serialize {value}")
-            elif isinstance(value, ParseableEnum):
-                return str(value)
-            elif isinstance(value, list):
-                return [_serialize(field, v) for v in value]
-            elif isinstance(value, dict):
-                return {k: _serialize(field, v) for k, v in value.items()}
-            elif isinstance(value, ResourceName):
-                return str(value)
-            elif isinstance(value, ResourceTags):
-                return value.tags
-            else:
-                return value
-
-        for f in fields(self._data):
-            value = getattr(self._data, f.name)
-            serialized[f.name] = _serialize(f, value)
-
-        return serialized
-
-    def eject(self):
-        return self._data.to_dict()
-
-    def create_sql(self, **kwargs):
+    def create_sql(
+        self,
+        account_edition: Optional[AccountEdition] = None,
+        **kwargs,
+    ):
         return create_resource(
             self.urn,
-            self.to_dict(),
+            self.to_dict(account_edition),
             self.props,
             **kwargs,
         )
 
-    def drop_sql(self, if_exists: bool = False):
-        return drop_resource(self.urn, self.to_dict(), if_exists=if_exists)
+    def drop_sql(
+        self,
+        if_exists: bool = False,
+        account_edition: Optional[AccountEdition] = None,
+    ):
+        return drop_resource(self.urn, self.to_dict(account_edition), if_exists=if_exists)
 
     def _requires(self, resource: "Resource"):
         if self._finalized:

@@ -20,6 +20,7 @@ from titan.exceptions import (
     InvalidResourceException,
     MissingVarException,
     NonConformingPlanException,
+    WrongEditionException,
 )
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
@@ -69,6 +70,7 @@ def resource_manifest():
         "account_locator": "ABCD123",
         "current_role": "SYSADMIN",
         "available_roles": ["SYSADMIN", "USERADMIN"],
+        "tag_support": True,
     }
     db = res.Database(name="DB")
     schema = res.Schema(name="SCHEMA", database=db)
@@ -701,11 +703,26 @@ def test_merge_account_scoped_resources_fail():
 def test_blueprint_edition_checks(session_ctx, remote_state):
     session_ctx = deepcopy(session_ctx)
     session_ctx["tag_support"] = False
+
     blueprint = Blueprint(resources=[res.Database(name="DB1"), res.Tag(name="TAG1")])
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     with pytest.raises(NonConformingPlanException):
         blueprint._raise_for_nonconforming_plan(session_ctx, plan)
+
+    blueprint = Blueprint(resources=[res.Warehouse(name="WH", min_cluster_count=2)])
+    with pytest.raises(WrongEditionException):
+        blueprint.generate_manifest(session_ctx)
+
+    blueprint = Blueprint(resources=[res.Warehouse(name="WH", min_cluster_count=None)])
+    with pytest.raises(WrongEditionException):
+        blueprint.generate_manifest(session_ctx)
+
+    blueprint = Blueprint(resources=[res.Warehouse(name="WH", min_cluster_count=1)])
+    assert blueprint.generate_manifest(session_ctx)
+
+    blueprint = Blueprint(resources=[res.Warehouse(name="WH")])
+    assert blueprint.generate_manifest(session_ctx)
 
 
 def test_blueprint_warehouse_scaling_policy_doesnt_render_in_standard_edition(session_ctx, remote_state):

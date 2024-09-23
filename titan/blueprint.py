@@ -21,7 +21,6 @@ from .enums import AccountEdition, ResourceType, RunMode, resource_type_is_grant
 from .exceptions import (
     DuplicateResourceException,
     InvalidResourceException,
-    MarkedForReplacementException,
     MissingPrivilegeException,
     MissingResourceException,
     NonConformingPlanException,
@@ -38,15 +37,15 @@ from .privs import (
 )
 from .resource_name import ResourceName
 from .resource_tags import ResourceTags
-from .resources import Database, DatabaseRole, Role, RoleGrant, Schema
+from .resources import Database, RoleGrant, Schema
 from .resources.database import public_schema_urn
 from .resources.resource import (
     RESOURCE_SCOPES,
     NamedResource,
     Resource,
     ResourceContainer,
-    ResourcePointer,
     ResourceLifecycleConfig,
+    ResourcePointer,
     infer_role_type_from_name,
 )
 from .resources.tag import Tag, TaggableResource
@@ -146,13 +145,13 @@ class Manifest:
         else:
             raise Exception("Manifest keys must be URNs")
 
-    def __contains__(self, key):
+    def __contains__(self, key: URN):
         if isinstance(key, URN):
             return key in self._resources
         else:
             raise Exception("Manifest keys must be URNs")
 
-    def add(self, resource: Resource):
+    def add(self, resource: Resource, account_edition: AccountEdition):
 
         urn = URN.from_resource(
             account_locator=self._account_locator,
@@ -160,7 +159,6 @@ class Manifest:
         )
 
         if urn in self._resources:
-            # if resource_data != self._data[urn]:
             if not isinstance(resource, ResourcePointer):
                 logger.warning(f"Duplicate resource {urn} with conflicting data, discarding {resource}")
             return
@@ -170,7 +168,7 @@ class Manifest:
             self._resources[urn] = ManifestResource(
                 urn,
                 resource.__class__,
-                resource.eject(),
+                resource.to_dict(account_edition),
                 resource.implicit,
                 resource.lifecycle,
             )
@@ -183,9 +181,6 @@ class Manifest:
             return self._resources.get(key, default)
         else:
             raise Exception("Manifest keys must be URNs")
-
-    # def to_dict(self, session_ctx: SessionContext):
-    #     return {k: v.to_dict(session_ctx) for k, v in self._data.items()}
 
     def items(self):
         return self._resources.items()
@@ -479,7 +474,7 @@ class Blueprint:
         exceptions = []
 
         # If the account doesn't support tags, assume the account is standard edition or trial
-        account_edition_is_standard = session_ctx["tag_support"] is False
+        account_is_standard_edition = session_ctx["tag_support"] is False
 
         for change in plan:
             # Run Mode exceptions
@@ -498,7 +493,7 @@ class Blueprint:
                 if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
-            if account_edition_is_standard:
+            if account_is_standard_edition:
                 if isinstance(change, CreateResource) and AccountEdition.STANDARD not in change.resource_cls.edition:
                     exceptions.append(f"Resource {change.urn} requires enterprise edition or higher")
 
@@ -534,6 +529,7 @@ class Blueprint:
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
         state: State = {}
         session_ctx = data_provider.fetch_session(session)
+        account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
 
         if self._config.run_mode == RunMode.SYNC:
             if self._config.allowlist:
@@ -544,7 +540,7 @@ class Blueprint:
                         if data is None:
                             raise MissingResourceException(f"Resource could not be found: {urn}")
                         resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
-                        state[urn] = resource_cls.spec(**data).to_dict()
+                        state[urn] = resource_cls.spec(**data).to_dict(account_edition)
             else:
                 raise RuntimeError("Sync mode requires an allowlist")
 
@@ -556,7 +552,7 @@ class Blueprint:
                 else:
                     resource_cls = manifest_item.resource_cls
 
-                state[urn] = resource_cls.spec(**data).to_dict()
+                state[urn] = resource_cls.spec(**data).to_dict(account_edition)
 
         # check for existence of resource refs
         for parent, reference in manifest.refs:
@@ -765,10 +761,11 @@ class Blueprint:
 
     def generate_manifest(self, session_ctx: SessionContext) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])
+        account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
         self._finalize(session_ctx)
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                manifest.add(resource)
+                manifest.add(resource, account_edition)
             else:
                 raise RuntimeError(f"Unexpected object found in blueprint: {resource}")
 
@@ -1068,7 +1065,7 @@ def sql_commands_for_change(
     before_change_cmd.append(f"USE ROLE {execution_role}")
 
     if isinstance(change, CreateResource):
-        # props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
+
         change_cmd = lifecycle.create_resource(change.urn, change.after, change.resource_cls.props)
         if transfer_owner:
             after_change_cmd.append(
@@ -1128,8 +1125,8 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
         )
         sql_commands.extend(commands)
 
+        # Update role privileges state for the next commands
         if isinstance(change, CreateResource):
-
             if change.urn.resource_type == ResourceType.ROLE_GRANT:
                 if change.after["to_role"] in available_roles:
                     available_roles.append(change.after["role"])
@@ -1267,22 +1264,38 @@ def diff(remote_state: State, manifest: Manifest):
         owner_attr = delta.pop("owner", None)
 
         # TODO: do we care about implicit resources?
+        replace_resource = False
+        create_resource = False
         ignore_fields = set()
         for attr in delta.keys():
             attr_metadata = manifest_item.resource_cls.spec.get_metadata(attr)
             change_requires_replacement = attr_metadata.triggers_replacement
-            # change_forces_add = attr_metadata.forces_add
+            change_triggers_create = attr_metadata.triggers_create
             change_is_fetchable = attr_metadata.fetchable
             change_is_known_after_apply = attr_metadata.known_after_apply
             change_should_be_ignored = attr in manifest_item.lifecycle.ignore_changes or attr_metadata.ignore_changes
             if change_requires_replacement:
-                raise Exception("Come back to this")
+                replace_resource = True
+                break
+            elif change_triggers_create:
+                create_resource = True
+                break
             elif not change_is_fetchable:
                 ignore_fields.add(attr)
             elif change_is_known_after_apply:
                 ignore_fields.add(attr)
             elif change_should_be_ignored:
                 ignore_fields.add(attr)
+
+        if replace_resource:
+            raise NotImplementedError("replace_resource")
+            # yield DropResource(urn, remote_state[urn])
+            # yield CreateResource(urn, manifest_item.resource_cls, manifest_item.data)
+            # continue
+
+        if create_resource:
+            yield CreateResource(urn, manifest_item.resource_cls, manifest_item.data)
+            continue
 
         delta = {k: v for k, v in delta.items() if k not in ignore_fields}
         if delta:
