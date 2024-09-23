@@ -8,7 +8,8 @@
         {
             "name": "id",
             "data_type": null,
-            "comment": "this is a column comment"
+            "comment": "this is a column comment",
+            "not_null": false
         }
     ],
     "comment": "This is a view",
