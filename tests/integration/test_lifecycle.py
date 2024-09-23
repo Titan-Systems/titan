@@ -1,13 +1,12 @@
 import os
-import pytest
 
+import pytest
 import snowflake.connector.errors
 
 from tests.helpers import get_json_fixtures
-
 from titan import resources as res
-from titan.blueprint import Blueprint, compile_plan_to_sql
-from titan.client import FEATURE_NOT_ENABLED_ERR, UNSUPPORTED_FEATURE, reset_cache
+from titan.blueprint import Blueprint, CreateResource
+from titan.client import FEATURE_NOT_ENABLED_ERR, UNSUPPORTED_FEATURE
 from titan.data_provider import fetch_session
 from titan.enums import AccountEdition
 from titan.scope import DatabaseScope, SchemaScope
@@ -31,7 +30,7 @@ def resource(request):
 
 
 def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
-    lifecycle_db = f"LIFECYCLE_DB_{suffix}"
+    lifecycle_db = f"LIFECYCLE_DB_{suffix}_{resource.__class__.__name__}"
     cursor.execute("USE ROLE SYSADMIN")
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {lifecycle_db}")
     cursor.execute(f"USE DATABASE {lifecycle_db}")
@@ -48,11 +47,12 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         res.Grant,
         res.RoleGrant,
         res.PasswordPolicy,
+        res.Pipe,
     ):
         pytest.skip("Skipping")
 
     try:
-        reset_cache()
+        fetch_session.cache_clear()
         session_ctx = fetch_session(cursor.connection)
         account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
 
@@ -69,14 +69,7 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         blueprint.add(resource)
         plan = blueprint.plan(cursor.connection)
         assert len(plan) == 1
-        compiled_sql = compile_plan_to_sql(session_ctx, plan)
-        if len(compiled_sql) == 4:
-            print(session_ctx["role_privileges"])
-            assert False
-        # assert len(compiled_sql) == 3
-        # assert compiled_sql[0] == "USE SECONDARY ROLES ALL"
-        # assert compiled_sql[1] == "USE ROLE SYSADMIN"
-        # assert compiled_sql[2].startswith("CREATE")
+        assert isinstance(plan[0], CreateResource)
         blueprint.apply(cursor.connection, plan)
     except snowflake.connector.errors.ProgrammingError as err:
         if err.errno == FEATURE_NOT_ENABLED_ERR or err.errno == UNSUPPORTED_FEATURE:

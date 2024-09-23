@@ -46,7 +46,7 @@ class _ReplicationGroup(ResourceSpec):
     allowed_integration_types: list[IntegrationType] = None
     ignore_edition_check: bool = None
     replication_schedule: str = None
-    owner: Role = "SYSADMIN"
+    owner: Role = "ACCOUNTADMIN"
 
 
 class ReplicationGroup(NamedResource, Resource):

@@ -545,28 +545,7 @@ def fetch_session(session) -> SessionContext:
             raise
 
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
-
-    role_privileges = {}
-    for role in available_roles:
-
-        # Adds 30+s of latency and we can infer what privs are available
-        if role == "ACCOUNTADMIN" or role.startswith("SNOWFLAKE."):
-            continue
-
-        role_privileges[role] = []
-
-        grants = _show_grants_to_role(session, role, cacheable=True)
-        for grant in grants:
-            try:
-                granted_priv = GrantedPrivilege.from_grant(
-                    privilege=grant["privilege"],
-                    granted_on=grant["granted_on"].replace("_", " "),
-                    name=grant["name"],
-                )
-                role_privileges[role].append(granted_priv)
-            # If titan isnt aware of the privilege, ignore it
-            except ValueError:
-                continue
+    role_privileges = fetch_role_privileges(session, available_roles, cacheable=True)
 
     return {
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
@@ -583,6 +562,31 @@ def fetch_session(session) -> SessionContext:
         "warehouse": session_obj["WAREHOUSE"],
         "role_privileges": role_privileges,
     }
+
+
+def fetch_role_privileges(session, roles: list, cacheable: bool = True) -> dict[ResourceName, list[GrantedPrivilege]]:
+    role_privileges = {}
+    for role in roles:
+
+        # Adds 30+s of latency and we can infer what privs are available
+        if role == "ACCOUNTADMIN" or role.startswith("SNOWFLAKE."):
+            continue
+
+        role_privileges[role] = []
+
+        grants = _show_grants_to_role(session, role, cacheable=cacheable)
+        for grant in grants:
+            try:
+                granted_priv = GrantedPrivilege.from_grant(
+                    privilege=grant["privilege"],
+                    granted_on=grant["granted_on"].replace("_", " "),
+                    name=grant["name"],
+                )
+                role_privileges[role].append(granted_priv)
+            # If titan isnt aware of the privilege, ignore it
+            except ValueError:
+                continue
+    return role_privileges
 
 
 # ------------------------------
@@ -2302,13 +2306,13 @@ def list_functions(session) -> list[FQN]:
 
 
 def list_grants(session) -> list[FQN]:
-    roles = execute(session, "SHOW ROLES", cacheable=True)
+    roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
         role_name = resource_name_from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        grant_data = _show_grants_to_role(session, role_name, cacheable=True)
+        grant_data = _show_grants_to_role(session, role_name, cacheable=False)
         for data in grant_data:
             if data["granted_on"] == "ROLE":
                 # raise Exception(f"Role grants are not supported yet: {data}")

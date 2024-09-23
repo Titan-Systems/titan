@@ -6,7 +6,7 @@ from inflection import pluralize
 
 from tests.helpers import get_json_fixtures
 from titan import data_provider
-from titan.client import UNSUPPORTED_FEATURE
+from titan.client import UNSUPPORTED_FEATURE, reset_cache
 from titan.enums import AccountEdition
 from titan.identifiers import resource_label_for_type
 from titan.resources import Database, Resource
@@ -56,6 +56,15 @@ def list_resources_database(cursor, suffix, marked_for_cleanup):
 
 
 def test_list_resource(cursor, list_resources_database, resource, marked_for_cleanup):
+
+    data_provider.fetch_session.cache_clear()
+    reset_cache()
+    session_ctx = data_provider.fetch_session(cursor.connection)
+    account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+
+    if account_edition not in resource.edition:
+        pytest.skip(f"Skipping {resource.__class__.__name__}, not supported by account edition {account_edition}")
+
     if isinstance(resource.scope, DatabaseScope):
         list_resources_database.add(resource)
     elif isinstance(resource.scope, SchemaScope):
