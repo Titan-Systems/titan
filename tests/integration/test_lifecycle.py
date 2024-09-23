@@ -8,6 +8,8 @@ from tests.helpers import get_json_fixtures
 from titan import resources as res
 from titan.blueprint import Blueprint
 from titan.client import FEATURE_NOT_ENABLED_ERR, UNSUPPORTED_FEATURE
+from titan.data_provider import fetch_session
+from titan.enums import AccountEdition
 from titan.scope import DatabaseScope, SchemaScope
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -50,6 +52,13 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         pytest.skip("Skipping Service")
 
     try:
+
+        session_ctx = fetch_session(cursor.connection)
+        account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+
+        if account_edition not in resource.edition:
+            pytest.skip(f"Skipping {resource.__class__.__name__}, not supported by account edition {account_edition}")
+
         if isinstance(resource.scope, DatabaseScope):
             database.add(resource)
         elif isinstance(resource.scope, SchemaScope):
