@@ -13,7 +13,7 @@ from ..props import (
 from ..resource_name import ResourceName
 from ..role_ref import RoleRef
 from ..scope import SchemaScope
-from .column import Column
+from .column import ColumnDefinition
 from .resource import NamedResource, Resource, ResourceSpec
 from .tag import TaggableResource
 
@@ -25,7 +25,7 @@ class _View(ResourceSpec):
     secure: bool = False
     volatile: bool = None
     recursive: bool = None
-    columns: list[Column] = None
+    columns: list[ColumnDefinition] = None
     change_tracking: bool = False
     copy_grants: bool = field(default=False, metadata={"fetchable": False})
     comment: str = None
