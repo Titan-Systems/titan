@@ -1,7 +1,6 @@
 name: reset-test-account
 run_mode: SYNC
 allowlist:
-  - "secret"
   - "tag"
   - "tag reference"
 
@@ -19,12 +18,3 @@ tags:
     comment: This is a static tag
     allowed_values:
       - STATIC_TAG_VALUE
-
-
-secrets:
-  - name: static_secret
-    secret_type: PASSWORD
-    username: someuser
-    password: somepass
-    database: static_database
-    schema: public

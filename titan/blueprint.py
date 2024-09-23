@@ -521,8 +521,8 @@ class Blueprint:
             resource_set.add(ref[1])
         # Calculate a topological sort order for the URNs
         sort_order = topological_sort(resource_set, set(manifest.refs))
-        plan = sorted(additive_changes, key=lambda change: sort_order[change.urn]) + sorted(
-            destructive_changes, key=lambda change: -1 * sort_order[change.urn]
+        plan = sorted(additive_changes, key=lambda change: sort_order[change.urn]) + _sort_destructive_changes(
+            destructive_changes, sort_order
         )
         return plan
 
@@ -1324,3 +1324,21 @@ def diff(remote_state: State, manifest: Manifest):
                 from_owner=remote_state[urn]["owner"],
                 to_owner=manifest_item.data["owner"],
             )
+
+
+def _sort_destructive_changes(
+    destructive_changes: list[ResourceChange], sort_order: dict[URN, int]
+) -> list[ResourceChange]:
+    # Not quite right but close enough for now.
+    def sort_key(change: ResourceChange) -> tuple:
+        return (
+            change.urn.database is not None,
+            change.urn.schema is not None,
+            # First, sort by the inverse of the sort_order (to reverse the order)
+            -1 * sort_order[change.urn],
+            # Then, sort network policies to the beginning
+            change.urn.resource_type != ResourceType.NETWORK_POLICY,
+            # Add more sorting criteria here if needed
+        )
+
+    return sorted(destructive_changes, key=sort_key)
