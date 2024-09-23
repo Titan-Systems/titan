@@ -10,8 +10,8 @@ from titan.resources import Resource
 
 pytestmark = pytest.mark.requires_snowflake
 
-TEST_ROLE = os.environ["TEST_SNOWFLAKE_ROLE"]
-TEST_USER = os.environ["TEST_SNOWFLAKE_USER"]
+TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
+TEST_USER = os.environ.get("TEST_SNOWFLAKE_USER")
 
 
 @pytest.fixture(scope="session")

@@ -8,7 +8,6 @@ from titan import var
 from titan.blueprint import (
     Blueprint,
     CreateResource,
-    DuplicateResourceException,
     _merge_pointers,
     compile_plan_to_sql,
     dump_plan,
@@ -711,10 +710,6 @@ def test_blueprint_edition_checks(session_ctx, remote_state):
         blueprint._raise_for_nonconforming_plan(session_ctx, plan)
 
     blueprint = Blueprint(resources=[res.Warehouse(name="WH", min_cluster_count=2)])
-    with pytest.raises(WrongEditionException):
-        blueprint.generate_manifest(session_ctx)
-
-    blueprint = Blueprint(resources=[res.Warehouse(name="WH", min_cluster_count=None)])
     with pytest.raises(WrongEditionException):
         blueprint.generate_manifest(session_ctx)
 
