@@ -6,7 +6,7 @@ import snowflake.connector.errors
 from tests.helpers import get_json_fixtures
 
 from titan import resources as res
-from titan.blueprint import Blueprint
+from titan.blueprint import Blueprint, compile_plan_to_sql
 from titan.client import FEATURE_NOT_ENABLED_ERR, UNSUPPORTED_FEATURE
 from titan.data_provider import fetch_session
 from titan.enums import AccountEdition
@@ -49,7 +49,7 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         res.RoleGrant,
         res.PasswordPolicy,
     ):
-        pytest.skip("Skipping Service")
+        pytest.skip("Skipping")
 
     try:
 
@@ -69,6 +69,12 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         blueprint.add(resource)
         plan = blueprint.plan(cursor.connection)
         assert len(plan) == 1
+        compiled_sql = compile_plan_to_sql(session_ctx, plan)
+        print(session_ctx["role_privileges"])
+        assert len(compiled_sql) == 3
+        assert compiled_sql[0] == "USE SECONDARY ROLES ALL"
+        assert compiled_sql[1] == "USE ROLE SYSADMIN"
+        assert compiled_sql[2].startswith("CREATE")
         blueprint.apply(cursor.connection, plan)
     except snowflake.connector.errors.ProgrammingError as err:
         if err.errno == FEATURE_NOT_ENABLED_ERR or err.errno == UNSUPPORTED_FEATURE:

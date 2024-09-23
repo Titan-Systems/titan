@@ -989,7 +989,7 @@ def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceC
             if granted_priv.privilege == AccountPriv.APPLY_TAG:
                 return True
 
-        # If we own the resource container, we can always perform ADD
+        # If we own the resource container, we can always perform CreateResource
         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == container_name:
             return True
 
