@@ -361,6 +361,11 @@ def resource_fixture(request):
 
 
 def test_fetch(cursor, resource_fixture, marked_for_cleanup, account_edition):
+    if account_edition not in resource_fixture.edition:
+        pytest.skip(
+            f"Skipping {resource_fixture.__class__.__name__}, not supported by account edition {account_edition}"
+        )
+
     create(cursor, resource_fixture, account_edition)
     marked_for_cleanup.append(resource_fixture)
 
