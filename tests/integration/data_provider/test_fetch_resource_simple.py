@@ -324,11 +324,8 @@ def resource_fixture(
     cursor,
     test_database,
     marked_for_cleanup,
-    account_edition,
 ):
     resource = request.param
-    if account_edition not in resource.edition:
-        return
 
     if isinstance(resource.scope, DatabaseScope):
         test_database.add(resource)
@@ -352,7 +349,10 @@ def test_database(cursor, suffix, marked_for_cleanup):
 def test_fetch(
     cursor,
     resource_fixture,
+    account_edition,
 ):
+    if account_edition not in resource_fixture.edition:
+        pytest.skip(f"Skipping test for {resource_fixture.__class__.__name__} on {account_edition} edition")
 
     create(cursor, resource_fixture, account_edition)
 
