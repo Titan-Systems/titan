@@ -4,6 +4,7 @@ import click
 import yaml
 
 from titan.blueprint import dump_plan
+from titan.enums import RunMode
 from titan.operations.blueprint import blueprint_apply, blueprint_plan
 from titan.operations.export import export_resources
 from titan.operations.connector import connect, get_env_vars
@@ -59,7 +60,7 @@ def plan(config_file, json_output, output_file, vars: dict, run_mode):
     if vars:
         cli_config["vars"] = vars
     if run_mode:
-        cli_config["run_mode"] = run_mode
+        cli_config["run_mode"] = RunMode(run_mode)
     plan_obj = blueprint_plan(yaml_config, cli_config)
     output = None
     if json_output:
@@ -98,7 +99,7 @@ def apply(config_file, plan_file, vars, run_mode, dry_run):
         if vars:
             cli_config["vars"] = vars
         if run_mode:
-            cli_config["run_mode"] = run_mode
+            cli_config["run_mode"] = RunMode(run_mode)
         if dry_run:
             cli_config["dry_run"] = dry_run
         blueprint_apply(yaml_config, cli_config)

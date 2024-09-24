@@ -13,6 +13,7 @@ from titan.blueprint import (
     UpdateResource,
     compile_plan_to_sql,
 )
+from titan.resources.database import public_schema_urn
 from titan.client import reset_cache
 from titan.enums import ResourceType
 
@@ -231,7 +232,7 @@ def test_blueprint_missing_database_inferred_from_session_context(cursor):
     blueprint.plan(session)
 
 
-def test_blueprint_all_grant_forces_add(cursor, test_db, role):
+def test_blueprint_all_grant_triggers_create(cursor, test_db, role):
     cursor.execute(f"GRANT USAGE ON DATABASE {test_db} TO ROLE {role.name}")
     session = cursor.connection
     all_grant = res.Grant(priv="ALL", on_database=test_db, to=role, owner=TEST_ROLE)
@@ -432,3 +433,30 @@ def test_blueprint_create_resource_with_database_role_owner(cursor, suffix, test
     assert schema_data is not None
     assert schema_data["name"] == schema.name
     assert schema_data["owner"] == str(database_role.fqn)
+
+
+def test_blueprint_database_params_passed_to_public_schema(cursor, suffix):
+    session = cursor.connection
+
+    def _database():
+        return res.Database(
+            name=f"test_db_params_passed_to_public_schema_{suffix}",
+            data_retention_time_in_days=1,
+            max_data_extension_time_in_days=2,
+            default_ddl_collation="en_US",
+        )
+
+    database = _database()
+    blueprint = Blueprint(resources=[database])
+    plan = blueprint.plan(session)
+    assert len(plan) == 1
+    blueprint.apply(session, plan)
+    schema_data = safe_fetch(cursor, public_schema_urn(database.urn))
+    assert schema_data is not None
+    assert schema_data["data_retention_time_in_days"] == 1
+    assert schema_data["max_data_extension_time_in_days"] == 2
+    assert schema_data["default_ddl_collation"] == "en_US"
+    database = _database()
+    blueprint = Blueprint(resources=[database])
+    plan = blueprint.plan(session)
+    assert len(plan) == 0

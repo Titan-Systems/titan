@@ -13,6 +13,7 @@ def session_ctx() -> dict:
         "account_locator": "ABCD123",
         "role": "SYSADMIN",
         "available_roles": ["SYSADMIN", "USERADMIN"],
+        "tag_support": True,
     }
 
 
@@ -90,4 +91,4 @@ def test_plan_no_removes_in_run_mode_create_or_update(session_ctx, remote_state)
     assert isinstance(change, DropResource)
     assert change.urn == parse_URN("urn::ABCD123:role/REMOVED_ROLE")
     with pytest.raises(NonConformingPlanException):
-        bp._raise_for_nonconforming_plan(plan)
+        bp._raise_for_nonconforming_plan(session_ctx, plan)

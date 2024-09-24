@@ -545,28 +545,7 @@ def fetch_session(session) -> SessionContext:
             raise
 
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
-
-    role_privileges = {}
-    for role in available_roles:
-
-        # Adds 30+s of latency and we can infer what privs are available
-        if role == "ACCOUNTADMIN" or role.startswith("SNOWFLAKE."):
-            continue
-
-        role_privileges[role] = []
-
-        grants = _show_grants_to_role(session, role, cacheable=True)
-        for grant in grants:
-            try:
-                granted_priv = GrantedPrivilege.from_grant(
-                    privilege=grant["privilege"],
-                    granted_on=grant["granted_on"].replace("_", " "),
-                    name=grant["name"],
-                )
-                role_privileges[role].append(granted_priv)
-            # If titan isnt aware of the privilege, ignore it
-            except ValueError:
-                continue
+    role_privileges = fetch_role_privileges(session, available_roles, cacheable=True)
 
     return {
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
@@ -585,6 +564,31 @@ def fetch_session(session) -> SessionContext:
     }
 
 
+def fetch_role_privileges(session, roles: list, cacheable: bool = True) -> dict[ResourceName, list[GrantedPrivilege]]:
+    role_privileges = {}
+    for role in roles:
+
+        # Adds 30+s of latency and we can infer what privs are available
+        if role == "ACCOUNTADMIN" or role.startswith("SNOWFLAKE."):
+            continue
+
+        role_privileges[role] = []
+
+        grants = _show_grants_to_role(session, role, cacheable=cacheable)
+        for grant in grants:
+            try:
+                granted_priv = GrantedPrivilege.from_grant(
+                    privilege=grant["privilege"],
+                    granted_on=grant["granted_on"].replace("_", " "),
+                    name=grant["name"],
+                )
+                role_privileges[role].append(granted_priv)
+            # If titan isnt aware of the privilege, ignore it
+            except ValueError:
+                continue
+    return role_privileges
+
+
 # ------------------------------
 # Fetch Resources
 # ------------------------------
@@ -592,7 +596,10 @@ def fetch_session(session) -> SessionContext:
 
 def fetch_account(session, fqn: FQN):
     # raise NotImplementedError()
-    return {}
+    return {
+        "name": None,
+        "locator": None,
+    }
 
 
 def fetch_aggregation_policy(session, fqn: FQN):
@@ -612,8 +619,7 @@ def fetch_aggregation_policy(session, fqn: FQN):
 
 
 def fetch_alert(session, fqn: FQN):
-    show_result = execute(session, "SHOW ALERTS", cacheable=True)
-    alerts = _filter_result(show_result, name=fqn.name)
+    alerts = _show_resources(session, "ALERTS", fqn)
     if len(alerts) == 0:
         return None
     if len(alerts) > 1:
@@ -812,8 +818,7 @@ def fetch_database_role(session, fqn: FQN):
 
 
 def fetch_dynamic_table(session, fqn: FQN):
-    show_result = execute(session, f"SHOW DYNAMIC TABLES LIKE '{fqn.name}'")
-
+    show_result = _show_resources(session, "DYNAMIC TABLES", fqn)
     if len(show_result) == 0:
         return None
     if len(show_result) > 1:
@@ -998,9 +1003,9 @@ def fetch_function(session, fqn: FQN):
         raise Exception(f"Found multiple functions matching {fqn}")
 
     data = udfs[0]
-    inputs, output = data["arguments"].split(" RETURN ")
+    _, returns = data["arguments"].split(" RETURN ")
     try:
-        desc_result = execute(session, f"DESC FUNCTION {inputs}", cacheable=True)
+        desc_result = execute(session, f"DESC FUNCTION {fqn}", cacheable=True)
     except ProgrammingError as err:
         if err.errno == DOES_NOT_EXIST_ERR:
             return None
@@ -1013,7 +1018,7 @@ def fetch_function(session, fqn: FQN):
             "name": _quote_snowflake_identifier(data["name"]),
             "secure": data["is_secure"] == "Y",
             "args": _parse_signature(properties["signature"]),
-            "returns": output,
+            "returns": returns,
             "language": data["language"],
             "comment": None if data["description"] == "user-defined function" else data["description"],
             "volatility": properties["volatility"],
@@ -1025,7 +1030,7 @@ def fetch_function(session, fqn: FQN):
             "name": _quote_snowflake_identifier(data["name"]),
             "secure": data["is_secure"] == "Y",
             "args": _parse_signature(properties["signature"]),
-            "returns": output,
+            "returns": returns,
             "language": data["language"],
             "comment": None if data["description"] == "user-defined function" else data["description"],
             "volatility": properties["volatility"],
@@ -2060,16 +2065,18 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
         must_change_password = data["must_change_password"] == "true"
 
     rsa_public_key = properties["rsa_public_key"] if properties["rsa_public_key"] != "null" else None
+    middle_name = properties["middle_name"] if properties["middle_name"] != "null" else None
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "login_name": login_name,
         "display_name": display_name,
         "first_name": data["first_name"] or None,
+        "middle_name": middle_name,
         "last_name": data["last_name"] or None,
         "email": data["email"] or None,
         "mins_to_unlock": data["mins_to_unlock"] or None,
-        "days_to_expiry": data["days_to_expiry"] or None,
+        # "days_to_expiry": data["days_to_expiry"] or None,
         "comment": data["comment"] or None,
         "disabled": data["disabled"] == "true",
         "must_change_password": must_change_password,
@@ -2131,28 +2138,35 @@ def fetch_warehouse(session, fqn: FQN):
     show_params_result = execute(session, f"SHOW PARAMETERS FOR WAREHOUSE {fqn}")
     params = params_result_to_dict(show_params_result)
 
+    resource_monitor = None if data["resource_monitor"] == "null" else data["resource_monitor"]
+
+    # Enterprise edition features
     query_accel = data.get("enable_query_acceleration")
     if query_accel:
         query_accel = query_accel == "true"
     else:
         query_accel = False
 
-    return {
+    warehouse_dict = {
         "name": _quote_snowflake_identifier(data["name"]),
         "owner": _get_owner_identifier(data),
         "warehouse_type": data["type"],
         "warehouse_size": str(WarehouseSize(data["size"])),
-        # "max_cluster_count": data["max_cluster_count"],
-        # "min_cluster_count": data["min_cluster_count"],
-        # "scaling_policy": data["scaling_policy"],
         "auto_suspend": data["auto_suspend"],
         "auto_resume": data["auto_resume"] == "true",
         "comment": data["comment"] or None,
+        "resource_monitor": resource_monitor,
         "enable_query_acceleration": query_accel,
+        "query_acceleration_max_scale_factor": data.get("query_acceleration_max_scale_factor", None),
+        "max_cluster_count": data.get("max_cluster_count", None),
+        "min_cluster_count": data.get("min_cluster_count", None),
+        "scaling_policy": data.get("scaling_policy", None),
         "max_concurrency_level": params["max_concurrency_level"],
         "statement_queued_timeout_in_seconds": params["statement_queued_timeout_in_seconds"],
         "statement_timeout_in_seconds": params["statement_timeout_in_seconds"],
     }
+
+    return warehouse_dict
 
 
 ################ List functions
@@ -2292,13 +2306,13 @@ def list_functions(session) -> list[FQN]:
 
 
 def list_grants(session) -> list[FQN]:
-    roles = execute(session, "SHOW ROLES", cacheable=True)
+    roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
         role_name = resource_name_from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        grant_data = _show_grants_to_role(session, role_name, cacheable=True)
+        grant_data = _show_grants_to_role(session, role_name, cacheable=False)
         for data in grant_data:
             if data["granted_on"] == "ROLE":
                 # raise Exception(f"Role grants are not supported yet: {data}")

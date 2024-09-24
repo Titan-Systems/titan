@@ -6,7 +6,10 @@
     "change_tracking": false,
     "columns": [
         {
-            "name": "id"
+            "name": "id",
+            "data_type": null,
+            "comment": "this is a column comment",
+            "not_null": false
         }
     ],
     "comment": "This is a view",

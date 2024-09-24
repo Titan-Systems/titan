@@ -1,13 +1,14 @@
 import os
-import pytest
 
+import pytest
 import snowflake.connector.errors
 
 from tests.helpers import get_json_fixtures
-
 from titan import resources as res
-from titan.blueprint import Blueprint
+from titan.blueprint import Blueprint, CreateResource
 from titan.client import FEATURE_NOT_ENABLED_ERR, UNSUPPORTED_FEATURE
+from titan.data_provider import fetch_session
+from titan.enums import AccountEdition
 from titan.scope import DatabaseScope, SchemaScope
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -29,7 +30,7 @@ def resource(request):
 
 
 def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
-    lifecycle_db = f"LIFECYCLE_DB_{suffix}"
+    lifecycle_db = f"LIFECYCLE_DB_{suffix}_{resource.__class__.__name__}"
     cursor.execute("USE ROLE SYSADMIN")
     cursor.execute(f"CREATE DATABASE IF NOT EXISTS {lifecycle_db}")
     cursor.execute(f"USE DATABASE {lifecycle_db}")
@@ -46,10 +47,19 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         res.Grant,
         res.RoleGrant,
         res.PasswordPolicy,
+        res.Pipe,
     ):
-        pytest.skip("Skipping Service")
+        pytest.skip("Skipping")
 
     try:
+        fetch_session.cache_clear()
+        session_ctx = fetch_session(cursor.connection)
+        account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+
+        if account_edition not in resource.edition:
+            feature_enabled = False
+            pytest.skip(f"Skipping {resource.__class__.__name__}, not supported by account edition {account_edition}")
+
         if isinstance(resource.scope, DatabaseScope):
             database.add(resource)
         elif isinstance(resource.scope, SchemaScope):
@@ -59,6 +69,7 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
         blueprint.add(resource)
         plan = blueprint.plan(cursor.connection)
         assert len(plan) == 1
+        assert isinstance(plan[0], CreateResource)
         blueprint.apply(cursor.connection, plan)
     except snowflake.connector.errors.ProgrammingError as err:
         if err.errno == FEATURE_NOT_ENABLED_ERR or err.errno == UNSUPPORTED_FEATURE:

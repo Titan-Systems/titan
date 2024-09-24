@@ -3,7 +3,9 @@ from typing import Union
 from .enums import DataType
 
 
-def convert_to_canonical_data_type(data_type: Union[str, DataType]) -> str:
+def convert_to_canonical_data_type(data_type: Union[str, DataType, None]) -> str:
+    if data_type is None:
+        return None
     if isinstance(data_type, DataType):
         data_type = str(data_type)
     data_type = data_type.upper()

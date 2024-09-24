@@ -1,6 +1,7 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Optional, Union
 
-from ..enums import ParseableEnum, ResourceType, WarehouseSize
+from ..enums import AccountEdition, ParseableEnum, ResourceType, WarehouseSize
 from ..props import (
     BoolProp,
     EnumProp,
@@ -34,16 +35,31 @@ class _Warehouse(ResourceSpec):
     owner: Role = "SYSADMIN"
     warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
-    max_cluster_count: int = None
-    min_cluster_count: int = None
-    scaling_policy: WarehouseScalingPolicy = None
+    max_cluster_count: int = field(
+        default=1,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
+    min_cluster_count: int = field(
+        default=1,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
+    scaling_policy: WarehouseScalingPolicy = field(
+        default=WarehouseScalingPolicy.STANDARD,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
     auto_suspend: int = 600
     auto_resume: bool = True
-    initially_suspended: bool = None
+    initially_suspended: bool = field(default=False, metadata={"fetchable": False})
     resource_monitor: ResourceMonitor = None
     comment: str = None
-    enable_query_acceleration: bool = False
-    query_acceleration_max_scale_factor: int = None
+    enable_query_acceleration: bool = field(
+        default=False,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
+    query_acceleration_max_scale_factor: int = field(
+        default=8,
+        metadata={"edition": {AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}},
+    )
     max_concurrency_level: int = 8
     statement_queued_timeout_in_seconds: int = 0
     statement_timeout_in_seconds: int = 172800
@@ -155,18 +171,18 @@ class Warehouse(NamedResource, TaggableResource, Resource):
         self,
         name: str,
         owner: str = "SYSADMIN",
-        warehouse_type: WarehouseType = "STANDARD",
-        warehouse_size: WarehouseSize = WarehouseSize.XSMALL,
-        max_cluster_count: int = None,
-        min_cluster_count: int = None,
-        scaling_policy: WarehouseScalingPolicy = None,
+        warehouse_type: str = "STANDARD",
+        warehouse_size: str = "XSMALL",
+        max_cluster_count: int = 1,
+        min_cluster_count: int = 1,
+        scaling_policy: str = "STANDARD",
         auto_suspend: int = 600,
         auto_resume: bool = True,
-        initially_suspended: bool = None,
-        resource_monitor: ResourceMonitor = None,
+        initially_suspended: bool = False,
+        resource_monitor: Union[ResourceMonitor, str, None] = None,
         comment: str = None,
         enable_query_acceleration: bool = False,
-        query_acceleration_max_scale_factor: int = None,
+        query_acceleration_max_scale_factor: int = 8,
         max_concurrency_level: int = 8,
         statement_queued_timeout_in_seconds: int = 0,
         statement_timeout_in_seconds: int = 172800,

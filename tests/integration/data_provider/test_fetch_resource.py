@@ -5,15 +5,16 @@ import pytest
 from tests.helpers import (
     assert_resource_dicts_eq_ignore_nulls,
     assert_resource_dicts_eq_ignore_nulls_and_unfetchable,
-    safe_fetch,
     clean_resource_data,
+    safe_fetch,
 )
 from titan import data_provider
 from titan import resources as res
 from titan.client import reset_cache
-from titan.enums import ResourceType
+from titan.enums import AccountEdition, ResourceType
 from titan.identifiers import URN, parse_FQN, parse_URN
 from titan.resource_name import ResourceName
+from titan.resources import Resource
 from titan.resources.resource import ResourcePointer
 
 pytestmark = pytest.mark.requires_snowflake
@@ -34,8 +35,10 @@ def email_address(cursor):
     return user["email"]
 
 
-def create(cursor, resource):
-    sql = resource.create_sql(if_not_exists=True)
+def create(cursor, resource: Resource):
+    session_ctx = data_provider.fetch_session(cursor.connection)
+    account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+    sql = resource.create_sql(account_edition=account_edition, if_not_exists=True)
     try:
         cursor.execute(sql)
     except Exception as err:
@@ -123,20 +126,6 @@ def test_fetch_grant_on_account(cursor, suffix):
         cursor.execute(role.drop_sql(if_exists=True))
 
 
-def test_fetch_database(cursor, suffix, marked_for_cleanup):
-    database = res.Database(
-        name=f"SOMEDB_{suffix}",
-        owner=TEST_ROLE,
-        transient=True,
-    )
-    create(cursor, database)
-    marked_for_cleanup.append(database)
-
-    result = safe_fetch(cursor, database.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, database.to_dict())
-
-
 def test_fetch_grant_all_on_resource(cursor):
     cursor.execute("GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE STATIC_ROLE")
     grant_all_urn = parse_URN("urn:::grant/STATIC_ROLE?priv=ALL&on=warehouse/STATIC_WAREHOUSE")
@@ -160,113 +149,6 @@ def test_fetch_grant_all_on_resource(cursor):
         cursor.execute("REVOKE ALL ON WAREHOUSE STATIC_WAREHOUSE FROM ROLE STATIC_ROLE")
 
 
-def test_fetch_external_stage(cursor, test_db, marked_for_cleanup):
-    external_stage = res.ExternalStage(
-        name="EXTERNAL_STAGE_EXAMPLE",
-        url="s3://titan-snowflake/",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, external_stage)
-    marked_for_cleanup.append(external_stage)
-
-    result = safe_fetch(cursor, external_stage.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
-
-    external_stage = res.ExternalStage(
-        name="EXTERNAL_STAGE_EXAMPLE_WITH_DIRECTORY",
-        url="s3://titan-snowflake/",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-        directory={"enable": True},
-    )
-    create(cursor, external_stage)
-    marked_for_cleanup.append(external_stage)
-
-    result = safe_fetch(cursor, external_stage.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, external_stage.to_dict())
-
-
-def test_fetch_internal_stage(cursor, test_db, marked_for_cleanup):
-    internal_stage = res.InternalStage(
-        name="INTERNAL_STAGE_EXAMPLE",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, internal_stage)
-    marked_for_cleanup.append(internal_stage)
-
-    result = safe_fetch(cursor, internal_stage.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, internal_stage.to_dict())
-
-    internal_stage = res.InternalStage(
-        name="INTERNAL_STAGE_EXAMPLE_WITH_DIRECTORY",
-        directory={"enable": True},
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, internal_stage)
-    marked_for_cleanup.append(internal_stage)
-
-    result = safe_fetch(cursor, internal_stage.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, internal_stage.to_dict())
-
-
-def test_fetch_csv_file_format(cursor, test_db, marked_for_cleanup):
-    csv_file_format = res.CSVFileFormat(
-        name="CSV_FILE_FORMAT_EXAMPLE",
-        owner=TEST_ROLE,
-        field_delimiter="|",
-        skip_header=1,
-        null_if=["NULL", "null"],
-        empty_field_as_null=True,
-        compression="GZIP",
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, csv_file_format)
-    marked_for_cleanup.append(csv_file_format)
-
-    result = safe_fetch(cursor, csv_file_format.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, csv_file_format.to_dict())
-
-    csv_file_format = res.CSVFileFormat(
-        name="CSV_FILE_FORMAT_EXAMPLE_ALL_DEFAULTS",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, csv_file_format)
-    marked_for_cleanup.append(csv_file_format)
-
-    result = safe_fetch(cursor, csv_file_format.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, csv_file_format.to_dict())
-
-
-def test_fetch_resource_monitor(cursor, marked_for_cleanup):
-    resource_monitor = res.ResourceMonitor(
-        name="RESOURCE_MONITOR_EXAMPLE",
-        credit_quota=1000,
-        start_timestamp="2049-01-01 00:00",
-    )
-    create(cursor, resource_monitor)
-    marked_for_cleanup.append(resource_monitor)
-
-    result = safe_fetch(cursor, resource_monitor.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, resource_monitor.to_dict())
-
-
 def test_fetch_email_notification_integration(cursor, email_address, marked_for_cleanup):
 
     email_notification_integration = res.EmailNotificationIntegration(
@@ -282,25 +164,6 @@ def test_fetch_email_notification_integration(cursor, email_address, marked_for_
     assert result is not None
     result = data_provider.remove_none_values(result)
     assert result == data_provider.remove_none_values(email_notification_integration.to_dict())
-
-
-def test_fetch_event_table(cursor, test_db, marked_for_cleanup):
-    event_table = res.EventTable(
-        name="EVENT_TABLE_EXAMPLE",
-        change_tracking=True,
-        cluster_by=["START_TIMESTAMP"],
-        data_retention_time_in_days=1,
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, event_table)
-    marked_for_cleanup.append(event_table)
-
-    result = safe_fetch(cursor, event_table.urn)
-    assert result is not None
-    result = data_provider.remove_none_values(result)
-    assert result == data_provider.remove_none_values(event_table.to_dict())
 
 
 def test_fetch_grant_with_fully_qualified_ref(cursor, test_db, suffix, marked_for_cleanup):
@@ -358,25 +221,6 @@ def test_fetch_pipe(cursor, test_db, marked_for_cleanup):
     assert result == data_provider.remove_none_values(pipe.to_dict())
 
 
-def test_fetch_view(cursor, test_db, marked_for_cleanup):
-    view = res.View(
-        name="VIEW_EXAMPLE",
-        as_="SELECT 1 as id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE",
-        columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
-        comment="View for testing",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, view)
-    marked_for_cleanup.append(view)
-
-    result = safe_fetch(cursor, view.urn)
-    assert result is not None
-    result = data_provider.remove_none_values(result)
-    assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.View.spec, result, view.to_dict())
-
-
 @pytest.mark.enterprise
 def test_fetch_tag(cursor, test_db, marked_for_cleanup):
     tag = res.Tag(
@@ -411,16 +255,6 @@ def test_fetch_tag(cursor, test_db, marked_for_cleanup):
     assert result == data_provider.remove_none_values(tag.to_dict())
 
 
-def test_fetch_role(cursor, suffix, marked_for_cleanup):
-    role = res.Role(name=f"ANOTHER_ROLE_{suffix}", owner=TEST_ROLE)
-    create(cursor, role)
-    marked_for_cleanup.append(role)
-
-    result = safe_fetch(cursor, role.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, role.to_dict())
-
-
 def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
     parent = res.Role(name=f"PARENT_ROLE_{suffix}", owner=TEST_ROLE)
     child = res.Role(name=f"CHILD_ROLE_{suffix}", owner=TEST_ROLE)
@@ -447,309 +281,6 @@ def test_fetch_role_grant(cursor, suffix, marked_for_cleanup):
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
     assert_resource_dicts_eq_ignore_nulls(result, grant.to_dict())
-
-
-def test_fetch_user(cursor, suffix, marked_for_cleanup):
-    user = res.User(
-        name=f"SOME_USER_{suffix}@applytitan.com",
-        owner=TEST_ROLE,
-    )
-    create(cursor, user)
-    marked_for_cleanup.append(user)
-
-    result = safe_fetch(cursor, user.urn)
-    assert result is not None
-    result = clean_resource_data(res.User.spec, result)
-    data = clean_resource_data(res.User.spec, user.to_dict())
-    assert result == data
-
-    user = res.User(
-        name=f"SOME_USER_TYPE_PERSON_{suffix}@applytitan.com",
-        owner=TEST_ROLE,
-        type="PERSON",
-    )
-    create(cursor, user)
-    marked_for_cleanup.append(user)
-
-    result = safe_fetch(cursor, user.urn)
-    assert result is not None
-    result = clean_resource_data(res.User.spec, result)
-    data = clean_resource_data(res.User.spec, user.to_dict())
-    assert result == data
-
-
-def test_fetch_glue_catalog_integration(cursor, marked_for_cleanup):
-    catalog_integration = res.GlueCatalogIntegration(
-        name="some_catalog_integration",
-        table_format="ICEBERG",
-        glue_aws_role_arn="arn:aws:iam::123456789012:role/SnowflakeAccess",
-        glue_catalog_id="123456789012",
-        catalog_namespace="some_namespace",
-        enabled=True,
-        glue_region="us-west-2",
-        comment="Integration for AWS Glue with Snowflake.",
-        owner=TEST_ROLE,
-    )
-    create(cursor, catalog_integration)
-    marked_for_cleanup.append(catalog_integration)
-
-    result = safe_fetch(cursor, catalog_integration.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, catalog_integration.to_dict())
-
-
-def test_fetch_object_store_catalog_integration(cursor, marked_for_cleanup):
-    catalog_integration = res.ObjectStoreCatalogIntegration(
-        name="OBJECT_STORE_CATALOG_INTEGRATION_EXAMPLE",
-        catalog_source="OBJECT_STORE",
-        table_format="ICEBERG",
-        enabled=True,
-        comment="Catalog integration for testing",
-        owner=TEST_ROLE,
-    )
-    create(cursor, catalog_integration)
-    marked_for_cleanup.append(catalog_integration)
-
-    result = safe_fetch(cursor, catalog_integration.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, catalog_integration.to_dict())
-
-
-def test_fetch_share(cursor, suffix, marked_for_cleanup):
-    share = res.Share(
-        name=f"SHARE_EXAMPLE_{suffix}",
-        comment="Share for testing",
-        owner=TEST_ROLE,
-    )
-    create(cursor, share)
-    marked_for_cleanup.append(share)
-
-    result = safe_fetch(cursor, share.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, share.to_dict())
-
-
-def test_fetch_s3_storage_integration(cursor, suffix, marked_for_cleanup):
-    storage_integration = res.S3StorageIntegration(
-        name=f"S3_STORAGE_INTEGRATION_EXAMPLE_{suffix}",
-        storage_provider="S3",
-        storage_aws_role_arn="arn:aws:iam::001234567890:role/myrole",
-        enabled=True,
-        storage_allowed_locations=["s3://mybucket1/path1/", "s3://mybucket2/path2/"],
-        owner=TEST_ROLE,
-    )
-    create(cursor, storage_integration)
-    marked_for_cleanup.append(storage_integration)
-
-    result = safe_fetch(cursor, storage_integration.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
-
-
-def test_fetch_gcs_storage_integration(cursor, suffix, marked_for_cleanup):
-    storage_integration = res.GCSStorageIntegration(
-        name=f"GCS_STORAGE_INTEGRATION_EXAMPLE_{suffix}",
-        enabled=True,
-        storage_allowed_locations=["gcs://mybucket1/path1/", "gcs://mybucket2/path2/"],
-        owner=TEST_ROLE,
-    )
-    create(cursor, storage_integration)
-    marked_for_cleanup.append(storage_integration)
-
-    result = safe_fetch(cursor, storage_integration.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
-
-
-def test_fetch_azure_storage_integration(cursor, suffix, marked_for_cleanup):
-    storage_integration = res.AzureStorageIntegration(
-        name=f"AZURE_STORAGE_INTEGRATION_EXAMPLE_{suffix}",
-        enabled=True,
-        azure_tenant_id="a123b4c5-1234-123a-a12b-1a23b45678c9",
-        storage_allowed_locations=[
-            "azure://myaccount.blob.core.windows.net/mycontainer/path1/",
-            "azure://myaccount.blob.core.windows.net/mycontainer/path2/",
-        ],
-        owner=TEST_ROLE,
-    )
-    create(cursor, storage_integration)
-    marked_for_cleanup.append(storage_integration)
-
-    result = safe_fetch(cursor, storage_integration.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, storage_integration.to_dict())
-
-
-def test_fetch_alert(cursor, suffix, test_db, marked_for_cleanup):
-    alert = res.Alert(
-        name=f"SOMEALERT_{suffix}",
-        warehouse="STATIC_WAREHOUSE",
-        schedule="60 MINUTE",
-        condition="SELECT 1",
-        then="SELECT 1",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, alert)
-    marked_for_cleanup.append(alert)
-
-    result = safe_fetch(cursor, alert.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, alert.to_dict())
-
-
-def test_fetch_dynamic_table(cursor, test_db, marked_for_cleanup):
-    dynamic_table = res.DynamicTable(
-        name="PRODUCT",
-        columns=[{"name": "ID", "comment": "This is a comment"}],
-        target_lag="20 minutes",
-        warehouse="CI",
-        refresh_mode="AUTO",
-        initialize="ON_CREATE",
-        comment="this is a comment",
-        as_="SELECT id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, dynamic_table)
-    marked_for_cleanup.append(dynamic_table)
-
-    result = safe_fetch(cursor, dynamic_table.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, dynamic_table.to_dict())
-
-
-def test_fetch_javascript_udf(cursor, test_db, marked_for_cleanup):
-    function = res.JavascriptUDF(
-        name="SOME_JAVASCRIPT_UDF",
-        args=[{"name": "INPUT_ARG", "data_type": "VARIANT"}],
-        returns="FLOAT",
-        volatility="VOLATILE",
-        as_="return 42;",
-        secure=False,
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, function)
-    marked_for_cleanup.append(function)
-
-    result = safe_fetch(cursor, function.urn)
-    assert result is not None
-    result = clean_resource_data(res.JavascriptUDF.spec, result)
-    data = clean_resource_data(res.JavascriptUDF.spec, function.to_dict())
-    assert result == data
-
-
-def test_fetch_password_policy(cursor, test_db, marked_for_cleanup):
-    password_policy = res.PasswordPolicy(
-        name="SOME_PASSWORD_POLICY",
-        password_min_length=12,
-        password_max_length=24,
-        password_min_upper_case_chars=2,
-        password_min_lower_case_chars=2,
-        password_min_numeric_chars=2,
-        password_min_special_chars=2,
-        password_min_age_days=1,
-        password_max_age_days=30,
-        password_max_retries=3,
-        password_lockout_time_mins=30,
-        password_history=5,
-        # comment="production account password policy", # Leaving this out until Snowflake fixes their bugs
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, password_policy)
-    marked_for_cleanup.append(password_policy)
-
-    result = safe_fetch(cursor, password_policy.urn)
-    assert result is not None
-    assert result == password_policy.to_dict()
-
-
-def test_fetch_python_stored_procedure(cursor, suffix, test_db, marked_for_cleanup):
-    procedure = res.PythonStoredProcedure(
-        name=f"somesproc_{suffix}",
-        args=[{"name": "ARG1", "data_type": "VARCHAR"}],
-        returns="NUMBER",
-        packages=["snowflake-snowpark-python"],
-        runtime_version="3.9",
-        handler="main",
-        execute_as="OWNER",
-        comment="user-defined procedure",
-        imports=[],
-        null_handling="CALLED ON NULL INPUT",
-        secure=False,
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-        as_="def main(arg1): return 42",
-    )
-    cursor.execute(procedure.create_sql())
-    marked_for_cleanup.append(procedure)
-
-    result = safe_fetch(cursor, procedure.urn)
-    assert result is not None
-    result = clean_resource_data(res.PythonStoredProcedure.spec, result)
-    data = clean_resource_data(res.PythonStoredProcedure.spec, procedure.to_dict())
-    assert result == data
-
-
-def test_fetch_schema(cursor, test_db, marked_for_cleanup):
-    schema = res.Schema(
-        name="SOMESCH",
-        data_retention_time_in_days=1,
-        max_data_extension_time_in_days=3,
-        transient=False,
-        managed_access=False,
-        owner=TEST_ROLE,
-        database=test_db,
-    )
-    create(cursor, schema)
-    marked_for_cleanup.append(schema)
-
-    result = safe_fetch(cursor, schema.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, schema.to_dict())
-
-
-def test_fetch_sequence(cursor, suffix, test_db, marked_for_cleanup):
-    sequence = res.Sequence(
-        name=f"SOMESEQ_{suffix}",
-        start=1,
-        increment=2,
-        comment="+3",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, sequence)
-    marked_for_cleanup.append(sequence)
-
-    result = safe_fetch(cursor, sequence.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, sequence.to_dict())
-
-
-def test_fetch_task(cursor, suffix, test_db, marked_for_cleanup):
-    task = res.Task(
-        name=f"SOMETASK_{suffix}",
-        schedule="60 MINUTE",
-        state="SUSPENDED",
-        as_="SELECT 1",
-        owner=TEST_ROLE,
-        database=test_db,
-        schema="PUBLIC",
-    )
-    create(cursor, task)
-    marked_for_cleanup.append(task)
-
-    result = safe_fetch(cursor, task.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, task.to_dict())
 
 
 def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
@@ -831,36 +362,6 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
     assert result == data
 
 
-def test_fetch_database_role(cursor, suffix, test_db, marked_for_cleanup):
-    database_role = res.DatabaseRole(
-        name=f"DATABASE_ROLE_EXAMPLE_{suffix}",
-        database=test_db,
-        owner=TEST_ROLE,
-    )
-    create(cursor, database_role)
-    marked_for_cleanup.append(database_role)
-
-    result = safe_fetch(cursor, database_role.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, database_role.to_dict())
-
-
-def test_fetch_packages_policy(cursor, suffix, marked_for_cleanup):
-    packages_policy = res.PackagesPolicy(
-        name=f"PACKAGES_POLICY_EXAMPLE_{suffix}",
-        allowlist=["numpy", "pandas"],
-        blocklist=["os", "sys"],
-        comment="Example packages policy",
-        owner=TEST_ROLE,
-    )
-    create(cursor, packages_policy)
-    marked_for_cleanup.append(packages_policy)
-
-    result = safe_fetch(cursor, packages_policy.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, packages_policy.to_dict())
-
-
 @pytest.mark.enterprise
 def test_fetch_aggregation_policy(cursor, suffix, test_db, marked_for_cleanup):
     aggregation_policy = res.AggregationPolicy(
@@ -896,22 +397,6 @@ def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
     result = clean_resource_data(res.ComputePool.spec, result)
     data = clean_resource_data(res.ComputePool.spec, compute_pool.to_dict())
     assert result == data
-
-
-def test_fetch_warehouse(cursor, suffix, marked_for_cleanup):
-    warehouse = res.Warehouse(
-        name=f"SOME_WAREHOUSE_{suffix}",
-        warehouse_size="XSMALL",
-        auto_suspend=60,
-        auto_resume=True,
-        owner=TEST_ROLE,
-    )
-    create(cursor, warehouse)
-    marked_for_cleanup.append(warehouse)
-
-    result = safe_fetch(cursor, warehouse.urn)
-    assert result is not None
-    assert_resource_dicts_eq_ignore_nulls(result, warehouse.to_dict())
 
 
 def test_fetch_password_secret(cursor, suffix, marked_for_cleanup):
@@ -1066,42 +551,6 @@ def test_fetch_stage_stream(cursor, suffix, marked_for_cleanup):
     assert_resource_dicts_eq_ignore_nulls_and_unfetchable(res.StageStream.spec, result, stream.to_dict())
 
 
-def test_fetch_authentication_policies(cursor, suffix, marked_for_cleanup):
-    policy = res.AuthenticationPolicy(
-        name=f"SOME_AUTHENTICATION_POLICY_{suffix}",
-        mfa_authentication_methods=["PASSWORD", "SAML"],
-        mfa_enrollment="REQUIRED",
-        client_types=["SNOWFLAKE_UI"],
-        comment="Authentication policy for testing",
-        owner=TEST_ROLE,
-    )
-    create(cursor, policy)
-    marked_for_cleanup.append(policy)
-
-    result = safe_fetch(cursor, policy.urn)
-    assert result is not None
-    result = clean_resource_data(res.AuthenticationPolicy.spec, result)
-    data = clean_resource_data(res.AuthenticationPolicy.spec, policy.to_dict())
-    assert result == data
-
-
-def test_fetch_external_access_integration(cursor, suffix, marked_for_cleanup):
-    integration = res.ExternalAccessIntegration(
-        name=f"EXTERNAL_ACCESS_INTEGRATION_{suffix}",
-        allowed_network_rules=["static_database.public.static_network_rule"],
-        comment="External access integration for testing",
-        owner=TEST_ROLE,
-    )
-    create(cursor, integration)
-    marked_for_cleanup.append(integration)
-
-    result = safe_fetch(cursor, integration.urn)
-    assert result is not None
-    result = clean_resource_data(res.ExternalAccessIntegration.spec, result)
-    data = clean_resource_data(res.ExternalAccessIntegration.spec, integration.to_dict())
-    assert result == data
-
-
 def test_fetch_parquet_file_format(cursor, suffix, marked_for_cleanup):
     file_format = res.ParquetFileFormat(
         name=f"SOME_PARQUET_FILE_FORMAT_{suffix}",
@@ -1115,38 +564,6 @@ def test_fetch_parquet_file_format(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = clean_resource_data(res.ParquetFileFormat.spec, result)
     data = clean_resource_data(res.ParquetFileFormat.spec, file_format.to_dict())
-    assert result == data
-
-
-def test_fetch_json_file_format(cursor, suffix, marked_for_cleanup):
-    file_format = res.JSONFileFormat(
-        name=f"SOME_JSON_FILE_FORMAT_{suffix}",
-        owner=TEST_ROLE,
-    )
-    create(cursor, file_format)
-    marked_for_cleanup.append(file_format)
-
-    result = safe_fetch(cursor, file_format.urn)
-    assert result is not None
-    result = clean_resource_data(res.JSONFileFormat.spec, result)
-    data = clean_resource_data(res.JSONFileFormat.spec, file_format.to_dict())
-    assert result == data
-
-
-def test_fetch_notebook(cursor, suffix, marked_for_cleanup):
-    notebook = res.Notebook(
-        name=f"SOME_NOTEBOOK_{suffix}",
-        query_warehouse="static_warehouse",
-        comment="This is a test notebook",
-        owner=TEST_ROLE,
-    )
-    create(cursor, notebook)
-    marked_for_cleanup.append(notebook)
-
-    result = safe_fetch(cursor, notebook.urn)
-    assert result is not None
-    result = clean_resource_data(res.Notebook.spec, result)
-    data = clean_resource_data(res.Notebook.spec, notebook.to_dict())
     assert result == data
 
 
@@ -1167,42 +584,6 @@ def test_fetch_network_policy(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = clean_resource_data(res.NetworkPolicy.spec, result)
     data = clean_resource_data(res.NetworkPolicy.spec, policy.to_dict())
-    assert result == data
-
-
-def test_fetch_table(cursor, suffix, marked_for_cleanup):
-    table = res.Table(
-        name=f"SOME_TABLE_{suffix}",
-        columns=[
-            res.Column(name="ID", data_type="NUMBER(38,0)", not_null=True),
-            res.Column(name="NAME", data_type="VARCHAR(16777216)", not_null=False),
-        ],
-        database="STATIC_DATABASE",
-        schema="PUBLIC",
-        owner=TEST_ROLE,
-    )
-    create(cursor, table)
-    marked_for_cleanup.append(table)
-
-    result = safe_fetch(cursor, table.urn)
-    assert result is not None
-    result = clean_resource_data(res.Table.spec, result)
-    data = clean_resource_data(res.Table.spec, table.to_dict())
-    assert result == data
-
-
-def test_fetch_image_repository(cursor, suffix, marked_for_cleanup):
-    repository = res.ImageRepository(
-        name=f"SOME_IMAGE_REPOSITORY_{suffix}",
-        owner=TEST_ROLE,
-    )
-    create(cursor, repository)
-    marked_for_cleanup.append(repository)
-
-    result = safe_fetch(cursor, repository.urn)
-    assert result is not None
-    result = clean_resource_data(res.ImageRepository.spec, result)
-    data = clean_resource_data(res.ImageRepository.spec, repository.to_dict())
     assert result == data
 
 
@@ -1236,28 +617,4 @@ def test_fetch_external_volume(cursor, suffix, marked_for_cleanup):
     assert clean_resource_data(ExternalVolumeStorageLocation.spec, result_storage_locations[0]) == clean_resource_data(
         ExternalVolumeStorageLocation.spec, data_storage_locations[0]
     )
-    assert result == data
-
-
-def test_fetch_iceberg_table(cursor, suffix, marked_for_cleanup):
-    table = res.SnowflakeIcebergTable(
-        name=f"SOME_ICEBERG_TABLE_{suffix}",
-        columns=[
-            res.Column(name="ID", data_type="NUMBER(38,0)", not_null=True),
-            res.Column(name="NAME", data_type="VARCHAR(16777216)", not_null=False),
-        ],
-        database="STATIC_DATABASE",
-        schema="PUBLIC",
-        owner=TEST_ROLE,
-        catalog="SNOWFLAKE",
-        external_volume="static_external_volume",
-        base_location="some_prefix",
-    )
-    cursor.execute(table.create_sql(if_not_exists=True))
-    marked_for_cleanup.append(table)
-
-    result = safe_fetch(cursor, table.urn)
-    assert result is not None
-    result = clean_resource_data(res.SnowflakeIcebergTable.spec, result)
-    data = clean_resource_data(res.SnowflakeIcebergTable.spec, table.to_dict())
     assert result == data

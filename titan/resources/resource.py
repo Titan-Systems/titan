@@ -10,6 +10,7 @@ from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
 import pyparsing as pp
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
+from ..exceptions import ResourceHasContainerException, WrongContainerException, WrongEditionException
 from ..identifiers import FQN, URN, parse_identifier, resource_label_for_type
 from ..lifecycle import create_resource, drop_resource
 from ..parse import _parse_create_header, _parse_props, resolve_resource_class
@@ -26,14 +27,6 @@ from ..scope import (
     resource_can_be_contained_in,
 )
 from ..var import VarString, string_contains_var
-
-
-class WrongContainerException(Exception):
-    pass
-
-
-class ResourceHasContainerException(Exception):
-    pass
 
 
 def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
@@ -64,7 +57,7 @@ class Returns(TypedDict):
 
 
 @dataclass
-class LifecycleConfig:
+class ResourceLifecycleConfig:
     ignore_changes: list[str] = field(default_factory=list)
     prevent_destroy: bool = False
 
@@ -149,6 +142,13 @@ def _coerce_resource_field(field_value, field_type):
             raise TypeError
         else:
             return field_value
+    elif field_type is float:
+        if isinstance(field_value, float):
+            return field_value
+        elif isinstance(field_value, int):
+            return float(field_value)
+        else:
+            raise TypeError
     else:
         # Typecheck all other field types (str, int, etc.)
         if not isinstance(field_value, field_type):
@@ -160,13 +160,59 @@ def _coerce_resource_field(field_value, field_type):
 class ResourceSpecMetadata:
     fetchable: bool = True
     triggers_replacement: bool = False
-    forces_add: bool = False
+    triggers_create: bool = False
     ignore_changes: bool = False
     known_after_apply: bool = False
+    edition: set[AccountEdition] = field(
+        default_factory=lambda: {AccountEdition.STANDARD, AccountEdition.ENTERPRISE, AccountEdition.BUSINESS_CRITICAL}
+    )
 
 
 @dataclass
 class ResourceSpec:
+
+    def to_dict(self, account_edition: AccountEdition):
+        dict_: dict[str, Any] = {}
+
+        def _serialize_field(field, value):
+            if field.name == "owner":
+                return str(value.fqn)
+            elif isinstance(value, ResourcePointer):
+                return str(value.fqn)
+            elif isinstance(value, Resource):
+                if getattr(value, "serialize_inline", False):
+                    return value.to_dict(account_edition)
+                elif isinstance(value, NamedResource):
+                    return str(value.fqn)
+                else:
+                    raise Exception(f"Cannot serialize {value}")
+            elif isinstance(value, ParseableEnum):
+                return str(value)
+            elif isinstance(value, list):
+                return [_serialize_field(field, v) for v in value]
+            elif isinstance(value, dict):
+                return {k: _serialize_field(field, v) for k, v in value.items()}
+            elif isinstance(value, ResourceName):
+                return str(value)
+            elif isinstance(value, ResourceTags):
+                return value.tags
+            else:
+                return value
+
+        for f in fields(self):
+            value = getattr(self, f.name)
+            field_metadata = ResourceSpecMetadata(**f.metadata)
+            if account_edition not in field_metadata.edition:
+                if value != f.default and value is not None:
+                    raise WrongEditionException(
+                        f"Field {self.__class__.__name__}.{f.name} is not supported in edition {account_edition}. Supported editions: {field_metadata.edition}"
+                    )
+                else:
+                    continue
+            dict_[f.name] = _serialize_field(f, value)
+
+        return dict_
+
     def __post_init__(self):
         for f in fields(self):
             field_value = getattr(self, f.name)
@@ -234,7 +280,7 @@ class Resource(metaclass=_Resource):
         self._data: ResourceSpec = None
         self._container: "ResourceContainer" = None
         self._finalized = False
-        self.lifecycle = LifecycleConfig(**lifecycle) if lifecycle else LifecycleConfig()
+        self.lifecycle = ResourceLifecycleConfig(**lifecycle) if lifecycle else ResourceLifecycleConfig()
         self.implicit = implicit
         self.refs: set[Resource] = set()
 
@@ -338,52 +384,27 @@ class Resource(metaclass=_Resource):
     def __hash__(self):
         return hash(URN.from_resource(self, ""))
 
-    def to_dict(self):
-        serialized: dict[str, Any] = {}
-        if self.implicit:
-            serialized["_implicit"] = True
+    def to_dict(self, account_edition: Optional[AccountEdition] = None):
+        return self._data.to_dict(account_edition or AccountEdition.ENTERPRISE)
 
-        def _serialize(field, value):
-            if field.name == "owner":
-                return str(value.fqn)
-            elif isinstance(value, ResourcePointer):
-                return str(value.fqn)
-            elif isinstance(value, Resource):
-                if getattr(value, "serialize_inline", False):
-                    return value.to_dict()
-                elif isinstance(value, NamedResource):
-                    return str(value.fqn)
-                else:
-                    raise Exception(f"Cannot serialize {value}")
-            elif isinstance(value, ParseableEnum):
-                return str(value)
-            elif isinstance(value, list):
-                return [_serialize(field, v) for v in value]
-            elif isinstance(value, dict):
-                return {k: _serialize(field, v) for k, v in value.items()}
-            elif isinstance(value, ResourceName):
-                return str(value)
-            elif isinstance(value, ResourceTags):
-                return value.tags
-            else:
-                return value
-
-        for f in fields(self._data):
-            value = getattr(self._data, f.name)
-            serialized[f.name] = _serialize(f, value)
-
-        return serialized
-
-    def create_sql(self, **kwargs):
+    def create_sql(
+        self,
+        account_edition: Optional[AccountEdition] = None,
+        **kwargs,
+    ):
         return create_resource(
             self.urn,
-            self.to_dict(),
+            self.to_dict(account_edition),
             self.props,
             **kwargs,
         )
 
-    def drop_sql(self, if_exists: bool = False):
-        return drop_resource(self.urn, self.to_dict(), if_exists=if_exists)
+    def drop_sql(
+        self,
+        if_exists: bool = False,
+        account_edition: Optional[AccountEdition] = None,
+    ):
+        return drop_resource(self.urn, self.to_dict(account_edition), if_exists=if_exists)
 
     def _requires(self, resource: "Resource"):
         if self._finalized:
@@ -616,7 +637,7 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
     def resource_type(self):
         return self._resource_type
 
-    def to_dict(self):
+    def to_dict(self, _=None):
         return {
             "_pointer": True,
             "name": self.name,

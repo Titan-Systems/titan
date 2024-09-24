@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 
 import pytest
 
@@ -7,14 +8,19 @@ from titan import var
 from titan.blueprint import (
     Blueprint,
     CreateResource,
-    DuplicateResourceException,
     _merge_pointers,
     compile_plan_to_sql,
     dump_plan,
 )
 from titan.blueprint_config import BlueprintConfig
 from titan.enums import ResourceType, RunMode
-from titan.exceptions import InvalidResourceException, MissingVarException, DuplicateResourceException
+from titan.exceptions import (
+    DuplicateResourceException,
+    InvalidResourceException,
+    MissingVarException,
+    NonConformingPlanException,
+    WrongEditionException,
+)
 from titan.identifiers import FQN, URN, parse_URN
 from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
@@ -45,6 +51,7 @@ def session_ctx() -> dict:
                 GrantedPrivilege(privilege=AccountPriv.CREATE_WAREHOUSE, on="ABCD123"),
             ],
         },
+        "tag_support": True,
     }
 
 
@@ -62,6 +69,7 @@ def resource_manifest():
         "account_locator": "ABCD123",
         "current_role": "SYSADMIN",
         "available_roles": ["SYSADMIN", "USERADMIN"],
+        "tag_support": True,
     }
     db = res.Database(name="DB")
     schema = res.Schema(name="SCHEMA", database=db)
@@ -86,7 +94,7 @@ def test_blueprint_with_database(resource_manifest):
 
     db_urn = parse_URN("urn::ABCD123:database/DB")
     assert db_urn in resource_manifest
-    assert resource_manifest[db_urn].to_dict() == {
+    assert resource_manifest[db_urn].data == {
         "name": "DB",
         "owner": "SYSADMIN",
         "comment": None,
@@ -102,7 +110,7 @@ def test_blueprint_with_database(resource_manifest):
 def test_blueprint_with_schema(resource_manifest):
     schema_urn = parse_URN("urn::ABCD123:schema/DB.SCHEMA")
     assert schema_urn in resource_manifest
-    assert resource_manifest[schema_urn].to_dict() == {
+    assert resource_manifest[schema_urn].data == {
         "comment": None,
         "data_retention_time_in_days": 1,
         "default_ddl_collation": None,
@@ -117,7 +125,7 @@ def test_blueprint_with_schema(resource_manifest):
 def test_blueprint_with_view(resource_manifest):
     view_urn = parse_URN("urn::ABCD123:view/DB.SCHEMA.VIEW")
     assert view_urn in resource_manifest
-    assert resource_manifest[view_urn].to_dict() == {
+    assert resource_manifest[view_urn].data == {
         "as_": "SELECT 1",
         "change_tracking": False,
         "columns": None,
@@ -134,7 +142,7 @@ def test_blueprint_with_view(resource_manifest):
 def test_blueprint_with_table(resource_manifest):
     table_urn = parse_URN("urn::ABCD123:table/DB.SCHEMA.TABLE")
     assert table_urn in resource_manifest
-    assert resource_manifest[table_urn].to_dict() == {
+    assert resource_manifest[table_urn].data == {
         "name": "TABLE",
         "owner": "SYSADMIN",
         "columns": [
@@ -177,7 +185,7 @@ def test_blueprint_with_udf(resource_manifest):
         account_locator="ABCD123",
     )
     assert udf_urn in resource_manifest
-    assert resource_manifest[udf_urn].to_dict() == {
+    assert resource_manifest[udf_urn].data == {
         "name": "SOMEUDF",
         "owner": "SYSADMIN",
         "returns": "VARCHAR",
@@ -565,7 +573,7 @@ def test_blueprint_vars(session_ctx):
         vars={"role_comment": "var role comment"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1]._data.comment == "var role comment"
+    assert manifest.resources[1].data["comment"] == "var role comment"
 
     role = res.Role(name="role", comment="some comment {{ var.suffix }}")
     assert isinstance(role._data.comment, VarString)
@@ -574,7 +582,7 @@ def test_blueprint_vars(session_ctx):
         vars={"suffix": "1234"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1]._data.comment == "some comment 1234"
+    assert manifest.resources[1].data["comment"] == "some comment 1234"
 
     role = res.Role(name=var.role_name)
     assert isinstance(role.name, VarString)
@@ -583,7 +591,7 @@ def test_blueprint_vars(session_ctx):
         vars={"role_name": "role123"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1].name == "role123"
+    assert manifest.resources[1].data["name"] == "role123"
 
     role = res.Role(name="role_{{ var.suffix }}")
     assert isinstance(role.name, VarString)
@@ -592,7 +600,7 @@ def test_blueprint_vars(session_ctx):
         vars={"suffix": "5678"},
     )
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1].name == "role_5678"
+    assert manifest.resources[1].data["name"] == "role_5678"
 
 
 def test_blueprint_vars_spec(session_ctx):
@@ -608,7 +616,7 @@ def test_blueprint_vars_spec(session_ctx):
     )
     assert blueprint._config.vars == {"role_comment": "var role comment"}
     manifest = blueprint.generate_manifest(session_ctx)
-    assert manifest.resources[1]._data.comment == "var role comment"
+    assert manifest.resources[1].data["comment"] == "var role comment"
 
     with pytest.raises(MissingVarException):
         blueprint = Blueprint(
@@ -689,3 +697,41 @@ def test_merge_account_scoped_resources_fail():
     ]
     with pytest.raises(DuplicateResourceException):
         _merge_pointers(resources)
+
+
+def test_blueprint_edition_checks(session_ctx, remote_state):
+    session_ctx = deepcopy(session_ctx)
+    session_ctx["tag_support"] = False
+
+    blueprint = Blueprint(resources=[res.Database(name="DB1"), res.Tag(name="TAG1")])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    with pytest.raises(NonConformingPlanException):
+        blueprint._raise_for_nonconforming_plan(session_ctx, plan)
+
+    blueprint = Blueprint(resources=[res.Warehouse(name="WH", min_cluster_count=2)])
+    with pytest.raises(WrongEditionException):
+        blueprint.generate_manifest(session_ctx)
+
+    blueprint = Blueprint(resources=[res.Warehouse(name="WH", min_cluster_count=1)])
+    assert blueprint.generate_manifest(session_ctx)
+
+    blueprint = Blueprint(resources=[res.Warehouse(name="WH")])
+    assert blueprint.generate_manifest(session_ctx)
+
+
+def test_blueprint_warehouse_scaling_policy_doesnt_render_in_standard_edition(session_ctx, remote_state):
+    session_ctx = deepcopy(session_ctx)
+    session_ctx["tag_support"] = False
+    wh = res.Warehouse(name="WH", warehouse_size="XSMALL")
+    blueprint = Blueprint(resources=[wh])
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+    assert isinstance(plan[0], CreateResource)
+    sql = compile_plan_to_sql(session_ctx, plan)
+    assert len(sql) == 3
+    assert sql[0] == "USE SECONDARY ROLES ALL"
+    assert sql[1] == "USE ROLE SYSADMIN"
+    assert sql[2].startswith("CREATE WAREHOUSE WH")
+    assert "scaling_policy" not in sql[2]

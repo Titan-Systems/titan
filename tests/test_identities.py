@@ -7,11 +7,24 @@ from typing import get_args, get_origin
 
 from tests.helpers import get_json_fixtures
 from titan.data_types import convert_to_canonical_data_type
+from titan.enums import AccountEdition
 from titan.resources import Resource
 from titan.resource_name import ResourceName
 from titan.role_ref import RoleRef
 
 JSON_FIXTURES = list(get_json_fixtures())
+
+
+def remove_none_values(d):
+    new_dict = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            new_dict[k] = remove_none_values(v)
+        elif isinstance(v, list) and len(v) > 0 and isinstance(v[0], dict):
+            new_dict[k] = [remove_none_values(item) for item in v if item is not None]
+        elif v is not None:
+            new_dict[k] = v
+    return new_dict
 
 
 @pytest.fixture(
@@ -26,6 +39,8 @@ def resource(request):
 
 def _field_type_is_serialized_as_resource_name(field):
     if field.type is RoleRef:
+        return True
+    if field.type is ResourceName:
         return True
     elif isinstance(field.type, str) and field.name == "owner" and field.type == "Role":
         return True
@@ -63,11 +78,11 @@ def test_data_identity(resource):
         for lhs, rhs in zip(lhs_cols, rhs_cols):
             if "name" in lhs:
                 assert _resource_names_are_eq(lhs.pop("name"), rhs.pop("name"))
-            if "data_type" in lhs:
+            if "data_type" in lhs and "data_type" in rhs:
                 assert convert_to_canonical_data_type(lhs.pop("data_type")) == convert_to_canonical_data_type(
                     rhs.pop("data_type")
                 )
-            assert lhs == rhs
+            assert remove_none_values(lhs) == remove_none_values(rhs)
     if "args" in serialized:
         lhs_args = serialized.pop("args", []) or []
         rhs_args = data.pop("args", []) or []
@@ -90,13 +105,13 @@ def test_data_identity(resource):
     assert serialized == data
 
 
-def test_sql_identity(resource):
+def test_sql_identity(resource: tuple[type[Resource], dict]):
     resource_cls, data = resource
     instance = resource_cls(**data)
-    sql = instance.create_sql()
+    sql = instance.create_sql(AccountEdition.ENTERPRISE)
     new = resource_cls.from_sql(sql)
-    new_dict = new.to_dict()
-    instance_dict = instance.to_dict()
+    new_dict = new.to_dict(AccountEdition.ENTERPRISE)
+    instance_dict = instance.to_dict(AccountEdition.ENTERPRISE)
     if "name" in new_dict:
         assert ResourceName(new_dict.pop("name")) == ResourceName(instance_dict.pop("name"))
 

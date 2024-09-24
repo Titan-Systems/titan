@@ -28,6 +28,7 @@ def session_ctx() -> dict:
             "PUBLIC",
         ],
         "role_privileges": {},
+        "tag_support": True,
     }
 
 
@@ -89,7 +90,7 @@ def test_custom_role_owner(session_ctx, remote_state):
 def test_transfer_ownership(session_ctx, remote_state):
     remote_state = remote_state.copy()
     remote_state[parse_URN("urn::ABCD123:role/test_role")] = {
-        "name": "test_role",
+        "name": str(ResourceName("test_role")),
         "owner": "ACCOUNTADMIN",
         "comment": None,
     }
@@ -111,7 +112,7 @@ def test_transfer_ownership(session_ctx, remote_state):
 def test_transfer_ownership_with_changes(session_ctx, remote_state):
     remote_state = remote_state.copy()
     remote_state[parse_URN("urn::ABCD123:role/test_role")] = {
-        "name": "test_role",
+        "name": str(ResourceName("test_role")),
         "owner": "ACCOUNTADMIN",
         "comment": None,
     }
@@ -185,6 +186,7 @@ def test_resource_cant_be_created(remote_state):
             "TEST_ROLE",
         ],
         "role_privileges": {},
+        "tag_support": True,
     }
     warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
     blueprint = Blueprint(resources=[warehouse])
@@ -211,6 +213,7 @@ def test_grant_with_grant_admin_custom_role(remote_state):
                 GrantedPrivilege(privilege=AccountPriv.MANAGE_GRANTS, on="ABCD123"),
             ]
         },
+        "tag_support": True,
     }
 
     grant = res.RoleGrant(role="GRANT_ADMIN", to_role="SYSADMIN")
@@ -236,6 +239,7 @@ def test_tag_reference_with_tag_admin_custom_role():
                 GrantedPrivilege(privilege=AccountPriv.APPLY_TAG, on="ABCD123"),
             ]
         },
+        "tag_support": True,
         "tags": ["tags.tags.cost_center"],
     }
 

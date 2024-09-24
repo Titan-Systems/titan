@@ -2,7 +2,7 @@ import pytest
 
 from titan import resources as res
 from titan.enums import ResourceType
-from titan.resources.resource import ResourceHasContainerException, WrongContainerException
+from titan.exceptions import ResourceHasContainerException, WrongContainerException
 
 
 def test_account_can_add_database():

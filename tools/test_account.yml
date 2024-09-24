@@ -14,6 +14,7 @@ allowlist:
   - "role grant"
   - "role"
   - "schema"
+  - "secret"
   - "security integration"
   - "share"
   - "stage"
@@ -259,3 +260,11 @@ external_volumes:
         storage_base_url: "{{ var.storage_base_url }}"
         storage_aws_role_arn: "{{ var.storage_role_arn }}"
         storage_aws_external_id: iceberg_table_external_id
+
+secrets:
+  - name: static_secret
+    secret_type: PASSWORD
+    username: someuser
+    password: somepass
+    database: static_database
+    schema: public

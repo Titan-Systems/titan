@@ -621,7 +621,7 @@ class ColumnNamesProp(Prop):
         columns = []
         for column in values:
             name = column["name"]
-            comment = f" COMMENT '{column['comment']}'" if "comment" in column else ""
+            comment = f" COMMENT '{column['comment']}'" if "comment" in column and column["comment"] else ""
             column_str = f"{name}{comment}"
             columns.append(column_str)
         return f"({', '.join(columns)})"

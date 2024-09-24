@@ -3,7 +3,7 @@
     "client_types": [
         "SNOWFLAKE_UI"
     ],
-    "comment": "Auth policy that only allows access through the web interface",
+    "comment": null,
     "owner": "SECURITYADMIN",
     "mfa_enrollment": "OPTIONAL",
     "security_integrations": [

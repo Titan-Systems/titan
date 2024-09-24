@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource
+from .resource import Resource, ResourceSpec, NamedResource, ResourcePointer, convert_to_resource
 from ..resource_name import ResourceName
 from .network_rule import NetworkRule
 from .role import Role
+
+# from .secret import Secret
 from ..enums import ResourceType
 from ..scope import AccountScope
 
@@ -33,11 +35,21 @@ class _ExternalAccessIntegration(ResourceSpec):
             if len(self.allowed_authentication_secrets) < 1:
                 raise ValueError("allowed_authentication_secrets must have at least one element if specified")
 
-            if "any" in self.allowed_authentication_secrets and len(self.allowed_authentication_secrets) > 1:
-                raise ValueError("allowed_authentication_secrets must not contain 'any' if there are other secrets")
-
-            if "none" in self.allowed_authentication_secrets and len(self.allowed_authentication_secrets) > 1:
-                raise ValueError("allowed_authentication_secrets must not contain 'none' if there are other secrets")
+            if not (
+                len(self.allowed_authentication_secrets) == 1
+                and self.allowed_authentication_secrets[0] in ("all", "none")
+            ):
+                converted_secrets = []
+                for secret in self.allowed_authentication_secrets:
+                    if isinstance(secret, (str, ResourceName)):
+                        converted_secrets.append(ResourcePointer(name=secret, resource_type=ResourceType.SECRET))
+                    elif isinstance(secret, ResourcePointer) and secret.resource_type == ResourceType.SECRET:
+                        converted_secrets.append(secret)
+                    elif isinstance(secret, Resource) and secret.resource_type == ResourceType.SECRET:
+                        converted_secrets.append(secret)
+                    else:
+                        raise ValueError(f"Invalid secret type: {secret}")
+                self.allowed_authentication_secrets = converted_secrets
 
 
 class ExternalAccessIntegration(NamedResource, Resource):
