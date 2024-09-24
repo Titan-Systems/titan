@@ -7,6 +7,7 @@ from titan import data_provider
 from titan import resources as res
 from titan.enums import AccountEdition
 from titan.resources import Resource
+from titan.scope import AccountScope, DatabaseScope, SchemaScope
 
 pytestmark = pytest.mark.requires_snowflake
 
@@ -44,8 +45,6 @@ def resource_fixtures() -> list:
             condition="SELECT 1",
             then="SELECT 1",
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.AuthenticationPolicy(
             name="TEST_FETCH_AUTHENTICATION_POLICY",
@@ -53,7 +52,6 @@ def resource_fixtures() -> list:
             mfa_enrollment="REQUIRED",
             client_types=["SNOWFLAKE_UI"],
             security_integrations=["STATIC_SECURITY_INTEGRATION"],
-            comment="Authentication policy for testing",
             owner=TEST_ROLE,
         ),
         res.AzureStorageIntegration(
@@ -74,8 +72,6 @@ def resource_fixtures() -> list:
             null_if=["NULL", "null"],
             empty_field_as_null=True,
             compression="GZIP",
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.Database(
             name="TEST_FETCH_DATABASE",
@@ -84,11 +80,6 @@ def resource_fixtures() -> list:
             data_retention_time_in_days=1,
             max_data_extension_time_in_days=3,
             comment="This is a test database",
-        ),
-        res.DatabaseRole(
-            name="TEST_FETCH_DATABASE_ROLE",
-            database="STATIC_DATABASE",
-            owner=TEST_ROLE,
         ),
         res.DynamicTable(
             name="TEST_FETCH_DYNAMIC_TABLE",
@@ -100,8 +91,6 @@ def resource_fixtures() -> list:
             comment="this is a comment",
             as_="SELECT id FROM STATIC_DATABASE.PUBLIC.STATIC_TABLE",
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.EventTable(
             name="TEST_FETCH_EVENT_TABLE",
@@ -109,8 +98,6 @@ def resource_fixtures() -> list:
             cluster_by=["START_TIMESTAMP"],
             data_retention_time_in_days=1,
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
             comment="This is a test event table",
         ),
         res.ExternalAccessIntegration(
@@ -125,8 +112,6 @@ def resource_fixtures() -> list:
             name="TEST_FETCH_EXTERNAL_STAGE",
             url="s3://titan-snowflake/",
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
             directory={"enable": True},
             comment="This is a test external stage",
         ),
@@ -155,8 +140,6 @@ def resource_fixtures() -> list:
             name="TEST_FETCH_INTERNAL_STAGE",
             directory={"enable": True},
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
             comment="This is a test internal stage",
         ),
         res.JavascriptUDF(
@@ -167,16 +150,12 @@ def resource_fixtures() -> list:
             as_="return 42;",
             secure=False,
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.JSONFileFormat(
             name="TEST_FETCH_JSON_FILE_FORMAT",
             owner=TEST_ROLE,
             compression="GZIP",
             replace_invalid_characters=True,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
             comment="This is a test JSON file format",
         ),
         res.Notebook(
@@ -208,8 +187,6 @@ def resource_fixtures() -> list:
             password_history=5,
             # comment="production account password policy", # Leaving this out until Snowflake fixes their bugs
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.PackagesPolicy(
             name="TEST_FETCH_PACKAGES_POLICY",
@@ -232,8 +209,6 @@ def resource_fixtures() -> list:
             null_handling="CALLED ON NULL INPUT",
             secure=False,
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
             as_="def main(arg1): return 42",
         ),
         res.ResourceMonitor(
@@ -255,7 +230,6 @@ def resource_fixtures() -> list:
         ),
         res.Schema(
             name="TEST_FETCH_SCHEMA",
-            database="STATIC_DATABASE",
             owner=TEST_ROLE,
             transient=True,
             managed_access=True,
@@ -267,8 +241,6 @@ def resource_fixtures() -> list:
             increment=2,
             comment="+3",
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.Share(
             name="TEST_FETCH_SHARE",
@@ -281,8 +253,6 @@ def resource_fixtures() -> list:
                 res.Column(name="ID", data_type="NUMBER(38,0)", not_null=True),
                 res.Column(name="NAME", data_type="VARCHAR(16777216)", not_null=False),
             ],
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
             owner=TEST_ROLE,
             catalog="SNOWFLAKE",
             external_volume="static_external_volume",
@@ -294,8 +264,6 @@ def resource_fixtures() -> list:
                 res.Column(name="ID", data_type="NUMBER(38,0)", not_null=True),
                 res.Column(name="NAME", data_type="VARCHAR(16777216)", not_null=False),
             ],
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
             owner=TEST_ROLE,
         ),
         res.Task(
@@ -304,8 +272,6 @@ def resource_fixtures() -> list:
             state="SUSPENDED",
             as_="SELECT 1",
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.User(
             name="TEST_FETCH_USER@applytitan.com",
@@ -327,8 +293,6 @@ def resource_fixtures() -> list:
             columns=[{"name": "ID", "data_type": "NUMBER(1,0)", "not_null": False}],
             comment="View for testing",
             owner=TEST_ROLE,
-            database="STATIC_DATABASE",
-            schema="PUBLIC",
         ),
         res.Warehouse(
             name="TEST_FETCH_WAREHOUSE",
@@ -355,19 +319,43 @@ def create(cursor, resource: Resource, account_edition):
     ids=[resource.__class__.__name__ for resource in resource_fixtures()],
     scope="function",
 )
-def resource_fixture(request):
+def resource_fixture(
+    request,
+    cursor,
+    test_database,
+    marked_for_cleanup,
+    account_edition,
+):
+
+    if account_edition not in resource_fixture.edition:
+        return
+
     resource = request.param
+    if isinstance(resource.scope, DatabaseScope):
+        test_database.add(resource)
+    elif isinstance(resource.scope, SchemaScope):
+        test_database.public_schema.add(resource)
+    elif isinstance(resource.scope, AccountScope):
+        cursor.execute(resource.drop_sql(if_exists=True))
+
+    marked_for_cleanup.append(resource)
     yield resource
 
 
-def test_fetch(cursor, resource_fixture, marked_for_cleanup, account_edition):
-    if account_edition not in resource_fixture.edition:
-        pytest.skip(
-            f"Skipping {resource_fixture.__class__.__name__}, not supported by account edition {account_edition}"
-        )
+@pytest.fixture(scope="session")
+def test_database(cursor, suffix, marked_for_cleanup):
+    db = res.Database(name=f"fetch_resource_test_database_{suffix}")
+    cursor.execute(db.create_sql(if_not_exists=True))
+    marked_for_cleanup.append(db)
+    yield db
+
+
+def test_fetch(
+    cursor,
+    resource_fixture,
+):
 
     create(cursor, resource_fixture, account_edition)
-    marked_for_cleanup.append(resource_fixture)
 
     fetched = safe_fetch(cursor, resource_fixture.urn)
     assert fetched is not None

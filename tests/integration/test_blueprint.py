@@ -13,6 +13,7 @@ from titan.blueprint import (
     UpdateResource,
     compile_plan_to_sql,
 )
+from titan.resources.database import public_schema_urn
 from titan.client import reset_cache
 from titan.enums import ResourceType
 
@@ -440,7 +441,7 @@ def test_blueprint_database_params_passed_to_public_schema(cursor, suffix):
     def _database():
         return res.Database(
             name=f"test_db_params_passed_to_public_schema_{suffix}",
-            data_retention_time_in_days=2,
+            data_retention_time_in_days=1,
             max_data_extension_time_in_days=2,
             default_ddl_collation="en_US",
         )
@@ -450,11 +451,11 @@ def test_blueprint_database_params_passed_to_public_schema(cursor, suffix):
     plan = blueprint.plan(session)
     assert len(plan) == 1
     blueprint.apply(session, plan)
-    database_data = safe_fetch(cursor, database.urn)
-    assert database_data is not None
-    assert database_data["data_retention_time_in_days"] == 2
-    assert database_data["max_data_extension_time_in_days"] == 2
-    assert database_data["default_ddl_collation"] == "en_US"
+    schema_data = safe_fetch(cursor, public_schema_urn(database.urn))
+    assert schema_data is not None
+    assert schema_data["data_retention_time_in_days"] == 1
+    assert schema_data["max_data_extension_time_in_days"] == 2
+    assert schema_data["default_ddl_collation"] == "en_US"
     database = _database()
     blueprint = Blueprint(resources=[database])
     plan = blueprint.plan(session)

@@ -1092,6 +1092,15 @@ def sql_commands_for_change(
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
         change_cmd = lifecycle.update_resource(change.urn, change.delta, props)
     elif isinstance(change, DropResource):
+        if transfer_owner:
+            before_change_cmd.append(
+                lifecycle.transfer_resource(
+                    change.urn,
+                    owner=str(execution_role),
+                    owner_resource_type=infer_role_type_from_name(str(execution_role)),
+                    copy_current_grants=True,
+                )
+            )
         change_cmd = lifecycle.drop_resource(
             change.urn,
             change.before,
@@ -1332,13 +1341,10 @@ def _sort_destructive_changes(
     # Not quite right but close enough for now.
     def sort_key(change: ResourceChange) -> tuple:
         return (
+            change.urn.resource_type != ResourceType.NETWORK_POLICY,
             change.urn.database is not None,
             change.urn.schema is not None,
-            # First, sort by the inverse of the sort_order (to reverse the order)
             -1 * sort_order[change.urn],
-            # Then, sort network policies to the beginning
-            change.urn.resource_type != ResourceType.NETWORK_POLICY,
-            # Add more sorting criteria here if needed
         )
 
     return sorted(destructive_changes, key=sort_key)
