@@ -326,11 +326,10 @@ def resource_fixture(
     marked_for_cleanup,
     account_edition,
 ):
-
-    if account_edition not in resource_fixture.edition:
+    resource = request.param
+    if account_edition not in resource.edition:
         return
 
-    resource = request.param
     if isinstance(resource.scope, DatabaseScope):
         test_database.add(resource)
     elif isinstance(resource.scope, SchemaScope):
