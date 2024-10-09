@@ -22,6 +22,13 @@ class JsonParamType(click.ParamType):
             self.fail(f"'{value}' is not a valid JSON string", param, ctx)
 
 
+class CommaSeparatedListParamType(click.ParamType):
+    name = "comma_separated_list"
+
+    def convert(self, value, param, ctx):
+        return _parse_resources(value)
+
+
 def load_config(config_file):
     with open(config_file, "r") as f:
         config = yaml.safe_load(f)
@@ -46,6 +53,11 @@ def titan_cli():
 @click.option("--out", "output_file", type=str, help="Write plan to a file", metavar="<filename>")
 @click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
 @click.option(
+    "--allowlist",
+    type=CommaSeparatedListParamType(),
+    help="List of resources types allowed in the plan. If not specified, all resources are allowed.",
+)
+@click.option(
     "--mode",
     "run_mode",
     type=click.Choice(["CREATE-OR-UPDATE", "SYNC"]),
@@ -53,7 +65,7 @@ def titan_cli():
     show_default=True,
     help="Run mode",
 )
-def plan(config_file, json_output, output_file, vars: dict, run_mode):
+def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode):
     """Generate an execution plan based on your configuration"""
     yaml_config = load_config(config_file)
     cli_config = {}
@@ -61,6 +73,8 @@ def plan(config_file, json_output, output_file, vars: dict, run_mode):
         cli_config["vars"] = vars
     if run_mode:
         cli_config["run_mode"] = RunMode(run_mode)
+    if allowlist:
+        cli_config["allowlist"] = allowlist
     plan_obj = blueprint_plan(yaml_config, cli_config)
     output = None
     if json_output:
@@ -79,6 +93,11 @@ def plan(config_file, json_output, output_file, vars: dict, run_mode):
 @click.option("--plan", "plan_file", type=str, help="Path to plan JSON file", metavar="<filename>")
 @click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
 @click.option(
+    "--allowlist",
+    type=CommaSeparatedListParamType(),
+    help="List of resources types allowed in the plan. If not specified, all resources are allowed.",
+)
+@click.option(
     "--mode",
     "run_mode",
     type=click.Choice(["CREATE-OR-UPDATE", "SYNC"]),
@@ -87,7 +106,7 @@ def plan(config_file, json_output, output_file, vars: dict, run_mode):
     help="Run mode",
 )
 @click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes")
-def apply(config_file, plan_file, vars, run_mode, dry_run):
+def apply(config_file, plan_file, vars, allowlist, run_mode, dry_run):
     """Apply an execution plan to a Snowflake account"""
     if config_file and plan_file:
         raise click.UsageError("Cannot specify both --config and --plan.")
