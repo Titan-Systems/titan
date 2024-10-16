@@ -26,7 +26,13 @@ class CommaSeparatedListParamType(click.ParamType):
     name = "comma_separated_list"
 
     def convert(self, value, param, ctx):
-        return _parse_resources(value)
+        return parse_resources(value)
+
+
+def parse_resources(resource_labels_str):
+    if resource_labels_str is None:
+        return None
+    return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
 
 
 def load_config(config_file):
@@ -56,6 +62,7 @@ def titan_cli():
     "--allowlist",
     type=CommaSeparatedListParamType(),
     help="List of resources types allowed in the plan. If not specified, all resources are allowed.",
+    metavar="<resource_types>",
 )
 @click.option(
     "--mode",
@@ -112,34 +119,44 @@ def apply(config_file, plan_file, vars, allowlist, run_mode, dry_run):
         raise click.UsageError("Cannot specify both --config and --plan.")
     if not config_file and not plan_file:
         raise click.UsageError("Either --config or --plan must be specified.")
+
+    cli_config = {}
+    if vars:
+        cli_config["vars"] = vars
+    if run_mode:
+        cli_config["run_mode"] = RunMode(run_mode)
+    if dry_run:
+        cli_config["dry_run"] = dry_run
+    if allowlist:
+        cli_config["allowlist"] = allowlist
+
     if config_file:
         yaml_config = load_config(config_file)
-        cli_config = {}
-        if vars:
-            cli_config["vars"] = vars
-        if run_mode:
-            cli_config["run_mode"] = RunMode(run_mode)
-        if dry_run:
-            cli_config["dry_run"] = dry_run
         blueprint_apply(yaml_config, cli_config)
     else:
         plan_obj = load_plan(plan_file)
-        blueprint_apply(plan_obj, run_mode, dry_run)
-
-
-def _parse_resources(resource_labels_str):
-    if resource_labels_str is None:
-        return None
-    return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
+        blueprint_apply(plan_obj, cli_config)
 
 
 @titan_cli.command("export", context_settings={"show_default": True}, no_args_is_help=True)
-@click.option("--resource", type=str, help="The resource types to export", metavar="<resource_types>")
+@click.option(
+    "--resource",
+    "resources",
+    type=CommaSeparatedListParamType(),
+    help="The resource types to export",
+    metavar="<resource_types>",
+)
 @click.option("--all", "export_all", is_flag=True, help="Export all resources")
-@click.option("--exclude", "exclude", type=str, help="Exclude resources, used with --all", metavar="<resource_types>")
+@click.option(
+    "--exclude",
+    "exclude_resources",
+    type=CommaSeparatedListParamType(),
+    help="Exclude resources, used with --all",
+    metavar="<resource_types>",
+)
 @click.option("--out", type=str, help="Write exported config to a file", metavar="<filename>")
 @click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Output format")
-def export(resource, export_all, exclude, out, format):
+def export(resources, export_all, exclude_resources, out, format):
     """
     This command allows you to export resources from Titan in either JSON or YAML format.
     You can specify the type of resource to export and the output filename for the exported data.
@@ -162,14 +179,14 @@ def export(resource, export_all, exclude, out, format):
     titan export --all --exclude=user,role --out=titan.yml
     """
 
-    if resource and export_all:
+    if resources and export_all:
         raise click.UsageError("You can't specify both --resource and --all options at the same time.")
 
     resource_config = {}
-    if resource:
-        resource_config = export_resources(include=_parse_resources(resource))
+    if resources:
+        resource_config = export_resources(include=resources)
     elif export_all:
-        resource_config = export_resources(exclude=_parse_resources(exclude))
+        resource_config = export_resources(exclude=exclude_resources)
     else:
         raise
 
