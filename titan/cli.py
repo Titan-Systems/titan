@@ -82,6 +82,7 @@ def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode)
         cli_config["run_mode"] = RunMode(run_mode)
     if allowlist:
         cli_config["allowlist"] = allowlist
+
     plan_obj = blueprint_plan(yaml_config, cli_config)
     output = None
     if json_output:
