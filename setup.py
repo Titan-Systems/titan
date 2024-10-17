@@ -48,7 +48,7 @@ setup(
             "build",
             "codespell==2.2.6",
             "pytest-cov",
-            "pytest-profiling",
+            "pytest-profiling!=1.8.0",
             "pytest-xdist",
             "pytest>=6.0",
             "python-dotenv",
