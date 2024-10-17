@@ -196,7 +196,11 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict] = Non
 
     allowlist = config.pop("allowlist", None)
     if allowlist:
+        if "allowlist" in cli_config:
+            raise ValueError("Cannot specify both allowlist in yaml and cli")
         blueprint_args["allowlist"] = [ResourceType(resource_type) for resource_type in allowlist]
+    elif "allowlist" in cli_config:
+        blueprint_args["allowlist"] = [ResourceType(resource_type) for resource_type in cli_config["allowlist"]]
 
     dry_run = config.pop("dry_run", None)
     if dry_run:
