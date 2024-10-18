@@ -200,12 +200,11 @@ class URN:
 
 
 def parse_identifier(identifier: str, is_db_scoped=False) -> dict:
-    # TODO: This needs to support periods and question marks in double quoted identifiers
-    scoped_name, param_str = identifier.split("?") if "?" in identifier else (identifier, "")
+    scoped_name, param_str = smart_split(identifier, "?") if "?" in identifier else (identifier, "")
     params = {}
     if param_str:
-        for param in param_str.split("&"):
-            k, v = param.split("=")
+        for param in smart_split(param_str, "&"):
+            k, v = smart_split(param, "=")
             params[k] = v
 
     arg_types = None
@@ -218,9 +217,8 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> dict:
             scoped_name += '"'
         else:
             scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
-        # TODO: This needs to support colons in double quoted identifiers
-        args_str = ":".join(args_str.split(":")[:-1]) if ":" in args_str else args_str  # Strip return type
-        arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
+        args_str = ":".join(smart_split(args_str, ":")[:-1]) if ":" in args_str else args_str  # Strip return type
+        arg_types = [arg.strip() for arg in smart_split(args_str.strip("()"), ",")]
 
     try:
         name_parts = list(FullyQualifiedIdentifier.parse_string(scoped_name, parse_all=True))
@@ -315,3 +313,14 @@ def names_are_equal(name1: Union[None, str, ResourceName], name2: Union[None, st
     if name1 is None or name2 is None:
         return False
     return ResourceName(name1) == ResourceName(name2)
+
+
+def smart_split(s: str, sep: str, maxsplit: int = -1) -> list[str]:
+    """Split while respecting double-quoted identifiers"""
+    content = pp.original_text_for(
+        pp.Optional(pp.dbl_quoted_string | pp.Word(pp.printables.replace(sep, "")))
+    )
+    res = list(pp.delimited_list(content, sep, allow_trailing_delim=True).leave_whitespace().parse_string(s))
+    if maxsplit >= 0 and len(res) > maxsplit:
+        res = [*res[:maxsplit], sep.join(res[maxsplit:])]
+    return res
