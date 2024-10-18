@@ -211,7 +211,15 @@ def parse_identifier(identifier: str, is_db_scoped=False) -> dict:
     arg_types = None
     if "(" in scoped_name:
         args_start = scoped_name.find("(")
-        scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
+        if scoped_name.endswith('"'):
+            # Handle situation such as `a.b."c(x varchar):varchar(12345)"`
+            scoped_name = scoped_name.rstrip('"')
+            scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
+            scoped_name += '"'
+        else:
+            scoped_name, args_str = scoped_name[:args_start], scoped_name[args_start:]
+        # TODO: This needs to support colons in double quoted identifiers
+        args_str = ":".join(args_str.split(":")[:-1]) if ":" in args_str else args_str  # Strip return type
         arg_types = [arg.strip() for arg in args_str.strip("()").split(",")]
 
     try:
