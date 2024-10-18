@@ -26,7 +26,7 @@ from .exceptions import (
     NonConformingPlanException,
     OrphanResourceException,
 )
-from .identifiers import URN, parse_identifier, resource_label_for_type
+from .identifiers import URN, parse_identifier, parse_URN, resource_label_for_type
 from .privs import (
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     PRIVS_FOR_RESOURCE_TYPE,
@@ -72,6 +72,7 @@ class CreateResource(ResourceChange):
         return {
             "action": "CREATE",
             "urn": str(self.urn),
+            "resource_cls": self.resource_cls.__name__,
             "after": self.after,
         }
 
@@ -99,6 +100,7 @@ class UpdateResource(ResourceChange):
         return {
             "action": "UPDATE",
             "urn": str(self.urn),
+            "resource_cls": self.resource_cls.__name__,
             "before": self.before,
             "after": self.after,
             "delta": self.delta,
@@ -115,6 +117,7 @@ class TransferOwnership(ResourceChange):
         return {
             "action": "TRANSFER",
             "urn": str(self.urn),
+            "resource_cls": self.resource_cls.__name__,
             "from_owner": self.from_owner,
             "to_owner": self.to_owner,
         }
@@ -122,6 +125,49 @@ class TransferOwnership(ResourceChange):
 
 State = dict[URN, dict]
 Plan = list[ResourceChange]
+
+
+def plan_from_dict(plan_dict: dict) -> Plan:
+    changes = []
+    for change in plan_dict:
+        action = change["action"]
+        if action == "CREATE":
+            changes.append(
+                CreateResource(
+                    urn=parse_URN(change["urn"]),
+                    resource_cls=Resource.__classes__[change["resource_cls"]],
+                    after=change["after"],
+                )
+            )
+        elif action == "DROP":
+            changes.append(
+                DropResource(
+                    urn=parse_URN(change["urn"]),
+                    before=change["before"],
+                )
+            )
+        elif action == "UPDATE":
+            changes.append(
+                UpdateResource(
+                    urn=parse_URN(change["urn"]),
+                    resource_cls=Resource.__classes__[change["resource_cls"]],
+                    before=change["before"],
+                    after=change["after"],
+                    delta=change["delta"],
+                )
+            )
+        elif action == "TRANSFER":
+            changes.append(
+                TransferOwnership(
+                    urn=parse_URN(change["urn"]),
+                    resource_cls=Resource.__classes__[change["resource_cls"]],
+                    from_owner=change["from_owner"],
+                    to_owner=change["to_owner"],
+                )
+            )
+        else:
+            raise Exception(f"Unsupported action {action}")
+    return changes
 
 
 @dataclass

@@ -248,12 +248,14 @@ RESOURCE_SCOPES = {
 
 class _Resource(type):
     __types__: dict[ResourceType, list[Type["Resource"]]] = {}
+    __classes__: dict[str, Type["Resource"]] = {}
     __resolvers__ = {}
 
     def __new__(cls, name, bases, attrs):
         cls_ = super().__new__(cls, name, bases, attrs)
         if cls_.__name__ in ["Resource", "_Resource", "ResourcePointer"]:
             return cls_
+        cls.__classes__[name] = cls_
         if cls_.resource_type not in cls.__types__:
             cls.__types__[cls_.resource_type] = []
         cls.__types__[cls_.resource_type].append(cls_)
