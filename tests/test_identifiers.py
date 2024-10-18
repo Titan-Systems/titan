@@ -3,7 +3,7 @@ import pytest
 import pyparsing as pp
 
 from titan import resources as res
-from titan.identifiers import parse_URN
+from titan.identifiers import parse_URN, smart_split
 from titan.parse import FullyQualifiedIdentifier
 from titan.resource_name import ResourceName
 
@@ -114,3 +114,13 @@ def test_parse_fully_qualified_schema():
 def test_resource_name_type_checking():
     with pytest.raises(RuntimeError):
         ResourceName(111)
+
+
+def test_smart_split():
+    assert smart_split("simple?test?of?delimiting", "?") == ["simple", "test", "of", "delimiting"]
+    assert smart_split("test whitespace works", " ") == ["test", "whitespace", "works"]
+    assert smart_split('"test!with"!quotes', "!") == ['"test!with"', "quotes"]
+    assert smart_split('"test...multiple"...delimiters', ".") == ['"test...multiple"', "", "", "delimiters"]
+    assert smart_split("\"test.only\".'double.quotes'.work", ".") == ['"test.only"', "'double", "quotes'", "work"]
+    assert smart_split('"test max" split works', " ", 1) == ['"test max"', "split works"]
+    assert smart_split('test!escaping!\\"still!splits\\"', "!") == ['test', "escaping", '\\"still', 'splits\\"']
