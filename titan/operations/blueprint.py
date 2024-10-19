@@ -5,6 +5,7 @@ from typing import Any
 from titan.blueprint import Blueprint
 from titan.blueprint import plan_from_dict
 from titan.blueprint_config import BlueprintConfig
+
 from titan.gitops import collect_blueprint_config
 from titan.operations.connector import connect
 
