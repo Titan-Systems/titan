@@ -134,7 +134,7 @@ Plan = list[ResourceChange]
 
 
 def plan_from_dict(plan_dict: dict) -> Plan:
-    changes = []
+    changes: list[ResourceChange] = []
     for change in plan_dict:
         action = change["action"]
         if action == "CREATE":
