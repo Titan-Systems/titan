@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 import re
 
 import pyparsing as pp
@@ -28,14 +30,14 @@ ON = Keyword("ON").suppress()
 TO = Keyword("TO").suppress()
 
 
-def Keywords(keywords):
+def Keywords(keywords: str) -> pp.ParserElement:
     words = keywords.split(" ")
     if len(words) == 1:
         return Keyword(words[0])
     return pp.ungroup(pp.And([Keyword(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
 
 
-def Literals(keywords):
+def Literals(keywords: str) -> pp.ParserElement:
     return pp.ungroup(pp.And([Literal(tok) for tok in keywords.split(" ")]).add_parse_action(" ".join))
 
 
@@ -334,6 +336,8 @@ class Lexicon:
         for word, action in lexicon.items():
             if isinstance(word, str):
                 word = Keywords(word)
+            if TYPE_CHECKING:
+                assert isinstance(word, pp.ParserElement)
             word = word.set_results_name(str(idx))
             self._words.append(word)
             self._actions.append(action)

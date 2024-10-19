@@ -1,6 +1,9 @@
-class ResourceTags:
+from typing import Mapping
+
+
+class ResourceTags(Mapping):
     def __init__(self, tags: dict[str, str]):
-        self.tags = {}
+        self.tags: dict[str, str] = {}
         if isinstance(tags, ResourceTags):
             tags = tags.to_dict()
         for key, value in tags.items():
@@ -20,6 +23,12 @@ class ResourceTags:
 
     def __hash__(self):
         return hash(frozenset(self.tags.items()))
+
+    def __len__(self):
+        return len(self.tags)
+
+    def __iter__(self):
+        return self.tags.__iter__()
 
     def to_dict(self):
         return self.tags.copy()

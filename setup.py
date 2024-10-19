@@ -47,6 +47,7 @@ setup(
             "black",
             "build",
             "codespell==2.2.6",
+            "mypy",
             "pytest-cov",
             "pytest-profiling!=1.8.0",
             "pytest-xdist",
@@ -56,6 +57,8 @@ setup(
             "snowflake-cli-labs",
             "tabulate",
             "twine!=5.1.0",
+            "types-pytz",
+            "types-pyyaml",
         ]
     },
 )

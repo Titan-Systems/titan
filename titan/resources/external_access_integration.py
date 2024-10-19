@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from .resource import Resource, ResourceSpec, NamedResource, ResourcePointer, convert_to_resource
+from .resource import Resource, ResourceSpec, NamedResource, ResourcePointer
 from ..resource_name import ResourceName
 from .network_rule import NetworkRule
 from .role import Role

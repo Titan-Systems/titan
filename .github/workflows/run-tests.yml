@@ -44,9 +44,11 @@ jobs:
         source ./.venv/bin/activate
         python -m pip install --upgrade pip
         make install-dev
-    - name: Run checks (linter, code style, tests)
+    - name: Run checks (linter, code style, static type checks, tests)
       run: |
         source ./.venv/bin/activate
+        ruff check titan/
+        mypy --exclude="titan/resources/.*" --exclude="titan/sql.py" --follow-imports=skip titan/
         python -m pytest --cov=./ --cov-report=xml
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4

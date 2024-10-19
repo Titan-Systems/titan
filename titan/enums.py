@@ -20,7 +20,7 @@ class _Parseable(EnumMeta):
         return child in self.__members__
 
 
-class ParseableEnum(Enum, metaclass=_Parseable):
+class ParseableEnum(str, Enum, metaclass=_Parseable):
     def __str__(self):
         return str(self.value)
 

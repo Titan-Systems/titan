@@ -100,12 +100,12 @@ def read_permifrost_config(session, file_path):
     with open(file_path, "r") as file:
         config = yaml.safe_load(file)
 
-    version = config.pop("version", None)
-    databases = config.pop("databases", [])
+    version = config.pop("version", None)  # noqa: F841
+    databases = config.pop("databases", [])  # noqa: F841
     roles = config.pop("roles", [])
     users = config.pop("users", [])
-    warehouses = config.pop("warehouses", [])
-    integrations = config.pop("integrations", [])
+    warehouses = config.pop("warehouses", [])  # noqa: F841
+    integrations = config.pop("integrations", [])  # noqa: F841
 
     return [
         # *databases,

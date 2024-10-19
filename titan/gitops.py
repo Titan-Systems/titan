@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from inflection import pluralize
 
@@ -186,13 +186,13 @@ def _resources_for_config(config: dict):
     return resources
 
 
-def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict] = None) -> BlueprintConfig:
+def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, Any]] = None) -> BlueprintConfig:
 
     if cli_config is None:
         cli_config = {}
 
     config = yaml_config.copy()
-    blueprint_args = {}
+    blueprint_args: dict[str, Any] = {}
 
     allowlist = config.pop("allowlist", None)
     if allowlist:
@@ -240,4 +240,4 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict] = Non
     if config:
         raise ValueError(f"Unknown keys in config: {config.keys()}")
 
-    return BlueprintConfig(**blueprint_args)
+    return BlueprintConfig(**blueprint_args)  # type: ignore[arg-type]

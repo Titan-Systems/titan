@@ -3,7 +3,7 @@ import logging.config
 # __version__ = open("version.md", encoding="utf-8").read().split(" ")[2]
 
 from .blueprint import Blueprint
-from .resources import *
+from .resources import *  # noqa: F403
 
 logger = logging.getLogger("titan")
 

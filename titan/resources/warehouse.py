@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Optional, Union
+from typing import Union
 
 from ..enums import AccountEdition, ParseableEnum, ResourceType, WarehouseSize
 from ..props import (
