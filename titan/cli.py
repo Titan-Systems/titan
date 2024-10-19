@@ -5,7 +5,7 @@ import yaml
 
 from titan.blueprint import dump_plan
 from titan.enums import RunMode
-from titan.operations.blueprint import blueprint_apply, blueprint_plan
+from titan.operations.blueprint import blueprint_apply, blueprint_apply_plan, blueprint_plan
 from titan.operations.export import export_resources
 from titan.operations.connector import connect, get_env_vars
 
@@ -84,15 +84,15 @@ def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode)
         cli_config["allowlist"] = allowlist
 
     plan_obj = blueprint_plan(yaml_config, cli_config)
-    output = None
-    if json_output:
-        output = dump_plan(plan_obj, format="json")
-    else:
-        output = dump_plan(plan_obj, format="text")
     if output_file:
         with open(output_file, "w") as f:
-            f.write(output)
+            f.write(dump_plan(plan_obj, format="json"))
     else:
+        output = None
+        if json_output:
+            output = dump_plan(plan_obj, format="json")
+        else:
+            output = dump_plan(plan_obj, format="text")
         print(output)
 
 
@@ -134,9 +134,11 @@ def apply(config_file, plan_file, vars, allowlist, run_mode, dry_run):
     if config_file:
         yaml_config = load_config(config_file)
         blueprint_apply(yaml_config, cli_config)
-    else:
+    elif plan_file:
         plan_obj = load_plan(plan_file)
-        blueprint_apply(plan_obj, cli_config)
+        blueprint_apply_plan(plan_obj, cli_config)
+    else:
+        raise Exception("No config or plan file specified")
 
 
 @titan_cli.command("export", context_settings={"show_default": True}, no_args_is_help=True)

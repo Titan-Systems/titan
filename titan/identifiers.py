@@ -317,9 +317,8 @@ def names_are_equal(name1: Union[None, str, ResourceName], name2: Union[None, st
 
 def smart_split(s: str, sep: str, maxsplit: int = -1) -> list[str]:
     """Split while respecting double-quoted identifiers"""
-    content = pp.original_text_for(
-        pp.Optional(pp.dbl_quoted_string | pp.Word(pp.printables.replace(sep, "")))
-    )
+    chars = (pp.printables + " ").replace(sep, "")
+    content = pp.original_text_for(pp.Optional(pp.dbl_quoted_string | pp.Word(chars)))
     res = list(pp.delimited_list(content, sep, allow_trailing_delim=True).leave_whitespace().parse_string(s))
     if maxsplit >= 0 and len(res) > maxsplit:
         res = [*res[:maxsplit], sep.join(res[maxsplit:])]
