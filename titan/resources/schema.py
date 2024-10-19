@@ -119,3 +119,8 @@ class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
             comment=comment,
         )
         self.set_tags(tags)
+
+    def _resolve_vars(self, vars: dict):
+        super()._resolve_vars(vars)
+        if self._name in ["INFORMATION_SCHEMA", "PUBLIC"]:
+            raise Exception("Cannot resolve vars for system schemas")

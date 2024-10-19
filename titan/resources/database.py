@@ -161,7 +161,7 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
             default_ddl_collation=default_ddl_collation,
             comment=comment,
         )
-        if self._data.name != "SNOWFLAKE":
+        if self._name != "SNOWFLAKE":
             self._public_schema = Schema(
                 name="PUBLIC",
                 implicit=True,
@@ -179,6 +179,11 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
     @property
     def public_schema(self) -> Schema:
         return self._public_schema
+
+    def _resolve_vars(self, vars: dict):
+        super()._resolve_vars(vars)
+        if self._name == "SNOWFLAKE":
+            raise Exception("Cannot resolve vars for system databases")
 
 
 def public_schema_urn(database_urn: URN) -> URN:
