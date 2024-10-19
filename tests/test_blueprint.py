@@ -246,6 +246,7 @@ def test_blueprint_deduplicate_resources(session_ctx, remote_state):
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+    assert plan[0].resource_cls == res.Database
 
     blueprint = Blueprint(
         name="blueprint",
@@ -280,6 +281,7 @@ def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+    assert plan[0].resource_cls == res.Database
 
 
 def test_blueprint_implied_container_tree(session_ctx, remote_state):
@@ -294,6 +296,7 @@ def test_blueprint_implied_container_tree(session_ctx, remote_state):
     assert len(plan) == 1
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn.fqn.name == "FUNC"
+    assert plan[0].resource_cls == res.JavascriptUDF
 
 
 def test_blueprint_chained_ownership(session_ctx, remote_state):
@@ -307,12 +310,16 @@ def test_blueprint_chained_ownership(session_ctx, remote_state):
     assert len(plan) == 4
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
+    assert plan[0].resource_cls == res.Role
     assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
+    assert plan[1].resource_cls == res.RoleGrant
     assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:database/DB")
+    assert plan[2].resource_cls == res.Database
     assert isinstance(plan[3], CreateResource)
     assert plan[3].urn == parse_URN("urn::ABCD123:schema/DB.SCHEMA")
+    assert plan[3].resource_cls == res.Schema
 
 
 def test_blueprint_polymorphic_resource_resolution(session_ctx, remote_state):
@@ -378,10 +385,13 @@ def test_blueprint_scope_sorting(session_ctx, remote_state):
     assert len(plan) == 3
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB")
+    assert plan[0].resource_cls == res.Database
     assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:schema/DB.SCHEMA")
+    assert plan[1].resource_cls == res.Schema
     assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:view/DB.SCHEMA.SOME_VIEW")
+    assert plan[2].resource_cls == res.View
 
 
 def test_blueprint_reference_sorting(session_ctx, remote_state):
@@ -396,10 +406,13 @@ def test_blueprint_reference_sorting(session_ctx, remote_state):
     assert len(plan) == 3
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:database/DB1")
+    assert plan[0].resource_cls == res.Database
     assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:database/DB2")
+    assert plan[1].resource_cls == res.Database
     assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:database/DB3")
+    assert plan[2].resource_cls == res.Database
 
 
 def test_blueprint_ownership_sorting(session_ctx, remote_state):
@@ -415,10 +428,13 @@ def test_blueprint_ownership_sorting(session_ctx, remote_state):
     assert len(plan) == 3
     assert isinstance(plan[0], CreateResource)
     assert plan[0].urn == parse_URN("urn::ABCD123:role/SOME_ROLE")
+    assert plan[0].resource_cls == res.Role
     assert isinstance(plan[1], CreateResource)
     assert plan[1].urn == parse_URN("urn::ABCD123:role_grant/SOME_ROLE?role=SYSADMIN")
+    assert plan[1].resource_cls == res.RoleGrant
     assert isinstance(plan[2], CreateResource)
     assert plan[2].urn == parse_URN("urn::ABCD123:warehouse/WH")
+    assert plan[2].resource_cls == res.Warehouse
 
     sql = compile_plan_to_sql(session_ctx, plan)
     assert len(sql) == 8
@@ -440,6 +456,7 @@ def test_blueprint_dump_plan_create(session_ctx, remote_state):
     assert json.loads(plan_json_str) == [
         {
             "action": "CREATE",
+            "resource_cls": "Role",
             "urn": "urn::ABCD123:role/ROLE1",
             "after": {"name": "ROLE1", "owner": "USERADMIN", "comment": None},
         }
@@ -477,6 +494,7 @@ def test_blueprint_dump_plan_update(session_ctx):
     assert json.loads(plan_json_str) == [
         {
             "action": "UPDATE",
+            "resource_cls": "Role",
             "urn": "urn::ABCD123:role/ROLE1",
             "before": {"name": "ROLE1", "owner": "USERADMIN", "comment": "old"},
             "after": {"name": "ROLE1", "owner": "USERADMIN", "comment": "new"},
@@ -514,6 +532,7 @@ def test_blueprint_dump_plan_transfer(session_ctx):
     assert json.loads(plan_json_str) == [
         {
             "action": "TRANSFER",
+            "resource_cls": "Role",
             "urn": "urn::ABCD123:role/ROLE1",
             "from_owner": "ACCOUNTADMIN",
             "to_owner": "USERADMIN",
@@ -547,13 +566,14 @@ def test_blueprint_dump_plan_drop(session_ctx):
     manifest = blueprint.generate_manifest(session_ctx)
     plan = blueprint._plan(remote_state, manifest)
     plan_json_str = dump_plan(plan, format="json")
-    assert json.loads(plan_json_str) == [
-        {
-            "action": "DROP",
-            "urn": "urn::ABCD123:role/ROLE1",
-            "before": {"name": "ROLE1", "owner": "ACCOUNTADMIN", "comment": None},
-        }
-    ]
+    plan_dict = json.loads(plan_json_str)
+    assert len(plan_dict) == 1
+    assert plan_dict[0] == {
+        "action": "DROP",
+        "urn": "urn::ABCD123:role/ROLE1",
+        "before": {"name": "ROLE1", "owner": "ACCOUNTADMIN", "comment": None},
+    }
+
     plan_str = dump_plan(plan, format="text")
     assert (
         plan_str
