@@ -284,7 +284,7 @@ class Resource(metaclass=_Resource):
         self._finalized = False
         self.lifecycle = ResourceLifecycleConfig(**lifecycle) if lifecycle else ResourceLifecycleConfig()
         self.implicit = implicit
-        self.refs: set[Resource] = set()
+        self.refs: list[Resource] = []
 
         # Consume resource_type from kwargs if it exists
         resource_type = kwargs.pop("resource_type", None)
@@ -412,7 +412,7 @@ class Resource(metaclass=_Resource):
         if self._finalized:
             raise RuntimeError("Cannot modify a finalized resource")
         if isinstance(resource, (Resource, ResourcePointer)):
-            self.refs.add(resource)
+            self.refs.append(resource)
 
     def requires(self, *resources: "Resource"):
         if isinstance(resources[0], list):
@@ -535,7 +535,7 @@ class ResourceContainer:
                 if item is resource:
                     self._items[resource.resource_type].pop(index)
                     resource._container = None
-            resource.refs.remove(self)
+            resource.refs = [r for r in resource.refs if r != self]
 
 
 class NamedResource:

@@ -19,7 +19,7 @@ class VarString:
             raise MissingVarException(f"Missing var: {self.string}")
 
     def __eq__(self, other: Any):
-        raise NotImplementedError("VarString does not support equality checks")
+        return False
 
 
 def __getattr__(name):

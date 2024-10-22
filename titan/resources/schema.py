@@ -5,6 +5,7 @@ from ..props import FlagProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..role_ref import RoleRef
 from ..scope import DatabaseScope
+from ..var import VarString
 from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
 from .tag import TaggableResource
 
@@ -119,3 +120,9 @@ class Schema(NamedResource, TaggableResource, Resource, ResourceContainer):
             comment=comment,
         )
         self.set_tags(tags)
+
+    def _resolve_vars(self, vars: dict):
+        name_uses_var = isinstance(self._name, VarString)
+        super()._resolve_vars(vars)
+        if name_uses_var and self._name in ["INFORMATION_SCHEMA", "PUBLIC"]:
+            raise Exception("Cannot resolve vars for system schemas")

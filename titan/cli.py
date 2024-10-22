@@ -76,6 +76,10 @@ def titan_cli():
 def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode):
     """Generate an execution plan based on your configuration"""
     yaml_config = load_config(config_file)
+
+    if yaml_config is None:
+        raise click.UsageError(f"Config file {config_file} is empty")
+
     cli_config: dict[str, Any] = {}
     if vars:
         cli_config["vars"] = vars
@@ -134,6 +138,8 @@ def apply(config_file, plan_file, vars, allowlist, run_mode, dry_run):
 
     if config_file:
         yaml_config = load_config(config_file)
+        if yaml_config is None:
+            raise click.UsageError(f"Config file {config_file} is empty")
         blueprint_apply(yaml_config, cli_config)
     elif plan_file:
         plan_obj = load_plan(plan_file)
