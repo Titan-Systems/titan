@@ -23,7 +23,7 @@ from .client import (
     UNSUPPORTED_FEATURE,
     execute,
 )
-from .enums import ResourceType, WarehouseSize
+from .enums import AccountEdition, ResourceType, WarehouseSize
 from .identifiers import FQN, URN, parse_FQN, resource_type_for_label
 from .parse import (
     _parse_column,
@@ -40,19 +40,18 @@ logger = logging.getLogger("titan")
 
 
 class SessionContext(TypedDict):
+    account_edition: AccountEdition
     account_locator: str
     account: str
     available_roles: list[ResourceName]
     database: str
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]]
     role: str
     schemas: list[str]
     secondary_roles: list[str]
-    tag_support: bool
-    tags: list[str]
     user: str
     version: str
     warehouse: str
-    role_privileges: dict[ResourceName, list[GrantedPrivilege]]
 
 
 def _quote_snowflake_identifier(identifier: Union[str, ResourceName]) -> str:
@@ -557,38 +556,28 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
             CURRENT_DATABASE() as database,
             CURRENT_SCHEMAS() as schemas,
             CURRENT_WAREHOUSE() as warehouse,
-            CURRENT_VERSION() as version
+            CURRENT_VERSION() as version,
+            SYSTEM$BOOTSTRAP_DATA_REQUEST('ACCOUNT') as account_data
         """,
     )[0]
 
-    try:
-        show_tags = execute(session, "SHOW TAGS IN ACCOUNT")
-        tags = [f"{row['database_name']}.{row['schema_name']}.{row['name']}" for row in show_tags]
-        tag_support = True
-    except ProgrammingError as err:
-        if err.errno == UNSUPPORTED_FEATURE:
-            tags = []
-            tag_support = False
-        else:
-            raise
-
+    account_data = json.loads(session_obj["ACCOUNT_DATA"])
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
     role_privileges = fetch_role_privileges(session, available_roles, cacheable=True)
 
     return {
+        "account_edition": AccountEdition(account_data["accountInfo"]["serviceLevelName"]),
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
         "account": session_obj["ACCOUNT"],
         "available_roles": available_roles,
         "database": session_obj["DATABASE"],
+        "role_privileges": role_privileges,
         "role": session_obj["ROLE"],
         "schemas": json.loads(session_obj["SCHEMAS"]),
         "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
-        "tag_support": tag_support,
-        "tags": tags,
         "user": session_obj["USER"],
         "version": session_obj["VERSION"],
         "warehouse": session_obj["WAREHOUSE"],
-        "role_privileges": role_privileges,
     }
 
 
@@ -1948,7 +1937,7 @@ def fetch_resource_monitor(session: SnowflakeConnection, fqn: FQN):
 
 def fetch_resource_tags(session: SnowflakeConnection, resource_type: ResourceType, fqn: FQN):
     session_ctx = fetch_session(session)
-    if session_ctx["tag_support"] is False:
+    if session_ctx["account_edition"] == AccountEdition.STANDARD:
         return None
 
     """
@@ -2027,7 +2016,7 @@ def fetch_table(session: SnowflakeConnection, fqn: FQN):
 
 def fetch_tag_reference(session: SnowflakeConnection, fqn: FQN):
     session_ctx = fetch_session(session)
-    if session_ctx["tag_support"] is False:
+    if session_ctx["account_edition"] == AccountEdition.STANDARD:
         return None
 
     object_domain = fqn.params["domain"]

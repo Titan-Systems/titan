@@ -9,6 +9,7 @@ from titan.blueprint import (
     UpdateResource,
     compile_plan_to_sql,
 )
+from titan.enums import AccountEdition
 from titan.identifiers import parse_URN
 from titan.privs import AccountPriv, DatabasePriv, GrantedPrivilege
 from titan.resource_name import ResourceName
@@ -18,6 +19,7 @@ from titan.resource_name import ResourceName
 def session_ctx() -> dict:
     return {
         "account": "SOMEACCT",
+        "account_edition": AccountEdition.ENTERPRISE,
         "account_locator": "ABCD123",
         "role": "SYSADMIN",
         "available_roles": [
@@ -28,7 +30,6 @@ def session_ctx() -> dict:
             "PUBLIC",
         ],
         "role_privileges": {},
-        "tag_support": True,
     }
 
 
@@ -180,13 +181,13 @@ def test_resource_is_transferred_to_custom_role_owner(session_ctx, remote_state)
 def test_resource_cant_be_created(remote_state):
     session_ctx = {
         "account": "SOMEACCT",
+        "account_edition": AccountEdition.ENTERPRISE,
         "account_locator": "ABCD123",
         "role": "TEST_ROLE",
         "available_roles": [
             "TEST_ROLE",
         ],
         "role_privileges": {},
-        "tag_support": True,
     }
     warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
     blueprint = Blueprint(resources=[warehouse])
@@ -203,6 +204,7 @@ def test_resource_cant_be_created(remote_state):
 def test_grant_with_grant_admin_custom_role(remote_state):
     session_ctx = {
         "account": "SOMEACCT",
+        "account_edition": AccountEdition.ENTERPRISE,
         "account_locator": "ABCD123",
         "role": "GRANT_ADMIN",
         "available_roles": [
@@ -213,7 +215,6 @@ def test_grant_with_grant_admin_custom_role(remote_state):
                 GrantedPrivilege(privilege=AccountPriv.MANAGE_GRANTS, on="ABCD123"),
             ]
         },
-        "tag_support": True,
     }
 
     grant = res.RoleGrant(role="GRANT_ADMIN", to_role="SYSADMIN")
@@ -229,6 +230,7 @@ def test_grant_with_grant_admin_custom_role(remote_state):
 def test_tag_reference_with_tag_admin_custom_role():
     session_ctx = {
         "account": "SOMEACCT",
+        "account_edition": AccountEdition.ENTERPRISE,
         "account_locator": "ABCD123",
         "role": "TAG_ADMIN",
         "available_roles": [
@@ -239,7 +241,6 @@ def test_tag_reference_with_tag_admin_custom_role():
                 GrantedPrivilege(privilege=AccountPriv.APPLY_TAG, on="ABCD123"),
             ]
         },
-        "tag_support": True,
         "tags": ["tags.tags.cost_center"],
     }
 

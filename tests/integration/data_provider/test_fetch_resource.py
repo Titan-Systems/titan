@@ -37,7 +37,7 @@ def email_address(cursor):
 
 def create(cursor, resource: Resource):
     session_ctx = data_provider.fetch_session(cursor.connection)
-    account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+    account_edition = session_ctx["account_edition"]
     sql = resource.create_sql(account_edition=account_edition, if_not_exists=True)
     try:
         cursor.execute(sql)

@@ -3,10 +3,10 @@ import os
 import pytest
 
 from tests.helpers import safe_fetch
-from titan.enums import ResourceType
+from titan import data_provider
+from titan.enums import AccountEdition, ResourceType
 from titan.identifiers import FQN, URN
 from titan.resource_name import ResourceName
-
 
 pytestmark = pytest.mark.requires_snowflake
 
@@ -39,3 +39,10 @@ def test_fetch_quoted_identifier(cursor, test_db):
     )
     assert schema is not None
     assert schema["name"] == '"multiCaseString"'
+
+
+@pytest.mark.enterprise
+def test_fetch_session_enterprise(cursor):
+    data_provider.fetch_session.cache_clear()
+    session = data_provider.fetch_session(cursor)
+    assert session["account_edition"] == AccountEdition.ENTERPRISE

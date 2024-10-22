@@ -18,7 +18,7 @@ TEST_USER = os.environ.get("TEST_SNOWFLAKE_USER")
 @pytest.fixture(scope="session")
 def account_edition(cursor):
     session_ctx = data_provider.fetch_session(cursor.connection)
-    return AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+    return session_ctx["account_edition"]
 
 
 @pytest.fixture(scope="session")
