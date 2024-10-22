@@ -45,6 +45,7 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
     if resource.__class__ in (
         res.Service,
         res.Grant,
+        res.FutureGrant,
         res.RoleGrant,
         res.PasswordPolicy,
         res.Pipe,
