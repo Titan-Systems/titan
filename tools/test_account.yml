@@ -6,6 +6,7 @@ allowlist:
   - "database role"
   - "database"
   - "external volume"
+  - "future grant"
   - "grant"
   - "iceberg table"
   - "network policy"
@@ -178,6 +179,12 @@ grants:
   # - GRANT ALL ON STAGE static_database.public.static_stage TO ROLE EVERY_PRIVILEGE
   # - GRANT ALL ON STREAM static_database.public.static_stream TO ROLE EVERY_PRIVILEGE
   # - GRANT ALL ON NETWORK RULE static_database.public.static_network_rule TO ROLE EVERY_PRIVILEGE
+
+future_grants:
+  - GRANT USAGE ON FUTURE SCHEMAS IN DATABASE static_database TO ROLE EVERY_PRIVILEGE
+  - GRANT SELECT ON FUTURE TABLES IN SCHEMA static_database.public TO ROLE EVERY_PRIVILEGE
+  - GRANT USAGE ON FUTURE STAGES IN SCHEMA static_database.public TO ROLE EVERY_PRIVILEGE
+  - GRANT USAGE ON FUTURE GIT REPOSITORIES IN SCHEMA static_database.public TO ROLE EVERY_PRIVILEGE
 
 schemas:
   - name: static_schema

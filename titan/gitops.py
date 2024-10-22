@@ -77,17 +77,17 @@ def _resources_from_database_config(databases_config: list) -> list:
     return resources
 
 
-def _resources_from_grants_config(grants_config: list) -> list:
-    resources = []
-    for grant in grants_config:
-        if isinstance(grant, dict):
-            titan_grant = Grant(**grant)
-        elif isinstance(grant, str):
-            titan_grant = Grant.from_sql(grant)
-        else:
-            raise Exception(f"Unsupported grant found: {type(grant)}, {grant}")
-        resources.append(titan_grant)
-    return resources
+# def _resources_from_grants_config(grants_config: list) -> list:
+#     resources = []
+#     for grant in grants_config:
+#         if isinstance(grant, dict):
+#             titan_grant = Grant(**grant)
+#         elif isinstance(grant, str):
+#             titan_grant = Grant.from_sql(grant)
+#         else:
+#             raise Exception(f"Unsupported grant found: {type(grant)}, {grant}")
+#         resources.append(titan_grant)
+#     return resources
 
 
 def _resources_from_users_config(users_config: list) -> list:
@@ -129,7 +129,7 @@ def _resources_for_config(config: dict):
     # Special cases
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
-    grants = config.pop("grants", [])
+    # grants = config.pop("grants", [])
     users = config.pop("users", [])
 
     resources = []
@@ -148,10 +148,18 @@ def _resources_for_config(config: dict):
     for resource_type, block in config_blocks:
         for resource_data in block:
             try:
-                requires = resource_data.pop("requires", [])
-                resource_cls = Resource.resolve_resource_cls(resource_type, resource_data)
-                resource = resource_cls(**resource_data)
-                process_requires(resource, requires)
+
+                if isinstance(resource_data, dict):
+                    requires = resource_data.pop("requires", [])
+                    resource_cls = Resource.resolve_resource_cls(resource_type, resource_data)
+                    resource = resource_cls(**resource_data)
+                    process_requires(resource, requires)
+                elif isinstance(resource_data, str):
+                    resource_cls = Resource.resolve_resource_cls(resource_type, {})
+                    resource = resource_cls.from_sql(resource_data)
+                else:
+                    raise Exception
+
                 resources.append(resource)
             except Exception as e:
                 print(f"Error processing resource: {resource_data}")
@@ -159,7 +167,7 @@ def _resources_for_config(config: dict):
 
     resources.extend(_resources_from_database_config(database_config))
     resources.extend(_resources_from_role_grants_config(role_grants))
-    resources.extend(_resources_from_grants_config(grants))
+    # resources.extend(_resources_from_grants_config(grants))
     resources.extend(_resources_from_users_config(users))
 
     resource_cache = {}

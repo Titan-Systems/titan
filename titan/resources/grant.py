@@ -327,12 +327,6 @@ class FutureGrant(Resource):
         owner: str = None,
         **kwargs,
     ):
-        """
-        Usage
-        -----
-
-
-        """
         on_type = kwargs.pop("on_type", None)
         in_type = kwargs.pop("in_type", None)
         in_name = kwargs.pop("in_name", None)
