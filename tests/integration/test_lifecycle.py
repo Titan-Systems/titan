@@ -57,7 +57,9 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
 
         if session_ctx["account_edition"] not in resource.edition:
             feature_enabled = False
-            pytest.skip(f"Skipping {resource.__class__.__name__}, not supported by account edition {account_edition}")
+            pytest.skip(
+                f"Skipping {resource.__class__.__name__}, not supported by account edition {session_ctx['account_edition']}"
+            )
 
         if isinstance(resource.scope, DatabaseScope):
             database.add(resource)
