@@ -1,3 +1,5 @@
+from typing import Any
+
 import jinja2.exceptions
 from jinja2 import Environment, StrictUndefined
 
@@ -16,7 +18,7 @@ class VarString:
         except jinja2.exceptions.UndefinedError:
             raise MissingVarException(f"Missing var: {self.string}")
 
-    def __eq__(self, other: str):
+    def __eq__(self, other: Any):
         raise NotImplementedError("VarString does not support equality checks")
 
 

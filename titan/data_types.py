@@ -1,9 +1,9 @@
-from typing import Union
+from typing import Optional, Union
 
 from .enums import DataType
 
 
-def convert_to_canonical_data_type(data_type: Union[str, DataType, None]) -> str:
+def convert_to_canonical_data_type(data_type: Union[str, DataType, None]) -> Optional[str]:
     if data_type is None:
         return None
     if isinstance(data_type, DataType):

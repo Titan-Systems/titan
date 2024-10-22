@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from queue import Queue
-from typing import Any, Generator, Optional, Sequence, Union, cast
+from typing import Any, Generator, Optional, Iterable, Union, cast, TypeVar, Sequence
 
 import snowflake.connector
 
@@ -28,6 +28,7 @@ from .exceptions import (
 )
 from .identifiers import URN, parse_identifier, parse_URN, resource_label_for_type
 from .privs import (
+    SchemaPriv,
     CREATE_PRIV_FOR_RESOURCE_TYPE,
     PRIVS_FOR_RESOURCE_TYPE,
     AccountPriv,
@@ -51,6 +52,11 @@ from .resources.resource import (
 from .resources.tag import Tag, TaggableResource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
 
+
+T = TypeVar("T")
+ResourceRef = Union[tuple[ResourceType, str], str]
+
+
 logger = logging.getLogger("titan")
 
 
@@ -59,16 +65,16 @@ class ResourceChange(ABC):
     urn: URN
 
     @abstractmethod
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         pass
 
 
 @dataclass
 class CreateResource(ResourceChange):
     resource_cls: type[Resource]
-    after: dict
+    after: dict[str, str]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Union[str, dict[str, str]]]:
         return {
             "action": "CREATE",
             "urn": str(self.urn),
@@ -79,9 +85,9 @@ class CreateResource(ResourceChange):
 
 @dataclass
 class DropResource(ResourceChange):
-    before: dict
+    before: dict[str, str]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Union[str, dict[str, str]]]:
         return {
             "action": "DROP",
             "urn": str(self.urn),
@@ -92,11 +98,11 @@ class DropResource(ResourceChange):
 @dataclass
 class UpdateResource(ResourceChange):
     resource_cls: type[Resource]
-    before: dict
-    after: dict
-    delta: dict
+    before: dict[str, str]
+    after: dict[str, str]
+    delta: dict[str, str]
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Union[str, dict[str, str]]]:
         return {
             "action": "UPDATE",
             "urn": str(self.urn),
@@ -113,7 +119,7 @@ class TransferOwnership(ResourceChange):
     from_owner: str
     to_owner: str
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, str]:
         return {
             "action": "TRANSFER",
             "urn": str(self.urn),
@@ -128,7 +134,7 @@ Plan = list[ResourceChange]
 
 
 def plan_from_dict(plan_dict: dict) -> Plan:
-    changes = []
+    changes: list[ResourceChange] = []
     for change in plan_dict:
         action = change["action"]
         if action == "CREATE":
@@ -305,7 +311,7 @@ def dump_plan(plan: Plan, format: str = "json"):
 
         for change in plan:
             action_marker = ""
-            items = []
+            items: Iterable[tuple[str, str]] = []
             if isinstance(change, CreateResource):
                 action_marker = "+"
                 items = change.after.items()
@@ -359,10 +365,10 @@ def print_diffs(diffs):
 def _split_by_scope(
     resources: list[Resource],
 ) -> tuple[list[Resource], list[Resource], list[Resource], list[Resource]]:
-    org_scoped = []
-    acct_scoped = []
-    db_scoped = []
-    schema_scoped = []
+    org_scoped: list[OrganizationScope] = []
+    acct_scoped: list[AccountScope] = []
+    db_scoped: list[DatabaseScope] = []
+    schema_scoped: list[SchemaScope] = []
 
     seen = set()
 
@@ -415,7 +421,7 @@ def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
 
     """
 
-    namespace: dict[Any, Resource] = {}
+    namespace: dict[ResourceRef, Resource] = {}
     # Push pointers to the end
     resources = sorted(resources, key=lambda resource: isinstance(resource, ResourcePointer))
 
@@ -433,6 +439,7 @@ def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
 
     for resource_or_pointer in resources:
         # Create a unique identifier for the resource
+        resource_id: ResourceRef
         if isinstance(resource_or_pointer, NamedResource):
             resource_id = (resource_or_pointer.resource_type, resource_or_pointer.name)
         else:
@@ -706,12 +713,12 @@ class Blueprint:
 
             for ref in resource.refs:
                 resource_and_ref_share_scope = isinstance(ref.scope, resource.scope.__class__)
-                if ref.container is None and resource_and_ref_share_scope:
+                if ref.container is None and resource.container is not None and resource_and_ref_share_scope:
                     # If a resource requires another, and that secondary resource couldn't be resolved into
                     # an existing scope, then assume it lives in the same container as the original resource
                     resource.container.add(ref)
 
-    def _create_tag_references(self):
+    def _create_tag_references(self) -> None:
         """
         Tag name resolution in Snowflake is special. Tags can be referenced
         by name only. If that tag name is unique in the account, the tag will be applied.
@@ -902,17 +909,17 @@ class Blueprint:
             self._add(resource)
 
 
-def owner_for_change(change: ResourceChange) -> Optional[str]:
+def owner_for_change(change: ResourceChange) -> Optional[ResourceName]:
     if isinstance(change, CreateResource) and "owner" in change.after:
-        return change.after["owner"]
+        return ResourceName(change.after["owner"])
     elif isinstance(change, UpdateResource) and "owner" in change.after:
         # TRANSFER actions occur strictly after CHANGE actions, so we use the before owner
         # as the role for the change
-        return change.before["owner"]
+        return ResourceName(change.before["owner"])
     elif isinstance(change, DropResource) and "owner" in change.before:
-        return change.before["owner"]
+        return ResourceName(change.before["owner"])
     elif isinstance(change, TransferOwnership):
-        return change.from_owner
+        return ResourceName(change.from_owner)
     else:
         return None
 
@@ -1184,9 +1191,9 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
         if isinstance(change, CreateResource):
             if change.urn.resource_type == ResourceType.ROLE_GRANT:
                 if change.after["to_role"] in available_roles:
-                    available_roles.append(change.after["role"])
+                    available_roles.append(ResourceName(change.after["role"]))
             elif change.urn.resource_type == ResourceType.GRANT:
-                grantee_role = change.after["to"]
+                grantee_role = ResourceName(change.after["to"])
                 if grantee_role not in role_privileges:
                     role_privileges[grantee_role] = []
                 for priv in change.after["_privs"]:
@@ -1202,9 +1209,9 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
             elif "owner" in change.after:
                 # When creating any other resource type, creating implies ownership
                 resource_priv_types = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]
+                owner_role = ResourceName(str(change.after["owner"]))
                 if resource_priv_types and "OWNERSHIP" in resource_priv_types:
                     ownership_priv = resource_priv_types("OWNERSHIP")
-                    owner_role = str(change.after["owner"])
                     if owner_role not in role_privileges:
                         role_privileges[owner_role] = []
                     role_privileges[owner_role].append(
@@ -1218,7 +1225,7 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
                 if change.urn.resource_type == ResourceType.DATABASE:
                     role_privileges[owner_role].append(
                         GrantedPrivilege.from_grant(
-                            privilege=PRIVS_FOR_RESOURCE_TYPE[ResourceType.SCHEMA]("OWNERSHIP"),
+                            privilege=SchemaPriv("OWNERSHIP"),
                             granted_on=ResourceType.SCHEMA,
                             name=str(change.urn.fqn) + ".PUBLIC",
                         )
@@ -1226,12 +1233,12 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
     return sql_commands
 
 
-def topological_sort(resource_set: set, references: set):
+def topological_sort(resource_set: set[T], references: set[tuple[T, T]]) -> dict[T, int]:
     # Kahn's algorithm
 
     # Compute in-degree (# of inbound edges) for each node
-    in_degrees = {}
-    outgoing_edges = {}
+    in_degrees: dict[T, int] = {}
+    outgoing_edges: dict[T, set[T]] = {}
 
     for node in resource_set:
         in_degrees[node] = 0
@@ -1242,7 +1249,7 @@ def topological_sort(resource_set: set, references: set):
         outgoing_edges[node].add(ref)
 
     # Put all nodes with 0 in-degree in a queue
-    queue = Queue()
+    queue: Queue = Queue()
     for node, in_degree in in_degrees.items():
         if in_degree == 0:
             queue.put(node)

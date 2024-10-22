@@ -1,4 +1,5 @@
 import json
+from typing import Any
 
 import click
 import yaml
@@ -75,7 +76,7 @@ def titan_cli():
 def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode):
     """Generate an execution plan based on your configuration"""
     yaml_config = load_config(config_file)
-    cli_config = {}
+    cli_config: dict[str, Any] = {}
     if vars:
         cli_config["vars"] = vars
     if run_mode:

@@ -35,7 +35,7 @@ class SchemaScope(ResourceScope):
 
 
 class TableScope(ResourceScope):
-    def fully_qualified_name(self, resource_name: ResourceName):
+    def fully_qualified_name(self, _, resource_name: ResourceName):
         raise NotImplementedError
         # return FQN(
         #     name=resource_name.upper(),

@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..enums import ParseableEnum, ResourceType, EncryptionType
 from ..props import (
@@ -7,14 +7,12 @@ from ..props import (
     PropSet,
     Props,
     StringProp,
-    TagsProp,
     PropList,
 )
 from ..resource_name import ResourceName
 from ..scope import AccountScope, AnonymousScope
 from .resource import NamedResource, Resource, ResourceSpec
 from .role import Role
-from .tag import TaggableResource
 
 
 class ExternalVolumeStorageProvider(ParseableEnum):

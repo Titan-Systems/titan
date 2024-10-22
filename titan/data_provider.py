@@ -3,11 +3,12 @@ import logging
 import json
 import sys
 from functools import cache
-from typing import Optional, Union, TypedDict
+from typing import Any, Optional, Union, TypedDict
 
 import pytz
 from inflection import pluralize
 from snowflake.connector.errors import ProgrammingError
+from snowflake.connector import SnowflakeConnection
 
 from .builtins import (
     SYSTEM_DATABASES,
@@ -152,13 +153,13 @@ def _fail_if_not_granted(result, *args):
         raise Exception(result[0]["status"], *args)
 
 
-_INDEX = {}
+_INDEX: dict[int, dict[tuple[str, str, str], dict[str, Any]]] = {}
 
 
-def _fetch_grant_to_role(session, role: ResourceName, granted_on: str, on_name: str, privilege: str):
+def _fetch_grant_to_role(session: SnowflakeConnection, role: ResourceName, granted_on: str, on_name: str, privilege: str):
     grants = _show_grants_to_role(session, role, cacheable=True)
     if id(grants) not in _INDEX:
-        local_index = {}
+        local_index: dict[tuple[str, str, str], dict[str, Any]] = {}
         _INDEX[id(grants)] = local_index
         for grant in grants:
             name = "ACCOUNT" if grant["granted_on"] == "ACCOUNT" else grant["name"]
@@ -367,7 +368,7 @@ def remove_none_values(d):
     return new_dict
 
 
-def _fetch_columns_for_table(session, fqn: FQN):
+def _fetch_columns_for_table(session: SnowflakeConnection, fqn: FQN):
     info_schema_result = execute(session, f"SELECT * FROM {fqn.database}.INFORMATION_SCHEMA.COLUMNS", cacheable=True)
     columns = []
     for col in info_schema_result:
@@ -404,7 +405,7 @@ def _fetch_columns_for_table(session, fqn: FQN):
     return columns
 
 
-def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
+def _fetch_owner(session: SnowflakeConnection, type_str: str, fqn: FQN) -> Optional[str]:
     show_grants = execute(session, f"SHOW GRANTS ON {type_str} {fqn}")
     ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
     if len(ownership_grant) == 0:
@@ -412,7 +413,7 @@ def _fetch_owner(session, type_str: str, fqn: FQN) -> Optional[str]:
     return ownership_grant[0]["grantee_name"]
 
 
-def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list[dict]:
+def _show_resources(session: SnowflakeConnection, type_str, fqn: FQN, cacheable: bool = True) -> list[dict]:
     try:
         in_account = " IN ACCOUNT"
         if "INTEGRATIONS" in type_str:
@@ -463,12 +464,12 @@ def _show_resources(session, type_str, fqn: FQN, cacheable: bool = True) -> list
             raise
 
 
-def _show_resource_parameters(session, type_str: str, fqn: FQN, cacheable: bool = True) -> dict:
+def _show_resource_parameters(session: SnowflakeConnection, type_str: str, fqn: FQN, cacheable: bool = True) -> dict:
     result = execute(session, f"SHOW PARAMETERS IN {type_str} {fqn}", cacheable=cacheable)
     return params_result_to_dict(result)
 
 
-def _show_grants_to_role(session, role: ResourceName, cacheable: bool = False) -> list:
+def _show_grants_to_role(session: SnowflakeConnection, role: ResourceName, cacheable: bool = False) -> list[dict[str, Any]]:
     """
     {
         'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
@@ -490,7 +491,7 @@ def _show_grants_to_role(session, role: ResourceName, cacheable: bool = False) -
     return grants
 
 
-def fetch_resource(session, urn: URN) -> Optional[dict]:
+def fetch_resource(session: SnowflakeConnection, urn: URN) -> Optional[dict]:
     try:
         return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
     except ProgrammingError as err:
@@ -504,18 +505,18 @@ def fetch_resource(session, urn: URN) -> Optional[dict]:
         raise
 
 
-def fetch_account_locator(session):
+def fetch_account_locator(session: SnowflakeConnection):
     locator = execute(session, "SELECT CURRENT_ACCOUNT() as account_locator")[0]["ACCOUNT_LOCATOR"]
     return locator
 
 
-def fetch_region(session):
+def fetch_region(session: SnowflakeConnection):
     region = execute(session, "SELECT CURRENT_REGION()")[0]
     return region
 
 
 @cache
-def fetch_session(session) -> SessionContext:
+def fetch_session(session: SnowflakeConnection) -> SessionContext:
     session_obj = execute(
         session,
         """
@@ -564,8 +565,8 @@ def fetch_session(session) -> SessionContext:
     }
 
 
-def fetch_role_privileges(session, roles: list, cacheable: bool = True) -> dict[ResourceName, list[GrantedPrivilege]]:
-    role_privileges = {}
+def fetch_role_privileges(session: SnowflakeConnection, roles: list[ResourceName], cacheable: bool = True) -> dict[ResourceName, list[GrantedPrivilege]]:
+    role_privileges: dict[ResourceName, list[GrantedPrivilege]] = {}
     for role in roles:
 
         # Adds 30+s of latency and we can infer what privs are available
@@ -594,7 +595,7 @@ def fetch_role_privileges(session, roles: list, cacheable: bool = True) -> dict[
 # ------------------------------
 
 
-def fetch_account(session, fqn: FQN):
+def fetch_account(session: SnowflakeConnection, fqn: FQN):
     # raise NotImplementedError()
     return {
         "name": None,
@@ -602,7 +603,7 @@ def fetch_account(session, fqn: FQN):
     }
 
 
-def fetch_aggregation_policy(session, fqn: FQN):
+def fetch_aggregation_policy(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "AGGREGATION POLICIES", fqn)
     if len(show_result) == 0:
         return None
@@ -618,7 +619,7 @@ def fetch_aggregation_policy(session, fqn: FQN):
     }
 
 
-def fetch_alert(session, fqn: FQN):
+def fetch_alert(session: SnowflakeConnection, fqn: FQN):
     alerts = _show_resources(session, "ALERTS", fqn)
     if len(alerts) == 0:
         return None
@@ -636,7 +637,7 @@ def fetch_alert(session, fqn: FQN):
     }
 
 
-def fetch_api_integration(session, fqn: FQN):
+def fetch_api_integration(session: SnowflakeConnection, fqn: FQN):
     integrations = _show_resources(session, "API INTEGRATIONS", fqn)
     if len(integrations) == 0:
         return None
@@ -659,7 +660,7 @@ def fetch_api_integration(session, fqn: FQN):
     }
 
 
-def fetch_authentication_policy(session, fqn: FQN):
+def fetch_authentication_policy(session: SnowflakeConnection, fqn: FQN):
     policies = _show_resources(session, "AUTHENTICATION POLICIES", fqn)
     if len(policies) == 0:
         return None
@@ -681,7 +682,7 @@ def fetch_authentication_policy(session, fqn: FQN):
     }
 
 
-def fetch_catalog_integration(session, fqn: FQN):
+def fetch_catalog_integration(session: SnowflakeConnection, fqn: FQN):
     integrations = _show_resources(session, "CATALOG INTEGRATIONS", fqn)
     if len(integrations) == 0:
         return None
@@ -719,7 +720,7 @@ def fetch_catalog_integration(session, fqn: FQN):
         raise Exception(f"Unsupported catalog integration: {properties['catalog_source']}")
 
 
-def fetch_columns(session, resource_type: str, fqn: FQN):
+def fetch_columns(session: SnowflakeConnection, resource_type: str, fqn: FQN):
     desc_result = execute(session, f"DESC {resource_type} {fqn}")
     columns = []
     for col in desc_result:
@@ -741,7 +742,7 @@ def fetch_columns(session, resource_type: str, fqn: FQN):
     return columns
 
 
-def fetch_compute_pool(session, fqn: FQN):
+def fetch_compute_pool(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW COMPUTE POOLS LIKE '{fqn.name}'", cacheable=True)
 
     if len(show_result) == 0:
@@ -763,7 +764,7 @@ def fetch_compute_pool(session, fqn: FQN):
     }
 
 
-def fetch_database(session, fqn: FQN):
+def fetch_database(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "DATABASES", fqn)
 
     if len(show_result) == 0:
@@ -795,7 +796,7 @@ def fetch_database(session, fqn: FQN):
     }
 
 
-def fetch_database_role(session, fqn: FQN):
+def fetch_database_role(session: SnowflakeConnection, fqn: FQN):
     try:
         show_result = execute(session, f"SHOW DATABASE ROLES IN DATABASE {fqn.database}", cacheable=True)
     except ProgrammingError as err:
@@ -817,7 +818,7 @@ def fetch_database_role(session, fqn: FQN):
     }
 
 
-def fetch_dynamic_table(session, fqn: FQN):
+def fetch_dynamic_table(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "DYNAMIC TABLES", fqn)
     if len(show_result) == 0:
         return None
@@ -842,7 +843,7 @@ def fetch_dynamic_table(session, fqn: FQN):
     }
 
 
-def fetch_event_table(session, fqn: FQN):
+def fetch_event_table(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, "SHOW EVENT TABLES IN ACCOUNT")
 
     tables = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
@@ -863,7 +864,7 @@ def fetch_event_table(session, fqn: FQN):
     }
 
 
-def fetch_external_access_integration(session, fqn: FQN):
+def fetch_external_access_integration(session: SnowflakeConnection, fqn: FQN):
     integrations = _show_resources(session, "EXTERNAL ACCESS INTEGRATIONS", fqn)
     if len(integrations) == 0:
         return None
@@ -885,7 +886,7 @@ def fetch_external_access_integration(session, fqn: FQN):
     }
 
 
-def fetch_external_volume(session, fqn: FQN):
+def fetch_external_volume(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "EXTERNAL VOLUMES", fqn)
     if len(show_result) == 0:
         return None
@@ -915,7 +916,7 @@ def fetch_external_volume(session, fqn: FQN):
     }
 
 
-def fetch_file_format(session, fqn: FQN):
+def fetch_file_format(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "FILE FORMATS", fqn)
     if len(show_result) == 0:
         return None
@@ -995,7 +996,7 @@ def fetch_file_format(session, fqn: FQN):
         raise Exception(f"Unsupported file format type: {data['type']}")
 
 
-def fetch_function(session, fqn: FQN):
+def fetch_function(session: SnowflakeConnection, fqn: FQN):
     udfs = _show_resources(session, "USER FUNCTIONS", fqn)
     if len(udfs) == 0:
         return None
@@ -1039,7 +1040,7 @@ def fetch_function(session, fqn: FQN):
         }
 
 
-def fetch_future_grant(session, fqn: FQN):
+def fetch_future_grant(session: SnowflakeConnection, fqn: FQN):
     try:
         show_result = execute(session, f"SHOW FUTURE GRANTS TO ROLE {fqn.name}", cacheable=True)
         """
@@ -1099,7 +1100,7 @@ def fetch_future_grant(session, fqn: FQN):
     }
 
 
-def fetch_grant(session, fqn: FQN):
+def fetch_grant(session: SnowflakeConnection, fqn: FQN):
     priv = fqn.params["priv"]
     on_type, on = fqn.params["on"].split("/")
     on_type = on_type.upper()
@@ -1151,12 +1152,12 @@ def fetch_grant(session, fqn: FQN):
     }
 
 
-def fetch_grant_on_all(session, fqn: FQN):
+def fetch_grant_on_all(session: SnowflakeConnection, fqn: FQN):
     # All grants are expensive to fetch, so we will assume they are always out of date
     return None
 
 
-def fetch_iceberg_table(session, fqn: FQN):
+def fetch_iceberg_table(session: SnowflakeConnection, fqn: FQN):
     tables = _show_resources(session, "ICEBERG TABLES", fqn)
     if len(tables) == 0:
         return None
@@ -1184,7 +1185,7 @@ def fetch_iceberg_table(session, fqn: FQN):
     }
 
 
-def fetch_image_repository(session, fqn: FQN):
+def fetch_image_repository(session: SnowflakeConnection, fqn: FQN):
     repos = _show_resources(session, "IMAGE REPOSITORIES", fqn)
 
     if len(repos) == 0:
@@ -1197,7 +1198,7 @@ def fetch_image_repository(session, fqn: FQN):
     return {"name": fqn.name, "owner": _get_owner_identifier(data)}
 
 
-def fetch_materialized_view(session, fqn: FQN):
+def fetch_materialized_view(session: SnowflakeConnection, fqn: FQN):
     materialized_views = _show_resources(session, "MATERIALIZED VIEWS", fqn)
     if len(materialized_views) == 0:
         return None
@@ -1218,7 +1219,7 @@ def fetch_materialized_view(session, fqn: FQN):
     }
 
 
-def fetch_network_policy(session, fqn: FQN):
+def fetch_network_policy(session: SnowflakeConnection, fqn: FQN):
     policies = _show_resources(session, "NETWORK POLICIES", fqn)
     if len(policies) == 0:
         return None
@@ -1259,7 +1260,7 @@ def fetch_network_policy(session, fqn: FQN):
     }
 
 
-def fetch_network_rule(session, fqn: FQN):
+def fetch_network_rule(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "NETWORK RULES", fqn)
 
     if len(show_result) == 0:
@@ -1281,7 +1282,7 @@ def fetch_network_rule(session, fqn: FQN):
     }
 
 
-def fetch_notebook(session, fqn: FQN):
+def fetch_notebook(session: SnowflakeConnection, fqn: FQN):
     notebooks = _show_resources(session, "NOTEBOOKS", fqn)
     if len(notebooks) == 0:
         return None
@@ -1301,7 +1302,7 @@ def fetch_notebook(session, fqn: FQN):
     }
 
 
-def fetch_notification_integration(session, fqn: FQN):
+def fetch_notification_integration(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW NOTIFICATION INTEGRATIONS LIKE '{fqn.name}'")
     if len(show_result) == 0:
         return None
@@ -1328,7 +1329,7 @@ def fetch_notification_integration(session, fqn: FQN):
         raise Exception(f"Unsupported notification integration type: {data['type']}")
 
 
-def fetch_packages_policy(session, fqn: FQN):
+def fetch_packages_policy(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "PACKAGES POLICIES", fqn)
     if len(show_result) == 0:
         return None
@@ -1350,7 +1351,7 @@ def fetch_packages_policy(session, fqn: FQN):
     }
 
 
-def fetch_password_policy(session, fqn: FQN):
+def fetch_password_policy(session: SnowflakeConnection, fqn: FQN):
     policies = _show_resources(session, "PASSWORD POLICIES", fqn)
     if len(policies) == 0:
         return None
@@ -1381,7 +1382,7 @@ def fetch_password_policy(session, fqn: FQN):
     }
 
 
-def fetch_pipe(session, fqn: FQN):
+def fetch_pipe(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "PIPES", fqn)
     if len(show_result) == 0:
         return None
@@ -1403,7 +1404,7 @@ def fetch_pipe(session, fqn: FQN):
     }
 
 
-def fetch_procedure(session, fqn: FQN):
+def fetch_procedure(session: SnowflakeConnection, fqn: FQN):
     # SHOW PROCEDURES IN SCHEMA {}.{}
     # FIXME: This will fail if the database doesnt exist
     show_result = execute(session, f"SHOW PROCEDURES IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True)
@@ -1442,7 +1443,7 @@ def fetch_procedure(session, fqn: FQN):
     }
 
 
-def fetch_role(session, fqn: FQN):
+def fetch_role(session: SnowflakeConnection, fqn: FQN):
     roles = _show_resources(session, "ROLES", fqn)
 
     if len(roles) == 0:
@@ -1459,7 +1460,7 @@ def fetch_role(session, fqn: FQN):
     }
 
 
-def fetch_role_grant(session, fqn: FQN):
+def fetch_role_grant(session: SnowflakeConnection, fqn: FQN):
     subject, name = fqn.params.copy().popitem()
     subject = ResourceName(subject)
     name = ResourceName(name)
@@ -1496,7 +1497,7 @@ def fetch_role_grant(session, fqn: FQN):
     return None
 
 
-def fetch_schema(session, fqn: FQN):
+def fetch_schema(session: SnowflakeConnection, fqn: FQN):
     if fqn.database is None:
         raise Exception(f"Schema {fqn} is missing a database name")
     try:
@@ -1527,7 +1528,7 @@ def fetch_schema(session, fqn: FQN):
     }
 
 
-def fetch_secret(session, fqn: FQN):
+def fetch_secret(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "SECRETS", fqn)
     if len(show_result) == 0:
         return None
@@ -1565,7 +1566,7 @@ def fetch_secret(session, fqn: FQN):
         raise NotImplementedError(f"Unsupported secret type {data['secret_type']}")
 
 
-def fetch_security_integration(session, fqn: FQN):
+def fetch_security_integration(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, "SHOW SECURITY INTEGRATIONS", cacheable=True)
 
     show_result = _filter_result(show_result, name=fqn.name)
@@ -1621,7 +1622,7 @@ def fetch_security_integration(session, fqn: FQN):
     # }
 
 
-def fetch_sequence(session, fqn: FQN):
+def fetch_sequence(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW SEQUENCES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}")
     if len(show_result) == 0:
         return None
@@ -1639,7 +1640,7 @@ def fetch_sequence(session, fqn: FQN):
     }
 
 
-def fetch_service(session, fqn: FQN):
+def fetch_service(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(
         session, f"SHOW SERVICES LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True
     )
@@ -1664,7 +1665,7 @@ def fetch_service(session, fqn: FQN):
     }
 
 
-def fetch_share(session, fqn: FQN):
+def fetch_share(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW SHARES LIKE '{fqn.name}'")
     shares = _filter_result(show_result, kind="OUTBOUND")
 
@@ -1681,7 +1682,7 @@ def fetch_share(session, fqn: FQN):
     }
 
 
-def fetch_shared_database(session, fqn: FQN):
+def fetch_shared_database(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, "SELECT SYSTEM$SHOW_IMPORTED_DATABASES()", cacheable=True)
     show_result = json.loads(show_result[0]["SYSTEM$SHOW_IMPORTED_DATABASES()"])
 
@@ -1700,7 +1701,7 @@ def fetch_shared_database(session, fqn: FQN):
     }
 
 
-def fetch_stage(session, fqn: FQN):
+def fetch_stage(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "STAGES", fqn)
     stages = _filter_result(show_result, name=fqn.name)
 
@@ -1735,7 +1736,7 @@ def fetch_stage(session, fqn: FQN):
         raise Exception(f"Unsupported stage type {data['type']}")
 
 
-def fetch_storage_integration(session, fqn: FQN):
+def fetch_storage_integration(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, "SHOW INTEGRATIONS")
     integrations = _filter_result(show_result, name=fqn.name, category="STORAGE")
 
@@ -1790,7 +1791,7 @@ def fetch_storage_integration(session, fqn: FQN):
         raise Exception(f"Unsupported storage provider {properties['storage_provider']}")
 
 
-def fetch_stream(session, fqn: FQN):
+def fetch_stream(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, "SHOW STREAMS IN ACCOUNT", cacheable=True)
 
     streams = _filter_result(show_result, name=fqn.name, database_name=fqn.database, schema_name=fqn.schema)
@@ -1828,7 +1829,7 @@ def fetch_stream(session, fqn: FQN):
         raise NotImplementedError(f"Unsupported stream source type {data['source_type']}")
 
 
-def fetch_tag(session, fqn: FQN):
+def fetch_tag(session: SnowflakeConnection, fqn: FQN):
     try:
         show_result = execute(session, "SHOW TAGS IN ACCOUNT", cacheable=True)
     except ProgrammingError as err:
@@ -1849,7 +1850,7 @@ def fetch_tag(session, fqn: FQN):
     }
 
 
-def fetch_task(session, fqn: FQN):
+def fetch_task(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW TASKS IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True)
 
     if len(show_result) == 0:
@@ -1872,7 +1873,7 @@ def fetch_task(session, fqn: FQN):
     }
 
 
-def fetch_replication_group(session, fqn: FQN):
+def fetch_replication_group(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW REPLICATION GROUPS LIKE '{fqn.name}'", cacheable=True)
 
     replication_groups = _filter_result(show_result, is_primary="true")
@@ -1897,7 +1898,7 @@ def fetch_replication_group(session, fqn: FQN):
     }
 
 
-def fetch_resource_monitor(session, fqn: FQN):
+def fetch_resource_monitor(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW RESOURCE MONITORS LIKE '{fqn.name}'")
     resource_monitors = _filter_result(show_result)
     if len(resource_monitors) == 0:
@@ -1916,7 +1917,7 @@ def fetch_resource_monitor(session, fqn: FQN):
     }
 
 
-def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
+def fetch_resource_tags(session: SnowflakeConnection, resource_type: ResourceType, fqn: FQN):
     session_ctx = fetch_session(session)
     if session_ctx["tag_support"] is False:
         return None
@@ -1959,7 +1960,7 @@ def fetch_resource_tags(session, resource_type: ResourceType, fqn: FQN):
     return tag_map
 
 
-def fetch_table(session, fqn: FQN):
+def fetch_table(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, "SHOW TABLES IN ACCOUNT", cacheable=True)
 
     tables = _filter_result(
@@ -1995,7 +1996,7 @@ def fetch_table(session, fqn: FQN):
     }
 
 
-def fetch_tag_reference(session, fqn: FQN):
+def fetch_tag_reference(session: SnowflakeConnection, fqn: FQN):
     session_ctx = fetch_session(session)
     if session_ctx["tag_support"] is False:
         return None
@@ -2009,7 +2010,7 @@ def fetch_tag_reference(session, fqn: FQN):
 
     # Another hacky fix
     if str(resource_fqn) == "DATABASE":
-        resource_fqn = '"DATABASE"'
+        resource_fqn = '"DATABASE"'  # type: ignore[assignment]
 
     try:
         tag_refs = execute(
@@ -2039,7 +2040,7 @@ def fetch_tag_reference(session, fqn: FQN):
     }
 
 
-def fetch_user(session, fqn: FQN) -> Optional[dict]:
+def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
     # SHOW USERS requires the MANAGE GRANTS privilege
     # Other roles can see the list of users but don't get access to other metadata such as login_name.
     # This causes incorrect drift
@@ -2091,7 +2092,7 @@ def fetch_user(session, fqn: FQN) -> Optional[dict]:
     }
 
 
-def fetch_view(session, fqn: FQN):
+def fetch_view(session: SnowflakeConnection, fqn: FQN):
     if fqn.schema is None:
         raise Exception(f"View fqn must have a schema {fqn}")
     try:
@@ -2122,7 +2123,7 @@ def fetch_view(session, fqn: FQN):
     }
 
 
-def fetch_warehouse(session, fqn: FQN):
+def fetch_warehouse(session: SnowflakeConnection, fqn: FQN):
     try:
         show_result = _show_resources(session, "WAREHOUSES", fqn)
     except ProgrammingError:
@@ -2174,11 +2175,11 @@ def fetch_warehouse(session, fqn: FQN):
 ######## List helpers
 
 
-def list_resource(session, resource_label: str) -> list[FQN]:
+def list_resource(session: SnowflakeConnection, resource_label: str) -> list[FQN]:
     return getattr(__this__, f"list_{pluralize(resource_label)}")(session)
 
 
-def list_account_scoped_resource(session, resource) -> list[FQN]:
+def list_account_scoped_resource(session: SnowflakeConnection, resource) -> list[FQN]:
     show_result = execute(session, f"SHOW {resource}")
     resources = []
     for row in show_result:
@@ -2186,7 +2187,7 @@ def list_account_scoped_resource(session, resource) -> list[FQN]:
     return resources
 
 
-def list_schema_scoped_resource(session, resource) -> list[FQN]:
+def list_schema_scoped_resource(session: SnowflakeConnection, resource) -> list[FQN]:
     show_result = execute(session, f"SHOW {resource} IN ACCOUNT")
     resources = []
     for row in show_result:
@@ -2203,23 +2204,23 @@ def list_schema_scoped_resource(session, resource) -> list[FQN]:
 ######## List functions by resource
 
 
-def list_alerts(session) -> list[FQN]:
+def list_alerts(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "ALERTS")
 
 
-def list_api_integrations(session) -> list[FQN]:
+def list_api_integrations(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "API INTEGRATIONS")
 
 
-def list_authentication_policies(session) -> list[FQN]:
+def list_authentication_policies(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "AUTHENTICATION POLICIES")
 
 
-def list_catalog_integrations(session) -> list[FQN]:
+def list_catalog_integrations(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "CATALOG INTEGRATIONS")
 
 
-def list_compute_pools(session) -> list[FQN]:
+def list_compute_pools(session: SnowflakeConnection) -> list[FQN]:
     try:
         show_result = execute(session, "SHOW COMPUTE POOLS")
     except ProgrammingError as err:
@@ -2228,7 +2229,7 @@ def list_compute_pools(session) -> list[FQN]:
     return [FQN(name=resource_name_from_snowflake_metadata(row["name"])) for row in show_result]
 
 
-def _list_databases(session) -> list[ResourceName]:
+def _list_databases(session: SnowflakeConnection) -> list[ResourceName]:
     show_result = execute(session, "SHOW DATABASES", cacheable=True)
     databases = []
     for row in show_result:
@@ -2242,12 +2243,12 @@ def _list_databases(session) -> list[ResourceName]:
     return databases
 
 
-def list_databases(session) -> list[FQN]:
+def list_databases(session: SnowflakeConnection) -> list[FQN]:
     databases = _list_databases(session)
     return [FQN(name=database) for database in databases]
 
 
-def list_database_roles(session) -> list[FQN]:
+def list_database_roles(session: SnowflakeConnection) -> list[FQN]:
     databases = _list_databases(session)
     roles = []
     for database_name in databases:
@@ -2271,15 +2272,15 @@ def list_database_roles(session) -> list[FQN]:
     return roles
 
 
-def list_dynamic_tables(session) -> list[FQN]:
+def list_dynamic_tables(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "DYNAMIC TABLES")
 
 
-def list_external_volumes(session) -> list[FQN]:
+def list_external_volumes(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "EXTERNAL VOLUMES")
 
 
-# def list_future_grants(session) -> list[FQN]:
+# def list_future_grants(session: SnowflakeConnection) -> list[FQN]:
 #     grants = []
 #     for role in roles:
 #         role_name = resource_name_from_snowflake_metadata(role["name"])
@@ -2292,7 +2293,7 @@ def list_external_volumes(session) -> list[FQN]:
 #     return grants
 
 
-def list_functions(session) -> list[FQN]:
+def list_functions(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW USER FUNCTIONS IN ACCOUNT")
     functions = []
     for row in show_result:
@@ -2305,7 +2306,7 @@ def list_functions(session) -> list[FQN]:
     return functions
 
 
-def list_grants(session) -> list[FQN]:
+def list_grants(session: SnowflakeConnection) -> list[FQN]:
     roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
@@ -2341,31 +2342,31 @@ def list_grants(session) -> list[FQN]:
     return grants
 
 
-def list_iceberg_tables(session) -> list[FQN]:
+def list_iceberg_tables(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "ICEBERG TABLES")
 
 
-def list_image_repositories(session) -> list[FQN]:
+def list_image_repositories(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "IMAGE REPOSITORIES")
 
 
-def list_network_policies(session) -> list[FQN]:
+def list_network_policies(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "NETWORK POLICIES")
 
 
-def list_network_rules(session) -> list[FQN]:
+def list_network_rules(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "NETWORK RULES")
 
 
-def list_pipes(session) -> list[FQN]:
+def list_pipes(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "PIPES")
 
 
-def list_resource_monitors(session) -> list[FQN]:
+def list_resource_monitors(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "RESOURCE MONITORS")
 
 
-def list_roles(session) -> list[FQN]:
+def list_roles(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW ROLES")
     return [
         FQN(name=resource_name_from_snowflake_metadata(row["name"]))
@@ -2374,7 +2375,7 @@ def list_roles(session) -> list[FQN]:
     ]
 
 
-def list_role_grants(session) -> list[FQN]:
+def list_role_grants(session: SnowflakeConnection) -> list[FQN]:
     roles = execute(session, "SHOW ROLES")
     grants = []
     for role in roles:
@@ -2411,7 +2412,7 @@ def list_schemas(session, database=None) -> list[FQN]:
             if row["name"] == "INFORMATION_SCHEMA":
                 continue
             # Skip database shares
-            if database is None and row["database_name"] not in user_databases:
+            if database is None and row["database_name"] not in (user_databases or []):
                 continue
             schemas.append(
                 FQN(
@@ -2426,11 +2427,11 @@ def list_schemas(session, database=None) -> list[FQN]:
         raise
 
 
-def list_secrets(session) -> list[FQN]:
+def list_secrets(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "SECRETS")
 
 
-def list_security_integrations(session) -> list[FQN]:
+def list_security_integrations(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW SECURITY INTEGRATIONS")
     integrations = []
     for row in show_result:
@@ -2440,7 +2441,7 @@ def list_security_integrations(session) -> list[FQN]:
     return integrations
 
 
-def list_shares(session) -> list[FQN]:
+def list_shares(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW SHARES")
     shares = []
     for row in show_result:
@@ -2450,7 +2451,7 @@ def list_shares(session) -> list[FQN]:
     return shares
 
 
-def list_stages(session) -> list[FQN]:
+def list_stages(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW STAGES IN ACCOUNT")
     stages = []
     for row in show_result:
@@ -2468,15 +2469,15 @@ def list_stages(session) -> list[FQN]:
     return stages
 
 
-def list_storage_integrations(session) -> list[FQN]:
+def list_storage_integrations(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "STORAGE INTEGRATIONS")
 
 
-def list_streams(session) -> list[FQN]:
+def list_streams(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "STREAMS")
 
 
-def list_tables(session) -> list[FQN]:
+def list_tables(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW TABLES IN ACCOUNT")
     user_databases = _list_databases(session)
     tables = []
@@ -2505,10 +2506,10 @@ def list_tables(session) -> list[FQN]:
     return tables
 
 
-def list_tag_references(session) -> list[FQN]:
+def list_tag_references(session: SnowflakeConnection) -> list[FQN]:
     try:
         show_result = execute(session, "SHOW TAGS IN ACCOUNT")
-        tag_references = []
+        tag_references: list[FQN] = []
         for tag in show_result:
             if tag["database_name"] in SYSTEM_DATABASES or tag["schema_name"] == "INFORMATION_SCHEMA":
                 continue
@@ -2551,7 +2552,7 @@ def list_tag_references(session) -> list[FQN]:
     return tag_map
 
 
-def list_tags(session) -> list[FQN]:
+def list_tags(session: SnowflakeConnection) -> list[FQN]:
     try:
         show_result = execute(session, "SHOW TAGS IN ACCOUNT")
         tags = []
@@ -2573,11 +2574,11 @@ def list_tags(session) -> list[FQN]:
             raise
 
 
-def list_tasks(session) -> list[FQN]:
+def list_tasks(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "TASKS")
 
 
-def list_users(session) -> list[FQN]:
+def list_users(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW USERS")
     users = []
     for row in show_result:
@@ -2587,7 +2588,7 @@ def list_users(session) -> list[FQN]:
     return users
 
 
-def list_views(session) -> list[FQN]:
+def list_views(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW VIEWS IN ACCOUNT")
     views = []
     for row in show_result:
@@ -2605,7 +2606,7 @@ def list_views(session) -> list[FQN]:
     return views
 
 
-def list_warehouses(session) -> list[FQN]:
+def list_warehouses(session: SnowflakeConnection) -> list[FQN]:
     show_result = execute(session, "SHOW WAREHOUSES")
     warehouses = []
     for row in show_result:

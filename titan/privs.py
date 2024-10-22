@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 from .enums import ParseableEnum, ResourceType
 
 
@@ -9,7 +9,8 @@ class Priv(ParseableEnum):
 
 @dataclass
 class GrantedPrivilege:
-    privilege: Priv
+    # Union[Priv, str] makes typing work, but probably should be Priv only.
+    privilege: Union[Priv, str]
     on: str  # probably should be FQN
 
     @classmethod

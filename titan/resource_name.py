@@ -1,6 +1,6 @@
 import re
 from functools import lru_cache
-from typing import Union
+from typing import Any, Union
 
 import pyparsing as pp
 import yaml
@@ -34,6 +34,9 @@ def _name_should_be_quoted(name: str) -> bool:
 
 
 class ResourceName:
+    _name: str
+    _quoted: bool
+
     def __init__(self, name: Union[str, "ResourceName"]) -> None:
         if not isinstance(name, (str, ResourceName)):
             raise RuntimeError(f"ResourceName must be a string or ResourceName, got {type(name)}")
@@ -60,7 +63,7 @@ class ResourceName:
     def __str__(self):
         return f'"{self._name}"' if self._quoted else self._name.upper()
 
-    def __eq__(self, other: Union[str, "ResourceName"]):
+    def __eq__(self, other: Any):
         if not isinstance(other, (ResourceName, str)):
             return False
         if isinstance(other, str):
