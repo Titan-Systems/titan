@@ -1,7 +1,6 @@
 import os
 
 import pytest
-from tests.helpers import clean_resource_data
 
 from titan import data_provider
 from titan import resources as res

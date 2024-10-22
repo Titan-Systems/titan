@@ -1,5 +1,4 @@
 import os
-import time
 
 import snowflake.connector
 import yaml
@@ -8,6 +7,7 @@ from dotenv import dotenv_values
 from titan import resources as res
 from titan.blueprint import Blueprint, print_plan
 from titan.data_provider import fetch_session
+from titan.enums import AccountEdition
 from titan.gitops import collect_blueprint_config
 
 
@@ -36,9 +36,8 @@ def configure_test_account(conn):
     config = read_config("test_account.yml")
     vars = dotenv_values("env/.vars.test_account")
     print(vars)
-    is_enterprise = session_ctx["tag_support"]
 
-    if is_enterprise:
+    if session_ctx["account_edition"] == AccountEdition.ENTERPRISE:
         config = merge_configs(config, read_config("test_account_enterprise.yml"))
 
     blueprint_config = collect_blueprint_config(config, {"vars": vars})

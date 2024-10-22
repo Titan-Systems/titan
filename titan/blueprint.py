@@ -526,9 +526,6 @@ class Blueprint:
     def _raise_for_nonconforming_plan(self, session_ctx: SessionContext, plan: Plan):
         exceptions = []
 
-        # If the account doesn't support tags, assume the account is standard edition or trial
-        account_is_standard_edition = session_ctx["tag_support"] is False
-
         for change in plan:
             # Run Mode exceptions
             if self._config.run_mode == RunMode.CREATE_OR_UPDATE:
@@ -546,7 +543,7 @@ class Blueprint:
                 if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
-            if account_is_standard_edition:
+            if session_ctx["account_edition"] == AccountEdition.STANDARD:
                 if isinstance(change, CreateResource) and AccountEdition.STANDARD not in change.resource_cls.edition:
                     exceptions.append(f"Resource {change.urn} requires enterprise edition or higher")
 
@@ -582,7 +579,6 @@ class Blueprint:
     def fetch_remote_state(self, session, manifest: Manifest) -> State:
         state: State = {}
         session_ctx = data_provider.fetch_session(session)
-        account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
 
         if self._config.run_mode == RunMode.SYNC:
             if self._config.allowlist:
@@ -593,7 +589,7 @@ class Blueprint:
                         if data is None:
                             raise MissingResourceException(f"Resource could not be found: {urn}")
                         resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
-                        state[urn] = resource_cls.spec(**data).to_dict(account_edition)
+                        state[urn] = resource_cls.spec(**data).to_dict(session_ctx["account_edition"])
             else:
                 raise RuntimeError("Sync mode requires an allowlist")
 
@@ -605,7 +601,7 @@ class Blueprint:
                 else:
                     resource_cls = manifest_item.resource_cls
 
-                state[urn] = resource_cls.spec(**data).to_dict(account_edition)
+                state[urn] = resource_cls.spec(**data).to_dict(session_ctx["account_edition"])
 
         # check for existence of resource refs
         for parent, reference in manifest.refs:
@@ -814,11 +810,10 @@ class Blueprint:
 
     def generate_manifest(self, session_ctx: SessionContext) -> Manifest:
         manifest = Manifest(account_locator=session_ctx["account_locator"])
-        account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
         self._finalize(session_ctx)
         for resource in _walk(self._root):
             if isinstance(resource, Resource):
-                manifest.add(resource, account_edition)
+                manifest.add(resource, session_ctx["account_edition"])
             else:
                 raise RuntimeError(f"Unexpected object found in blueprint: {resource}")
 

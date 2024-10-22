@@ -2,7 +2,7 @@ import pytest
 
 from titan import resources as res
 from titan.blueprint import Blueprint, CreateResource, DropResource, NonConformingPlanException, RunMode, UpdateResource
-from titan.enums import ResourceType
+from titan.enums import AccountEdition, ResourceType
 from titan.identifiers import parse_URN
 
 
@@ -10,10 +10,10 @@ from titan.identifiers import parse_URN
 def session_ctx() -> dict:
     return {
         "account": "SOMEACCT",
+        "account_edition": AccountEdition.ENTERPRISE,
         "account_locator": "ABCD123",
         "role": "SYSADMIN",
         "available_roles": ["SYSADMIN", "USERADMIN"],
-        "tag_support": True,
     }
 
 

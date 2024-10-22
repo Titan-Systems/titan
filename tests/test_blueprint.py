@@ -13,7 +13,7 @@ from titan.blueprint import (
     dump_plan,
 )
 from titan.blueprint_config import BlueprintConfig
-from titan.enums import ResourceType, RunMode
+from titan.enums import AccountEdition, ResourceType, RunMode
 from titan.exceptions import (
     DuplicateResourceException,
     InvalidResourceException,
@@ -32,6 +32,7 @@ from titan.var import VarString
 def session_ctx() -> dict:
     return {
         "account": "SOMEACCT",
+        "account_edition": AccountEdition.ENTERPRISE,
         "account_locator": "ABCD123",
         "role": "SYSADMIN",
         "available_roles": [
@@ -51,7 +52,6 @@ def session_ctx() -> dict:
                 GrantedPrivilege(privilege=AccountPriv.CREATE_WAREHOUSE, on="ABCD123"),
             ],
         },
-        "tag_support": True,
     }
 
 
@@ -66,10 +66,10 @@ def remote_state() -> dict:
 def resource_manifest():
     session_ctx = {
         "account": "SOMEACCT",
+        "account_edition": AccountEdition.ENTERPRISE,
         "account_locator": "ABCD123",
         "current_role": "SYSADMIN",
         "available_roles": ["SYSADMIN", "USERADMIN"],
-        "tag_support": True,
     }
     db = res.Database(name="DB")
     schema = res.Schema(name="SCHEMA", database=db)
@@ -721,7 +721,7 @@ def test_merge_account_scoped_resources_fail():
 
 def test_blueprint_edition_checks(session_ctx, remote_state):
     session_ctx = deepcopy(session_ctx)
-    session_ctx["tag_support"] = False
+    session_ctx["account_edition"] = AccountEdition.STANDARD
 
     blueprint = Blueprint(resources=[res.Database(name="DB1"), res.Tag(name="TAG1")])
     manifest = blueprint.generate_manifest(session_ctx)
@@ -742,7 +742,7 @@ def test_blueprint_edition_checks(session_ctx, remote_state):
 
 def test_blueprint_warehouse_scaling_policy_doesnt_render_in_standard_edition(session_ctx, remote_state):
     session_ctx = deepcopy(session_ctx)
-    session_ctx["tag_support"] = False
+    session_ctx["account_edition"] = AccountEdition.STANDARD
     wh = res.Warehouse(name="WH", warehouse_size="XSMALL")
     blueprint = Blueprint(resources=[wh])
     manifest = blueprint.generate_manifest(session_ctx)

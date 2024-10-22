@@ -54,9 +54,8 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
     try:
         fetch_session.cache_clear()
         session_ctx = fetch_session(cursor.connection)
-        account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
 
-        if account_edition not in resource.edition:
+        if session_ctx["account_edition"] not in resource.edition:
             feature_enabled = False
             pytest.skip(f"Skipping {resource.__class__.__name__}, not supported by account edition {account_edition}")
 

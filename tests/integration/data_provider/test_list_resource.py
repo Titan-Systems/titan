@@ -38,7 +38,7 @@ def resource(request, suffix):
 
 def create(cursor, resource: Resource):
     session_ctx = data_provider.fetch_session(cursor.connection)
-    account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
+    account_edition = session_ctx["account_edition"]
     sql = resource.create_sql(account_edition=account_edition, if_not_exists=True)
     try:
         cursor.execute(sql)
@@ -60,10 +60,11 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
     data_provider.fetch_session.cache_clear()
     reset_cache()
     session_ctx = data_provider.fetch_session(cursor.connection)
-    account_edition = AccountEdition.ENTERPRISE if session_ctx["tag_support"] else AccountEdition.STANDARD
 
-    if account_edition not in resource.edition:
-        pytest.skip(f"Skipping {resource.__class__.__name__}, not supported by account edition {account_edition}")
+    if session_ctx["account_edition"] not in resource.edition:
+        pytest.skip(
+            f"Skipping {resource.__class__.__name__}, not supported by account edition {session_ctx['account_edition']}"
+        )
 
     if isinstance(resource.scope, DatabaseScope):
         list_resources_database.add(resource)
