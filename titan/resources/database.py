@@ -5,6 +5,7 @@ from ..identifiers import FQN, URN
 from ..props import FlagProp, IdentifierProp, IntProp, Props, StringProp, TagsProp
 from ..resource_name import ResourceName
 from ..scope import AccountScope
+from ..var import VarString
 from .external_volume import ExternalVolume
 from .resource import NamedResource, Resource, ResourceContainer, ResourceSpec
 from .role import Role
@@ -181,8 +182,9 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         return self._public_schema
 
     def _resolve_vars(self, vars: dict):
+        name_uses_var = isinstance(self._name, VarString)
         super()._resolve_vars(vars)
-        if self._name == "SNOWFLAKE":
+        if name_uses_var and self._name == "SNOWFLAKE":
             raise Exception("Cannot resolve vars for system databases")
 
 
