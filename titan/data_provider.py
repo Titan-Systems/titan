@@ -1519,7 +1519,6 @@ def fetch_schema(session: SnowflakeConnection, fqn: FQN):
     if fqn.database is None:
         raise Exception(f"Schema {fqn} is missing a database name")
     try:
-        # show_result = execute(session, f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
         show_result = _show_resources(session, "SCHEMAS", fqn)
     except ProgrammingError:
         return None
@@ -2422,15 +2421,15 @@ def list_role_grants(session: SnowflakeConnection) -> list[FQN]:
     return grants
 
 
-def list_schemas(session, database=None) -> list[FQN]:
+def list_schemas(session: SnowflakeConnection, database=None) -> list[FQN]:
     if database:
-        db = f" IN DATABASE {database}"
+        in_ctx = f"DATABASE {database}"
         user_databases = None
     else:
-        db = ""
+        in_ctx = "ACCOUNT"
         user_databases = _list_databases(session)
     try:
-        show_result = execute(session, f"SHOW SCHEMAS{db}")
+        show_result = execute(session, f"SHOW SCHEMAS IN {in_ctx}")
         schemas = []
         for row in show_result:
             # Skip system databases

@@ -29,17 +29,7 @@ def resource(request):
     yield res
 
 
-def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
-    lifecycle_db = f"LIFECYCLE_DB_{suffix}_{resource.__class__.__name__}"
-    cursor.execute("USE ROLE SYSADMIN")
-    cursor.execute(f"CREATE DATABASE IF NOT EXISTS {lifecycle_db}")
-    cursor.execute(f"USE DATABASE {lifecycle_db}")
-    cursor.execute("USE WAREHOUSE CI")
-
-    database = res.Database(name=lifecycle_db, owner="SYSADMIN")
-    marked_for_cleanup.append(database)
-
-    feature_enabled = True
+def test_create_drop_from_json(resource, cursor, suffix):
 
     # Not easily testable without flakiness
     if resource.__class__ in (
@@ -52,6 +42,11 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
     ):
         pytest.skip("Skipping")
 
+    lifecycle_db = f"LIFECYCLE_DB_{suffix}_{resource.__class__.__name__}"
+    database = res.Database(name=lifecycle_db, owner="SYSADMIN")
+
+    feature_enabled = True
+
     try:
         fetch_session.cache_clear()
         session_ctx = fetch_session(cursor.connection)
@@ -61,6 +56,12 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
             pytest.skip(
                 f"Skipping {resource.__class__.__name__}, not supported by account edition {session_ctx['account_edition']}"
             )
+
+        if isinstance(resource.scope, (DatabaseScope, SchemaScope)):
+            cursor.execute("USE ROLE SYSADMIN")
+            cursor.execute(f"CREATE DATABASE IF NOT EXISTS {lifecycle_db}")
+            cursor.execute(f"USE DATABASE {lifecycle_db}")
+            cursor.execute("USE WAREHOUSE CI")
 
         if isinstance(resource.scope, DatabaseScope):
             database.add(resource)
@@ -86,3 +87,5 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
                 cursor.execute(drop_sql)
             except Exception:
                 pytest.fail(f"Failed to drop resource with sql {drop_sql}")
+        cursor.execute("USE ROLE SYSADMIN")
+        cursor.execute(database.drop_sql(if_exists=True))

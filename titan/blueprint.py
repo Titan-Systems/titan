@@ -129,7 +129,11 @@ class TransferOwnership(ResourceChange):
         }
 
 
-State = dict[URN, dict]
+class RemoteResourceStub:
+    pass
+
+
+State = dict[URN, Union[dict, RemoteResourceStub]]
 Plan = list[ResourceChange]
 
 
@@ -585,6 +589,7 @@ class Blueprint:
                 for resource_type in self._config.allowlist:
                     for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                         urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
+                        # state[urn] = {}  # RemoteResourceStub()
                         data = data_provider.fetch_resource(session, urn)
                         if data is None:
                             raise MissingResourceException(f"Resource could not be found: {urn}")
@@ -957,6 +962,9 @@ def execution_strategy_for_change(
         # If we can use the owner of the change, use that
         if change_owner in available_roles and role_can_execute_change(change_owner, change, role_privileges):
             return change_owner, False
+
+        if change.urn.resource_type == ResourceType.NOTEBOOK:
+            raise MissingPrivilegeException("Notebook ownership cannot be transferred")
 
         # See if there is another role we can use to execute the change
         alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)

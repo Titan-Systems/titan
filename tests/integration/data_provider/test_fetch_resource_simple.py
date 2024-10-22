@@ -319,31 +319,24 @@ def create(cursor, resource: Resource, account_edition):
     ids=[resource.__class__.__name__ for resource in resource_fixtures()],
     scope="function",
 )
-def resource_fixture(
-    request,
-    cursor,
-    test_database,
-    marked_for_cleanup,
-):
+def resource_fixture(request, cursor, suffix):
     resource = request.param
-
-    if isinstance(resource.scope, DatabaseScope):
-        test_database.add(resource)
-    elif isinstance(resource.scope, SchemaScope):
-        test_database.public_schema.add(resource)
-    elif isinstance(resource.scope, AccountScope):
+    if isinstance(resource.scope, AccountScope):
         cursor.execute(resource.drop_sql(if_exists=True))
-
-    marked_for_cleanup.append(resource)
-    yield resource
-
-
-@pytest.fixture(scope="session")
-def test_database(cursor, suffix, marked_for_cleanup):
-    db = res.Database(name=f"fetch_resource_test_database_{suffix}")
-    cursor.execute(db.create_sql(if_not_exists=True))
-    marked_for_cleanup.append(db)
-    yield db
+        yield resource
+        cursor.execute(resource.drop_sql(if_exists=True))
+    elif isinstance(resource.scope, DatabaseScope):
+        db = res.Database(name=f"test_fetch_{resource.__class__.__name__}_{suffix}")
+        cursor.execute(db.create_sql(if_not_exists=True))
+        db.add(resource)
+        yield resource
+        cursor.execute(db.drop_sql(if_exists=True))
+    elif isinstance(resource.scope, SchemaScope):
+        db = res.Database(name=f"test_fetch_{resource.__class__.__name__}_{suffix}")
+        cursor.execute(db.create_sql(if_not_exists=True))
+        db.public_schema.add(resource)
+        yield resource
+        cursor.execute(db.drop_sql(if_exists=True))
 
 
 def test_fetch(
