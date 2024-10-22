@@ -156,7 +156,9 @@ def _fail_if_not_granted(result, *args):
 _INDEX: dict[int, dict[tuple[str, str, str], dict[str, Any]]] = {}
 
 
-def _fetch_grant_to_role(session: SnowflakeConnection, role: ResourceName, granted_on: str, on_name: str, privilege: str):
+def _fetch_grant_to_role(
+    session: SnowflakeConnection, role: ResourceName, granted_on: str, on_name: str, privilege: str
+):
     grants = _show_grants_to_role(session, role, cacheable=True)
     if id(grants) not in _INDEX:
         local_index: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -469,7 +471,9 @@ def _show_resource_parameters(session: SnowflakeConnection, type_str: str, fqn: 
     return params_result_to_dict(result)
 
 
-def _show_grants_to_role(session: SnowflakeConnection, role: ResourceName, cacheable: bool = False) -> list[dict[str, Any]]:
+def _show_grants_to_role(
+    session: SnowflakeConnection, role: ResourceName, cacheable: bool = False
+) -> list[dict[str, Any]]:
     """
     {
         'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
@@ -485,6 +489,29 @@ def _show_grants_to_role(session: SnowflakeConnection, role: ResourceName, cache
     grants = execute(
         session,
         f"SHOW GRANTS TO ROLE {role}",
+        cacheable=cacheable,
+        empty_response_codes=[DOES_NOT_EXIST_ERR],
+    )
+    return grants
+
+
+def _show_future_grants_to_role(
+    session: SnowflakeConnection, role: ResourceName, cacheable: bool = False
+) -> list[dict[str, Any]]:
+    """
+    {
+        'created_on': datetime.datetime(2024, 2, 28, 20, 5, 32, 166000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
+        'privilege': 'USAGE',
+        'grant_on': 'SCHEMA',
+        'name': 'STATIC_DATABASE.<SCHEMA>',
+        'grant_to': 'ROLE',
+        'grantee_name': 'THATROLE',
+        'grant_option': 'false'
+    }
+    """
+    grants = execute(
+        session,
+        f"SHOW FUTURE GRANTS TO ROLE {role}",
         cacheable=cacheable,
         empty_response_codes=[DOES_NOT_EXIST_ERR],
     )
@@ -565,7 +592,9 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
     }
 
 
-def fetch_role_privileges(session: SnowflakeConnection, roles: list[ResourceName], cacheable: bool = True) -> dict[ResourceName, list[GrantedPrivilege]]:
+def fetch_role_privileges(
+    session: SnowflakeConnection, roles: list[ResourceName], cacheable: bool = True
+) -> dict[ResourceName, list[GrantedPrivilege]]:
     role_privileges: dict[ResourceName, list[GrantedPrivilege]] = {}
     for role in roles:
 
@@ -2280,17 +2309,27 @@ def list_external_volumes(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "EXTERNAL VOLUMES")
 
 
-# def list_future_grants(session: SnowflakeConnection) -> list[FQN]:
-#     grants = []
-#     for role in roles:
-#         role_name = resource_name_from_snowflake_metadata(role["name"])
-#         if role_name in SYSTEM_ROLES:
-#             continue
-#         show_result = execute(session, f"SHOW GRANTS OF ROLE {role_name}")
-#         for data in show_result:
-#             subject = "user" if data["granted_to"] == "USER" else "role"
-#             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
-#     return grants
+def list_future_grants(session: SnowflakeConnection) -> list[FQN]:
+    roles = execute(session, "SHOW ROLES")
+    grants = []
+    for role in roles:
+        role_name = resource_name_from_snowflake_metadata(role["name"])
+        if role_name in SYSTEM_ROLES:
+            continue
+        grant_data = _show_future_grants_to_role(session, role_name)
+        for data in grant_data:
+            in_type = "database" if data["grant_on"] == "SCHEMA" else "schema"
+            collection = data["name"]
+            grants.append(
+                FQN(
+                    name=role_name,
+                    params={
+                        "priv": data["privilege"],
+                        "on": f"{in_type}/{collection}",
+                    },
+                )
+            )
+    return grants
 
 
 def list_functions(session: SnowflakeConnection) -> list[FQN]:
