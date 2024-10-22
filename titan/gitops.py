@@ -9,7 +9,6 @@ from .identifiers import resource_label_for_type
 from .resource_name import ResourceName
 from .resources import (
     Database,
-    Grant,
     Resource,
     RoleGrant,
     Schema,
@@ -75,19 +74,6 @@ def _resources_from_database_config(databases_config: list) -> list:
             db.add(sch)
             resources.append(sch)
     return resources
-
-
-# def _resources_from_grants_config(grants_config: list) -> list:
-#     resources = []
-#     for grant in grants_config:
-#         if isinstance(grant, dict):
-#             titan_grant = Grant(**grant)
-#         elif isinstance(grant, str):
-#             titan_grant = Grant.from_sql(grant)
-#         else:
-#             raise Exception(f"Unsupported grant found: {type(grant)}, {grant}")
-#         resources.append(titan_grant)
-#     return resources
 
 
 def _resources_from_users_config(users_config: list) -> list:
