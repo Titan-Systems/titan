@@ -77,8 +77,6 @@ def test_create_drop_from_json(resource, cursor, suffix, marked_for_cleanup):
             pytest.skip(f"Skipping {resource.__class__.__name__}, feature not enabled")
         else:
             pytest.fail(f"Failed to create resource {resource}")
-    except Exception:
-        pytest.fail(f"Failed to create resource {resource}")
     finally:
         if feature_enabled:
             try:
