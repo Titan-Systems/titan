@@ -11,7 +11,7 @@ from titan.blueprint import (
 )
 from titan.enums import AccountEdition
 from titan.identifiers import parse_URN
-from titan.privs import AccountPriv, DatabasePriv, GrantedPrivilege
+from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
 
 
@@ -29,7 +29,6 @@ def session_ctx() -> dict:
             "SECURITYADMIN",
             "PUBLIC",
         ],
-        "role_privileges": {},
     }
 
 
@@ -183,7 +182,6 @@ def test_resource_cant_be_created(remote_state):
         "available_roles": [
             "TEST_ROLE",
         ],
-        "role_privileges": {},
     }
     warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
     blueprint = Blueprint(resources=[warehouse])
@@ -232,11 +230,11 @@ def test_tag_reference_with_tag_admin_custom_role():
         "available_roles": [
             "TAG_ADMIN",
         ],
-        "role_privileges": {
-            "TAG_ADMIN": [
-                GrantedPrivilege(privilege=AccountPriv.APPLY_TAG, on="ABCD123"),
-            ]
-        },
+        # "role_privileges": {
+        #     "TAG_ADMIN": [
+        #         GrantedPrivilege(privilege=AccountPriv.APPLY_TAG, on="ABCD123"),
+        #     ]
+        # },
         "tags": ["tags.tags.cost_center"],
     }
 

@@ -42,16 +42,6 @@ def session_ctx() -> dict:
             "SECURITYADMIN",
             "PUBLIC",
         ],
-        "role_privileges": {
-            "USERADMIN": [
-                GrantedPrivilege(privilege=AccountPriv.CREATE_ROLE, on="ABCD123"),
-                GrantedPrivilege(privilege=AccountPriv.CREATE_USER, on="ABCD123"),
-            ],
-            "SYSADMIN": [
-                GrantedPrivilege(privilege=AccountPriv.CREATE_DATABASE, on="ABCD123"),
-                GrantedPrivilege(privilege=AccountPriv.CREATE_WAREHOUSE, on="ABCD123"),
-            ],
-        },
     }
 
 

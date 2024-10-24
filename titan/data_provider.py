@@ -46,7 +46,7 @@ class SessionContext(TypedDict):
     available_roles: list[ResourceName]
     database: str
     role_privileges: dict[ResourceName, list[GrantedPrivilege]]
-    role: str
+    role: ResourceName
     schemas: list[str]
     secondary_roles: list[str]
     user: str
@@ -572,7 +572,7 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
         "available_roles": available_roles,
         "database": session_obj["DATABASE"],
         "role_privileges": role_privileges,
-        "role": session_obj["ROLE"],
+        "role": ResourceName(session_obj["ROLE"]),
         "schemas": json.loads(session_obj["SCHEMAS"]),
         "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
         "user": session_obj["USER"],

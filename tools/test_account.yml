@@ -70,6 +70,8 @@ roles:
     comment: This role must be quoted
   - name: EVERY_PRIVILEGE
     comment: This role has every privilege
+  - name: TITAN_GRANT_ADMIN
+    comment: This role has MANAGE GRANTS privileges
 
 databases:
   - name: static_database
@@ -92,6 +94,9 @@ role_grants:
   - role: EVERY_PRIVILEGE
     roles:
       - SYSADMIN
+  - role: TITAN_GRANT_ADMIN
+    roles:
+      - SYSADMIN
 
 # database_role_grants:
 #   - role: static_database_role
@@ -108,12 +113,18 @@ network_rules:
 
 
 grants:
+  # TITAN_GRANT_ADMIN grants
+  - GRANT MANAGE GRANTS ON ACCOUNT TO ROLE TITAN_GRANT_ADMIN
+
+  # CI grants
   - GRANT USAGE ON WAREHOUSE STATIC_WAREHOUSE TO ROLE CI
   - GRANT USAGE ON DATABASE static_database TO ROLE CI
   - GRANT USAGE ON SCHEMA static_database.static_schema TO ROLE CI
   - GRANT SELECT ON TABLE static_database.public.static_table TO ROLE CI
   - GRANT SELECT ON VIEW static_database.public.static_view TO ROLE CI
   - GRANT READ ON STAGE static_database.public.static_stage TO ROLE CI
+
+  # EVERY_PRIVILEGE grants
   - GRANT APPLY AUTHENTICATION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY MASKING POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY PACKAGES POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
