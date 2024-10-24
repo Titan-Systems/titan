@@ -135,25 +135,6 @@ def test_transfer_ownership_with_changes(session_ctx, remote_state):
     assert sql_commands[4] == "GRANT OWNERSHIP ON ROLE TEST_ROLE TO ROLE USERADMIN COPY CURRENT GRANTS"
 
 
-# def test_resource_has_custom_role_owner_with_create_priv(session_ctx, remote_state):
-#     session_ctx = session_ctx.copy()
-#     session_ctx["available_roles"].append(ResourceName("test_role"))
-
-#     warehouse = res.Warehouse(name="test_warehouse", owner="test_role")
-#     blueprint = Blueprint(resources=[warehouse])
-#     manifest = blueprint.generate_manifest(session_ctx)
-#     plan = blueprint._plan(remote_state, manifest)
-#     assert len(plan) == 1
-#     assert isinstance(plan[0], CreateResource)
-#     assert plan[0].urn == parse_URN("urn::ABCD123:warehouse/test_warehouse")
-
-#     sql_commands = compile_plan_to_sql(session_ctx, plan)
-#     assert sql_commands[0] == "USE SECONDARY ROLES ALL"
-#     assert sql_commands[1] == "USE ROLE SYSADMIN"
-#     assert sql_commands[2].startswith("CREATE WAREHOUSE TEST_WAREHOUSE")
-#     assert sql_commands[3] == "GRANT OWNERSHIP ON WAREHOUSE TEST_WAREHOUSE TO ROLE TEST_ROLE COPY CURRENT GRANTS"
-
-
 def test_resource_is_transferred_to_custom_role_owner(session_ctx, remote_state):
     session_ctx = session_ctx.copy()
     session_ctx["available_roles"].append(ResourceName("test_role"))
@@ -204,11 +185,6 @@ def test_grant_with_grant_admin_custom_role(remote_state):
         "available_roles": [
             "GRANT_ADMIN",
         ],
-        # "role_privileges": {
-        #     "GRANT_ADMIN": [
-        #         GrantedPrivilege(privilege=AccountPriv.MANAGE_GRANTS, on="ABCD123"),
-        #     ]
-        # },
     }
 
     grant = res.RoleGrant(role="GRANT_ADMIN", to_role="SYSADMIN")
@@ -230,11 +206,6 @@ def test_tag_reference_with_tag_admin_custom_role():
         "available_roles": [
             "TAG_ADMIN",
         ],
-        # "role_privileges": {
-        #     "TAG_ADMIN": [
-        #         GrantedPrivilege(privilege=AccountPriv.APPLY_TAG, on="ABCD123"),
-        #     ]
-        # },
         "tags": ["tags.tags.cost_center"],
     }
 

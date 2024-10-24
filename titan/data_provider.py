@@ -45,7 +45,6 @@ class SessionContext(TypedDict):
     account: str
     available_roles: list[ResourceName]
     database: str
-    role_privileges: dict[ResourceName, list[GrantedPrivilege]]
     role: ResourceName
     schemas: list[str]
     secondary_roles: list[str]
@@ -563,7 +562,6 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
 
     account_data = json.loads(session_obj["ACCOUNT_DATA"])
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
-    role_privileges = {}  # fetch_role_privileges(session, available_roles, cacheable=True)
 
     return {
         "account_edition": AccountEdition(account_data["accountInfo"]["serviceLevelName"]),
@@ -571,7 +569,6 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
         "account": session_obj["ACCOUNT"],
         "available_roles": available_roles,
         "database": session_obj["DATABASE"],
-        "role_privileges": role_privileges,
         "role": ResourceName(session_obj["ROLE"]),
         "schemas": json.loads(session_obj["SCHEMAS"]),
         "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
@@ -614,7 +611,6 @@ def fetch_role_privileges(
 
 
 def fetch_account(session: SnowflakeConnection, fqn: FQN):
-    # raise NotImplementedError()
     return {
         "name": None,
         "locator": None,

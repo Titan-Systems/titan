@@ -17,7 +17,11 @@ style:
 	python -m black .
 	codespell .
 
-check: style test
+
+typecheck:
+	mypy --exclude="titan/resources/.*" --exclude="titan/sql.py" --follow-imports=skip titan/
+
+check: style typecheck test
 
 clean:
 	rm -rf build dist *.egg-info

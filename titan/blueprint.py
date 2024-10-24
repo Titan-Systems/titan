@@ -634,7 +634,7 @@ class Blueprint:
         for resource in self._staged:
             resource._resolve_vars(self._config.vars)
 
-    def _build_resource_graph(self, session_ctx: dict):
+    def _build_resource_graph(self, session_ctx: SessionContext) -> None:
         """
         Convert the staged resources into a directed graph of resources
         """
@@ -756,7 +756,7 @@ class Blueprint:
             if tag_ref:
                 self._root.add(tag_ref)
 
-    def _create_ownership_refs(self, session_ctx):
+    def _create_ownership_refs(self, session_ctx: SessionContext) -> None:
         role_grants: list[RoleGrant] = _get_role_grants(self._root)
 
         for resource in _walk(self._root):
@@ -803,16 +803,16 @@ class Blueprint:
                     #         f"Blueprint resource {resource} owner {resource._data.owner} must be granted to the current session"
                     #     )
 
-    def _create_grandparent_refs(self):
+    def _create_grandparent_refs(self) -> None:
         for resource in _walk(self._root):
             if isinstance(resource.scope, SchemaScope):
                 resource.requires(resource.container.container)
 
-    def _finalize_resources(self):
+    def _finalize_resources(self) -> None:
         for resource in _walk(self._root):
             resource._finalized = True
 
-    def _finalize(self, session_ctx):
+    def _finalize(self, session_ctx: SessionContext) -> None:
         if self._finalized:
             raise RuntimeError("Blueprint already finalized")
         self._finalized = True
@@ -917,15 +917,6 @@ class Blueprint:
             resources = resources[0]
         for resource in resources:
             self._add(resource)
-
-
-# def system_role_for_change(change: ResourceChange) -> Optional[ResourceName]:
-#     if resource_type_is_grant(change.urn.resource_type):
-#         # MANAGE GRANTS
-#         return ResourceName("SECURITYADMIN")
-#     elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
-#         # APPLY TAG
-#         return ResourceName("ACCOUNTADMIN")
 
 
 def owner_for_change(change: ResourceChange) -> Optional[ResourceName]:
