@@ -44,7 +44,7 @@ class Account(NamedResource, Resource, ResourceContainer):
         comment: str = None,
         **kwargs,
     ):
-        super().__init__(name=name, **kwargs)
+        super().__init__(name="ACCOUNT", **kwargs)
         self._data: _Account = _Account(
             name=self._name,
             locator=locator,

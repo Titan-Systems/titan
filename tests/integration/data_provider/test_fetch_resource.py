@@ -388,6 +388,7 @@ def test_fetch_compute_pool(cursor, suffix, marked_for_cleanup):
         auto_resume=False,
         auto_suspend_secs=60,
         comment="Compute Pool comment",
+        owner=TEST_ROLE,
     )
     create(cursor, compute_pool)
     marked_for_cleanup.append(compute_pool)

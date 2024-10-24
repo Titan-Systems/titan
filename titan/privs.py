@@ -422,11 +422,14 @@ CREATE_PRIV_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {
     ResourceType.ACCOUNT: AccountPriv.CREATE_ACCOUNT,
     ResourceType.ALERT: SchemaPriv.CREATE_ALERT,
     ResourceType.API_INTEGRATION: AccountPriv.CREATE_API_INTEGRATION,
+    ResourceType.CATALOG_INTEGRATION: AccountPriv.CREATE_INTEGRATION,
+    ResourceType.COMPUTE_POOL: AccountPriv.CREATE_COMPUTE_POOL,
     ResourceType.DATABASE: AccountPriv.CREATE_DATABASE,
     ResourceType.DYNAMIC_TABLE: SchemaPriv.CREATE_DYNAMIC_TABLE,
     ResourceType.EVENT_TABLE: SchemaPriv.CREATE_TABLE,
     ResourceType.EXTERNAL_ACCESS_INTEGRATION: AccountPriv.CREATE_INTEGRATION,
     ResourceType.EXTERNAL_FUNCTION: SchemaPriv.CREATE_FUNCTION,
+    ResourceType.EXTERNAL_VOLUME: AccountPriv.CREATE_EXTERNAL_VOLUME,
     ResourceType.FAILOVER_GROUP: AccountPriv.CREATE_FAILOVER_GROUP,
     ResourceType.FILE_FORMAT: SchemaPriv.CREATE_FILE_FORMAT,
     ResourceType.FUNCTION: SchemaPriv.CREATE_FUNCTION,
@@ -446,7 +449,9 @@ CREATE_PRIV_FOR_RESOURCE_TYPE: dict[ResourceType, ParseableEnum] = {
     ResourceType.SCHEMA: DatabasePriv.CREATE_SCHEMA,
     ResourceType.SECRET: SchemaPriv.CREATE_SECRET,
     ResourceType.SEQUENCE: SchemaPriv.CREATE_SEQUENCE,
+    ResourceType.SHARE: AccountPriv.CREATE_SHARE,
     ResourceType.STAGE: SchemaPriv.CREATE_STAGE,
+    ResourceType.STORAGE_INTEGRATION: AccountPriv.CREATE_INTEGRATION,
     ResourceType.STREAM: SchemaPriv.CREATE_STREAM,
     ResourceType.TABLE: SchemaPriv.CREATE_TABLE,
     ResourceType.TAG: SchemaPriv.CREATE_TAG,
@@ -487,6 +492,7 @@ GLOBAL_PRIV_DEFAULT_OWNERS = {
     AccountPriv.CREATE_REPLICATION_GROUP: "ACCOUNTADMIN",
     AccountPriv.CREATE_ROLE: "USERADMIN",
     AccountPriv.CREATE_SHARE: "ACCOUNTADMIN",
+    AccountPriv.CREATE_INTEGRATION: "ACCOUNTADMIN",
     AccountPriv.CREATE_USER: "USERADMIN",
     AccountPriv.CREATE_WAREHOUSE: "SYSADMIN",
     AccountPriv.EXECUTE_ALERT: "ACCOUNTADMIN",
@@ -530,7 +536,7 @@ def all_privs_for_resource_type(resource_type):
     return all_privs
 
 
-def execution_role_for_priv(priv: str):
+def system_role_for_priv(priv: str):
     try:
         account_priv = AccountPriv(priv)
     except ValueError:

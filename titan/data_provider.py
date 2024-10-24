@@ -45,8 +45,7 @@ class SessionContext(TypedDict):
     account: str
     available_roles: list[ResourceName]
     database: str
-    role_privileges: dict[ResourceName, list[GrantedPrivilege]]
-    role: str
+    role: ResourceName
     schemas: list[str]
     secondary_roles: list[str]
     user: str
@@ -563,7 +562,6 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
 
     account_data = json.loads(session_obj["ACCOUNT_DATA"])
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
-    role_privileges = fetch_role_privileges(session, available_roles, cacheable=True)
 
     return {
         "account_edition": AccountEdition(account_data["accountInfo"]["serviceLevelName"]),
@@ -571,8 +569,7 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
         "account": session_obj["ACCOUNT"],
         "available_roles": available_roles,
         "database": session_obj["DATABASE"],
-        "role_privileges": role_privileges,
-        "role": session_obj["ROLE"],
+        "role": ResourceName(session_obj["ROLE"]),
         "schemas": json.loads(session_obj["SCHEMAS"]),
         "secondary_roles": json.loads(session_obj["SECONDARY_ROLES"]),
         "user": session_obj["USER"],
@@ -614,7 +611,6 @@ def fetch_role_privileges(
 
 
 def fetch_account(session: SnowflakeConnection, fqn: FQN):
-    # raise NotImplementedError()
     return {
         "name": None,
         "locator": None,
@@ -1519,7 +1515,6 @@ def fetch_schema(session: SnowflakeConnection, fqn: FQN):
     if fqn.database is None:
         raise Exception(f"Schema {fqn} is missing a database name")
     try:
-        # show_result = execute(session, f"SHOW SCHEMAS LIKE '{fqn.name}' IN DATABASE {fqn.database}")
         show_result = _show_resources(session, "SCHEMAS", fqn)
     except ProgrammingError:
         return None
@@ -2422,15 +2417,15 @@ def list_role_grants(session: SnowflakeConnection) -> list[FQN]:
     return grants
 
 
-def list_schemas(session, database=None) -> list[FQN]:
+def list_schemas(session: SnowflakeConnection, database=None) -> list[FQN]:
     if database:
-        db = f" IN DATABASE {database}"
+        in_ctx = f"DATABASE {database}"
         user_databases = None
     else:
-        db = ""
+        in_ctx = "ACCOUNT"
         user_databases = _list_databases(session)
     try:
-        show_result = execute(session, f"SHOW SCHEMAS{db}")
+        show_result = execute(session, f"SHOW SCHEMAS IN {in_ctx}")
         schemas = []
         for row in show_result:
             # Skip system databases

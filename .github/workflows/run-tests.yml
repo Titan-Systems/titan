@@ -48,7 +48,7 @@ jobs:
       run: |
         source ./.venv/bin/activate
         ruff check titan/
-        mypy --exclude="titan/resources/.*" --exclude="titan/sql.py" --follow-imports=skip titan/
+        make typecheck
         python -m pytest --cov=./ --cov-report=xml
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v4

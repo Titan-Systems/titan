@@ -28,7 +28,7 @@ class InstanceFamily(ParseableEnum):
 @dataclass(unsafe_hash=True)
 class _ComputePool(ResourceSpec):
     name: ResourceName
-    owner: Role = "ACCOUNTADMIN"
+    owner: Role = "SYSADMIN"
     min_nodes: int = None
     max_nodes: int = None
     instance_family: InstanceFamily = None
@@ -104,7 +104,7 @@ class ComputePool(NamedResource, Resource):
     def __init__(
         self,
         name: str,
-        owner: str = "ACCOUNTADMIN",
+        owner: str = "SYSADMIN",
         min_nodes: int = None,
         max_nodes: int = None,
         instance_family: InstanceFamily = None,

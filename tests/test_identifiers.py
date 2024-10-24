@@ -123,4 +123,4 @@ def test_smart_split():
     assert smart_split('"test...multiple"...delimiters', ".") == ['"test...multiple"', "", "", "delimiters"]
     assert smart_split("\"test.only\".'double.quotes'.work", ".") == ['"test.only"', "'double", "quotes'", "work"]
     assert smart_split('"test max" split works', " ", 1) == ['"test max"', "split works"]
-    assert smart_split('test!escaping!\\"still!splits\\"', "!") == ['test', "escaping", '\\"still', 'splits\\"']
+    assert smart_split('test!escaping!\\"still!splits\\"', "!") == ["test", "escaping", '\\"still', 'splits\\"']

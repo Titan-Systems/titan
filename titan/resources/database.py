@@ -151,7 +151,7 @@ class Database(NamedResource, TaggableResource, Resource, ResourceContainer):
         **kwargs,
     ):
         super().__init__(name, **kwargs)
-        self._data = _Database(
+        self._data: _Database = _Database(
             name=self._name,
             transient=transient,
             owner=owner,

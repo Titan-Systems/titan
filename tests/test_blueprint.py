@@ -42,23 +42,13 @@ def session_ctx() -> dict:
             "SECURITYADMIN",
             "PUBLIC",
         ],
-        "role_privileges": {
-            "USERADMIN": [
-                GrantedPrivilege(privilege=AccountPriv.CREATE_ROLE, on="ABCD123"),
-                GrantedPrivilege(privilege=AccountPriv.CREATE_USER, on="ABCD123"),
-            ],
-            "SYSADMIN": [
-                GrantedPrivilege(privilege=AccountPriv.CREATE_DATABASE, on="ABCD123"),
-                GrantedPrivilege(privilege=AccountPriv.CREATE_WAREHOUSE, on="ABCD123"),
-            ],
-        },
     }
 
 
 @pytest.fixture
 def remote_state() -> dict:
     return {
-        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
     }
 
 
@@ -285,8 +275,8 @@ def test_blueprint_dont_add_public_schema(session_ctx, remote_state):
 
 
 def test_blueprint_implied_container_tree(session_ctx, remote_state):
-    remote_state[parse_URN("urn::ABCD123:database/STATIC_DB")] = {}
-    remote_state[parse_URN("urn::ABCD123:schema/STATIC_DB.PUBLIC")] = {}
+    remote_state[parse_URN("urn::ABCD123:database/STATIC_DB")] = {"owner": "SYSADMIN"}
+    remote_state[parse_URN("urn::ABCD123:schema/STATIC_DB.PUBLIC")] = {"owner": "SYSADMIN"}
     func = res.JavascriptUDF(
         name="func", args=[], returns="INT", as_="return 1;", database="STATIC_DB", schema="public"
     )
@@ -480,7 +470,7 @@ def test_blueprint_dump_plan_create(session_ctx, remote_state):
 
 def test_blueprint_dump_plan_update(session_ctx):
     remote_state = {
-        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
         parse_URN("urn::ABCD123:role/ROLE1"): {
             "name": "ROLE1",
             "owner": "USERADMIN",
@@ -518,7 +508,7 @@ def test_blueprint_dump_plan_update(session_ctx):
 
 def test_blueprint_dump_plan_transfer(session_ctx):
     remote_state = {
-        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
         parse_URN("urn::ABCD123:role/ROLE1"): {
             "name": "ROLE1",
             "owner": "ACCOUNTADMIN",
@@ -555,7 +545,7 @@ def test_blueprint_dump_plan_transfer(session_ctx):
 
 def test_blueprint_dump_plan_drop(session_ctx):
     remote_state = {
-        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
         parse_URN("urn::ABCD123:role/ROLE1"): {
             "name": "ROLE1",
             "owner": "ACCOUNTADMIN",

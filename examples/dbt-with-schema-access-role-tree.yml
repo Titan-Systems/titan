@@ -1,0 +1,265 @@
+roles:
+# access roles 
+  - name: AR__DB__RAW_TITAN__RO
+    owner: SECURITYADMIN
+  - name: AR__DB__RAW_TITAN__RW
+    owner: SECURITYADMIN
+  - name: AR__DB__RAW_TITAN__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__REFERENCE__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__REFERENCE__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__REFERENCE__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__DB__TRANSFORM_TITAN__RO
+    owner: SECURITYADMIN
+  - name: AR__DB__TRANSFORM_TITAN__RW
+    owner: SECURITYADMIN
+  - name: AR__DB__TRANSFORM_TITAN__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__COMMON__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__COMMON__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__COMMON__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__MART_FINANCE__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__MART_FINANCE__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__MART_FINANCE__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__REPORTING__RO
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__REPORTING__RW
+    owner: SECURITYADMIN
+  - name: AR__SC__TRANSFORM_TITAN__REPORTING__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__WH__INGEST_TITAN__USE
+    owner: SECURITYADMIN
+  - name: AR__WH__INGEST_TITAN__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__WH__TRANSFORM_TITAN__USE
+    owner: SECURITYADMIN
+  - name: AR__WH__TRANSFORM_TITAN__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__WH__ADMIN_TITAN__USE
+    owner: SECURITYADMIN
+  - name: AR__WH__ADMIN_TITAN__ADMIN
+    owner: SECURITYADMIN
+  - name: AR__WH__REPORT_TITAN__USE
+    owner: SECURITYADMIN
+  - name: AR__WH__REPORT_TITAN__ADMIN
+    owner: SECURITYADMIN
+# functional roles
+  - name: FR__DB_ADMIN_TITAN
+    owner: SECURITYADMIN
+    comment: "Database manager."
+  - name: FR__INGEST_TITAN
+    owner: SECURITYADMIN
+    comment: "Owns the tables in your raw database, and connects to the loading warehouse."
+  - name: FR__TRANSFORM_TITAN
+    owner: SECURITYADMIN
+    comment: "Has query permissions on tables in raw database and owns tables in the analytics database. This is for dbt developers and scheduled jobs."
+  - name: FR__REPORT_TITAN
+    owner: SECURITYADMIN
+    comment: "Has permissions on the reporting layer in the analytics database only. This role is for data consumers, such as analysts and BI tools. These users will not have permissions to read data from the raw database."
+  - name: FR__OPERATIONS_TITAN
+    owner: SECURITYADMIN
+    comment: "Has permissions on the reporting layer and in the specific marts for the domain."
+  - name: FR__FINANCE_TITAN
+    owner: SECURITYADMIN
+    comment: "Has permissions on the reporting layer and in the specific marts for the domain."
+  - name: WH__ADMIN_TITAN  
+    owner: SECURITYADMIN
+    comment: "Warehouse manager."
+
+
+role_grants:
+
+# role hierarchy
+  - role: AR__DB__RAW_TITAN__RO
+    to_role: AR__DB__RAW_TITAN__RW
+  - role: AR__DB__RAW_TITAN__RW
+    to_role: AR__DB__RAW_TITAN__ADMIN
+  - role: AR__SC__RAW_TITAN__REFERENCE__RO
+    to_role: AR__SC__RAW_TITAN__REFERENCE__RW
+  - role: AR__SC__RAW_TITAN__REFERENCE__RW
+    to_role: AR__SC__RAW_TITAN__REFERENCE__ADMIN
+  - role: AR__SC__RAW_TITAN__REFERENCE__ADMIN
+    to_role: AR__DB__RAW_TITAN__ADMIN
+  - role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__RO
+    to_role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__RW
+  - role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__RW
+    to_role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__ADMIN
+  - role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__ADMIN
+    to_role: AR__DB__RAW_TITAN__ADMIN
+  - role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__RO
+    to_role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__RW
+  - role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__RW
+    to_role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__ADMIN
+  - role: AR__SC__RAW_TITAN__SOURCE_SYSTEM_2__ADMIN
+    to_role: AR__DB__RAW_TITAN__ADMIN
+  - role: AR__DB__TRANSFORM_TITAN__RO
+    to_role: AR__DB__TRANSFORM_TITAN__RW
+  - role: AR__DB__TRANSFORM_TITAN__RW
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__RO
+    to_role: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__RW
+  - role: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__RW
+    to_role: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__STG_REFERENCE__ADMIN
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__RO
+    to_role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__RW
+  - role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__RW
+    to_role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_1__ADMIN
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__RO
+    to_role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__RW
+  - role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__RW
+    to_role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__STG_SOURCE_SYSTEM_2__ADMIN
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__COMMON__RO
+    to_role: AR__SC__TRANSFORM_TITAN__COMMON__RW
+  - role: AR__SC__TRANSFORM_TITAN__COMMON__RW
+    to_role: AR__SC__TRANSFORM_TITAN__COMMON__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__COMMON__ADMIN
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__MART_FINANCE__RO
+    to_role: AR__SC__TRANSFORM_TITAN__MART_FINANCE__RW
+  - role: AR__SC__TRANSFORM_TITAN__MART_FINANCE__RW
+    to_role: AR__SC__TRANSFORM_TITAN__MART_FINANCE__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__MART_FINANCE__ADMIN
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__RO
+    to_role: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__RW
+  - role: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__RW
+    to_role: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__ADMIN
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__REPORTING__RO
+    to_role: AR__SC__TRANSFORM_TITAN__REPORTING__RW
+  - role: AR__SC__TRANSFORM_TITAN__REPORTING__RW
+    to_role: AR__SC__TRANSFORM_TITAN__REPORTING__ADMIN
+  - role: AR__SC__TRANSFORM_TITAN__REPORTING__ADMIN
+    to_role: AR__DB__TRANSFORM_TITAN__ADMIN
+  - role: AR__DB__RAW_TITAN__ADMIN
+    to_role: FR__DB_ADMIN_TITAN
+  - role: AR__DB__TRANSFORM_TITAN__ADMIN
+    to_role: FR__DB_ADMIN_TITAN
+  - role: AR__WH__ADMIN_TITAN__USE
+    to_role: FR__DB_ADMIN_TITAN
+  - role: FR__DB_ADMIN_TITAN
+    to_role: SYSADMIN
+  - role: AR__DB__RAW_TITAN__RW
+    to_role: FR__INGEST_TITAN
+  - role: AR__WH__INGEST_TITAN__USE
+    to_role: FR__INGEST_TITAN
+  - role: FR__INGEST_TITAN
+    to_role: SYSADMIN
+  - role: AR__DB__RAW_TITAN__RO
+    to_role: FR__TRANSFORM_TITAN
+  - role: AR__DB__TRANSFORM_TITAN__RW
+    to_role: FR__TRANSFORM_TITAN
+  - role: AR__WH__TRANSFORM_TITAN__USE
+    to_role: FR__TRANSFORM_TITAN
+  - role: FR__TRANSFORM_TITAN
+    to_role: SYSADMIN
+  - role: AR__SC__TRANSFORM_TITAN__REPORTING__RO
+    to_role: FR__REPORT_TITAN
+  - role: AR__WH__TRANSFORM_TITAN__USE
+    to_role: FR__REPORT_TITAN
+  - role: FR__REPORT_TITAN
+    to_role: SYSADMIN
+  - role: AR__SC__TRANSFORM_TITAN__REPORTING__RO
+    to_role: FR__OPERATIONS_TITAN
+  - role: AR__SC__TRANSFORM_TITAN__MART_OPERATIONS__RO
+    to_role: FR__OPERATIONS_TITAN
+  - role: AR__WH__REPORT_TITAN__USE
+    to_role: FR__OPERATIONS_TITAN
+  - role: FR__OPERATIONS_TITAN
+    to_role: SYSADMIN
+  - role: AR__SC__TRANSFORM_TITAN__REPORTING__RO
+    to_role: FR__FINANCE_TITAN
+  - role: AR__SC__TRANSFORM_TITAN__MART_FINANCE__RO
+    to_role: FR__FINANCE_TITAN
+  - role: AR__WH__REPORT_TITAN__USE
+    to_role: FR__FINANCE_TITAN
+  - role: FR__FINANCE_TITAN
+    to_role: SYSADMIN
+  - role: AR__WH__ADMIN_TITAN__ADMIN
+    to_role: WH__ADMIN_TITAN
+  - role: AR__WH__TRANSFORM_TITAN__ADMIN
+    to_role: WH__ADMIN_TITAN
+  - role: AR__WH__INGEST_TITAN__ADMIN
+    to_role: WH__ADMIN_TITAN
+  - role: AR__WH__REPORT_TITAN__ADMIN
+    to_role: WH__ADMIN_TITAN
+  - role: WH__ADMIN_TITAN
+    to_role: SYSADMIN
+
+databases:
+  - name: raw_titan
+    owner: AR__DB__RAW_TITAN__ADMIN
+    comment: "This database contains your raw data. This is the landing pad for everything extracted and loaded, as well as containing external stages for data living in S3. Access to this database is strictly permissioned."
+    schemas:
+      - name: reference
+        owner: AR__SC__RAW_TITAN__REFERENCE__ADMIN
+        managed_access: true
+      - name: source_system_1
+        owner: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__ADMIN
+        managed_access: true
+      - name: source_system_2
+        managed_access: true
+        owner: AR__SC__RAW_TITAN__SOURCE_SYSTEM_1__ADMIN
+  - name: transform_titan
+    owner: AR__DB__TRANSFORM_TITAN__ADMIN
+    comment: "This database contains tables and views accessible to analysts and reporting. Everything in analytics is created and owned by dbt."
+    schemas:
+      - name: stg_reference
+      - name: stg_source_system_1
+      - name: stg_source_system_2
+      - name: common
+      - name: mart_operations
+      - name: mart_finance
+      - name: reporting

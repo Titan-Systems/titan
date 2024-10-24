@@ -70,6 +70,8 @@ def _resources_from_database_config(databases_config: list) -> list:
         db = Database(**database)
         resources.append(db)
         for schema in schemas:
+            if "owner" not in schema:
+                schema["owner"] = db._data.owner
             sch = Schema(**schema)
             db.add(sch)
             resources.append(sch)

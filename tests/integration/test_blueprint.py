@@ -242,18 +242,23 @@ def test_blueprint_all_grant_triggers_create(cursor, test_db, role):
     assert isinstance(plan[0], CreateResource)
 
 
-def test_blueprint_sync_dont_remove_system_schemas(cursor, test_db):
+def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
     session = cursor.connection
-    blueprint = Blueprint(
-        name="blueprint",
-        resources=[
-            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
-        ],
-        run_mode="sync",
-        allowlist=[ResourceType.SCHEMA],
-    )
-    plan = blueprint.plan(session)
-    assert len(plan) == 0
+    db_name = f"BLUEPRINT_SYNC_DONT_REMOVE_SYSTEM_SCHEMAS_{suffix}"
+    try:
+        cursor.execute(f"CREATE DATABASE {db_name}")
+        blueprint = Blueprint(
+            name="blueprint",
+            resources=[
+                res.Schema(name="INFORMATION_SCHEMA", database=db_name),
+            ],
+            run_mode="sync",
+            allowlist=[ResourceType.SCHEMA],
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) == 0
+    finally:
+        cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
 def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
@@ -438,25 +443,30 @@ def test_blueprint_create_resource_with_database_role_owner(cursor, suffix, test
 def test_blueprint_database_params_passed_to_public_schema(cursor, suffix):
     session = cursor.connection
 
+    db_name = f"test_db_params_passed_to_public_schema_{suffix}"
+
     def _database():
         return res.Database(
-            name=f"test_db_params_passed_to_public_schema_{suffix}",
+            name=db_name,
             data_retention_time_in_days=1,
             max_data_extension_time_in_days=2,
             default_ddl_collation="en_US",
         )
 
-    database = _database()
-    blueprint = Blueprint(resources=[database])
-    plan = blueprint.plan(session)
-    assert len(plan) == 1
-    blueprint.apply(session, plan)
-    schema_data = safe_fetch(cursor, public_schema_urn(database.urn))
-    assert schema_data is not None
-    assert schema_data["data_retention_time_in_days"] == 1
-    assert schema_data["max_data_extension_time_in_days"] == 2
-    assert schema_data["default_ddl_collation"] == "en_US"
-    database = _database()
-    blueprint = Blueprint(resources=[database])
-    plan = blueprint.plan(session)
-    assert len(plan) == 0
+    try:
+        database = _database()
+        blueprint = Blueprint(resources=[database])
+        plan = blueprint.plan(session)
+        assert len(plan) == 1
+        blueprint.apply(session, plan)
+        schema_data = safe_fetch(cursor, public_schema_urn(database.urn))
+        assert schema_data is not None
+        assert schema_data["data_retention_time_in_days"] == 1
+        assert schema_data["max_data_extension_time_in_days"] == 2
+        assert schema_data["default_ddl_collation"] == "en_US"
+        database = _database()
+        blueprint = Blueprint(resources=[database])
+        plan = blueprint.plan(session)
+        assert len(plan) == 0
+    finally:
+        cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
