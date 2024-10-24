@@ -3,7 +3,7 @@ import copy
 import pytest
 
 from dataclasses import fields
-from typing import get_args, get_origin
+from typing import Any, get_args, get_origin
 
 from tests.helpers import get_json_fixtures
 from titan.data_types import convert_to_canonical_data_type
@@ -38,6 +38,8 @@ def resource(request):
 
 
 def _field_type_is_serialized_as_resource_name(field):
+    if field.type is Any:
+        return False
     if field.type is RoleRef:
         return True
     if field.type is ResourceName:

@@ -130,7 +130,48 @@ def _parse_create_header(sql, resource_type, scope):
         raise pp.ParseException("Failed to parse header") from err
 
 
-def _parse_grant(sql: str):
+def parse_alter_account_parameter(sql: str):
+    """
+    ALTER ACCOUNT SET { [ accountParams ] | [ objectParams ] | [ sessionParams ] }
+
+    accountParams ::=
+        ALLOW_ID_TOKEN = TRUE | FALSE
+        CLIENT_ENCRYPTION_KEY_SIZE = <integer>
+        CORTEX_ENABLED_CROSS_REGION = { 'DISABLED' | 'ANY_REGION' | '<list_of_regions>' }
+        ENABLE_INTERNAL_STAGES_PRIVATELINK = TRUE | FALSE
+        ENFORCE_NETWORK_RULES_FOR_INTERNAL_STAGES = TRUE | FALSE
+        EXTERNAL_OAUTH_ADD_PRIVILEGED_ROLES_TO_BLOCKED_LIST = TRUE | FALSE
+        INITIAL_REPLICATION_SIZE_LIMIT_IN_TB = <num>
+        NETWORK_POLICY = <string>
+        OAUTH_ADD_PRIVILEGED_ROLES_TO_BLOCKED_LIST = TRUE | FALSE
+        PERIODIC_DATA_REKEYING = TRUE | FALSE
+        PREVENT_UNLOAD_TO_INLINE_URL = TRUE | FALSE
+        PREVENT_UNLOAD_TO_INTERNAL_STAGES = TRUE | FALSE
+        REQUIRE_STORAGE_INTEGRATION_FOR_STAGE_CREATION = TRUE | FALSE
+        REQUIRE_STORAGE_INTEGRATION_FOR_STAGE_OPERATION = TRUE | FALSE
+        SAML_IDENTITY_PROVIDER = <json_object>
+        SSO_LOGIN_PAGE = TRUE | FALSE
+    """
+
+    alter_account = Keywords("ALTER ACCOUNT SET") + Identifier("name") + EQUALS + ANY("value")
+
+    try:
+        results = alter_account.parse_string(sql, parse_all=True)
+        results = results.as_dict()
+        value = results["value"]
+        if value.lower() == "true" or value.lower() == "false":
+            value = value.lower() == "true"
+        elif value.isdigit():
+            value = int(value)
+        return {
+            "name": results["name"],
+            "value": value,
+        }
+    except pp.ParseException as err:
+        raise pp.ParseException("Failed to parse account parameter") from err
+
+
+def parse_grant(sql: str):
 
     # Check for role grant
     if _contains(Keywords("GRANT ROLE"), sql):

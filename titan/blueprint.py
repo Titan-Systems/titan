@@ -971,6 +971,11 @@ def execution_strategy_for_change(
             return ResourceName("ACCOUNTADMIN"), False
         raise MissingPrivilegeException("ACCOUNTADMIN role is required to work with resource monitors")
 
+    elif change.urn.resource_type == ResourceType.ACCOUNT_PARAMETER:
+        if "ACCOUNTADMIN" in available_roles:
+            return ResourceName("ACCOUNTADMIN"), False
+        raise MissingPrivilegeException("ACCOUNTADMIN role is required to work with account parameters")
+
     elif isinstance(change, (UpdateResource, DropResource, TransferOwnership)):
         if change_owner:
             return change_owner, False
@@ -1300,8 +1305,11 @@ def _sort_destructive_changes(
     # Not quite right but close enough for now.
     def sort_key(change: ResourceChange) -> tuple:
         return (
+            # Put network policies first
             change.urn.resource_type != ResourceType.NETWORK_POLICY,
-            change.urn.resource_type != ResourceType.ROLE,
+            # Put roles and role grants last
+            change.urn.resource_type == ResourceType.ROLE_GRANT,
+            change.urn.resource_type == ResourceType.ROLE,
             change.urn.database is not None,
             change.urn.schema is not None,
             -1 * sort_order[change.urn],

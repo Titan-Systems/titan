@@ -10,6 +10,7 @@
 
 * [APIAuthenticationSecurityIntegration](resources/api_authentication_security_integration.md)
 * [APIIntegration](resources/api_integration.md)
+* [AccountParameter](resources/account_parameter.md)
 * [AggregationPolicy](resources/aggregation_policy.md)
 * [Alert](resources/alert.md)
 * [AuthenticationPolicy](resources/authentication_policy.md)

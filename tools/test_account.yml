@@ -1,6 +1,7 @@
 name: reset-test-account
 run_mode: SYNC
 allowlist:
+  - "account parameter"
   - "catalog integration"
   - "compute pool"
   - "database role"
@@ -25,6 +26,12 @@ allowlist:
   - "user"
   - "view"
   - "warehouse"
+
+account_parameters:
+  - name: ALLOW_ID_TOKEN
+    value: true
+  - name: TIMEZONE
+    value: "America/Los_Angeles"
 
 users:
   - name: static_user

@@ -1,4 +1,5 @@
 from .account import Account
+from .account_parameter import AccountParameter
 from .aggregation_policy import AggregationPolicy
 from .alert import Alert
 from .api_integration import APIIntegration
@@ -65,6 +66,7 @@ from .warehouse import Warehouse
 
 __all__ = [
     "Account",
+    "AccountParameter",
     "AggregationPolicy",
     "Alert",
     "APIAuthenticationSecurityIntegration",

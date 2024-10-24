@@ -35,6 +35,20 @@ def create__default(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
+def create_account_parameter(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    value = data["value"]
+    if isinstance(value, str):
+        value = f"'{value}'"
+    return tidy_sql(
+        "ALTER",
+        "ACCOUNT",
+        "SET",
+        urn.fqn.name,
+        "=",
+        value,
+    )
+
+
 def create_aggregation_policy(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     return tidy_sql(
         "CREATE",
@@ -221,6 +235,10 @@ def update__default(urn: URN, data: dict, props: Props) -> str:
         )
 
 
+def update_account_parameter(urn: URN, data: dict, props: Props) -> str:
+    return create_account_parameter(urn, data, props)
+
+
 def update_event_table(urn: URN, data: dict, props: Props) -> str:
     new_urn = URN(ResourceType.TABLE, urn.fqn, urn.account_locator)
     return update__default(new_urn, data, props)
@@ -292,6 +310,15 @@ def drop__default(urn: URN, data: dict, if_exists: bool) -> str:
         urn.resource_type,
         "IF EXISTS" if if_exists else "",
         fqn_to_sql(urn.fqn),
+    )
+
+
+def drop_account_parameter(urn: URN, data: dict, if_exists: bool) -> str:
+    return tidy_sql(
+        "ALTER",
+        "ACCOUNT",
+        "UNSET",
+        urn.fqn.name,
     )
 
 

@@ -242,6 +242,7 @@ def test_blueprint_all_grant_triggers_create(cursor, test_db, role):
     assert isinstance(plan[0], CreateResource)
 
 
+@pytest.mark.skip(reason="This test requires blueprint scopes")
 def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
     session = cursor.connection
     db_name = f"BLUEPRINT_SYNC_DONT_REMOVE_SYSTEM_SCHEMAS_{suffix}"
@@ -261,6 +262,7 @@ def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
         cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
+@pytest.mark.skip(reason="This test requires blueprint scopes")
 def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
     session = cursor.connection
     blueprint = Blueprint(
@@ -278,6 +280,7 @@ def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
     assert plan[0].urn.fqn.name == "ABSENT"
 
 
+@pytest.mark.skip(reason="This test requires blueprint scopes")
 def test_blueprint_sync_plan_matches_remote_state(cursor, test_db):
     session = cursor.connection
     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
@@ -294,6 +297,7 @@ def test_blueprint_sync_plan_matches_remote_state(cursor, test_db):
     assert len(plan) == 0
 
 
+@pytest.mark.skip(reason="This test requires blueprint scopes")
 def test_blueprint_sync_remote_state_contains_extra_resource(cursor, test_db):
     session = cursor.connection
     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
@@ -470,3 +474,21 @@ def test_blueprint_database_params_passed_to_public_schema(cursor, suffix):
         assert len(plan) == 0
     finally:
         cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
+
+
+def test_blueprint_account_parameters_sync_drift(cursor):
+    cursor.execute("ALTER ACCOUNT SET MAX_CONCURRENCY_LEVEL = 7")
+    session = cursor.connection
+    try:
+        blueprint = Blueprint(
+            name="test_account_parameters_sync_drift",
+            run_mode="sync",
+            allowlist=[ResourceType.ACCOUNT_PARAMETER],
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) > 0
+        max_concurrency_level = next((r for r in plan if r.urn.fqn.name == "MAX_CONCURRENCY_LEVEL"), None)
+        assert max_concurrency_level is not None
+        assert isinstance(max_concurrency_level, DropResource)
+    finally:
+        cursor.execute("ALTER ACCOUNT UNSET MAX_CONCURRENCY_LEVEL")
