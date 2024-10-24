@@ -16,6 +16,35 @@ class _AccountParameter(ResourceSpec):
 
 
 class AccountParameter(NamedResource, Resource):
+    """
+    Description:
+        An account parameter in Snowflake that allows you to set or alter account-level parameters.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/alter-account
+
+    Fields:
+        name (string, required): The name of the account parameter.
+        value (Any, required): The value to set for the account parameter.
+
+    Python:
+
+        ```python
+        account_parameter = AccountParameter(
+            name="some_parameter",
+            value="some_value",
+        )
+        ```
+
+    Yaml:
+
+        ```yaml
+        account_parameters:
+          - name: some_parameter
+            value: some_value
+        ```
+    """
+
     resource_type = ResourceType.ACCOUNT_PARAMETER
     props = Props()
     scope = AccountScope()

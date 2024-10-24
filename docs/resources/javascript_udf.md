@@ -19,7 +19,7 @@ js_udf = JavascriptUDF(
     name="some_function",
     returns="STRING",
     as_="function(x) { return x.toUpperCase(); }",
-    args=[{"name": "x", "type": "STRING"}],
+    args=[{"name": "x", "data_type": "STRING"}],
     comment="Converts a string to uppercase",
 )
 ```
@@ -34,7 +34,7 @@ functions:
     as_: function(x) { return x.toUpperCase(); }
     args:
       - name: x
-        type: STRING
+        data_type: STRING
     comment: Converts a string to uppercase
 ```
 
