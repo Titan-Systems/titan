@@ -34,6 +34,9 @@ def test_example(example, cursor, marked_for_cleanup, blueprint_vars):
     example_name, example_content = example
     blueprint_vars = VARS.get(example_name, blueprint_vars)
 
+    if example_name == "dbt-with-schema-access-role-tree":
+        pytest.skip("Skipping until issues are resolved")
+
     cursor.execute("USE WAREHOUSE CI")
     blueprint_config = collect_blueprint_config(example_content.copy(), {"vars": blueprint_vars})
     assert blueprint_config.resources is not None

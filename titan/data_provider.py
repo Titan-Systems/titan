@@ -341,10 +341,12 @@ def _cast_param_value(raw_value: str, param_type: str) -> Any:
     if param_type == "BOOLEAN":
         return raw_value == "true"
     elif param_type == "NUMBER":
-        if raw_value.replace(".", "", 1).isdigit():
+        if raw_value.isdigit():
+            return int(raw_value)
+        elif raw_value.replace(".", "", 1).isdigit():
             return float(raw_value)
         else:
-            return int(raw_value)
+            raise Exception(f"Unsupported number type: {raw_value}")
     elif param_type == "STRING":
         return str(raw_value) if raw_value else None
     else:
