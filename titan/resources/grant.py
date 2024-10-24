@@ -6,7 +6,7 @@ from inflection import singularize
 
 from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN, parse_FQN, resource_label_for_type, resource_type_for_label
-from ..parse import _parse_grant, format_collection_string
+from ..parse import parse_grant, format_collection_string
 from ..privs import all_privs_for_resource_type
 from ..props import FlagProp, IdentifierProp, Props
 from ..resource_name import ResourceName
@@ -192,7 +192,7 @@ class Grant(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        parsed = _parse_grant(sql)
+        parsed = parse_grant(sql)
         return cls(**parsed)
 
     @property
@@ -381,7 +381,7 @@ class FutureGrant(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        parsed = _parse_grant(sql)
+        parsed = parse_grant(sql)
         return cls(**parsed)
 
     @property
@@ -522,7 +522,7 @@ class GrantOnAll(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        parsed = _parse_grant(sql)
+        parsed = parse_grant(sql)
         return cls(**parsed)
 
     @property
@@ -657,7 +657,7 @@ class RoleGrant(Resource):
 
     @classmethod
     def from_sql(cls, sql):
-        props = _parse_grant(sql)
+        props = parse_grant(sql)
         return RoleGrant(**props)
 
     def __repr__(self):  # pragma: no cover

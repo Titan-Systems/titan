@@ -20,6 +20,7 @@ logger = logging.getLogger("titan")
 
 ALIASES = {
     "grants_on_all": ResourceType.GRANT_ON_ALL,
+    "account_parameters": ResourceType.ACCOUNT_PARAMETER,
 }
 
 
@@ -117,7 +118,6 @@ def _resources_for_config(config: dict):
     # Special cases
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
-    # grants = config.pop("grants", [])
     users = config.pop("users", [])
 
     resources = []
@@ -155,7 +155,6 @@ def _resources_for_config(config: dict):
 
     resources.extend(_resources_from_database_config(database_config))
     resources.extend(_resources_from_role_grants_config(role_grants))
-    # resources.extend(_resources_from_grants_config(grants))
     resources.extend(_resources_from_users_config(users))
 
     resource_cache = {}
@@ -168,16 +167,6 @@ def _resources_for_config(config: dict):
             cache_pointer = (resource.on_type, ResourceName(resource.on))
             if cache_pointer in resource_cache:
                 resource._data.on = ResourceName(str(resource_cache[cache_pointer].fqn))
-
-        # TODO: investigate this
-        # for ref in resource.refs:
-        #     cache_pointer = (ref.resource_type, ResourceName(ref.name))
-        #     if (
-        #         isinstance(ref, ResourcePointer)
-        #         and cache_pointer in resource_cache
-        #         and resource_cache[cache_pointer]._container is not None
-        #     ):
-        #         ref._container = resource_cache[cache_pointer]._container
 
     return resources
 

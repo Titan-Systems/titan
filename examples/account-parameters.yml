@@ -1,0 +1,12 @@
+name: account-parameters-titan-example
+run_mode: sync
+allowlist:
+  - account parameter
+
+account_parameters:
+  - name: ALLOW_CLIENT_MFA_CACHING
+    value: true
+  - name: ALLOW_ID_TOKEN
+    value: true
+  - name: TIMEZONE
+    value: "America/New_York"

@@ -7,9 +7,8 @@ from inflection import pluralize
 from tests.helpers import get_json_fixtures
 from titan import data_provider
 from titan.client import UNSUPPORTED_FEATURE, reset_cache
-from titan.enums import AccountEdition
 from titan.identifiers import resource_label_for_type
-from titan.resources import Database, Resource
+from titan.resources import AccountParameter, Database, Resource
 from titan.scope import DatabaseScope, SchemaScope
 
 pytestmark = pytest.mark.requires_snowflake
@@ -27,7 +26,7 @@ JSON_FIXTURES = list(get_json_fixtures())
 )
 def resource(request, suffix):
     resource_cls, data = request.param
-    if "name" in data:
+    if "name" in data and resource_cls != AccountParameter:
         data["name"] += f"_{suffix}_list_resources"
     if "login_name" in data:
         data["login_name"] += f"_{suffix}_list_resources"

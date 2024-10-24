@@ -337,17 +337,21 @@ def _parse_storage_location(storage_location_str: str) -> Optional[dict]:
     return storage_location
 
 
+def _cast_param_value(raw_value: str, param_type: str) -> Any:
+    if param_type == "BOOLEAN":
+        return raw_value == "true"
+    elif param_type == "NUMBER":
+        return int(raw_value)
+    elif param_type == "STRING":
+        return str(raw_value) if raw_value else None
+    else:
+        return raw_value
+
+
 def params_result_to_dict(params_result):
     params = {}
     for param in params_result:
-        if param["type"] == "BOOLEAN":
-            typed_value = param["value"] == "true"
-        elif param["type"] == "NUMBER":
-            typed_value = int(param["value"])
-        elif param["type"] == "STRING":
-            typed_value = str(param["value"]) if param["value"] else None
-        else:
-            typed_value = param["value"]
+        typed_value = _cast_param_value(param["value"], param["type"])
         params[param["key"].lower()] = typed_value
     return params
 
@@ -614,6 +618,20 @@ def fetch_account(session: SnowflakeConnection, fqn: FQN):
     return {
         "name": None,
         "locator": None,
+    }
+
+
+def fetch_account_parameter(session: SnowflakeConnection, fqn: FQN):
+    show_result = execute(session, "SHOW PARAMETERS IN ACCOUNT", cacheable=True)
+    account_parameters = _filter_result(show_result, key=fqn.name, level="ACCOUNT")
+    if len(account_parameters) == 0:
+        return None
+    if len(account_parameters) > 1:
+        raise Exception(f"Found multiple account parameters matching {fqn}")
+    data = account_parameters[0]
+    return {
+        "name": ResourceName(data["key"]),
+        "value": _cast_param_value(data["value"], data["type"]),
     }
 
 
@@ -2215,6 +2233,17 @@ def list_schema_scoped_resource(session: SnowflakeConnection, resource) -> list[
 
 
 ######## List functions by resource
+
+
+def list_account_parameters(session: SnowflakeConnection) -> list[FQN]:
+    show_result = execute(session, "SHOW PARAMETERS IN ACCOUNT")
+    account_parameters = []
+    for row in show_result:
+        # Skip system parameters and unset parameters
+        if row["level"] != "ACCOUNT":
+            continue
+        account_parameters.append(FQN(name=ResourceName(row["key"])))
+    return account_parameters
 
 
 def list_alerts(session: SnowflakeConnection) -> list[FQN]:
