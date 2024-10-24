@@ -36,6 +36,7 @@ stages:
   - name: dicom_images_stage
     database: IND_SOL_DICOM
     schema: DICOM
+    owner: data_scientist
     type: external
     url: "s3://your-bucket-name"
     credentials:

@@ -131,6 +131,15 @@ class URN:
     def from_resource(cls, resource, account_locator: str = ""):
         return cls(resource_type=resource.resource_type, fqn=resource.fqn, account_locator=account_locator)
 
+    def account(self):
+        if not self.account_locator:
+            raise Exception(f"URN does not have an account: {self}")
+        return URN(
+            resource_type=ResourceType.ACCOUNT,
+            account_locator=self.account_locator,
+            fqn=FQN(name=ResourceName("ACCOUNT")),
+        )
+
     def database(self):
         if not self.fqn.database:
             raise Exception(f"URN does not have a database: {self}")

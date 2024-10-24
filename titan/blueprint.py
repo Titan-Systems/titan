@@ -3,7 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from queue import Queue
-from typing import Any, Generator, Optional, Iterable, Union, cast, TypeVar, Sequence
+from typing import Any, Generator, Iterable, Optional, Sequence, TypeVar, Union, cast
 
 import snowflake.connector
 
@@ -28,13 +28,8 @@ from .exceptions import (
 )
 from .identifiers import URN, parse_identifier, parse_URN, resource_label_for_type
 from .privs import (
-    SchemaPriv,
     CREATE_PRIV_FOR_RESOURCE_TYPE,
-    PRIVS_FOR_RESOURCE_TYPE,
-    AccountPriv,
-    GrantedPrivilege,
-    execution_role_for_priv,
-    is_ownership_priv,
+    system_role_for_priv,
 )
 from .resource_name import ResourceName
 from .resource_tags import ResourceTags
@@ -49,9 +44,9 @@ from .resources.resource import (
     ResourcePointer,
     infer_role_type_from_name,
 )
+from .resources.role import Role
 from .resources.tag import Tag, TaggableResource
 from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
-
 
 T = TypeVar("T")
 ResourceRef = Union[tuple[ResourceType, str], str]
@@ -69,9 +64,14 @@ class ResourceChange(ABC):
         pass
 
 
+ResourceOwner = ResourceName
+ContainerPointer = tuple[URN, ResourceOwner]
+
+
 @dataclass
 class CreateResource(ResourceChange):
     resource_cls: type[Resource]
+    container: Optional[ContainerPointer]
     after: dict[str, str]
 
     def to_dict(self) -> dict[str, Union[str, dict[str, str]]]:
@@ -129,11 +129,11 @@ class TransferOwnership(ResourceChange):
         }
 
 
-class RemoteResourceStub:
-    pass
+# class RemoteResourceStub:
+#     pass
 
 
-State = dict[URN, Union[dict, RemoteResourceStub]]
+State = dict[URN, dict]
 Plan = list[ResourceChange]
 
 
@@ -142,10 +142,14 @@ def plan_from_dict(plan_dict: dict) -> Plan:
     for change in plan_dict:
         action = change["action"]
         if action == "CREATE":
+            container_pointer: ContainerPointer
+            for urn, owner in change["container"].items():
+                container_pointer = (parse_URN(urn), ResourceName(owner))
             changes.append(
                 CreateResource(
                     urn=parse_URN(change["urn"]),
                     resource_cls=Resource.__classes__[change["resource_cls"]],
+                    container=container_pointer,
                     after=change["after"],
                 )
             )
@@ -369,10 +373,10 @@ def print_diffs(diffs):
 def _split_by_scope(
     resources: list[Resource],
 ) -> tuple[list[Resource], list[Resource], list[Resource], list[Resource]]:
-    org_scoped: list[OrganizationScope] = []
-    acct_scoped: list[AccountScope] = []
-    db_scoped: list[DatabaseScope] = []
-    schema_scoped: list[SchemaScope] = []
+    org_scoped: list[Resource] = []
+    acct_scoped: list[Resource] = []
+    db_scoped: list[Resource] = []
+    schema_scoped: list[Resource] = []
 
     seen = set()
 
@@ -575,6 +579,9 @@ class Blueprint:
             resource_set.add(ref[1])
         # Calculate a topological sort order for the URNs
         sort_order = topological_sort(resource_set, set(manifest.refs))
+        # print(f">>>>>>>> {sort_order}")
+        for k, v in sort_order.items():
+            print(f">>>>>>>> {k} -> {v}")
         plan = sorted(additive_changes, key=lambda change: sort_order[change.urn]) + _sort_destructive_changes(
             destructive_changes, sort_order
         )
@@ -636,7 +643,7 @@ class Blueprint:
 
     def _build_resource_graph(self, session_ctx: dict):
         """
-        Convert the staged resources into a tree of resources
+        Convert the staged resources into a directed graph of resources
         """
         org_scoped, acct_scoped, db_scoped, schema_scoped = _split_by_scope(self._staged)
         self._staged = []
@@ -645,7 +652,7 @@ class Blueprint:
         if len(org_scoped) > 0:
             raise Exception("Blueprint cannot contain an Account resource")
         else:
-            self._root = ResourcePointer(name=session_ctx["account"], resource_type=ResourceType.ACCOUNT)
+            self._root = ResourcePointer(name="ACCOUNT", resource_type=ResourceType.ACCOUNT)
 
         # Merge account scoped pointers into their proper resource
         acct_scoped = _merge_pointers(acct_scoped)
@@ -757,10 +764,16 @@ class Blueprint:
                 self._root.add(tag_ref)
 
     def _create_ownership_refs(self, session_ctx):
+        role_grants: list[RoleGrant] = _get_role_grants(self._root)
+
         for resource in _walk(self._root):
             if isinstance(resource, ResourcePointer):
                 continue
-            if hasattr(resource._data, "owner"):
+            elif isinstance(resource, RoleGrant):
+                for role_grant in role_grants:
+                    if isinstance(resource.to, Role) and resource.to.name == role_grant.role.name:
+                        resource.requires(role_grant)
+            elif hasattr(resource._data, "owner"):
                 owner = getattr(resource._data, "owner")
 
                 # Misconfigured resource, owner should always be a Role
@@ -777,12 +790,10 @@ class Blueprint:
                 resource.requires(owner)
 
                 if owner.name not in session_ctx["available_roles"]:
-                    for role_grant in _get_role_grants(self._root):
+                    for role_grant in role_grants:
                         if role_grant.role.name != owner.name:
                             continue
                         if role_grant._data.to_role is None:
-                            continue
-                        if role_grant.to.name not in session_ctx["available_roles"]:
                             continue
                         resource.requires(role_grant)
                         break
@@ -909,6 +920,15 @@ class Blueprint:
             self._add(resource)
 
 
+# def system_role_for_change(change: ResourceChange) -> Optional[ResourceName]:
+#     if resource_type_is_grant(change.urn.resource_type):
+#         # MANAGE GRANTS
+#         return ResourceName("SECURITYADMIN")
+#     elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
+#         # APPLY TAG
+#         return ResourceName("ACCOUNTADMIN")
+
+
 def owner_for_change(change: ResourceChange) -> Optional[ResourceName]:
     if isinstance(change, CreateResource) and "owner" in change.after:
         return ResourceName(change.after["owner"])
@@ -927,22 +947,23 @@ def owner_for_change(change: ResourceChange) -> Optional[ResourceName]:
 def execution_strategy_for_change(
     change: ResourceChange,
     available_roles: list[ResourceName],
-    default_role: str,
-    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ) -> tuple[ResourceName, bool]:
+
+    change_owner = owner_for_change(change)
 
     if resource_type_is_grant(change.urn.resource_type):
 
+        # 2024-10-22: maybe the better thing to do is check role privs selectively
         if isinstance(change, CreateResource) and change.urn.resource_type == ResourceType.GRANT:
-            execution_role = execution_role_for_priv(change.after["priv"])
+            execution_role = system_role_for_priv(change.after["priv"])
             if execution_role and execution_role in available_roles:
                 return execution_role, False
 
         if "SECURITYADMIN" in available_roles:
             return ResourceName("SECURITYADMIN"), False
-        alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
-        if alternate_role:
-            return alternate_role, False
+
+        # TODO: support TITAN_ADMIN custom role
+
         raise MissingPrivilegeException(f"{change} requires a role with MANAGE GRANTS privilege")
 
     elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
@@ -951,141 +972,166 @@ def execution_strategy_for_change(
         # 2. You have APPLY privilege on the TAG object AND you have ownership of the tagged object
         if "ACCOUNTADMIN" in available_roles:
             return ResourceName("ACCOUNTADMIN"), False
-        alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
-        if alternate_role:
-            return alternate_role, False
+
+        # TODO: support TITAN_ADMIN custom role
+
         raise MissingPrivilegeException(f"{change} requires a role with APPLY TAGS privilege")
 
-    change_owner = owner_for_change(change)
+    elif change.urn.resource_type == ResourceType.RESOURCE_MONITOR:
+        # For some reason Snowflake chose to not have a priv type for resource monitors.
+        # Only ACCOUNTADMIN can create them.
+        return ResourceName("ACCOUNTADMIN"), False
 
-    if change_owner:
-        # If we can use the owner of the change, use that
-        if change_owner in available_roles and role_can_execute_change(change_owner, change, role_privileges):
+    elif isinstance(change, (UpdateResource, DropResource, TransferOwnership)):
+        if change_owner:
             return change_owner, False
+        else:
+            raise MissingPrivilegeException(change)
+    elif isinstance(change, CreateResource):
+        if isinstance(change.resource_cls.scope, AccountScope):
+            create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
+            system_role = system_role_for_priv(create_priv)
+            if system_role and system_role in available_roles:
+                transfer_ownership = system_role != change_owner
+                return system_role, transfer_ownership
+            raise MissingPrivilegeException(f"{system_role} isnt available to execute {change}")
+        elif isinstance(change.resource_cls.scope, (DatabaseScope, SchemaScope)) and change.container:
+            container_owner = ResourceName(change.container[1])
+            if container_owner in available_roles:
+                transfer_ownership = container_owner != change_owner
+                return container_owner, transfer_ownership
+            raise MissingPrivilegeException(f"{container_owner} isnt available to execute {change}")
 
-        if change.urn.resource_type == ResourceType.NOTEBOOK:
-            raise MissingPrivilegeException("Notebook ownership cannot be transferred")
+    # change_owner = owner_for_change(change)
 
-        # See if there is another role we can use to execute the change
-        alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
-        if alternate_role:
-            return alternate_role, True
-        # This change cannot be executed
-        raise MissingPrivilegeException(
-            f"Role {change_owner} does not have the required privileges to execute {change}"
-        )
+    # if change_owner:
+    #     # If we can use the owner of the change, use that
+    #     if change_owner in available_roles and role_can_execute_change(change_owner, change, role_privileges):
+    #         return change_owner, False
+
+    #     if change.urn.resource_type == ResourceType.NOTEBOOK:
+    #         raise MissingPrivilegeException("Notebook ownership cannot be transferred")
+
+    #     # See if there is another role we can use to execute the change
+    #     # alternate_role = find_role_to_execute_change(change, available_roles, default_role, role_privileges)
+    #     # if alternate_role:
+    #     #     return alternate_role, True
+    #     # This change cannot be executed
+    #     raise MissingPrivilegeException(
+    #         f"Role {change_owner} does not have the required privileges to execute {change}"
+    #     )
 
     raise NotImplementedError(change)
 
 
-# NOTE: this is in a hot loop and maybe should be cached
-def role_can_execute_change(
-    role: ResourceName,
-    change: ResourceChange,
-    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
-):
+# # NOTE: this is in a hot loop and maybe should be cached
+# def role_can_execute_change(
+#     role: ResourceName,
+#     change: ResourceChange,
+#     role_privileges: dict[ResourceName, list[GrantedPrivilege]],
+# ):
 
-    # Assume ACCOUNTADMIN can do anything
-    if role == "ACCOUNTADMIN":
-        return True
+#     # Assume ACCOUNTADMIN can do anything
+#     if role == "ACCOUNTADMIN":
+#         return True
 
-    if role not in role_privileges:
-        return False
-    if len(role_privileges[role]) == 0:
-        return False
+#     if role not in role_privileges:
+#         return False
+#     if len(role_privileges[role]) == 0:
+#         return False
 
-    for granted_priv in role_privileges[role]:
-        if granted_priv_allows_change(granted_priv, change):
-            return True
+#     for granted_priv in role_privileges[role]:
+#         if granted_priv_allows_change(granted_priv, change):
+#             return True
 
-    return False
-
-
-def find_role_to_execute_change(
-    change: ResourceChange,
-    available_roles: list[ResourceName],
-    default_role: str,
-    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
-):
-    # Check default role first
-    sorted_roles = sorted(available_roles, key=lambda role: (role != default_role))
-    for role in sorted_roles:
-        if role_can_execute_change(role, change, role_privileges):
-            return role
-    return None
+#     return False
 
 
-def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceChange):
+# def find_role_to_execute_change(
+#     change: ResourceChange,
+#     available_roles: list[ResourceName],
+#     default_role: str,
+#     role_privileges: dict[ResourceName, list[GrantedPrivilege]],
+# ):
+#     # Check default role first
+#     sorted_roles = sorted(available_roles, key=lambda role: (role != default_role))
+#     for role in sorted_roles:
+#         if role_can_execute_change(role, change, role_privileges):
+#             return role
+#     return None
 
-    # if change.action not in (Action.ADD,):
-    #     raise NotImplementedError
 
-    scope = RESOURCE_SCOPES[change.urn.resource_type]
+# def granted_priv_allows_change(granted_priv: GrantedPrivilege, change: ResourceChange):
 
-    if isinstance(scope, AccountScope):
-        container_name = str(change.urn.account_locator)
-    elif isinstance(scope, DatabaseScope):
-        container_name = str(change.urn.database().fqn)
-    elif isinstance(scope, SchemaScope):
-        container_name = str(change.urn.schema().fqn)
-    else:
-        raise Exception("Exception in granted_priv_allows_change, this should never be reached")
+#     # if change.action not in (Action.ADD,):
+#     #     raise NotImplementedError
 
-    resource_name = str(change.urn.fqn)
+#     scope = RESOURCE_SCOPES[change.urn.resource_type]
 
-    if isinstance(change, CreateResource):
+#     if isinstance(scope, AccountScope):
+#         container_name = str(change.urn.account_locator)
+#     elif isinstance(scope, DatabaseScope):
+#         container_name = str(change.urn.database().fqn)
+#     elif isinstance(scope, SchemaScope):
+#         container_name = str(change.urn.schema().fqn)
+#     else:
+#         raise Exception("Exception in granted_priv_allows_change, this should never be reached")
 
-        # if resource is a grant, check for MANAGE GRANTS
-        if resource_type_is_grant(change.urn.resource_type):
-            if granted_priv.privilege == AccountPriv.MANAGE_GRANTS:
-                return True
+#     resource_name = str(change.urn.fqn)
 
-        # If resource is a tag reference, check for APPLY TAGS
-        elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
-            if granted_priv.privilege == AccountPriv.APPLY_TAG:
-                return True
+#     if isinstance(change, CreateResource):
 
-        # If we own the resource container, we can always perform CreateResource
-        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == container_name:
-            return True
+#         # if resource is a grant, check for MANAGE GRANTS
+#         if resource_type_is_grant(change.urn.resource_type):
+#             if granted_priv.privilege == AccountPriv.MANAGE_GRANTS:
+#                 return True
 
-        # If we don't own the container, we need the CREATE privilege for the resource on the container
-        create_priv = None
-        if change.urn.resource_type in CREATE_PRIV_FOR_RESOURCE_TYPE:
-            create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
+#         # If resource is a tag reference, check for APPLY TAGS
+#         elif change.urn.resource_type == ResourceType.TAG_REFERENCE:
+#             if granted_priv.privilege == AccountPriv.APPLY_TAG:
+#                 return True
 
-        if granted_priv.privilege == create_priv and granted_priv.on == container_name:
-            return True
+#         # If we own the resource container, we can always perform CreateResource
+#         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == container_name:
+#             return True
 
-        return False
+#         # If we don't own the container, we need the CREATE privilege for the resource on the container
+#         create_priv = None
+#         if change.urn.resource_type in CREATE_PRIV_FOR_RESOURCE_TYPE:
+#             create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
 
-    elif isinstance(change, UpdateResource):
+#         if granted_priv.privilege == create_priv and granted_priv.on == container_name:
+#             return True
 
-        # If we own the resource, we can always make changes
-        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
-            return True
+#         return False
 
-        # Some resources have a MODIFY privilege that typically allows changes
-        if str(granted_priv.privilege) == "MODIFY" and granted_priv.on == resource_name:
-            return True
+#     elif isinstance(change, UpdateResource):
 
-        return False
-    elif isinstance(change, DropResource):
-        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
-            return True
-        return False
-    elif isinstance(change, TransferOwnership):
-        # We must own the resource in order to transfer ownership
-        if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
-            return True
-        return False
+#         # If we own the resource, we can always make changes
+#         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
+#             return True
+
+#         # Some resources have a MODIFY privilege that typically allows changes
+#         if str(granted_priv.privilege) == "MODIFY" and granted_priv.on == resource_name:
+#             return True
+
+#         return False
+#     elif isinstance(change, DropResource):
+#         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
+#             return True
+#         return False
+#     elif isinstance(change, TransferOwnership):
+#         # We must own the resource in order to transfer ownership
+#         if is_ownership_priv(granted_priv.privilege) and granted_priv.on == resource_name:
+#             return True
+#         return False
 
 
 def sql_commands_for_change(
     change: ResourceChange,
     available_roles: list[ResourceName],
     default_role: str,
-    role_privileges: dict[ResourceName, list[GrantedPrivilege]],
+    # role_privileges: dict[ResourceName, list[GrantedPrivilege]],
 ):
     """
     In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
@@ -1115,8 +1161,6 @@ def sql_commands_for_change(
     execution_role, transfer_owner = execution_strategy_for_change(
         change,
         available_roles,
-        default_role,
-        role_privileges,
     )
     before_change_cmd.append(f"USE ROLE {execution_role}")
 
@@ -1177,62 +1221,23 @@ def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan):
     sql_commands = []
 
     sql_commands.append("USE SECONDARY ROLES ALL")
-    available_roles = session_ctx["available_roles"]
+    available_roles = session_ctx["available_roles"].copy()
     default_role = session_ctx["role"]
-    role_privileges = session_ctx["role_privileges"]
     for change in plan:
         # Generate SQL commands
         commands = sql_commands_for_change(
             change,
             available_roles,
             default_role,
-            role_privileges,
         )
         sql_commands.extend(commands)
 
-        # Update role privileges state for the next commands
         if isinstance(change, CreateResource):
             if change.urn.resource_type == ResourceType.ROLE_GRANT:
+                print(f">>>>>>>> {change.after['role']} -> {change.after['to_role']}")
                 if change.after["to_role"] in available_roles:
                     available_roles.append(ResourceName(change.after["role"]))
-            elif change.urn.resource_type == ResourceType.GRANT:
-                grantee_role = ResourceName(change.after["to"])
-                if grantee_role not in role_privileges:
-                    role_privileges[grantee_role] = []
-                for priv in change.after["_privs"]:
-                    if change.after["on_type"] is None:
-                        raise
-                    role_privileges[grantee_role].append(
-                        GrantedPrivilege.from_grant(
-                            privilege=priv,
-                            granted_on=change.after["on_type"],
-                            name=change.after["on"],
-                        )
-                    )
-            elif "owner" in change.after:
-                # When creating any other resource type, creating implies ownership
-                resource_priv_types = PRIVS_FOR_RESOURCE_TYPE[change.urn.resource_type]
-                owner_role = ResourceName(str(change.after["owner"]))
-                if resource_priv_types and "OWNERSHIP" in resource_priv_types:
-                    ownership_priv = resource_priv_types("OWNERSHIP")
-                    if owner_role not in role_privileges:
-                        role_privileges[owner_role] = []
-                    role_privileges[owner_role].append(
-                        GrantedPrivilege.from_grant(
-                            privilege=ownership_priv,
-                            granted_on=change.urn.resource_type,
-                            name=str(change.urn.fqn),
-                        )
-                    )
-                # Special case for databases: if you create a database you own the public schema
-                if change.urn.resource_type == ResourceType.DATABASE:
-                    role_privileges[owner_role].append(
-                        GrantedPrivilege.from_grant(
-                            privilege=SchemaPriv("OWNERSHIP"),
-                            granted_on=ResourceType.SCHEMA,
-                            name=str(change.urn.fqn) + ".PUBLIC",
-                        )
-                    )
+
     return sql_commands
 
 
@@ -1282,6 +1287,24 @@ def topological_sort(resource_set: set[T], references: set[tuple[T, T]]) -> dict
 
 def diff(remote_state: State, manifest: Manifest):
 
+    def _container_pointer(resource_urn: URN) -> Optional[ContainerPointer]:
+        if isinstance(RESOURCE_SCOPES[resource_urn.resource_type], AccountScope):
+            return None
+
+        container_urn = _container_urn(resource_urn)
+        if container_urn in remote_state:
+            if "owner" in remote_state[container_urn]:
+                container_owner = remote_state[container_urn]["owner"]
+            else:
+                raise Exception(f"Remote state for {container_urn} is missing owner -> {remote_state[container_urn]}")
+        else:
+            manifest_item = manifest[container_urn]
+            if isinstance(manifest_item, ManifestResource):
+                container_owner = manifest_item.data["owner"]
+            else:
+                raise Exception(f"Unknown manifest item type: {manifest_item}")
+        return (container_urn, container_owner)
+
     def _diff_resource_data(lhs: dict, rhs: dict) -> dict:
 
         if not isinstance(lhs, dict) or not isinstance(rhs, dict):
@@ -1313,7 +1336,12 @@ def diff(remote_state: State, manifest: Manifest):
             # We don't create implicit resources
             if manifest[urn].implicit:
                 continue
-            yield CreateResource(urn, manifest_item.resource_cls, manifest_item.data)
+            yield CreateResource(
+                urn,
+                manifest_item.resource_cls,
+                _container_pointer(urn),
+                manifest_item.data,
+            )
         else:
             raise Exception(f"Unknown type in manifest: {manifest_item}")
 
@@ -1359,7 +1387,12 @@ def diff(remote_state: State, manifest: Manifest):
             # continue
 
         if create_resource:
-            yield CreateResource(urn, manifest_item.resource_cls, manifest_item.data)
+            yield CreateResource(
+                urn,
+                manifest_item.resource_cls,
+                _container_pointer(urn),
+                manifest_item.data,
+            )
             continue
 
         delta = {k: v for k, v in delta.items() if k not in ignore_fields}
@@ -1404,3 +1437,18 @@ def _sort_destructive_changes(
         )
 
     return sorted(destructive_changes, key=sort_key)
+
+
+def _container_urn(resource_urn: URN) -> URN:
+    scope = RESOURCE_SCOPES[resource_urn.resource_type]
+    container_urn: URN
+
+    if isinstance(scope, AccountScope):
+        container_urn = resource_urn.account()
+    elif isinstance(scope, DatabaseScope):
+        container_urn = resource_urn.database()
+    elif isinstance(scope, SchemaScope):
+        container_urn = resource_urn.schema()
+    else:
+        raise NotImplementedError(f"Unsupported resource scope: {scope}")
+    return container_urn

@@ -32,14 +32,7 @@ def resource(request):
 def test_create_drop_from_json(resource, cursor, suffix):
 
     # Not easily testable without flakiness
-    if resource.__class__ in (
-        res.Service,
-        res.Grant,
-        res.FutureGrant,
-        res.RoleGrant,
-        res.PasswordPolicy,
-        res.Pipe,
-    ):
+    if resource.__class__ in (res.Service,):
         pytest.skip("Skipping")
 
     lifecycle_db = f"LIFECYCLE_DB_{suffix}_{resource.__class__.__name__}"
@@ -68,6 +61,7 @@ def test_create_drop_from_json(resource, cursor, suffix):
         elif isinstance(resource.scope, SchemaScope):
             database.public_schema.add(resource)
 
+        fetch_session.cache_clear()
         blueprint = Blueprint()
         blueprint.add(resource)
         plan = blueprint.plan(cursor.connection)

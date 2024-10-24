@@ -20,7 +20,7 @@ def session_ctx() -> dict:
 @pytest.fixture
 def remote_state() -> dict:
     return {
-        parse_URN("urn::ABCD123:account/SOMEACCT"): {},
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
     }
 
 

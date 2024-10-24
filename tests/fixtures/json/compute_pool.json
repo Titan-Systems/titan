@@ -7,5 +7,5 @@
     "auto_suspend_secs": 3600,
     "comment": null,
     "initially_suspended": null,
-    "owner": "ACCOUNTADMIN"
+    "owner": "SYSADMIN"
 }

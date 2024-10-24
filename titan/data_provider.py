@@ -563,7 +563,7 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
 
     account_data = json.loads(session_obj["ACCOUNT_DATA"])
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
-    role_privileges = fetch_role_privileges(session, available_roles, cacheable=True)
+    role_privileges = {}  # fetch_role_privileges(session, available_roles, cacheable=True)
 
     return {
         "account_edition": AccountEdition(account_data["accountInfo"]["serviceLevelName"]),
