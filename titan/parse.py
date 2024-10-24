@@ -14,6 +14,7 @@ Literal = pp.CaselessLiteral
 StringLiteral = pp.QuotedString("'", multiline=False, unquote_results=True) | pp.QuotedString(
     "$$", multiline=True, unquote_results=True
 )
+Numeric = pp.Word(pp.nums + ".")
 
 ARROW = Literal("=>").suppress()
 AS = Keyword("AS").suppress()
@@ -153,7 +154,7 @@ def parse_alter_account_parameter(sql: str):
         SSO_LOGIN_PAGE = TRUE | FALSE
     """
 
-    alter_account = Keywords("ALTER ACCOUNT SET") + Identifier("name") + EQUALS + ANY("value")
+    alter_account = Keywords("ALTER ACCOUNT SET") + Identifier("name") + EQUALS + pp.MatchFirst([Numeric, ANY])("value")
 
     try:
         results = alter_account.parse_string(sql, parse_all=True)
@@ -163,6 +164,8 @@ def parse_alter_account_parameter(sql: str):
             value = value.lower() == "true"
         elif value.isdigit():
             value = int(value)
+        elif value.replace(".", "", 1).isdigit():
+            value = float(value)
         return {
             "name": results["name"],
             "value": value,
