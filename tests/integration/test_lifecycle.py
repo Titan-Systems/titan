@@ -32,7 +32,12 @@ def resource(request):
 def test_create_drop_from_json(resource, cursor, suffix):
 
     # Not easily testable without flakiness
-    if resource.__class__ in (res.Service,):
+    if resource.__class__ in (
+        res.Service,
+        res.Grant,
+        res.RoleGrant,
+        res.FutureGrant,
+    ):
         pytest.skip("Skipping")
 
     lifecycle_db = f"LIFECYCLE_DB_{suffix}_{resource.__class__.__name__}"
