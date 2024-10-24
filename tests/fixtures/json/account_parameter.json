@@ -1,4 +1,4 @@
 {
-    "name": "MAX_CONCURRENCY_LEVEL",
-    "value": 7
+    "name": "INITIAL_REPLICATION_SIZE_LIMIT_IN_TB",
+    "value": 11.0
 }

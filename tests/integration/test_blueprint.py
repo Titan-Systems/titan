@@ -477,7 +477,7 @@ def test_blueprint_database_params_passed_to_public_schema(cursor, suffix):
 
 
 def test_blueprint_account_parameters_sync_drift(cursor):
-    cursor.execute("ALTER ACCOUNT SET MAX_CONCURRENCY_LEVEL = 7")
+    cursor.execute("ALTER ACCOUNT SET INITIAL_REPLICATION_SIZE_LIMIT_IN_TB = 11.0")
     session = cursor.connection
     try:
         blueprint = Blueprint(
@@ -487,8 +487,10 @@ def test_blueprint_account_parameters_sync_drift(cursor):
         )
         plan = blueprint.plan(session)
         assert len(plan) > 0
-        max_concurrency_level = next((r for r in plan if r.urn.fqn.name == "MAX_CONCURRENCY_LEVEL"), None)
+        max_concurrency_level = next(
+            (r for r in plan if r.urn.fqn.name == "INITIAL_REPLICATION_SIZE_LIMIT_IN_TB"), None
+        )
         assert max_concurrency_level is not None
         assert isinstance(max_concurrency_level, DropResource)
     finally:
-        cursor.execute("ALTER ACCOUNT UNSET MAX_CONCURRENCY_LEVEL")
+        cursor.execute("ALTER ACCOUNT UNSET INITIAL_REPLICATION_SIZE_LIMIT_IN_TB")
