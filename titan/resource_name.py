@@ -39,7 +39,7 @@ class ResourceName:
 
     def __init__(self, name: Union[str, "ResourceName"]) -> None:
         if not isinstance(name, (str, ResourceName)):
-            raise RuntimeError(f"ResourceName must be a string or ResourceName, got {type(name)}")
+            raise RuntimeError(f"ResourceName must be a string or ResourceName, got {repr(name)} {type(name)}")
 
         if isinstance(name, ResourceName):
             self._name = name._name

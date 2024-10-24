@@ -72,3 +72,28 @@ def test_grant_on_all_alias():
     assert len(blueprint_config.resources) == 1
     assert len(blueprint_config_aliased.resources) == 1
     assert blueprint_config.resources[0]._data == blueprint_config_aliased.resources[0]._data
+
+
+def test_vars_defaults(database_config):
+    config = {
+        "vars": [{"name": "foo", "default": "bar", "type": "string"}],
+        **database_config,
+    }
+    blueprint_config = collect_blueprint_config(config)
+    assert blueprint_config.vars["foo"] == "bar"
+
+
+def test_for_each():
+    config = {
+        "vars": [{"name": "some_list_var", "default": ["bar", "baz"], "type": "list"}],
+        "roles": [
+            {
+                "for_each": "var.some_list_var",
+                "name": "role_{{ each.value}}",
+            }
+        ],
+    }
+    blueprint_config = collect_blueprint_config(config)
+    assert blueprint_config.resources is not None
+    assert len(blueprint_config.resources) == 2
+    assert [resource.urn.fqn.name for resource in blueprint_config.resources] == ["role_bar", "role_baz"]

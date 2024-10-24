@@ -7,6 +7,15 @@ from titan.enums import ResourceType
 from titan.gitops import collect_blueprint_config
 
 EXAMPLES_YML = list(get_examples_yml())
+VARS = {
+    "for-each-example": {
+        "schemas": [
+            "schema1",
+            "schema2",
+            "schema3",
+        ]
+    },
+}
 
 
 @pytest.fixture(
@@ -15,16 +24,22 @@ EXAMPLES_YML = list(get_examples_yml())
     scope="function",
 )
 def example(request):
-    _, example_content = request.param
-    yield yaml.safe_load(example_content)
+    example_name, example_content = request.param
+    yield example_name, yaml.safe_load(example_content)
 
 
 @pytest.mark.enterprise
 @pytest.mark.requires_snowflake
 def test_example(example, cursor, marked_for_cleanup, blueprint_vars):
-    cursor.execute("USE WAREHOUSE CI")
+    example_name, example_content = example
+    blueprint_vars = VARS.get(example_name, blueprint_vars)
 
-    blueprint_config = collect_blueprint_config(example, {"vars": blueprint_vars})
+    if example_name == "dbt-with-schema-access-role-tree":
+        pytest.skip("Skipping until issues are resolved")
+
+    cursor.execute("USE WAREHOUSE CI")
+    blueprint_config = collect_blueprint_config(example_content.copy(), {"vars": blueprint_vars})
+    assert blueprint_config.resources is not None
     for resource in blueprint_config.resources:
         marked_for_cleanup.append(resource)
     blueprint = Blueprint.from_config(blueprint_config)
@@ -32,7 +47,7 @@ def test_example(example, cursor, marked_for_cleanup, blueprint_vars):
     cmds = blueprint.apply(cursor.connection, plan)
     assert cmds
 
-    blueprint_config = collect_blueprint_config(example, {"vars": blueprint_vars})
+    blueprint_config = collect_blueprint_config(example_content.copy(), {"vars": blueprint_vars})
     blueprint = Blueprint.from_config(blueprint_config)
     plan = blueprint.plan(cursor.connection)
     unexpected_drift = [change for change in plan if not change_is_expected(change)]

@@ -1,0 +1,10 @@
+vars:
+  - name: schemas
+    type: list
+    default:
+      - schema1
+      - schema2
+
+roles:
+  - for_each: var.schemas
+    name: "AR_{{ each.value }}_ROLE"

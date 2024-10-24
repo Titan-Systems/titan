@@ -5,7 +5,6 @@ import pytest
 from tests.helpers import safe_fetch
 from titan import data_provider
 from titan import resources as res
-from titan.enums import AccountEdition
 from titan.resources import Resource
 from titan.scope import AccountScope, DatabaseScope, SchemaScope
 
