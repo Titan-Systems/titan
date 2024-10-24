@@ -3,7 +3,7 @@ from typing import Any, Optional
 
 from inflection import pluralize
 
-from .blueprint_config import BlueprintConfig
+from .blueprint_config import BlueprintConfig, set_vars_defaults
 from .enums import ResourceType, RunMode
 from .identifiers import resource_label_for_type
 from .resource_name import ResourceName
@@ -15,6 +15,7 @@ from .resources import (
     User,
 )
 from .resources.resource import ResourcePointer
+from .var import string_contains_var, process_for_each
 
 logger = logging.getLogger("titan")
 
@@ -103,18 +104,7 @@ def process_requires(resource: Resource, requires: list):
         resource.requires(ResourcePointer(name=req["name"], resource_type=ResourceType(req["resource_type"])))
 
 
-def collect_resources_from_config(config: dict):
-    # TODO: ResourcePointers should get resolved to top-level resource configs when possible
-    logger.warning("collect_resources_from_config is deprecated, use collect_blueprint_config instead")
-
-    config = config.copy()
-    resources = _resources_for_config(config)
-    if config:
-        raise ValueError(f"Unknown keys in config: {config.keys()}")
-    return resources
-
-
-def _resources_for_config(config: dict):
+def _resources_for_config(config: dict, vars: dict):
     # Special cases
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
@@ -135,28 +125,47 @@ def _resources_for_config(config: dict):
 
     for resource_type, block in config_blocks:
         for resource_data in block:
-            try:
 
-                if isinstance(resource_data, dict):
+            if isinstance(resource_data, dict):
+                if "for_each" in resource_data:
+                    resource_cls = Resource.resolve_resource_cls(resource_type, resource_data)
+                    resource_instance = resource_data.copy()
+                    for_each = resource_instance.pop("for_each")
+
+                    if isinstance(for_each, str) and for_each.startswith("var."):
+                        var_name = for_each.split(".")[1]
+                        if var_name not in vars:
+                            raise ValueError(f"Var {var_name} not found")
+                        for_each_input = vars[var_name]
+                    else:
+                        raise ValueError(f"for_each must be a var reference. Got: {for_each}")
+
+                    for each_value in for_each_input:
+                        for key, value in resource_data.items():
+                            if isinstance(value, str) and string_contains_var(value):
+                                resource_instance[key] = process_for_each(value, each_value)
+
+                        resource = resource_cls(**resource_instance)
+                        resources.append(resource)
+                else:
                     requires = resource_data.pop("requires", [])
                     resource_cls = Resource.resolve_resource_cls(resource_type, resource_data)
                     resource = resource_cls(**resource_data)
                     process_requires(resource, requires)
-                elif isinstance(resource_data, str):
-                    resource_cls = Resource.resolve_resource_cls(resource_type, {})
-                    resource = resource_cls.from_sql(resource_data)
-                else:
-                    raise Exception
-
+                    resources.append(resource)
+            elif isinstance(resource_data, str):
+                resource_cls = Resource.resolve_resource_cls(resource_type, {})
+                resource = resource_cls.from_sql(resource_data)
                 resources.append(resource)
-            except Exception as e:
-                print(f"Error processing resource: {resource_data}")
-                raise e
+            else:
+                raise Exception(f"Unknown resource data type: {resource_data}")
 
     resources.extend(_resources_from_database_config(database_config))
     resources.extend(_resources_from_role_grants_config(role_grants))
     resources.extend(_resources_from_users_config(users))
 
+    # This code helps resolve grant references to the fully qualified name of the resource.
+    # This probably belongs in blueprint as a finalization step.
     resource_cache = {}
     for resource in resources:
         if hasattr(resource._data, "name"):
@@ -207,16 +216,20 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
     elif "run_mode" in cli_config:
         blueprint_args["run_mode"] = cli_config["run_mode"]
 
-    vars_spec = config.pop("vars", None)
+    vars_spec = config.pop("vars", [])
     if vars_spec:
         if not isinstance(vars_spec, list):
             raise ValueError("vars config entry must be a list of dicts")
         blueprint_args["vars_spec"] = vars_spec
 
+    vars = {}
     if "vars" in cli_config:
-        blueprint_args["vars"] = cli_config["vars"]
+        vars = cli_config["vars"]
+        blueprint_args["vars"] = vars
 
-    resources = _resources_for_config(config)
+    vars = set_vars_defaults(vars_spec, vars)
+
+    resources = _resources_for_config(config, vars)
     if len(resources) == 0:
         raise ValueError("No resources found in config")
 

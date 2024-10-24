@@ -14,10 +14,11 @@ _VAR_TYPE_MAP = {
     "integer": int,
     "str": str,
     "string": str,
+    "list": list,
 }
 
 
-@dataclass(frozen=True)
+@dataclass
 class BlueprintConfig:
     name: Optional[str] = None
     resources: Optional[list[Resource]] = None
@@ -83,9 +84,15 @@ class BlueprintConfig:
                     raise TypeError(f"Var '{var_name}' should be of type {spec['type']}")
 
             # Check for missing vars and use defaults if available
-            for spec in self.vars_spec:
-                if spec["name"] not in self.vars:
-                    if "default" in spec:
-                        self.vars[spec["name"]] = spec["default"]
-                    else:
-                        raise MissingVarException(f"Required var '{spec['name']}' is missing and has no default value")
+            self.vars = set_vars_defaults(self.vars_spec, self.vars)
+
+
+def set_vars_defaults(vars_spec: list[dict], vars: dict) -> dict:
+    new_vars = vars.copy()
+    for spec in vars_spec:
+        if spec["name"] not in new_vars:
+            if "default" in spec:
+                new_vars[spec["name"]] = spec["default"]
+            else:
+                raise MissingVarException(f"Required var '{spec['name']}' is missing and has no default value")
+    return new_vars
