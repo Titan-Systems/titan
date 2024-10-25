@@ -2295,8 +2295,13 @@ def list_databases(session: SnowflakeConnection) -> list[FQN]:
     return [FQN(name=database) for database in databases]
 
 
-def list_database_roles(session: SnowflakeConnection) -> list[FQN]:
-    databases = _list_databases(session)
+def list_database_roles(session: SnowflakeConnection, database=None) -> list[FQN]:
+    databases: list[ResourceName]
+    if database:
+        databases = [ResourceName(database)]
+    else:
+        databases = _list_databases(session)
+
     roles = []
     for database_name in databases:
         try:

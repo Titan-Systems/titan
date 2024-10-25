@@ -618,6 +618,11 @@ class Blueprint:
             if self._config.allowlist:
                 for resource_type in self._config.allowlist:
                     for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
+                        # FIXME
+                        if self._config.scope == BlueprintScope.DATABASE and fqn.database != self._config.database:
+                            continue
+                        elif self._config.scope == BlueprintScope.SCHEMA and fqn.schema != self._config.schema:
+                            continue
                         urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
                         # state[urn] = {}  # RemoteResourceStub()
                         data = data_provider.fetch_resource(session, urn)
@@ -685,13 +690,17 @@ class Blueprint:
             self._root.add(resource)
 
         if self._config.scope != BlueprintScope.ACCOUNT and self._config.database is not None:
-            if len(acct_scoped) > 0:
+            if len(acct_scoped) > 1:
                 raise RuntimeError
-            scoped_database = ResourcePointer(name=self._config.database, resource_type=ResourceType.DATABASE)
-            self._root.add(scoped_database)
-            if self._config.schema is not None:
-                scoped_database.add(ResourcePointer(name=self._config.schema, resource_type=ResourceType.SCHEMA))
-
+            elif len(acct_scoped) == 1:
+                scoped_database = acct_scoped[0]
+                if scoped_database.name != self._config.database:
+                    raise RuntimeError
+            else:
+                scoped_database = ResourcePointer(name=self._config.database, resource_type=ResourceType.DATABASE)
+                self._root.add(scoped_database)
+                if self._config.schema is not None:
+                    scoped_database.add(ResourcePointer(name=self._config.schema, resource_type=ResourceType.SCHEMA))
 
         # List all databases connected to root
         databases = _get_databases(self._root)

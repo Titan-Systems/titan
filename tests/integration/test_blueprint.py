@@ -242,7 +242,6 @@ def test_blueprint_all_grant_triggers_create(cursor, test_db, role):
     assert isinstance(plan[0], CreateResource)
 
 
-@pytest.mark.skip(reason="This test requires blueprint scopes")
 def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
     session = cursor.connection
     db_name = f"BLUEPRINT_SYNC_DONT_REMOVE_SYSTEM_SCHEMAS_{suffix}"
@@ -250,11 +249,11 @@ def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
         cursor.execute(f"CREATE DATABASE {db_name}")
         blueprint = Blueprint(
             name="blueprint",
-            resources=[
-                res.Schema(name="INFORMATION_SCHEMA", database=db_name),
-            ],
+            resources=[],
             run_mode="sync",
             allowlist=[ResourceType.SCHEMA],
+            scope="DATABASE",
+            database=db_name,
         )
         plan = blueprint.plan(session)
         assert len(plan) == 0
@@ -262,39 +261,50 @@ def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
         cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
-@pytest.mark.skip(reason="This test requires blueprint scopes")
-def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
+def test_blueprint_sync_resource_missing_from_remote_state(cursor, suffix):
     session = cursor.connection
-    blueprint = Blueprint(
-        name="blueprint",
-        resources=[
-            res.Schema(name="ABSENT", database=test_db),
-            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
-        ],
-        run_mode="sync",
-        allowlist=[ResourceType.SCHEMA],
-    )
-    plan = blueprint.plan(session)
-    assert len(plan) == 1
-    assert isinstance(plan[0], CreateResource)
-    assert plan[0].urn.fqn.name == "ABSENT"
+    db_name = f"BLUEPRINT_SYNC_RESOURCE_MISSING_{suffix}"
+    try:
+        cursor.execute(f"CREATE DATABASE {db_name}")
+        blueprint = Blueprint(
+            name="blueprint",
+            resources=[
+                res.Schema(name="ABSENT", database=db_name),
+                res.Schema(name="INFORMATION_SCHEMA", database=db_name),
+            ],
+            run_mode="sync",
+            allowlist=[ResourceType.SCHEMA],
+            scope="DATABASE",
+            database=db_name,
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) == 1
+        assert isinstance(plan[0], CreateResource)
+        assert plan[0].urn.fqn.name == "ABSENT"
+    finally:
+        cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
-@pytest.mark.skip(reason="This test requires blueprint scopes")
-def test_blueprint_sync_plan_matches_remote_state(cursor, test_db):
+def test_blueprint_sync_plan_matches_remote_state(cursor, suffix):
     session = cursor.connection
-    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
-    blueprint = Blueprint(
-        name="blueprint",
-        resources=[
-            res.Schema(name="PRESENT", database=test_db, owner=TEST_ROLE),
-            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
-        ],
-        run_mode="sync",
-        allowlist=[ResourceType.SCHEMA],
-    )
-    plan = blueprint.plan(session)
-    assert len(plan) == 0
+    db_name = f"BLUEPRINT_SYNC_PLAN_MATCHES_REMOTE_STATE_{suffix}"
+    try:
+        cursor.execute(f"CREATE DATABASE {db_name}")
+        cursor.execute(f"CREATE SCHEMA {db_name}.PRESENT")
+        blueprint = Blueprint(
+            name="blueprint",
+            resources=[
+                res.Schema(name="PRESENT", owner=TEST_ROLE),
+            ],
+            run_mode="sync",
+            allowlist=[ResourceType.SCHEMA],
+            scope="DATABASE",
+            database=db_name,
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) == 0
+    finally:
+        cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
 @pytest.mark.skip(reason="This test requires blueprint scopes")
