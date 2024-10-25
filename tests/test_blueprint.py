@@ -13,7 +13,7 @@ from titan.blueprint import (
     dump_plan,
 )
 from titan.blueprint_config import BlueprintConfig
-from titan.enums import AccountEdition, ResourceType, RunMode
+from titan.enums import AccountEdition, BlueprintScope, ResourceType, RunMode
 from titan.exceptions import (
     DuplicateResourceException,
     InvalidResourceException,
@@ -22,7 +22,6 @@ from titan.exceptions import (
     WrongEditionException,
 )
 from titan.identifiers import FQN, URN, parse_URN
-from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
 from titan.resources.resource import ResourcePointer
 from titan.var import VarString
@@ -745,3 +744,126 @@ def test_blueprint_warehouse_scaling_policy_doesnt_render_in_standard_edition(se
     assert sql[1] == "USE ROLE SYSADMIN"
     assert sql[2].startswith("CREATE WAREHOUSE WH")
     assert "scaling_policy" not in sql[2]
+
+
+def test_blueprint_scope_config():
+
+    bc = BlueprintConfig(
+        scope=BlueprintScope.DATABASE,
+        database=ResourceName("foo"),
+    )
+    assert bc
+
+    with pytest.raises(ValueError):
+        BlueprintConfig(
+            scope=BlueprintScope.DATABASE,
+            schema=ResourceName("bar"),
+        )
+
+    with pytest.raises(ValueError):
+        BlueprintConfig(
+            scope=BlueprintScope.ACCOUNT,
+            database=ResourceName("foo"),
+        )
+
+    with pytest.raises(ValueError):
+        BlueprintConfig(
+            scope=BlueprintScope.ACCOUNT,
+            schema=ResourceName("bar"),
+        )
+
+    with pytest.raises(ValueError):
+        BlueprintConfig(
+            scope=BlueprintScope.ACCOUNT,
+            database=ResourceName("foo"),
+            schema=ResourceName("bar"),
+        )
+
+
+def test_blueprint_scope(session_ctx, remote_state):
+
+    blueprint = Blueprint(resources=[res.Database(name="DB1")], scope=BlueprintScope.DATABASE)
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+
+    blueprint = Blueprint(resources=[res.Role(name="ROLE1")], scope=BlueprintScope.DATABASE)
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    with pytest.raises(NonConformingPlanException):
+        blueprint._raise_for_nonconforming_plan(session_ctx, plan)
+
+    remote_state = {
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
+        parse_URN("urn::ABCD123:database/DB1"): {"owner": "SYSADMIN"},
+        parse_URN("urn::ABCD123:schema/DB1.PUBLIC"): {"owner": "SYSADMIN"},
+    }
+
+    blueprint = Blueprint(
+        resources=[
+            res.Schema(name="SCHEMA1"),
+            res.Task(name="TASK1"),
+        ],
+        scope=BlueprintScope.DATABASE,
+        database="DB1",
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 2
+
+    blueprint = Blueprint(resources=[res.Database(name="DB2")], scope=BlueprintScope.SCHEMA)
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    with pytest.raises(NonConformingPlanException):
+        blueprint._raise_for_nonconforming_plan(session_ctx, plan)
+
+
+def test_blueprint_plan_scope_stubbing(session_ctx):
+    remote_state = {
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
+        parse_URN("urn::ABCD123:database/DB1"): {"owner": "SYSADMIN"},
+        parse_URN("urn::ABCD123:schema/DB1.PUBLIC"): {"owner": "SYSADMIN"},
+    }
+
+    blueprint = Blueprint(
+        resources=[res.Task(name="TASK1")],
+        scope=BlueprintScope.SCHEMA,
+        database="DB1",
+        schema="PUBLIC",
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+
+    remote_state = {
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
+        parse_URN("urn::ABCD123:database/DB1"): {"owner": "SYSADMIN"},
+        parse_URN("urn::ABCD123:schema/DB1.PUBLIC"): {"owner": "SYSADMIN"},
+        parse_URN("urn::ABCD123:schema/DB1.ANOTHER_SCHEMA"): {"owner": "SYSADMIN"},
+    }
+
+    blueprint = Blueprint(
+        resources=[res.Task(name="TASK1")],
+        scope=BlueprintScope.SCHEMA,
+        database="DB1",
+        schema="ANOTHER_SCHEMA",
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 1
+
+    remote_state = {
+        parse_URN("urn::ABCD123:account/ACCOUNT"): {},
+        parse_URN("urn::ABCD123:database/DB1"): {"owner": "SYSADMIN"},
+        parse_URN("urn::ABCD123:schema/DB1.PUBLIC"): {"owner": "SYSADMIN"},
+    }
+
+    blueprint = Blueprint(
+        resources=[res.Schema(name="A_THIRD_SCHEMA"), res.Task(name="TASK1")],
+        scope=BlueprintScope.SCHEMA,
+        database="DB1",
+        schema="A_THIRD_SCHEMA",
+    )
+    manifest = blueprint.generate_manifest(session_ctx)
+    plan = blueprint._plan(remote_state, manifest)
+    assert len(plan) == 2

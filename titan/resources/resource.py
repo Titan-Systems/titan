@@ -602,7 +602,7 @@ class NamedResource:
 
 
 class ResourcePointer(NamedResource, Resource, ResourceContainer):
-    def __init__(self, name: str, resource_type: ResourceType):
+    def __init__(self, name: Union[str, ResourceName], resource_type: ResourceType):
         self._resource_type: ResourceType = resource_type
         self.scope = RESOURCE_SCOPES[resource_type]
         super().__init__(name)

@@ -17,7 +17,7 @@ from .client import (
     reset_cache,
 )
 from .data_provider import SessionContext
-from .enums import AccountEdition, ResourceType, RunMode, resource_type_is_grant
+from .enums import AccountEdition, BlueprintScope, ResourceType, RunMode, resource_type_is_grant
 from .exceptions import (
     DuplicateResourceException,
     InvalidResourceException,
@@ -46,7 +46,7 @@ from .resources.resource import (
 )
 from .resources.role import Role
 from .resources.tag import Tag, TaggableResource
-from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
+from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope, TableScope
 
 T = TypeVar("T")
 ResourceRef = Union[tuple[ResourceType, str], str]
@@ -491,6 +491,21 @@ def _get_role_grants(resource: ResourceContainer) -> list[RoleGrant]:
     return cast(list[RoleGrant], resource.items(resource_type=ResourceType.ROLE_GRANT))
 
 
+def _resource_scope_is_outside_blueprint_scope(resource_type: ResourceType, blueprint_scope: BlueprintScope) -> bool:
+    resource_scope = RESOURCE_SCOPES[resource_type]
+    if blueprint_scope == BlueprintScope.SCHEMA and (
+        resource_type == ResourceType.SCHEMA or isinstance(resource_scope, (SchemaScope, TableScope))
+    ):
+        return False
+    elif blueprint_scope == BlueprintScope.DATABASE and (
+        resource_type == ResourceType.DATABASE or isinstance(resource_scope, (DatabaseScope, SchemaScope, TableScope))
+    ):
+        return False
+    elif blueprint_scope == BlueprintScope.ACCOUNT:
+        return False
+    return True
+
+
 class Blueprint:
 
     def __init__(
@@ -502,6 +517,9 @@ class Blueprint:
         allowlist: Optional[list] = None,
         vars: Optional[dict] = None,
         vars_spec: Optional[list[dict]] = None,
+        scope: Optional[str] = None,
+        database: Optional[str] = None,
+        schema: Optional[str] = None,
     ) -> None:
         self._config: BlueprintConfig = BlueprintConfig(
             name=name,
@@ -511,6 +529,9 @@ class Blueprint:
             allowlist=[ResourceType(item) for item in allowlist] if allowlist else None,
             vars=vars or {},
             vars_spec=vars_spec or [],
+            scope=BlueprintScope(scope) if scope else None,
+            database=ResourceName(database) if database else None,
+            schema=ResourceName(schema) if schema else None,
         )
         self._finalized: bool = False
         self._staged: list[Resource] = []
@@ -542,14 +563,23 @@ class Blueprint:
                     exceptions.append(f"Create-or-update mode does not allow renaming resources (ref: {change.urn})")
                 if change.resource_cls.resource_type == ResourceType.GRANT:
                     exceptions.append(f"Grants cannot be updated (ref: {change.urn})")
+
             # Valid Resource Types exceptions
             if self._config.allowlist:
                 if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
+            # Edition exceptions
             if session_ctx["account_edition"] == AccountEdition.STANDARD:
                 if isinstance(change, CreateResource) and AccountEdition.STANDARD not in change.resource_cls.edition:
                     exceptions.append(f"Resource {change.urn} requires enterprise edition or higher")
+
+            # Scope exceptions
+            if self._config.scope:
+                if _resource_scope_is_outside_blueprint_scope(change.urn.resource_type, self._config.scope):
+                    exceptions.append(
+                        f"Resource {change.urn} is out of scope ({self._config.scope}) for this blueprint"
+                    )
 
         if exceptions:
             if len(exceptions) > 5:
@@ -654,6 +684,15 @@ class Blueprint:
         for resource in acct_scoped:
             self._root.add(resource)
 
+        if self._config.scope != BlueprintScope.ACCOUNT and self._config.database is not None:
+            if len(acct_scoped) > 0:
+                raise RuntimeError
+            scoped_database = ResourcePointer(name=self._config.database, resource_type=ResourceType.DATABASE)
+            self._root.add(scoped_database)
+            if self._config.schema is not None:
+                scoped_database.add(ResourcePointer(name=self._config.schema, resource_type=ResourceType.SCHEMA))
+
+
         # List all databases connected to root
         databases = _get_databases(self._root)
 
@@ -683,7 +722,6 @@ class Blueprint:
                 available_scopes[f"{database.name}.{schema.name}"] = schema
 
         for resource in schema_scoped:
-
             if resource.container is None:
                 if len(databases) == 1:
                     logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
