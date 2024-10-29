@@ -188,7 +188,7 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
     cli_config_ = cli_config.copy()
     blueprint_args: dict[str, Any] = {}
 
-    for key in ["allowlist", "dry_run", "name", "run_mode", "vars"]:
+    for key in ["allowlist", "dry_run", "name", "run_mode"]:
         if key in yaml_config_ and key in cli_config_:
             raise ValueError(f"Cannot specify `{key}` in both yaml config and cli")
 
