@@ -511,8 +511,16 @@ def test_blueprint_account_parameters_sync_drift(cursor):
         cursor.execute("ALTER ACCOUNT UNSET PREVENT_UNLOAD_TO_INLINE_URL")
 
 
+def test_blueprint_scope_missing_resource(cursor):
+    session = cursor.connection
+    blueprint = Blueprint(scope="DATABASE", database="THIS_DATABASE_DOES_NOT_EXIST")
+    with pytest.raises(MissingResourceException):
+        blueprint.plan(session)
+
+
 def test_blueprint_single_schema_example(cursor, suffix):
     session = cursor.connection
+    cursor.execute(f"CREATE SCHEMA STATIC_DATABASE.DEV_{suffix}")
     yaml_config = {
         "scope": "SCHEMA",
         "database": "STATIC_DATABASE",
@@ -535,12 +543,15 @@ def test_blueprint_single_schema_example(cursor, suffix):
         ],
     }
     cli_config = {"schema": f"DEV_{suffix}"}
-    bc = collect_blueprint_config(yaml_config, cli_config)
-    blueprint = Blueprint.from_config(bc)
-    assert blueprint._config.scope == BlueprintScope.SCHEMA
-    plan = blueprint.plan(session)
-    assert len(plan) == 2
-    assert isinstance(plan[0], CreateResource)
-    assert plan[0].urn.fqn.name == "my_table"
-    assert isinstance(plan[1], CreateResource)
-    assert plan[1].urn.fqn.name == "my_view"
+    try:
+        bc = collect_blueprint_config(yaml_config, cli_config)
+        blueprint = Blueprint.from_config(bc)
+        assert blueprint._config.scope == BlueprintScope.SCHEMA
+        plan = blueprint.plan(session)
+        assert len(plan) == 2
+        assert isinstance(plan[0], CreateResource)
+        assert plan[0].urn.fqn.name == "my_table"
+        assert isinstance(plan[1], CreateResource)
+        assert plan[1].urn.fqn.name == "my_view"
+    finally:
+        cursor.execute(f"DROP SCHEMA STATIC_DATABASE.DEV_{suffix}")

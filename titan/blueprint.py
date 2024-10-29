@@ -1241,7 +1241,10 @@ def diff(remote_state: State, manifest: Manifest):
             if isinstance(manifest_item, ManifestResource):
                 container_owner = manifest_item.data["owner"]
             else:
-                raise Exception(f"Unknown manifest item type: {manifest_item}")
+                raise MissingResourceException(
+                    f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {container_urn}"
+                )
+
         return (container_urn, container_owner)
 
     def _diff_resource_data(lhs: dict, rhs: dict) -> dict:
