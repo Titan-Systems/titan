@@ -517,7 +517,7 @@ class ResourceContainer:
         else:
             return list(chain.from_iterable(self._items.values()))
 
-    def find(self, resource_type: ResourceType, name: str) -> Resource:
+    def find(self, resource_type: ResourceType, name: Union[ResourceName, str]) -> Resource:
         for resource in self.items(resource_type):
             if isinstance(resource, ResourcePointer) and resource.name == name:
                 return resource

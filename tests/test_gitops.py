@@ -74,6 +74,28 @@ def test_grant_on_all_alias():
     assert blueprint_config.resources[0]._data == blueprint_config_aliased.resources[0]._data
 
 
+def test_vars_type_validation(database_config):
+    yaml_config = {
+        "vars": [{"name": "foo", "type": "string"}],
+        **database_config,
+    }
+    cli_config = {
+        "vars": {"foo": 42},
+    }
+    with pytest.raises(TypeError):
+        collect_blueprint_config(yaml_config, cli_config)
+
+    yaml_config = {
+        "vars": [{"name": "foo", "type": "int", "default": 0}],
+        **database_config,
+    }
+    cli_config = {
+        "vars": {"foo": "bar"},
+    }
+    with pytest.raises(TypeError):
+        collect_blueprint_config(yaml_config, cli_config)
+
+
 def test_vars_defaults(database_config):
     config = {
         "vars": [{"name": "foo", "default": "bar", "type": "string"}],

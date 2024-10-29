@@ -73,7 +73,15 @@ def titan_cli():
     show_default=True,
     help="Run mode",
 )
-def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode):
+@click.option(
+    "--scope",
+    type=click.Choice(["ACCOUNT", "DATABASE", "SCHEMA"]),
+    help="Limit the scope of resources to a specific database or schema",
+    metavar="<scope>",
+)
+@click.option("--database", type=str, help="Database to limit the scope to", metavar="<database>")
+@click.option("--schema", type=str, help="Schema to limit the scope to", metavar="<schema>")
+def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode, scope, database, schema):
     """Generate an execution plan based on your configuration"""
     yaml_config = load_config(config_file)
 
@@ -87,6 +95,12 @@ def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode)
         cli_config["run_mode"] = RunMode(run_mode)
     if allowlist:
         cli_config["allowlist"] = allowlist
+    if scope:
+        cli_config["scope"] = scope
+    if database:
+        cli_config["database"] = database
+    if schema:
+        cli_config["schema"] = schema
 
     plan_obj = blueprint_plan(yaml_config, cli_config)
     if output_file:

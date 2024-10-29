@@ -1,0 +1,15 @@
+scope: SCHEMA
+database: STATIC_DATABASE
+
+schemas:
+  - name: my_schema
+
+tables:
+  - name: my_table
+    columns:
+      - name: my_column
+        type: string
+
+views:
+  - name: my_view
+    as_: "SELECT * FROM my_table"

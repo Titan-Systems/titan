@@ -173,8 +173,6 @@ def _fetch_grant_to_role(
     if needle in local_index:
         return local_index[needle]
     else:
-        # print(local_index)
-        # raise Exception(needle)
         return None
 
 

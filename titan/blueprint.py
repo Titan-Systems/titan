@@ -65,13 +65,13 @@ class ResourceChange(ABC):
 
 
 ResourceOwner = ResourceName
-ContainerPointer = tuple[URN, ResourceOwner]
+ContainerDescriptor = tuple[URN, ResourceOwner]
 
 
 @dataclass
 class CreateResource(ResourceChange):
     resource_cls: type[Resource]
-    container: Optional[ContainerPointer]
+    container: Optional[ContainerDescriptor]
     after: dict[str, str]
 
     def to_dict(self) -> dict[str, Union[str, dict[str, str]]]:
@@ -138,14 +138,14 @@ def plan_from_dict(plan_dict: dict) -> Plan:
     for change in plan_dict:
         action = change["action"]
         if action == "CREATE":
-            container_pointer: ContainerPointer
+            container_descriptor: ContainerDescriptor
             for urn, owner in change["container"].items():
-                container_pointer = (parse_URN(urn), ResourceName(owner))
+                container_descriptor = (parse_URN(urn), ResourceName(owner))
             changes.append(
                 CreateResource(
                     urn=parse_URN(change["urn"]),
                     resource_cls=Resource.__classes__[change["resource_cls"]],
-                    container=container_pointer,
+                    container=container_descriptor,
                     after=change["after"],
                 )
             )
@@ -483,8 +483,12 @@ def _get_schemas(resource: ResourceContainer) -> list[Union[Schema, ResourcePoin
     return cast(list[Union[Schema, ResourcePointer]], resource.items(resource_type=ResourceType.SCHEMA))
 
 
+def _get_schema_by_name(resource: ResourceContainer, name: Union[ResourceName, str]) -> Union[Schema, ResourcePointer]:
+    return cast(Union[Schema, ResourcePointer], resource.find(name=name, resource_type=ResourceType.SCHEMA))
+
+
 def _get_public_schema(resource: ResourceContainer) -> Union[Schema, ResourcePointer]:
-    return cast(Union[Schema, ResourcePointer], resource.find(name="PUBLIC", resource_type=ResourceType.SCHEMA))
+    return _get_schema_by_name(resource, "PUBLIC")
 
 
 def _get_role_grants(resource: ResourceContainer) -> list[RoleGrant]:
@@ -692,10 +696,14 @@ class Blueprint:
         if self._config.scope != BlueprintScope.ACCOUNT and self._config.database is not None:
             if len(acct_scoped) > 1:
                 raise RuntimeError
+            # The user has specified a database and added a resource to the config
             elif len(acct_scoped) == 1:
                 scoped_database = acct_scoped[0]
+                if scoped_database.resource_type != ResourceType.DATABASE:
+                    raise RuntimeError(f"Expected a database, got {scoped_database.resource_type}")
                 if scoped_database.name != self._config.database:
                     raise RuntimeError
+            # The user has specified a database by name only
             else:
                 scoped_database = ResourcePointer(name=self._config.database, resource_type=ResourceType.DATABASE)
                 self._root.add(scoped_database)
@@ -733,8 +741,14 @@ class Blueprint:
         for resource in schema_scoped:
             if resource.container is None:
                 if len(databases) == 1:
-                    logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
-                    _get_public_schema(databases[0]).add(resource)
+                    # When the blueprint is scoped all dangling resources should be assigned to the configured scope
+                    if self._config.scope == BlueprintScope.SCHEMA and self._config.schema is not None:
+                        scoped_schema = _get_schema_by_name(databases[0], self._config.schema)
+                        scoped_schema.add(resource)
+                        # TODO: figure out how to handle the case where the schema is already in the blueprint
+                    else:
+                        logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
+                        _get_public_schema(databases[0]).add(resource)
                 else:
                     raise OrphanResourceException(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
@@ -1209,7 +1223,10 @@ def topological_sort(resource_set: set[T], references: set[tuple[T, T]]) -> dict
 
 def diff(remote_state: State, manifest: Manifest):
 
-    def _container_pointer(resource_urn: URN) -> Optional[ContainerPointer]:
+    def _container_descriptor(resource_urn: URN) -> Optional[ContainerDescriptor]:
+        """
+        Given the URN of a resource, return a descriptor of the container that owns it.
+        """
         if isinstance(RESOURCE_SCOPES[resource_urn.resource_type], AccountScope):
             return None
 
@@ -1261,7 +1278,7 @@ def diff(remote_state: State, manifest: Manifest):
             yield CreateResource(
                 urn,
                 manifest_item.resource_cls,
-                _container_pointer(urn),
+                _container_descriptor(urn),
                 manifest_item.data,
             )
         else:
@@ -1312,7 +1329,7 @@ def diff(remote_state: State, manifest: Manifest):
             yield CreateResource(
                 urn,
                 manifest_item.resource_cls,
-                _container_pointer(urn),
+                _container_descriptor(urn),
                 manifest_item.data,
             )
             continue
