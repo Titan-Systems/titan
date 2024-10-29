@@ -4,9 +4,8 @@ from typing import Any, Optional
 from inflection import pluralize
 
 from .blueprint_config import BlueprintConfig, set_vars_defaults
-from .enums import ResourceType, RunMode
+from .enums import BlueprintScope, ResourceType, RunMode
 from .identifiers import resource_label_for_type
-from .resource_name import ResourceName
 from .resources import (
     Database,
     Resource,
@@ -166,16 +165,16 @@ def _resources_for_config(config: dict, vars: dict):
 
     # This code helps resolve grant references to the fully qualified name of the resource.
     # This probably belongs in blueprint as a finalization step.
-    resource_cache = {}
-    for resource in resources:
-        if hasattr(resource._data, "name"):
-            resource_cache[(resource.resource_type, ResourceName(resource._data.name))] = resource
+    # resource_cache = {}
+    # for resource in resources:
+    #     if hasattr(resource._data, "name"):
+    #         resource_cache[(resource.resource_type, ResourceName(resource._data.name))] = resource
 
-    for resource in resources:
-        if resource.resource_type == ResourceType.GRANT:
-            cache_pointer = (resource.on_type, ResourceName(resource.on))
-            if cache_pointer in resource_cache:
-                resource._data.on = ResourceName(str(resource_cache[cache_pointer].fqn))
+    # for resource in resources:
+    #     if resource.resource_type == ResourceType.GRANT:
+    #         cache_pointer = (resource.on_type, ResourceName(resource.on))
+    #         if cache_pointer in resource_cache:
+    #             resource._data.on = ResourceName(str(resource_cache[cache_pointer].fqn))
 
     return resources
 
@@ -185,57 +184,62 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
     if cli_config is None:
         cli_config = {}
 
-    config = yaml_config.copy()
+    yaml_config_ = yaml_config.copy()
+    cli_config_ = cli_config.copy()
     blueprint_args: dict[str, Any] = {}
 
-    allowlist = config.pop("allowlist", None)
+    for key in ["allowlist", "dry_run", "name", "run_mode"]:
+        if key in yaml_config_ and key in cli_config_:
+            raise ValueError(f"Cannot specify `{key}` in both yaml config and cli")
+
+    allowlist = yaml_config_.pop("allowlist", None) or cli_config_.pop("allowlist", None)
+    database = yaml_config_.pop("database", None) or cli_config_.pop("database", None)
+    dry_run = yaml_config_.pop("dry_run", None) or cli_config_.pop("dry_run", None)
+    name = yaml_config_.pop("name", None) or cli_config_.pop("name", None)
+    run_mode = yaml_config_.pop("run_mode", None) or cli_config_.pop("run_mode", None)
+    scope = yaml_config_.pop("scope", None) or cli_config_.pop("scope", None)
+    schema = yaml_config_.pop("schema", None) or cli_config_.pop("schema", None)
+    vars = cli_config_.pop("vars", {})
+    vars_spec = yaml_config_.pop("vars", [])
+
     if allowlist:
-        if "allowlist" in cli_config:
-            raise ValueError("Cannot specify both allowlist in yaml and cli")
         blueprint_args["allowlist"] = [ResourceType(resource_type) for resource_type in allowlist]
-    elif "allowlist" in cli_config:
-        blueprint_args["allowlist"] = [ResourceType(resource_type) for resource_type in cli_config["allowlist"]]
 
-    dry_run = config.pop("dry_run", None)
+    if database:
+        blueprint_args["database"] = database
+
     if dry_run:
-        if "dry_run" in cli_config:
-            raise ValueError("Cannot specify both dry_run in yaml and cli")
         blueprint_args["dry_run"] = dry_run
-    elif "dry_run" in cli_config:
-        blueprint_args["dry_run"] = cli_config["dry_run"]
 
-    name = config.pop("name", None)
     if name:
         blueprint_args["name"] = name
 
-    run_mode = config.pop("run_mode", None)
     if run_mode:
-        if "run_mode" in cli_config:
-            raise ValueError("Cannot specify both run_mode in yaml and cli")
         blueprint_args["run_mode"] = RunMode(run_mode)
-    elif "run_mode" in cli_config:
-        blueprint_args["run_mode"] = cli_config["run_mode"]
 
-    vars_spec = config.pop("vars", [])
+    if scope:
+        blueprint_args["scope"] = BlueprintScope(scope)
+
+    if schema:
+        blueprint_args["schema"] = schema
+
+    if vars:
+        blueprint_args["vars"] = vars
+
     if vars_spec:
         if not isinstance(vars_spec, list):
             raise ValueError("vars config entry must be a list of dicts")
         blueprint_args["vars_spec"] = vars_spec
 
-    vars = {}
-    if "vars" in cli_config:
-        vars = cli_config["vars"]
-        blueprint_args["vars"] = vars
-
     vars = set_vars_defaults(vars_spec, vars)
+    resources = _resources_for_config(yaml_config_, vars)
 
-    resources = _resources_for_config(config, vars)
     if len(resources) == 0:
         raise ValueError("No resources found in config")
 
     blueprint_args["resources"] = resources
 
-    if config:
-        raise ValueError(f"Unknown keys in config: {config.keys()}")
+    if yaml_config_:
+        raise ValueError(f"Unknown keys in config: {yaml_config_.keys()}")
 
-    return BlueprintConfig(**blueprint_args)  # type: ignore[arg-type]
+    return BlueprintConfig(**blueprint_args)

@@ -37,6 +37,12 @@ class ParseableEnum(str, Enum, metaclass=_Parseable):
         return super()._missing_(val)
 
 
+class BlueprintScope(ParseableEnum):
+    ACCOUNT = "ACCOUNT"
+    DATABASE = "DATABASE"
+    SCHEMA = "SCHEMA"
+
+
 class RunMode(ParseableEnum):
     CREATE_OR_UPDATE = "CREATE-OR-UPDATE"
     SYNC = "SYNC"

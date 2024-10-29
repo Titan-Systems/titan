@@ -17,7 +17,7 @@ from .client import (
     reset_cache,
 )
 from .data_provider import SessionContext
-from .enums import AccountEdition, ResourceType, RunMode, resource_type_is_grant
+from .enums import AccountEdition, BlueprintScope, ResourceType, RunMode, resource_type_is_grant
 from .exceptions import (
     DuplicateResourceException,
     InvalidResourceException,
@@ -46,7 +46,7 @@ from .resources.resource import (
 )
 from .resources.role import Role
 from .resources.tag import Tag, TaggableResource
-from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope
+from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope, TableScope
 
 T = TypeVar("T")
 ResourceRef = Union[tuple[ResourceType, str], str]
@@ -65,13 +65,13 @@ class ResourceChange(ABC):
 
 
 ResourceOwner = ResourceName
-ContainerPointer = tuple[URN, ResourceOwner]
+ContainerDescriptor = tuple[URN, ResourceOwner]
 
 
 @dataclass
 class CreateResource(ResourceChange):
     resource_cls: type[Resource]
-    container: Optional[ContainerPointer]
+    container: Optional[ContainerDescriptor]
     after: dict[str, str]
 
     def to_dict(self) -> dict[str, Union[str, dict[str, str]]]:
@@ -138,14 +138,14 @@ def plan_from_dict(plan_dict: dict) -> Plan:
     for change in plan_dict:
         action = change["action"]
         if action == "CREATE":
-            container_pointer: ContainerPointer
+            container_descriptor: ContainerDescriptor
             for urn, owner in change["container"].items():
-                container_pointer = (parse_URN(urn), ResourceName(owner))
+                container_descriptor = (parse_URN(urn), ResourceName(owner))
             changes.append(
                 CreateResource(
                     urn=parse_URN(change["urn"]),
                     resource_cls=Resource.__classes__[change["resource_cls"]],
-                    container=container_pointer,
+                    container=container_descriptor,
                     after=change["after"],
                 )
             )
@@ -483,12 +483,31 @@ def _get_schemas(resource: ResourceContainer) -> list[Union[Schema, ResourcePoin
     return cast(list[Union[Schema, ResourcePointer]], resource.items(resource_type=ResourceType.SCHEMA))
 
 
+def _get_schema_by_name(resource: ResourceContainer, name: Union[ResourceName, str]) -> Union[Schema, ResourcePointer]:
+    return cast(Union[Schema, ResourcePointer], resource.find(name=name, resource_type=ResourceType.SCHEMA))
+
+
 def _get_public_schema(resource: ResourceContainer) -> Union[Schema, ResourcePointer]:
-    return cast(Union[Schema, ResourcePointer], resource.find(name="PUBLIC", resource_type=ResourceType.SCHEMA))
+    return _get_schema_by_name(resource, "PUBLIC")
 
 
 def _get_role_grants(resource: ResourceContainer) -> list[RoleGrant]:
     return cast(list[RoleGrant], resource.items(resource_type=ResourceType.ROLE_GRANT))
+
+
+def _resource_scope_is_outside_blueprint_scope(resource_type: ResourceType, blueprint_scope: BlueprintScope) -> bool:
+    resource_scope = RESOURCE_SCOPES[resource_type]
+    if blueprint_scope == BlueprintScope.SCHEMA and (
+        resource_type == ResourceType.SCHEMA or isinstance(resource_scope, (SchemaScope, TableScope))
+    ):
+        return False
+    elif blueprint_scope == BlueprintScope.DATABASE and (
+        resource_type == ResourceType.DATABASE or isinstance(resource_scope, (DatabaseScope, SchemaScope, TableScope))
+    ):
+        return False
+    elif blueprint_scope == BlueprintScope.ACCOUNT:
+        return False
+    return True
 
 
 class Blueprint:
@@ -502,6 +521,9 @@ class Blueprint:
         allowlist: Optional[list] = None,
         vars: Optional[dict] = None,
         vars_spec: Optional[list[dict]] = None,
+        scope: Optional[str] = None,
+        database: Optional[str] = None,
+        schema: Optional[str] = None,
     ) -> None:
         self._config: BlueprintConfig = BlueprintConfig(
             name=name,
@@ -511,6 +533,9 @@ class Blueprint:
             allowlist=[ResourceType(item) for item in allowlist] if allowlist else None,
             vars=vars or {},
             vars_spec=vars_spec or [],
+            scope=BlueprintScope(scope) if scope else None,
+            database=ResourceName(database) if database else None,
+            schema=ResourceName(schema) if schema else None,
         )
         self._finalized: bool = False
         self._staged: list[Resource] = []
@@ -542,14 +567,23 @@ class Blueprint:
                     exceptions.append(f"Create-or-update mode does not allow renaming resources (ref: {change.urn})")
                 if change.resource_cls.resource_type == ResourceType.GRANT:
                     exceptions.append(f"Grants cannot be updated (ref: {change.urn})")
+
             # Valid Resource Types exceptions
             if self._config.allowlist:
                 if change.urn.resource_type not in self._config.allowlist:
                     exceptions.append(f"Resource type {change.urn.resource_type} not allowed in blueprint")
 
+            # Edition exceptions
             if session_ctx["account_edition"] == AccountEdition.STANDARD:
                 if isinstance(change, CreateResource) and AccountEdition.STANDARD not in change.resource_cls.edition:
                     exceptions.append(f"Resource {change.urn} requires enterprise edition or higher")
+
+            # Scope exceptions
+            if self._config.scope:
+                if _resource_scope_is_outside_blueprint_scope(change.urn.resource_type, self._config.scope):
+                    exceptions.append(
+                        f"Resource {change.urn} is out of scope ({self._config.scope}) for this blueprint"
+                    )
 
         if exceptions:
             if len(exceptions) > 5:
@@ -588,6 +622,11 @@ class Blueprint:
             if self._config.allowlist:
                 for resource_type in self._config.allowlist:
                     for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
+                        # FIXME
+                        if self._config.scope == BlueprintScope.DATABASE and fqn.database != self._config.database:
+                            continue
+                        elif self._config.scope == BlueprintScope.SCHEMA and fqn.schema != self._config.schema:
+                            continue
                         urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
                         # state[urn] = {}  # RemoteResourceStub()
                         data = data_provider.fetch_resource(session, urn)
@@ -654,6 +693,23 @@ class Blueprint:
         for resource in acct_scoped:
             self._root.add(resource)
 
+        if self._config.scope != BlueprintScope.ACCOUNT and self._config.database is not None:
+            if len(acct_scoped) > 1:
+                raise RuntimeError
+            # The user has specified a database and added a resource to the config
+            elif len(acct_scoped) == 1:
+                scoped_database = acct_scoped[0]
+                if scoped_database.resource_type != ResourceType.DATABASE:
+                    raise RuntimeError(f"Expected a database, got {scoped_database.resource_type}")
+                if scoped_database.name != self._config.database:
+                    raise RuntimeError
+            # The user has specified a database by name only
+            else:
+                scoped_database = ResourcePointer(name=self._config.database, resource_type=ResourceType.DATABASE)
+                self._root.add(scoped_database)
+                if self._config.schema is not None:
+                    scoped_database.add(ResourcePointer(name=self._config.schema, resource_type=ResourceType.SCHEMA))
+
         # List all databases connected to root
         databases = _get_databases(self._root)
 
@@ -683,11 +739,16 @@ class Blueprint:
                 available_scopes[f"{database.name}.{schema.name}"] = schema
 
         for resource in schema_scoped:
-
             if resource.container is None:
                 if len(databases) == 1:
-                    logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
-                    _get_public_schema(databases[0]).add(resource)
+                    # When the blueprint is scoped all dangling resources should be assigned to the configured scope
+                    if self._config.scope == BlueprintScope.SCHEMA and self._config.schema is not None:
+                        scoped_schema = _get_schema_by_name(databases[0], self._config.schema)
+                        scoped_schema.add(resource)
+                        # TODO: figure out how to handle the case where the schema is already in the blueprint
+                    else:
+                        logger.warning(f"Resource {resource} has no schema, using {databases[0].name}.PUBLIC")
+                        _get_public_schema(databases[0]).add(resource)
                 else:
                     raise OrphanResourceException(f"No schema for resource {repr(resource)} found")
             elif isinstance(resource.container, ResourcePointer):
@@ -1162,7 +1223,10 @@ def topological_sort(resource_set: set[T], references: set[tuple[T, T]]) -> dict
 
 def diff(remote_state: State, manifest: Manifest):
 
-    def _container_pointer(resource_urn: URN) -> Optional[ContainerPointer]:
+    def _container_descriptor(resource_urn: URN) -> Optional[ContainerDescriptor]:
+        """
+        Given the URN of a resource, return a descriptor of the container that owns it.
+        """
         if isinstance(RESOURCE_SCOPES[resource_urn.resource_type], AccountScope):
             return None
 
@@ -1177,7 +1241,10 @@ def diff(remote_state: State, manifest: Manifest):
             if isinstance(manifest_item, ManifestResource):
                 container_owner = manifest_item.data["owner"]
             else:
-                raise Exception(f"Unknown manifest item type: {manifest_item}")
+                raise MissingResourceException(
+                    f"Blueprint has pointer to resource that doesn't exist or isn't visible in session: {container_urn}"
+                )
+
         return (container_urn, container_owner)
 
     def _diff_resource_data(lhs: dict, rhs: dict) -> dict:
@@ -1214,7 +1281,7 @@ def diff(remote_state: State, manifest: Manifest):
             yield CreateResource(
                 urn,
                 manifest_item.resource_cls,
-                _container_pointer(urn),
+                _container_descriptor(urn),
                 manifest_item.data,
             )
         else:
@@ -1265,7 +1332,7 @@ def diff(remote_state: State, manifest: Manifest):
             yield CreateResource(
                 urn,
                 manifest_item.resource_cls,
-                _container_pointer(urn),
+                _container_descriptor(urn),
                 manifest_item.data,
             )
             continue

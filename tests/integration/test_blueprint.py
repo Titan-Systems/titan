@@ -13,9 +13,10 @@ from titan.blueprint import (
     UpdateResource,
     compile_plan_to_sql,
 )
-from titan.resources.database import public_schema_urn
 from titan.client import reset_cache
-from titan.enums import ResourceType
+from titan.enums import BlueprintScope, ResourceType
+from titan.gitops import collect_blueprint_config
+from titan.resources.database import public_schema_urn
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
@@ -242,7 +243,6 @@ def test_blueprint_all_grant_triggers_create(cursor, test_db, role):
     assert isinstance(plan[0], CreateResource)
 
 
-@pytest.mark.skip(reason="This test requires blueprint scopes")
 def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
     session = cursor.connection
     db_name = f"BLUEPRINT_SYNC_DONT_REMOVE_SYSTEM_SCHEMAS_{suffix}"
@@ -250,11 +250,11 @@ def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
         cursor.execute(f"CREATE DATABASE {db_name}")
         blueprint = Blueprint(
             name="blueprint",
-            resources=[
-                res.Schema(name="INFORMATION_SCHEMA", database=db_name),
-            ],
+            resources=[],
             run_mode="sync",
             allowlist=[ResourceType.SCHEMA],
+            scope="DATABASE",
+            database=db_name,
         )
         plan = blueprint.plan(session)
         assert len(plan) == 0
@@ -262,71 +262,88 @@ def test_blueprint_sync_dont_remove_system_schemas(cursor, suffix):
         cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
-@pytest.mark.skip(reason="This test requires blueprint scopes")
-def test_blueprint_sync_resource_missing_from_remote_state(cursor, test_db):
+def test_blueprint_sync_resource_missing_from_remote_state(cursor, suffix):
     session = cursor.connection
-    blueprint = Blueprint(
-        name="blueprint",
-        resources=[
-            res.Schema(name="ABSENT", database=test_db),
-            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
-        ],
-        run_mode="sync",
-        allowlist=[ResourceType.SCHEMA],
-    )
-    plan = blueprint.plan(session)
-    assert len(plan) == 1
-    assert isinstance(plan[0], CreateResource)
-    assert plan[0].urn.fqn.name == "ABSENT"
+    db_name = f"BLUEPRINT_SYNC_RESOURCE_MISSING_{suffix}"
+    try:
+        cursor.execute(f"CREATE DATABASE {db_name}")
+        blueprint = Blueprint(
+            name="blueprint",
+            resources=[
+                res.Schema(name="ABSENT", database=db_name),
+                res.Schema(name="INFORMATION_SCHEMA", database=db_name),
+            ],
+            run_mode="sync",
+            allowlist=[ResourceType.SCHEMA],
+            scope="DATABASE",
+            database=db_name,
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) == 1
+        assert isinstance(plan[0], CreateResource)
+        assert plan[0].urn.fqn.name == "ABSENT"
+    finally:
+        cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
-@pytest.mark.skip(reason="This test requires blueprint scopes")
-def test_blueprint_sync_plan_matches_remote_state(cursor, test_db):
+def test_blueprint_sync_plan_matches_remote_state(cursor, suffix):
     session = cursor.connection
-    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
-    blueprint = Blueprint(
-        name="blueprint",
-        resources=[
-            res.Schema(name="PRESENT", database=test_db, owner=TEST_ROLE),
-            res.Schema(name="INFORMATION_SCHEMA", database=test_db),
-        ],
-        run_mode="sync",
-        allowlist=[ResourceType.SCHEMA],
-    )
-    plan = blueprint.plan(session)
-    assert len(plan) == 0
+    db_name = f"BLUEPRINT_SYNC_PLAN_MATCHES_REMOTE_STATE_{suffix}"
+    try:
+        cursor.execute(f"CREATE DATABASE {db_name}")
+        cursor.execute(f"CREATE SCHEMA {db_name}.PRESENT")
+        blueprint = Blueprint(
+            name="blueprint",
+            resources=[
+                res.Schema(name="PRESENT", owner=TEST_ROLE),
+            ],
+            run_mode="sync",
+            allowlist=[ResourceType.SCHEMA],
+            scope="DATABASE",
+            database=db_name,
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) == 0
+    finally:
+        cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
-@pytest.mark.skip(reason="This test requires blueprint scopes")
-def test_blueprint_sync_remote_state_contains_extra_resource(cursor, test_db):
+def test_blueprint_sync_remote_state_contains_extra_resource(cursor, suffix):
     session = cursor.connection
-    cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {test_db}.PRESENT")
-    blueprint = Blueprint(
-        name="blueprint",
-        resources=[res.Schema(name="INFORMATION_SCHEMA", database=test_db)],
-        run_mode="sync",
-        allowlist=[ResourceType.SCHEMA],
-    )
-    plan = blueprint.plan(session)
-    assert len(plan) == 1
-    assert isinstance(plan[0], DropResource)
-    assert plan[0].urn.fqn.name == "PRESENT"
+    db_name = f"BLUEPRINT_SYNC_REMOTE_STATE_CONTAINS_EXTRA_RESOURCE_{suffix}"
+    try:
+        cursor.execute(f"CREATE DATABASE {db_name}")
+        cursor.execute(f"CREATE SCHEMA {db_name}.PRESENT")
+        blueprint = Blueprint(
+            name="blueprint",
+            resources=[res.Schema(name="INFORMATION_SCHEMA", database=db_name)],
+            run_mode="sync",
+            allowlist=[ResourceType.SCHEMA],
+            scope="DATABASE",
+            database=db_name,
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) == 1
+        assert isinstance(plan[0], DropResource)
+        assert plan[0].urn.fqn.name == "PRESENT"
+    finally:
+        cursor.execute(f"DROP DATABASE IF EXISTS {db_name}")
 
 
 def test_blueprint_quoted_references(cursor):
     session = cursor.connection
+    try:
+        cursor.execute('CREATE USER IF NOT EXISTS "info@applytitan.com"')
+        cursor.execute('GRANT ROLE STATIC_ROLE TO USER "info@applytitan.com"')
 
-    cursor.execute('CREATE USER IF NOT EXISTS "info@applytitan.com"')
-    cursor.execute('GRANT ROLE STATIC_ROLE TO USER "info@applytitan.com"')
-
-    blueprint = Blueprint(
-        name="test_quoted_references",
-        resources=[res.RoleGrant(role="STATIC_ROLE", to_user="info@applytitan.com")],
-    )
-    plan = blueprint.plan(session)
-    cursor.execute('DROP USER IF EXISTS "info@applytitan.com"')
-
-    assert len(plan) == 0
+        blueprint = Blueprint(
+            name="test_quoted_references",
+            resources=[res.RoleGrant(role="STATIC_ROLE", to_user="info@applytitan.com")],
+        )
+        plan = blueprint.plan(session)
+        assert len(plan) == 0
+    finally:
+        cursor.execute('DROP USER IF EXISTS "info@applytitan.com"')
 
 
 def test_blueprint_grant_with_lowercase_priv_drift(cursor, suffix, marked_for_cleanup):
@@ -477,7 +494,7 @@ def test_blueprint_database_params_passed_to_public_schema(cursor, suffix):
 
 
 def test_blueprint_account_parameters_sync_drift(cursor):
-    cursor.execute("ALTER ACCOUNT SET INITIAL_REPLICATION_SIZE_LIMIT_IN_TB = 11.0")
+    cursor.execute("ALTER ACCOUNT SET PREVENT_UNLOAD_TO_INLINE_URL = TRUE")
     session = cursor.connection
     try:
         blueprint = Blueprint(
@@ -487,10 +504,54 @@ def test_blueprint_account_parameters_sync_drift(cursor):
         )
         plan = blueprint.plan(session)
         assert len(plan) > 0
-        max_concurrency_level = next(
-            (r for r in plan if r.urn.fqn.name == "INITIAL_REPLICATION_SIZE_LIMIT_IN_TB"), None
-        )
+        max_concurrency_level = next((r for r in plan if r.urn.fqn.name == "PREVENT_UNLOAD_TO_INLINE_URL"), None)
         assert max_concurrency_level is not None
         assert isinstance(max_concurrency_level, DropResource)
     finally:
-        cursor.execute("ALTER ACCOUNT UNSET INITIAL_REPLICATION_SIZE_LIMIT_IN_TB")
+        cursor.execute("ALTER ACCOUNT UNSET PREVENT_UNLOAD_TO_INLINE_URL")
+
+
+def test_blueprint_scope_missing_resource(cursor):
+    session = cursor.connection
+    blueprint = Blueprint(scope="DATABASE", database="THIS_DATABASE_DOES_NOT_EXIST")
+    with pytest.raises(MissingResourceException):
+        blueprint.plan(session)
+
+
+def test_blueprint_single_schema_example(cursor, suffix):
+    session = cursor.connection
+    cursor.execute(f"CREATE SCHEMA STATIC_DATABASE.DEV_{suffix}")
+    yaml_config = {
+        "scope": "SCHEMA",
+        "database": "STATIC_DATABASE",
+        "tables": [
+            {
+                "name": "my_table",
+                "columns": [
+                    {"name": "my_column", "data_type": "string"},
+                ],
+            },
+        ],
+        "views": [
+            {
+                "name": "my_view",
+                "as_": "SELECT * FROM my_table",
+                "requires": [
+                    {"name": "my_table", "resource_type": "TABLE"},
+                ],
+            },
+        ],
+    }
+    cli_config = {"schema": f"DEV_{suffix}"}
+    try:
+        bc = collect_blueprint_config(yaml_config, cli_config)
+        blueprint = Blueprint.from_config(bc)
+        assert blueprint._config.scope == BlueprintScope.SCHEMA
+        plan = blueprint.plan(session)
+        assert len(plan) == 2
+        assert isinstance(plan[0], CreateResource)
+        assert plan[0].urn.fqn.name == "my_table"
+        assert isinstance(plan[1], CreateResource)
+        assert plan[1].urn.fqn.name == "my_view"
+    finally:
+        cursor.execute(f"DROP SCHEMA STATIC_DATABASE.DEV_{suffix}")

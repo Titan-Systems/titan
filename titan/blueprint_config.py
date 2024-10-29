@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from .enums import ResourceType, RunMode
-from .exceptions import MissingVarException, InvalidResourceException
+from .enums import BlueprintScope, ResourceType, RunMode
+from .exceptions import InvalidResourceException, MissingVarException
+from .resource_name import ResourceName
 from .resources.resource import Resource
-
 
 _VAR_TYPE_MAP = {
     "bool": bool,
@@ -18,7 +18,7 @@ _VAR_TYPE_MAP = {
 }
 
 
-@dataclass
+@dataclass  # (frozen=True)
 class BlueprintConfig:
     name: Optional[str] = None
     resources: Optional[list[Resource]] = None
@@ -27,6 +27,9 @@ class BlueprintConfig:
     allowlist: Optional[list[ResourceType]] = None
     vars: dict = field(default_factory=dict)
     vars_spec: list[dict] = field(default_factory=list)
+    scope: Optional[BlueprintScope] = None
+    database: Optional[ResourceName] = None
+    schema: Optional[ResourceName] = None
 
     def __post_init__(self):
 
@@ -41,6 +44,9 @@ class BlueprintConfig:
 
         if not isinstance(self.run_mode, RunMode):
             raise ValueError(f"Invalid run_mode: {self.run_mode}")
+
+        if self.scope is not None and not isinstance(self.scope, BlueprintScope):
+            raise ValueError(f"Invalid scope: {self.scope}")
 
         if self.run_mode == RunMode.SYNC:
             """
@@ -84,7 +90,13 @@ class BlueprintConfig:
                     raise TypeError(f"Var '{var_name}' should be of type {spec['type']}")
 
             # Check for missing vars and use defaults if available
+            # TODO: this causes us to violate frozen=true
             self.vars = set_vars_defaults(self.vars_spec, self.vars)
+
+        if self.scope == BlueprintScope.DATABASE and self.schema is not None:
+            raise ValueError("Cannot specify a schema when using DATABASE scope")
+        elif self.scope == BlueprintScope.ACCOUNT and (self.database is not None or self.schema is not None):
+            raise ValueError("Cannot specify a database or schema when using ACCOUNT scope")
 
 
 def set_vars_defaults(vars_spec: list[dict], vars: dict) -> dict:
