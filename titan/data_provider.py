@@ -2225,6 +2225,8 @@ def list_schema_scoped_resource(session: SnowflakeConnection, resource) -> list[
     show_result = execute(session, f"SHOW {resource} IN ACCOUNT")
     resources = []
     for row in show_result:
+        if row["database_name"] in SYSTEM_DATABASES:
+            continue
         resources.append(
             FQN(
                 database=resource_name_from_snowflake_metadata(row["database_name"]),
