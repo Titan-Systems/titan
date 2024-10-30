@@ -7,12 +7,13 @@ from dotenv import dotenv_values
 
 from titan.enums import ResourceType
 
+TEST_ACCOUNT = os.environ["TEST_SNOWFLAKE_ACCOUNT"]
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 
 def connection_params():
     return {
-        "account": os.environ["TEST_SNOWFLAKE_ACCOUNT"],
+        "account": TEST_ACCOUNT,
         "user": os.environ["TEST_SNOWFLAKE_USER"],
         "password": os.environ["TEST_SNOWFLAKE_PASSWORD"],
         "role": TEST_ROLE,
@@ -114,3 +115,11 @@ def reset_cursor_context(dummy_cursor, test_db):
         cursor.execute("USE WAREHOUSE CI")
         cursor.execute(f"USE DATABASE {test_db}")
     yield
+
+
+@pytest.fixture(scope="session")
+def account_cloud():
+    if TEST_ACCOUNT.endswith(".gcp"):
+        return "gcp"
+    else:
+        return "aws"
