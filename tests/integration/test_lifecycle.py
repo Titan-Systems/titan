@@ -8,7 +8,7 @@ from titan import resources as res
 from titan.blueprint import Blueprint, CreateResource
 from titan.client import FEATURE_NOT_ENABLED_ERR, UNSUPPORTED_FEATURE
 from titan.data_provider import fetch_session
-from titan.enums import AccountEdition
+from titan.client import reset_cache
 from titan.scope import DatabaseScope, SchemaScope
 
 JSON_FIXTURES = list(get_json_fixtures())
@@ -67,6 +67,7 @@ def test_create_drop_from_json(resource, cursor, suffix):
             database.public_schema.add(resource)
 
         fetch_session.cache_clear()
+        reset_cache()
         blueprint = Blueprint()
         blueprint.add(resource)
         plan = blueprint.plan(cursor.connection)

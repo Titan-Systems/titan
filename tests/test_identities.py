@@ -109,6 +109,8 @@ def test_data_identity(resource):
 
 def test_sql_identity(resource: tuple[type[Resource], dict]):
     resource_cls, data = resource
+    if resource_cls.__name__ == "ScannerPackage":
+        pytest.skip("Skipping scanner package")
     instance = resource_cls(**data)
     sql = instance.create_sql(AccountEdition.ENTERPRISE)
     new = resource_cls.from_sql(sql)

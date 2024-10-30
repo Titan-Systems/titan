@@ -6,9 +6,10 @@ from inflection import pluralize
 
 from tests.helpers import get_json_fixtures
 from titan import data_provider
+from titan import resources as res
 from titan.client import UNSUPPORTED_FEATURE, reset_cache
 from titan.identifiers import resource_label_for_type
-from titan.resources import AccountParameter, Database, Resource
+from titan.resources import Resource
 from titan.scope import DatabaseScope, SchemaScope
 
 pytestmark = pytest.mark.requires_snowflake
@@ -26,13 +27,13 @@ JSON_FIXTURES = list(get_json_fixtures())
 )
 def resource(request, suffix):
     resource_cls, data = request.param
-    if "name" in data and resource_cls != AccountParameter:
+    if "name" in data and resource_cls not in (res.AccountParameter, res.ScannerPackage):
         data["name"] += f"_{suffix}_list_resources"
     if "login_name" in data:
         data["login_name"] += f"_{suffix}_list_resources"
-    res = resource_cls(**data)
+    resource = resource_cls(**data)
 
-    yield res
+    yield resource
 
 
 def create(cursor, resource: Resource):
@@ -48,7 +49,7 @@ def create(cursor, resource: Resource):
 
 @pytest.fixture(scope="session")
 def list_resources_database(cursor, suffix, marked_for_cleanup):
-    db = Database(name=f"list_resources_test_database_{suffix}")
+    db = res.Database(name=f"list_resources_test_database_{suffix}")
     cursor.execute(db.create_sql(if_not_exists=True))
     marked_for_cleanup.append(db)
     yield db

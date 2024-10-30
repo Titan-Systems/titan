@@ -60,6 +60,7 @@ from .stream import StageStream, TableStream, ViewStream  # ExternalTableStream
 from .table import Table  # , CreateTableAsSelect
 from .tag import Tag, TagReference
 from .task import Task
+from .scanner_package import ScannerPackage
 from .user import User
 from .view import View
 from .warehouse import Warehouse
@@ -122,6 +123,7 @@ __all__ = [
     "Role",
     "RoleGrant",
     "S3StorageIntegration",
+    "ScannerPackage",
     "Schema",
     "Sequence",
     "Service",

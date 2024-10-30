@@ -1540,6 +1540,26 @@ def fetch_role_grant(session: SnowflakeConnection, fqn: FQN):
     return None
 
 
+def fetch_scanner_package(session: SnowflakeConnection, fqn: FQN):
+    scanner_packages = execute(
+        session,
+        f"select * from snowflake.trust_center.scanner_packages where ID = '{fqn.name}' and STATE = 'TRUE'",
+        cacheable=True,
+    )
+    if len(scanner_packages) == 0:
+        return None
+    if len(scanner_packages) > 1:
+        raise Exception(f"Found multiple scanner packages matching {fqn}")
+
+    data = scanner_packages[0]
+
+    return {
+        "name": _quote_snowflake_identifier(data["ID"]),
+        "enabled": data["STATE"] == "TRUE",
+        "schedule": data["SCHEDULE"][11:],
+    }
+
+
 def fetch_schema(session: SnowflakeConnection, fqn: FQN):
     if fqn.database is None:
         raise Exception(f"Schema {fqn} is missing a database name")
@@ -2463,6 +2483,16 @@ def list_role_grants(session: SnowflakeConnection) -> list[FQN]:
             subject = "user" if data["granted_to"] == "USER" else "role"
             grants.append(FQN(name=role_name, params={subject: data["grantee_name"]}))
     return grants
+
+
+def list_scanner_packages(session: SnowflakeConnection) -> list[FQN]:
+    scanner_packages = execute(session, "select * from snowflake.trust_center.scanner_packages WHERE state = 'TRUE'")
+    user_packages = []
+    for pkg in scanner_packages:
+        if pkg["ID"] == "SECURITY_ESSENTIALS":
+            continue
+        user_packages.append(FQN(name=resource_name_from_snowflake_metadata(pkg["ID"])))
+    return user_packages
 
 
 def list_schemas(session: SnowflakeConnection, database=None) -> list[FQN]:
