@@ -618,6 +618,8 @@ class Blueprint:
         state: State = {}
         session_ctx = data_provider.fetch_session(session)
 
+        data_provider.use_secondary_roles(session, all=True)
+
         if self._config.run_mode == RunMode.SYNC:
             if self._config.allowlist:
                 for resource_type in self._config.allowlist:

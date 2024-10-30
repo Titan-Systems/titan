@@ -523,6 +523,14 @@ def _show_future_grants_to_role(
     return grants
 
 
+def use_secondary_roles(session: SnowflakeConnection, all: bool = False):
+    """
+    Set the secondary roles for the current session.
+    """
+    secondary_roles = "ALL" if all else "NONE"
+    execute(session, f"USE SECONDARY ROLES {secondary_roles}")
+
+
 def fetch_resource(session: SnowflakeConnection, urn: URN) -> Optional[dict]:
     try:
         return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
