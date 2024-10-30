@@ -2393,9 +2393,10 @@ def list_grants(session: SnowflakeConnection) -> list[FQN]:
             if data["privilege"] == "OWNERSHIP":
                 continue
 
-            # Skip this undocumented new priv because it's unrevokable
-            if data["privilege"] == "CREATE CORTEX SEARCH SERVICE":
+            # Skip undocumented privs
+            if data["privilege"] in ["CREATE CORTEX SEARCH SERVICE", "CANCEL QUERY"]:
                 continue
+
             name = data["name"]
             if data["granted_on"] == "ACCOUNT":
                 name = "ACCOUNT"
