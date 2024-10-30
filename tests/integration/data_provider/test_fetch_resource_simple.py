@@ -342,7 +342,6 @@ def test_fetch(
     cursor,
     resource_fixture,
     account_edition,
-    account_cloud,
 ):
     if account_edition not in resource_fixture.edition:
         pytest.skip(f"Skipping test for {resource_fixture.__class__.__name__} on {account_edition} edition")
