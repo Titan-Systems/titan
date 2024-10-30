@@ -1,7 +1,10 @@
 import logging
 from typing import Optional
+
+import snowflake.connector.errors
 from inflection import pluralize
 
+from titan.client import UNSUPPORTED_FEATURE
 from titan.data_provider import fetch_resource, list_resource
 from titan.enums import ResourceType
 from titan.identifiers import URN, resource_label_for_type
@@ -26,7 +29,15 @@ def export_resources(
             config.update(export_resource(session, resource_type))
         # No list method for resource
         except AttributeError:
+            logger.warning(f"Skipping {resource_type} because it has no list method")
             continue
+        # Resource not supported
+        except snowflake.connector.errors.ProgrammingError as err:
+            if err.errno == UNSUPPORTED_FEATURE:
+                logger.warning(f"Skipping {resource_type} because it is not supported")
+                continue
+            else:
+                raise
     return config
 
 
