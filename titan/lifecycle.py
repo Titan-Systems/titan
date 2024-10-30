@@ -148,10 +148,21 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
     )
 
 
-def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
+def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool = False):
     return tidy_sql(
         "GRANT",
         props.render(data),
+    )
+
+
+def create_scanner_package(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    package_name = f"'{urn.fqn.name}'"
+    return tidy_sql(
+        "CALL SNOWFLAKE.TRUST_CENTER.SET_CONFIGURATION(",
+        "'ENABLED',",
+        "'TRUE',",
+        package_name,
+        ")",
     )
 
 
@@ -259,6 +270,23 @@ def update_procedure(urn: URN, data: dict, props: Props) -> str:
 
 def update_role_grant(urn: URN, data: dict, props: Props) -> str:
     raise NotImplementedError
+
+
+def update_scanner_package(urn: URN, data: dict, props: Props) -> str:
+    package_name = f"'{urn.fqn.name}'"
+    attr, new_value = data.popitem()
+    if attr == "schedule":
+        new_value = f"'USING CRON {new_value}'"
+    else:
+        new_value = f"'{new_value}'"
+    return tidy_sql(
+        "CALL SNOWFLAKE.TRUST_CENTER.SET_CONFIGURATION(",
+        f"'{attr}',",
+        new_value,
+        ",",
+        package_name,
+        ")",
+    )
 
 
 def update_schema(urn: URN, data: dict, props: Props) -> str:
@@ -401,6 +429,20 @@ def drop_role_grant(urn: URN, data: dict, **kwargs):
         "ROLE" if data.get("to_role") else "USER",
         ResourceName(data["to_role"] if data.get("to_role") else data["to_user"]),
     )
+
+
+def drop_scanner_package(urn: URN, data: dict, **kwargs) -> str:
+    package_name = f"'{urn.fqn.name}'"
+    return tidy_sql(
+        "CALL SNOWFLAKE.TRUST_CENTER.SET_CONFIGURATION(",
+        "'ENABLED',",
+        "'FALSE',",
+        package_name,
+        ")",
+    )
+
+
+################ Transfer functions
 
 
 def transfer_resource(

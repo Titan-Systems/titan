@@ -14,6 +14,7 @@ allowlist:
   - "resource monitor"
   - "role grant"
   - "role"
+  - "scanner package"
   - "schema"
   - "secret"
   - "security integration"
@@ -284,3 +285,8 @@ secrets:
     password: somepass
     database: static_database
     schema: public
+
+scanner_packages:
+  - name: THREAT_INTELLIGENCE
+    enabled: true
+    schedule: "0 0 * * * UTC"

@@ -1,0 +1,5 @@
+{
+    "name": "CIS_BENCHMARKS",
+    "enabled": true,
+    "schedule": "0 0 0 * * UTC"
+}

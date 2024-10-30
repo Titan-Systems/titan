@@ -646,7 +646,10 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
         }
 
 
-def convert_to_resource(cls: Resource, resource_or_descriptor: Union[str, dict, Resource, ResourceName]) -> Resource:
+def convert_to_resource(
+    cls: type[Resource],
+    resource_or_descriptor: Union[str, dict, Resource, ResourceName],
+) -> Resource:
     """
     This function helps provide flexibility to users on how Resource fields are set.
     The most common use case is to allow a user to pass in a string of the name of a resource without

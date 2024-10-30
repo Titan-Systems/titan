@@ -1039,6 +1039,11 @@ def execution_strategy_for_change(
             return ResourceName("ACCOUNTADMIN"), False
         raise MissingPrivilegeException("ACCOUNTADMIN role is required to work with account parameters")
 
+    elif change.urn.resource_type == ResourceType.SCANNER_PACKAGE:
+        if "ACCOUNTADMIN" in available_roles:
+            return ResourceName("ACCOUNTADMIN"), False
+        raise MissingPrivilegeException("ACCOUNTADMIN role is required to work with scanner packages")
+
     elif isinstance(change, (UpdateResource, DropResource, TransferOwnership)):
         if change_owner:
             return change_owner, False
@@ -1125,6 +1130,9 @@ def sql_commands_for_change(
                         copy_current_grants=True,
                     )
                 )
+
+            if change.urn.resource_type == ResourceType.SCANNER_PACKAGE:
+                after_change_cmd.append(lifecycle.update_resource(change.urn, {}, change.resource_cls.props))
     elif isinstance(change, UpdateResource):
         props = Resource.props_for_resource_type(change.urn.resource_type, change.after)
         change_cmd = lifecycle.update_resource(change.urn, change.delta, props)
