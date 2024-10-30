@@ -3,7 +3,6 @@ run_mode: SYNC
 allowlist:
   - "account parameter"
   - "catalog integration"
-  - "compute pool"
   - "database role"
   - "database"
   - "external volume"
@@ -141,7 +140,6 @@ grants:
   - GRANT ATTACH POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT AUDIT ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE EVERY_PRIVILEGE
-  - GRANT CANCEL QUERY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE ACCOUNT ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE API INTEGRATION ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT CREATE APPLICATION ON ACCOUNT TO ROLE EVERY_PRIVILEGE
@@ -254,14 +252,7 @@ warehouses:
   - name: CI
     warehouse_size: XSMALL
 
-compute_pools:
-  - name: static_compute_pool
-    min_nodes: 1
-    max_nodes: 1
-    initially_suspended: true
-    auto_resume: false
-    auto_suspend_secs: 60
-    instance_family: CPU_X64_XS
+
   
 security_integrations:
   # - name: SNOWSERVICES_INGRESS_OAUTH

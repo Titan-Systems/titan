@@ -31,7 +31,7 @@ def merge_configs(config1: dict, config2: dict) -> dict:
     return merged
 
 
-def configure_test_account(conn):
+def configure_test_account(conn, cloud: str):
     session_ctx = fetch_session(conn)
     config = read_config("test_account.yml")
     vars = dotenv_values("env/.vars.test_account")
@@ -39,6 +39,11 @@ def configure_test_account(conn):
 
     if session_ctx["account_edition"] == AccountEdition.ENTERPRISE:
         config = merge_configs(config, read_config("test_account_enterprise.yml"))
+
+    if cloud == "aws":
+        config = merge_configs(config, read_config("test_account_aws.yml"))
+    # elif cloud == "gcp":
+    #     config = merge_configs(config, read_config("test_account_gcp.yml"))
 
     blueprint_config = collect_blueprint_config(config, {"vars": vars})
 
@@ -112,12 +117,13 @@ def get_connection(env_vars):
 
 def configure_test_accounts():
 
-    for account in ["aws.standard", "aws.enterprise"]:
+    for account in ["aws.standard", "aws.enterprise", "gcp.standard"]:
         print(">>>>>>>>>>>>>>>>", account)
+        cloud = account.split(".")[0]
         env_vars = dotenv_values(f"env/.env.{account}")
         conn = get_connection(env_vars)
         try:
-            configure_test_account(conn)
+            configure_test_account(conn, cloud)
         # except Exception as e:
         #     print(f"Error configuring {account}: {e}")
         finally:
