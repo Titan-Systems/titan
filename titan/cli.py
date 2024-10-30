@@ -6,11 +6,10 @@ import yaml
 
 from titan.blueprint import dump_plan
 from titan.enums import RunMode
+from titan.gitops import collect_vars_from_environment, merge_vars, parse_resources
 from titan.operations.blueprint import blueprint_apply, blueprint_apply_plan, blueprint_plan
-from titan.operations.export import export_resources
 from titan.operations.connector import connect, get_env_vars
-
-from .identifiers import resource_type_for_label
+from titan.operations.export import export_resources
 
 
 class JsonParamType(click.ParamType):
@@ -28,12 +27,6 @@ class CommaSeparatedListParamType(click.ParamType):
 
     def convert(self, value, param, ctx):
         return parse_resources(value)
-
-
-def parse_resources(resource_labels_str):
-    if resource_labels_str is None:
-        return None
-    return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
 
 
 def load_config(config_file):
@@ -102,6 +95,10 @@ def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode,
     if schema:
         cli_config["schema"] = schema
 
+    env_vars = collect_vars_from_environment()
+    if env_vars:
+        cli_config["vars"] = merge_vars(cli_config.get("vars", {}), env_vars)
+
     plan_obj = blueprint_plan(yaml_config, cli_config)
     if output_file:
         with open(output_file, "w") as f:
@@ -149,6 +146,10 @@ def apply(config_file, plan_file, vars, allowlist, run_mode, dry_run):
         cli_config["dry_run"] = dry_run
     if allowlist:
         cli_config["allowlist"] = allowlist
+
+    env_vars = collect_vars_from_environment()
+    if env_vars:
+        cli_config["vars"] = merge_vars(cli_config.get("vars", {}), env_vars)
 
     if config_file:
         yaml_config = load_config(config_file)
