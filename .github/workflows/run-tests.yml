@@ -59,6 +59,8 @@ jobs:
     strategy:
       matrix:
         include:
+          - environment: snowflake-gcp-standard
+            edition: standard
           - environment: snowflake-aws-standard
             edition: standard
           - environment: snowflake-aws-enterprise
