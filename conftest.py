@@ -7,6 +7,7 @@ from dotenv import dotenv_values
 
 from titan.enums import ResourceType
 
+
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 
 

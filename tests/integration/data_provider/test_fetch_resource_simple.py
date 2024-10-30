@@ -346,6 +346,14 @@ def test_fetch(
     if account_edition not in resource_fixture.edition:
         pytest.skip(f"Skipping test for {resource_fixture.__class__.__name__} on {account_edition} edition")
 
+    if os.environ["TEST_SNOWFLAKE_ACCOUNT"].endswith(".gcp"):
+        account_cloud = "gcp"
+    else:
+        account_cloud = "aws"
+
+    if account_cloud == "gcp" and resource_fixture.__class__ == res.SnowflakeIcebergTable:
+        pytest.skip("Skipping test for SnowflakeIcebergTable on GCP")
+
     create(cursor, resource_fixture, account_edition)
 
     fetched = safe_fetch(cursor, resource_fixture.urn)
