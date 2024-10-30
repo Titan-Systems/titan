@@ -1,6 +1,7 @@
 import os
 
 import pytest
+import snowflake.connector
 
 from tests.helpers import safe_fetch
 from titan import data_provider
@@ -555,3 +556,38 @@ def test_blueprint_single_schema_example(cursor, suffix):
         assert plan[1].urn.fqn.name == "my_view"
     finally:
         cursor.execute(f"DROP SCHEMA STATIC_DATABASE.DEV_{suffix}")
+
+
+def test_blueprint_split_role_user(cursor):
+    cursor.execute("CREATE USER SPLIT_ROLE_USER PASSWORD = 'p4ssw0rd'")
+    cursor.execute("CREATE ROLE SPLIT_ROLE_A")
+    cursor.execute("CREATE ROLE SPLIT_ROLE_B")
+    cursor.execute("GRANT ROLE SPLIT_ROLE_A TO USER SPLIT_ROLE_USER")
+    cursor.execute("GRANT ROLE SPLIT_ROLE_B TO USER SPLIT_ROLE_USER")
+    cursor.execute("CREATE DATABASE SPLIT_ROLE_DATABASE_A")
+    cursor.execute("CREATE DATABASE SPLIT_ROLE_DATABASE_B")
+    cursor.execute("GRANT USAGE ON DATABASE SPLIT_ROLE_DATABASE_A TO ROLE SPLIT_ROLE_A")
+    cursor.execute("GRANT USAGE ON DATABASE SPLIT_ROLE_DATABASE_B TO ROLE SPLIT_ROLE_B")
+
+    try:
+        split_user_session = snowflake.connector.connect(
+            account=os.environ["TEST_SNOWFLAKE_ACCOUNT"],
+            user="SPLIT_ROLE_USER",
+            password="p4ssw0rd",
+            role="SPLIT_ROLE_A",
+        )
+        with split_user_session.cursor(snowflake.connector.DictCursor) as cur:
+            blueprint = Blueprint(
+                resources=[
+                    res.Database(name="SPLIT_ROLE_DATABASE_A", owner=TEST_ROLE),
+                    res.Database(name="SPLIT_ROLE_DATABASE_B", owner=TEST_ROLE),
+                ]
+            )
+            plan = blueprint.plan(cur)
+            assert len(plan) == 0
+    finally:
+        cursor.execute("DROP DATABASE IF EXISTS SPLIT_ROLE_DATABASE_A")
+        cursor.execute("DROP DATABASE IF EXISTS SPLIT_ROLE_DATABASE_B")
+        cursor.execute("DROP USER IF EXISTS SPLIT_ROLE_USER")
+        cursor.execute("DROP ROLE IF EXISTS SPLIT_ROLE_A")
+        cursor.execute("DROP ROLE IF EXISTS SPLIT_ROLE_B")
