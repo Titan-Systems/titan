@@ -1,6 +1,7 @@
 import os
 
 import pytest
+import snowflake.connector.errors
 
 from tests.helpers import (
     assert_resource_dicts_eq_ignore_nulls,
@@ -10,8 +11,8 @@ from tests.helpers import (
 )
 from titan import data_provider
 from titan import resources as res
-from titan.client import reset_cache
-from titan.enums import AccountEdition, ResourceType
+from titan.client import UNSUPPORTED_FEATURE, reset_cache
+from titan.enums import ResourceType
 from titan.identifiers import URN, parse_FQN, parse_URN
 from titan.resource_name import ResourceName
 from titan.resources import Resource
@@ -41,6 +42,11 @@ def create(cursor, resource: Resource):
     sql = resource.create_sql(account_edition=account_edition, if_not_exists=True)
     try:
         cursor.execute(sql)
+    except snowflake.connector.errors.ProgrammingError as err:
+        if err.errno == UNSUPPORTED_FEATURE:
+            pytest.skip(f"{resource.resource_type} is not supported")
+        else:
+            raise
     except Exception as err:
         raise Exception(f"Error creating resource: \nQuery: {err.query}\nMsg: {err.msg}") from err
     return resource
