@@ -271,7 +271,10 @@ def crawl(path: str):
 def read_config(file) -> dict:
     config_path = os.path.join(os.path.dirname(__file__), file)
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+        try:
+            config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Error parsing YAML file: {file}") from e
     return config
 
 
