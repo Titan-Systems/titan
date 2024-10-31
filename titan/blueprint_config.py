@@ -96,7 +96,9 @@ class BlueprintConfig:
         if self.scope == BlueprintScope.DATABASE and self.schema is not None:
             raise ValueError("Cannot specify a schema when using DATABASE scope")
         elif self.scope == BlueprintScope.ACCOUNT and (self.database is not None or self.schema is not None):
-            raise ValueError("Cannot specify a database or schema when using ACCOUNT scope")
+            raise ValueError(
+                f"Cannot specify a database or schema when using ACCOUNT scope (database={repr(self.database)}, schema={repr(self.schema)})"
+            )
 
 
 def set_vars_defaults(vars_spec: list[dict], vars: dict) -> dict:
