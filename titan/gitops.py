@@ -295,7 +295,7 @@ def collect_configs_from_path(path: str) -> list[tuple[str, dict]]:
     configs = []
 
     if not os.path.exists(path):
-        raise ValueError(f"Invalid path: {path}. Must be a file or directory.")
+        raise ValueError(f"Invalid path: `{path}`. Must be a file or directory.")
 
     for file in crawl(path):
         config = read_config(file)

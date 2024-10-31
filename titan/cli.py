@@ -5,7 +5,7 @@ import click
 import yaml
 
 from titan.blueprint import dump_plan
-from titan.enums import RunMode
+from titan.enums import RunMode, BlueprintScope
 from titan.gitops import (
     collect_configs_from_path,
     collect_vars_from_environment,
@@ -16,6 +16,20 @@ from titan.gitops import (
 from titan.operations.blueprint import blueprint_apply, blueprint_apply_plan, blueprint_plan
 from titan.operations.connector import connect, get_env_vars
 from titan.operations.export import export_resources
+
+
+class RunModeParamType(click.ParamType):
+    name = "run_mode"
+
+    def convert(self, value, param, ctx):
+        return RunMode(value)
+
+
+class ScopeParamType(click.ParamType):
+    name = "scope"
+
+    def convert(self, value, param, ctx):
+        return BlueprintScope(value)
 
 
 class JsonParamType(click.ParamType):
@@ -47,35 +61,85 @@ def titan_cli():
     pass
 
 
+# Shared click options
+
+
+def config_path_option():
+    return click.option(
+        "--config",
+        "config_path",
+        type=str,
+        help="Path to configuration YAML file or directory",
+        metavar="<file_or_dir>",
+    )
+
+
+def vars_option():
+    return click.option(
+        "--vars",
+        type=JsonParamType(),
+        help="Dynamic values, specified as a JSON dictionary",
+        metavar="<JSON_string>",
+    )
+
+
+def allowlist_option():
+    return click.option(
+        "--allowlist",
+        type=CommaSeparatedListParamType(),
+        help="List of resources types allowed in the plan. If not specified, all resources are allowed.",
+        metavar="<resource_types>",
+    )
+
+
+def run_mode_option():
+    return click.option(
+        "--mode",
+        "run_mode",
+        type=RunModeParamType(),
+        metavar="<run_mode>",
+        show_default=True,
+        help="Run mode",
+    )
+
+
+def scope_option():
+    return click.option(
+        "--scope",
+        type=ScopeParamType(),
+        help="Limit the scope of resources to a specific database or schema",
+        metavar="<scope>",
+    )
+
+
+def database_option():
+    return click.option(
+        "--database",
+        type=str,
+        help="Database to limit the scope to",
+        metavar="<database_name>",
+    )
+
+
+def schema_option():
+    return click.option(
+        "--schema",
+        type=str,
+        help="Schema to limit the scope to",
+        metavar="<schema_name>",
+    )
+
+
 @titan_cli.command("plan", no_args_is_help=True)
-@click.option(
-    "--config", "config_path", type=str, help="Path to configuration YAML file or directory", metavar="<file_or_dir>"
-)
+@config_path_option()
 @click.option("--json", "json_output", is_flag=True, help="Output plan in machine-readable JSON format")
 @click.option("--out", "output_file", type=str, help="Write plan to a file", metavar="<filename>")
-@click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
-@click.option(
-    "--allowlist",
-    type=CommaSeparatedListParamType(),
-    help="List of resources types allowed in the plan. If not specified, all resources are allowed.",
-    metavar="<resource_types>",
-)
-@click.option(
-    "--mode",
-    "run_mode",
-    type=click.Choice(["CREATE-OR-UPDATE", "SYNC"]),
-    metavar="<run_mode>",
-    show_default=True,
-    help="Run mode",
-)
-@click.option(
-    "--scope",
-    type=click.Choice(["ACCOUNT", "DATABASE", "SCHEMA"]),
-    help="Limit the scope of resources to a specific database or schema",
-    metavar="<scope>",
-)
-@click.option("--database", type=str, help="Database to limit the scope to", metavar="<database>")
-@click.option("--schema", type=str, help="Schema to limit the scope to", metavar="<schema>")
+@vars_option()
+@allowlist_option()
+@run_mode_option()
+@scope_option()
+@database_option()
+@schema_option()
 def plan(config_path, json_output, output_file, vars: dict, allowlist, run_mode, scope, database, schema):
     """Generate an execution plan based on your configuration"""
 
@@ -119,26 +183,16 @@ def plan(config_path, json_output, output_file, vars: dict, allowlist, run_mode,
 
 
 @titan_cli.command("apply", no_args_is_help=True)
-@click.option(
-    "--config", "config_path", type=str, help="Path to configuration YAML file or directory", metavar="<file_or_dir>"
-)
+@config_path_option()
 @click.option("--plan", "plan_file", type=str, help="Path to plan JSON file", metavar="<filename>")
-@click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
-@click.option(
-    "--allowlist",
-    type=CommaSeparatedListParamType(),
-    help="List of resources types allowed in the plan. If not specified, all resources are allowed.",
-)
-@click.option(
-    "--mode",
-    "run_mode",
-    type=click.Choice(["CREATE-OR-UPDATE", "SYNC"]),
-    metavar="<run_mode>",
-    show_default=True,
-    help="Run mode",
-)
-@click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes")
-def apply(config_path, plan_file, vars, allowlist, run_mode, dry_run):
+@vars_option()
+@allowlist_option()
+@run_mode_option()
+@scope_option()
+@database_option()
+@schema_option()
+@click.option("--dry-run", is_flag=True, help="When dry run is true, Titan will not make any changes to Snowflake")
+def apply(config_path, plan_file, vars, allowlist, run_mode, scope, database, schema, dry_run):
     """Apply an execution plan to a Snowflake account"""
 
     if config_path and plan_file:
@@ -155,6 +209,12 @@ def apply(config_path, plan_file, vars, allowlist, run_mode, dry_run):
         cli_config["dry_run"] = dry_run
     if allowlist:
         cli_config["allowlist"] = allowlist
+    if scope:
+        cli_config["scope"] = scope
+    if database:
+        cli_config["database"] = database
+    if schema:
+        cli_config["schema"] = schema
 
     env_vars = collect_vars_from_environment()
     if env_vars:
