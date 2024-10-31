@@ -253,6 +253,10 @@ def crawl(path: str):
     else:
         spec = PathSpec([])
 
+    if os.path.isfile(path):
+        yield path
+        return
+
     for root, _, files in os.walk(path):
         for file in files:
             if file.endswith(".yaml") or file.endswith(".yml"):
@@ -263,13 +267,12 @@ def crawl(path: str):
                     yield full_path
 
 
-def read_config(file) -> dict:
-    config_path = os.path.join(os.path.dirname(__file__), file)
+def read_config(config_path) -> dict:
     with open(config_path, "r") as f:
         try:
             config = yaml.safe_load(f)
         except yaml.YAMLError as e:
-            raise ValueError(f"Error parsing YAML file: {file}") from e
+            raise ValueError(f"Error parsing YAML file: {config_path}") from e
     return config
 
 
@@ -282,7 +285,7 @@ def merge_configs(config1: dict, config2: dict) -> dict:
             elif merged[key] is None:
                 merged[key] = value
             else:
-                raise ValueError(f"Found a conflict for key {key} with {value} and {merged[key]}")
+                raise ValueError(f"Found a conflict for key `{key}` with {value} and {merged[key]}")
         else:
             merged[key] = value
     return merged
