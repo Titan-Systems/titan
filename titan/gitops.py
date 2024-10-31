@@ -184,12 +184,8 @@ def _resources_for_config(config: dict, vars: dict):
 
 
 def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, Any]] = None) -> BlueprintConfig:
-
-    if cli_config is None:
-        cli_config = {}
-
     yaml_config_ = yaml_config.copy()
-    cli_config_ = cli_config.copy()
+    cli_config_ = cli_config.copy() if cli_config else {}
     blueprint_args: dict[str, Any] = {}
 
     for key in ["allowlist", "dry_run", "name", "run_mode"]:
@@ -203,7 +199,7 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
     run_mode = yaml_config_.pop("run_mode", None) or cli_config_.pop("run_mode", None)
     scope = yaml_config_.pop("scope", None) or cli_config_.pop("scope", None)
     schema = yaml_config_.pop("schema", None) or cli_config_.pop("schema", None)
-    vars = cli_config_.pop("vars", {})
+    input_vars = cli_config_.pop("vars", {}) or {}
     vars_spec = yaml_config_.pop("vars", [])
 
     if allowlist:
@@ -227,16 +223,15 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
     if schema:
         blueprint_args["schema"] = schema
 
-    if vars:
-        blueprint_args["vars"] = vars
+    blueprint_args["vars"] = input_vars
 
     if vars_spec:
         if not isinstance(vars_spec, list):
             raise ValueError("vars config entry must be a list of dicts")
         blueprint_args["vars_spec"] = vars_spec
+        blueprint_args["vars"] = set_vars_defaults(vars_spec, blueprint_args["vars"])
 
-    vars = set_vars_defaults(vars_spec, vars)
-    resources = _resources_for_config(yaml_config_, vars)
+    resources = _resources_for_config(yaml_config_, blueprint_args["vars"])
 
     if len(resources) == 0:
         raise ValueError("No resources found in config")
