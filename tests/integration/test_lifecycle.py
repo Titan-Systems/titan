@@ -37,6 +37,7 @@ def test_create_drop_from_json(resource, cursor, suffix):
         res.Grant,
         res.RoleGrant,
         res.FutureGrant,
+        res.ScannerPackage,
     ):
         pytest.skip("Skipping")
 

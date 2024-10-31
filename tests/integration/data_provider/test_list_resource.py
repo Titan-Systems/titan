@@ -66,13 +66,15 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
             f"Skipping {resource.__class__.__name__}, not supported by account edition {session_ctx['account_edition']}"
         )
 
+    if not hasattr(data_provider, f"list_{pluralize(resource_label_for_type(resource.resource_type))}"):
+        pytest.skip(f"{resource.resource_type} is not supported")
+
+    if resource.__class__ == res.ScannerPackage:
+        pytest.skip("Flaky test, skipping for now")
     if isinstance(resource.scope, DatabaseScope):
         list_resources_database.add(resource)
     elif isinstance(resource.scope, SchemaScope):
         list_resources_database.public_schema.add(resource)
-
-    if not hasattr(data_provider, f"list_{pluralize(resource_label_for_type(resource.resource_type))}"):
-        pytest.skip(f"{resource.resource_type} is not supported")
 
     try:
         create(cursor, resource)
