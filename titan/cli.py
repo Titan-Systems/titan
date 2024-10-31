@@ -6,7 +6,13 @@ import yaml
 
 from titan.blueprint import dump_plan
 from titan.enums import RunMode
-from titan.gitops import collect_vars_from_environment, merge_vars, parse_resources
+from titan.gitops import (
+    collect_configs_from_path,
+    collect_vars_from_environment,
+    merge_configs,
+    merge_vars,
+    parse_resources,
+)
 from titan.operations.blueprint import blueprint_apply, blueprint_apply_plan, blueprint_plan
 from titan.operations.connector import connect, get_env_vars
 from titan.operations.export import export_resources
@@ -29,12 +35,6 @@ class CommaSeparatedListParamType(click.ParamType):
         return parse_resources(value)
 
 
-def load_config(config_file):
-    with open(config_file, "r") as f:
-        config = yaml.safe_load(f)
-    return config
-
-
 def load_plan(plan_file):
     with open(plan_file, "r") as f:
         plan = json.load(f)
@@ -48,7 +48,9 @@ def titan_cli():
 
 
 @titan_cli.command("plan", no_args_is_help=True)
-@click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
+@click.option(
+    "--config", "config_path", type=str, help="Path to configuration YAML file or directory", metavar="<file_or_dir>"
+)
 @click.option("--json", "json_output", is_flag=True, help="Output plan in machine-readable JSON format")
 @click.option("--out", "output_file", type=str, help="Write plan to a file", metavar="<filename>")
 @click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
@@ -74,12 +76,16 @@ def titan_cli():
 )
 @click.option("--database", type=str, help="Database to limit the scope to", metavar="<database>")
 @click.option("--schema", type=str, help="Schema to limit the scope to", metavar="<schema>")
-def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode, scope, database, schema):
+def plan(config_path, json_output, output_file, vars: dict, allowlist, run_mode, scope, database, schema):
     """Generate an execution plan based on your configuration"""
-    yaml_config = load_config(config_file)
 
-    if yaml_config is None:
-        raise click.UsageError(f"Config file {config_file} is empty")
+    if not config_path:
+        raise click.UsageError("--config is required")
+
+    yaml_config = {}
+    configs = collect_configs_from_path(config_path)
+    for config in configs:
+        yaml_config = merge_configs(yaml_config, config[1])
 
     cli_config: dict[str, Any] = {}
     if vars:
@@ -113,7 +119,9 @@ def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode,
 
 
 @titan_cli.command("apply", no_args_is_help=True)
-@click.option("--config", "config_file", type=str, help="Path to configuration YAML file", metavar="<filename>")
+@click.option(
+    "--config", "config_path", type=str, help="Path to configuration YAML file or directory", metavar="<file_or_dir>"
+)
 @click.option("--plan", "plan_file", type=str, help="Path to plan JSON file", metavar="<filename>")
 @click.option("--vars", type=JsonParamType(), help="Vars to pass to the blueprint")
 @click.option(
@@ -130,11 +138,12 @@ def plan(config_file, json_output, output_file, vars: dict, allowlist, run_mode,
     help="Run mode",
 )
 @click.option("--dry-run", is_flag=True, help="Perform a dry run without applying changes")
-def apply(config_file, plan_file, vars, allowlist, run_mode, dry_run):
+def apply(config_path, plan_file, vars, allowlist, run_mode, dry_run):
     """Apply an execution plan to a Snowflake account"""
-    if config_file and plan_file:
+
+    if config_path and plan_file:
         raise click.UsageError("Cannot specify both --config and --plan.")
-    if not config_file and not plan_file:
+    if not config_path and not plan_file:
         raise click.UsageError("Either --config or --plan must be specified.")
 
     cli_config = {}
@@ -151,10 +160,11 @@ def apply(config_file, plan_file, vars, allowlist, run_mode, dry_run):
     if env_vars:
         cli_config["vars"] = merge_vars(cli_config.get("vars", {}), env_vars)
 
-    if config_file:
-        yaml_config = load_config(config_file)
-        if yaml_config is None:
-            raise click.UsageError(f"Config file {config_file} is empty")
+    if config_path:
+        yaml_config = {}
+        configs = collect_configs_from_path(config_path)
+        for config in configs:
+            yaml_config = merge_configs(yaml_config, config[1])
         blueprint_apply(yaml_config, cli_config)
     elif plan_file:
         plan_obj = load_plan(plan_file)
