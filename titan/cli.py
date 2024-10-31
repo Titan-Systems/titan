@@ -146,7 +146,7 @@ def plan(config_path, json_output, output_file, vars: dict, allowlist, run_mode,
     if not config_path:
         raise click.UsageError("--config is required")
 
-    yaml_config = {}
+    yaml_config: dict[str, Any] = {}
     configs = collect_configs_from_path(config_path)
     for config in configs:
         yaml_config = merge_configs(yaml_config, config[1])
@@ -200,7 +200,7 @@ def apply(config_path, plan_file, vars, allowlist, run_mode, scope, database, sc
     if not config_path and not plan_file:
         raise click.UsageError("Either --config or --plan must be specified.")
 
-    cli_config = {}
+    cli_config: dict[str, Any] = {}
     if vars:
         cli_config["vars"] = vars
     if run_mode:
@@ -221,7 +221,7 @@ def apply(config_path, plan_file, vars, allowlist, run_mode, scope, database, sc
         cli_config["vars"] = merge_vars(cli_config.get("vars", {}), env_vars)
 
     if config_path:
-        yaml_config = {}
+        yaml_config: dict[str, Any] = {}
         configs = collect_configs_from_path(config_path)
         for config in configs:
             yaml_config = merge_configs(yaml_config, config[1])
@@ -277,7 +277,7 @@ def export(resources, export_all, exclude_resources, out, format):
     if resources and export_all:
         raise click.UsageError("You can't specify both --resource and --all options at the same time.")
 
-    resource_config = {}
+    resource_config: dict[str, Any] = {}
     if resources:
         resource_config = export_resources(include=resources)
     elif export_all:
