@@ -1,11 +1,15 @@
+import os
+import yaml
 import logging
 from typing import Any, Optional
 
 from inflection import pluralize
+from pathspec import PathSpec
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from .blueprint_config import BlueprintConfig, set_vars_defaults
 from .enums import BlueprintScope, ResourceType, RunMode
-from .identifiers import resource_label_for_type
+from .identifiers import resource_label_for_type, resource_type_for_label
 from .resources import (
     Database,
     Resource,
@@ -180,12 +184,8 @@ def _resources_for_config(config: dict, vars: dict):
 
 
 def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, Any]] = None) -> BlueprintConfig:
-
-    if cli_config is None:
-        cli_config = {}
-
     yaml_config_ = yaml_config.copy()
-    cli_config_ = cli_config.copy()
+    cli_config_ = cli_config.copy() if cli_config else {}
     blueprint_args: dict[str, Any] = {}
 
     for key in ["allowlist", "dry_run", "name", "run_mode"]:
@@ -199,7 +199,7 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
     run_mode = yaml_config_.pop("run_mode", None) or cli_config_.pop("run_mode", None)
     scope = yaml_config_.pop("scope", None) or cli_config_.pop("scope", None)
     schema = yaml_config_.pop("schema", None) or cli_config_.pop("schema", None)
-    vars = cli_config_.pop("vars", {})
+    input_vars = cli_config_.pop("vars", {}) or {}
     vars_spec = yaml_config_.pop("vars", [])
 
     if allowlist:
@@ -223,16 +223,15 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
     if schema:
         blueprint_args["schema"] = schema
 
-    if vars:
-        blueprint_args["vars"] = vars
+    blueprint_args["vars"] = input_vars
 
     if vars_spec:
         if not isinstance(vars_spec, list):
             raise ValueError("vars config entry must be a list of dicts")
         blueprint_args["vars_spec"] = vars_spec
+        blueprint_args["vars"] = set_vars_defaults(vars_spec, blueprint_args["vars"])
 
-    vars = set_vars_defaults(vars_spec, vars)
-    resources = _resources_for_config(yaml_config_, vars)
+    resources = _resources_for_config(yaml_config_, blueprint_args["vars"])
 
     if len(resources) == 0:
         raise ValueError("No resources found in config")
@@ -243,3 +242,89 @@ def collect_blueprint_config(yaml_config: dict, cli_config: Optional[dict[str, A
         raise ValueError(f"Unknown keys in config: {yaml_config_.keys()}")
 
     return BlueprintConfig(**blueprint_args)
+
+
+def crawl(path: str):
+    # Load .titanignore patterns if the file exists
+    gitignore_path = os.path.join(path, ".titanignore")
+    if os.path.exists(gitignore_path):
+        with open(gitignore_path) as f:
+            spec = PathSpec.from_lines(GitWildMatchPattern, f.readlines())
+    else:
+        spec = PathSpec([])
+
+    if os.path.isfile(path):
+        yield path
+        return
+
+    for root, _, files in os.walk(path):
+        for file in files:
+            if file.endswith(".yaml") or file.endswith(".yml"):
+                full_path = os.path.join(root, file)
+                # Get path relative to the base path for titanignore matching
+                rel_path = os.path.relpath(full_path, path)
+                if not spec.match_file(rel_path):
+                    yield full_path
+
+
+def read_config(config_path) -> dict:
+    with open(config_path, "r") as f:
+        try:
+            config = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise ValueError(f"Error parsing YAML file: {config_path}") from e
+    return config
+
+
+def merge_configs(config1: dict, config2: dict) -> dict:
+    merged = config1.copy()
+    for key, value in config2.items():
+        if key in merged:
+            if isinstance(merged[key], list):
+                merged[key] = merged[key] + value
+            elif merged[key] is None:
+                merged[key] = value
+            else:
+                raise ValueError(f"Found a conflict for key `{key}` with {value} and {merged[key]}")
+        else:
+            merged[key] = value
+    return merged
+
+
+def collect_configs_from_path(path: str) -> list[tuple[str, dict]]:
+    configs = []
+
+    if not os.path.exists(path):
+        raise ValueError(f"Invalid path: `{path}`. Must be a file or directory.")
+
+    for file in crawl(path):
+        config = read_config(file)
+        configs.append((file, config))
+
+    if len(configs) == 0:
+        raise ValueError(f"No valid YAML files were read from the given path: {path}")
+
+    return configs
+
+
+def parse_resources(resource_labels_str: Optional[str]) -> Optional[list[ResourceType]]:
+    if resource_labels_str is None or resource_labels_str == "all":
+        return None
+    return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
+
+
+def collect_vars_from_environment() -> dict:
+    vars = {}
+    for key, value in os.environ.items():
+        if key.startswith("TITAN_VAR_"):
+            vars[key[10:].lower()] = value
+    return vars
+
+
+def merge_vars(vars: dict, other_vars: dict) -> dict:
+    for key in other_vars.keys():
+        if key in vars:
+            raise ValueError(f"Conflicting var found: '{key}'")
+    merged = vars.copy()
+    merged.update(other_vars)
+    return merged
