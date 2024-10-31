@@ -304,7 +304,7 @@ def collect_configs_from_path(path: str) -> list[tuple[str, dict]]:
     return configs
 
 
-def parse_resources(resource_labels_str):
+def parse_resources(resource_labels_str: Optional[str]) -> Optional[list[ResourceType]]:
     if resource_labels_str is None or resource_labels_str == "all":
         return None
     return [resource_type_for_label(resource_label) for resource_label in resource_labels_str.split(",")]
