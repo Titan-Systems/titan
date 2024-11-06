@@ -29,6 +29,7 @@
 * [GenericSecret](resources/generic_secret.md)
 * [GlueCatalogIntegration](resources/glue_catalog_integration.md)
 * [Grant](resources/grant.md)
+* [GrantOnAll](resources/grant_on_all.md)
 * [HybridTable](resources/hybrid_table.md)
 * [ImageRepository](resources/image_repository.md)
 * [InternalStage](resources/internal_stage.md)

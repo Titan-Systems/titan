@@ -435,6 +435,62 @@ class _GrantOnAll(ResourceSpec):
 
 
 class GrantOnAll(Resource):
+    """
+    Description:
+        Represents a grant of privileges on all resources of a specified type to a role in Snowflake.
+
+    Snowflake Docs:
+        https://docs.snowflake.com/en/sql-reference/sql/grant-privilege
+
+    Fields:
+        priv (string, required): The privilege to grant. Examples include 'SELECT', 'INSERT', 'CREATE TABLE'.
+        on_type (string or ResourceType, required): The type of resource on which the privileges are granted.
+        in_type (string or ResourceType, required): The type of container resource in which the privilege is granted.
+        in_name (string, required): The name of the container resource in which the privilege is granted.
+        to (string or Role, required): The role to which the privileges are granted.
+        grant_option (bool): Specifies whether the grantee can grant the privileges to other roles. Defaults to False.
+
+    Python:
+
+        ```python
+            # Schema Privs:
+            grant_on_all = GrantOnAll(
+                priv="CREATE TABLE",
+                on_all_schemas_in_database="somedb",
+                to="somerole",
+            )
+
+            grant_on_all = GrantOnAll(
+                priv="CREATE VIEW",
+                on_all_schemas_in=Database(name="somedb"),
+                to="somerole",
+            )
+
+            # Schema Object Privs:
+            grant_on_all = GrantOnAll(
+                priv="SELECT",
+                on_all_tables_in_schema="someschema",
+                to="somerole",
+            )
+
+            grant_on_all = GrantOnAll(
+                priv="SELECT",
+                on_all_views_in_database="somedb",
+                to="somerole",
+            )
+        ```
+
+    Yaml:
+
+        ```yaml
+        grants_on_all:
+            - priv: SELECT
+                on_all_tables_in_schema: someschema
+                to: somerole
+        ```
+
+    """
+
     resource_type = ResourceType.GRANT_ON_ALL
     props = Props(
         priv=IdentifierProp("priv", eq=False),
@@ -454,19 +510,6 @@ class GrantOnAll(Resource):
         grant_option: bool = False,
         **kwargs,
     ):
-        """
-        Usage
-        -----
-
-        Schema Privs:
-        >>> GrantOnAll(priv="CREATE TABLE", on_all_schemas_in_database="somedb", to="somerole")
-        >>> GrantOnAll(priv="CREATE VIEW", on_all_schemas_in=Database(name="somedb"), to="somerole")
-
-        Schema Object Privs:
-        >>> GrantOnAll(priv="SELECT", on_all_tables_in_schema="sch", to="somerole")
-        >>> GrantOnAll(priv="SELECT", on_all_views_in_database="somedb", to="somerole")
-
-        """
         on_type = kwargs.pop("on_type", None)
         in_type = kwargs.pop("in_type", None)
         in_name = kwargs.pop("in_name", None)
