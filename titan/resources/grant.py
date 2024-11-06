@@ -355,7 +355,7 @@ class FutureGrant(Resource):
                     # At some point we need to support _in_sometype=SomeType(blah)
 
                     if isinstance(arg, Resource):
-                        on_type = ResourceType(singularize(keyword[10:-3]))
+                        on_type = resource_type_for_label(singularize(keyword[10:-3]))
                         in_type = arg.resource_type
                         in_name = str(arg.fqn)
                         granted_in_ref = arg
@@ -499,15 +499,27 @@ class GrantOnAll(Resource):
             # Handle on_all_ kwargs
             if on_kwargs:
                 for keyword, arg in on_kwargs.items():
-                    on_keyword = keyword.split("_")[2]
-                    on_type = ResourceType(singularize(on_keyword))
                     if isinstance(arg, Resource):
+                        # In type inferred from Resource class
+                        # on_all_schemas_in=Database(name="somedb")
                         in_type = arg.resource_type
                         in_name = str(arg.fqn)
+                        on_type = resource_type_for_label(singularize(keyword[7:-3]))
                     else:
-                        in_stmt = keyword.split("_in_")[1]
+                        # on_all_schemas_in_database="somedb"
+                        on_stmt, in_stmt = keyword.split("_in_")
                         in_type = ResourceType(in_stmt)
                         in_name = arg
+                        on_type = resource_type_for_label(singularize(on_stmt[7:]))
+                    # on_keyword = keyword.split("_")[2]
+                    # on_type = ResourceType(singularize(on_keyword))
+                    # if isinstance(arg, Resource):
+                    #     in_type = arg.resource_type
+                    #     in_name = str(arg.fqn)
+                    # else:
+                    #     in_stmt = keyword.split("_in_")[1]
+                    #     in_type = ResourceType(in_stmt)
+                    #     in_name = arg
 
         super().__init__(**kwargs)
         self._data: _GrantOnAll = _GrantOnAll(

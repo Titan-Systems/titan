@@ -180,3 +180,60 @@ def test_grant_on_accepts_resource_name():
     grant = res.Grant(priv="usage", on_warehouse=wh.name, to="somerole")
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
+
+
+def test_grant_on_dynamic_tables():
+    grant = res.Grant(
+        priv="SELECT",
+        on_dynamic_table="somedb.someschema.sometable",
+        to="somerole",
+    )
+    assert grant._data.on == "SOMEDB.SOMESCHEMA.SOMETABLE"
+    assert grant._data.on_type == ResourceType.DYNAMIC_TABLE
+
+    dynamic_table = ResourcePointer(name="sometable", resource_type=ResourceType.DYNAMIC_TABLE)
+    grant = res.Grant(
+        priv="SELECT",
+        on=dynamic_table,
+        to="somerole",
+    )
+    assert grant._data.on == "SOMETABLE"
+    assert grant._data.on_type == ResourceType.DYNAMIC_TABLE
+
+    grant_on_all = res.GrantOnAll(
+        priv="SELECT",
+        on_all_dynamic_tables_in_schema="somedb.someschema",
+        to="somerole",
+    )
+    assert grant_on_all._data.in_name == "SOMEDB.SOMESCHEMA"
+    assert grant_on_all._data.in_type == ResourceType.SCHEMA
+    assert grant_on_all._data.on_type == ResourceType.DYNAMIC_TABLE
+
+    schema = res.Schema(name="somedb.someschema")
+    grant_on_all = res.GrantOnAll(
+        priv="SELECT",
+        on_all_dynamic_tables_in=schema,
+        to="somerole",
+    )
+    assert grant_on_all._data.in_name == "SOMEDB.SOMESCHEMA"
+    assert grant_on_all._data.in_type == ResourceType.SCHEMA
+    assert grant_on_all._data.on_type == ResourceType.DYNAMIC_TABLE
+
+    future_grant = res.FutureGrant(
+        priv="CREATE TABLE",
+        on_future_dynamic_tables_in_schema="somedb.someschema",
+        to="somerole",
+    )
+    assert future_grant._data.in_name == "SOMEDB.SOMESCHEMA"
+    assert future_grant._data.in_type == ResourceType.SCHEMA
+    assert future_grant._data.on_type == ResourceType.DYNAMIC_TABLE
+
+    schema = res.Schema(name="somedb.someschema")
+    future_grant = res.FutureGrant(
+        priv="CREATE TABLE",
+        on_future_dynamic_tables_in=schema,
+        to="somerole",
+    )
+    assert future_grant._data.in_name == "SOMEDB.SOMESCHEMA"
+    assert future_grant._data.in_type == ResourceType.SCHEMA
+    assert future_grant._data.on_type == ResourceType.DYNAMIC_TABLE
