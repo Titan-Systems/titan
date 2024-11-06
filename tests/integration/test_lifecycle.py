@@ -33,11 +33,12 @@ def test_create_drop_from_json(resource, cursor, suffix):
 
     # Not easily testable without flakiness
     if resource.__class__ in (
-        res.Service,
+        res.AccountParameter,
+        res.FutureGrant,
         res.Grant,
         res.RoleGrant,
-        res.FutureGrant,
         res.ScannerPackage,
+        res.Service,
     ):
         pytest.skip("Skipping")
 
