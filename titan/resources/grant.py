@@ -17,8 +17,6 @@ from .user import User
 
 logger = logging.getLogger("titan")
 
-# TODO: Should Grant objects verify grant types in advance?
-
 
 @dataclass(unsafe_hash=True)
 class _Grant(ResourceSpec):
@@ -218,8 +216,6 @@ class Grant(Resource):
 
 def grant_fqn(grant: _Grant):
     on = f"{resource_label_for_type(grant.on_type)}/{grant.on}"
-    # if grant.on_type == ResourceType.ACCOUNT:
-    #     on = "ACCOUNT"
     return FQN(
         name=grant.to.name,
         params={
@@ -434,8 +430,6 @@ class _GrantOnAll(ResourceSpec):
 
     def __post_init__(self):
         super().__post_init__()
-        # if isinstance(self.priv, str):
-        #     self.priv = self.priv.upper()
         if self.in_type not in [ResourceType.DATABASE, ResourceType.SCHEMA]:
             raise ValueError(f"in_type must be either DATABASE or SCHEMA, not {self.in_type}")
 
@@ -506,20 +500,12 @@ class GrantOnAll(Resource):
                         in_name = str(arg.fqn)
                         on_type = resource_type_for_label(singularize(keyword[7:-3]))
                     else:
+                        # In type named in kwarg
                         # on_all_schemas_in_database="somedb"
                         on_stmt, in_stmt = keyword.split("_in_")
                         in_type = ResourceType(in_stmt)
                         in_name = arg
                         on_type = resource_type_for_label(singularize(on_stmt[7:]))
-                    # on_keyword = keyword.split("_")[2]
-                    # on_type = ResourceType(singularize(on_keyword))
-                    # if isinstance(arg, Resource):
-                    #     in_type = arg.resource_type
-                    #     in_name = str(arg.fqn)
-                    # else:
-                    #     in_stmt = keyword.split("_in_")[1]
-                    #     in_type = ResourceType(in_stmt)
-                    #     in_name = arg
 
         super().__init__(**kwargs)
         self._data: _GrantOnAll = _GrantOnAll(
@@ -554,14 +540,6 @@ def grant_on_all_fqn(data: _GrantOnAll):
             "on": f"{in_type}/{collection}",
         },
     )
-    # return FQN(
-    #     name=grant.to.name,
-    #     params={
-    #         "on_type": str(grant.on_type),
-    #         "in_type": str(grant.in_type),
-    #         "in_name": grant.in_name,
-    #     },
-    # )
 
 
 @dataclass(unsafe_hash=True)
