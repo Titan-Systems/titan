@@ -113,3 +113,12 @@ def set_vars_defaults(vars_spec: list[dict], vars: dict) -> dict:
             else:
                 raise MissingVarException(f"Required var '{spec['name']}' is missing and has no default value")
     return new_vars
+
+
+def print_blueprint_config(config: BlueprintConfig):
+    print(f"{config.name=}")
+    print(f"config.resources={len(config.resources or [])}")
+    print(f"{config.run_mode=}")
+    print(f"{config.dry_run=}")
+    print(f"{config.allowlist=}")
+    print(f"config.vars={list(config.vars.keys())}")

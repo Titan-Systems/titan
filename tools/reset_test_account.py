@@ -4,6 +4,7 @@ import pathlib
 import snowflake.connector
 
 from titan.blueprint import Blueprint, print_plan
+from titan.blueprint_config import print_blueprint_config
 from titan.data_provider import fetch_session
 from titan.enums import AccountEdition, AccountCloud
 from titan.gitops import collect_blueprint_config, collect_vars_from_environment, merge_configs, read_config
@@ -28,11 +29,7 @@ def reset_test_account():
     conn = get_connection()
     session_ctx = fetch_session(conn)
     config = read_test_account_config("base.yml")
-    # titan_vars = collect_vars_from_environment()
-    from dotenv import dotenv_values
-
-    titan_vars = dotenv_values("env/.vars.test_account")
-    print("\n".join([f"{k}={v}" for k, v in titan_vars.items()]))
+    titan_vars = collect_vars_from_environment()
 
     if session_ctx["account_edition"] == AccountEdition.ENTERPRISE:
         config = merge_configs(config, read_test_account_config("enterprise.yml"))
@@ -49,6 +46,7 @@ def reset_test_account():
         raise ValueError(f"Unknown cloud: {session_ctx['cloud']}")
 
     blueprint_config = collect_blueprint_config(config, {"vars": titan_vars})
+    print_blueprint_config(blueprint_config)
 
     bp = Blueprint.from_config(blueprint_config)
     plan = bp.plan(conn)
