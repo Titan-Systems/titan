@@ -224,7 +224,7 @@ class ResourceSpec:
                     setattr(self, f.name, new_value)
                 except TypeError as err:
                     human_readable_classname = self.__class__.__name__[1:]
-                    if issubclass(f.type, Enum):
+                    if isclass(f.type) and issubclass(f.type, Enum):
                         raise TypeError(
                             f"Expected {human_readable_classname}.{f.name} to be one of ({', '.join(f.type.__members__.keys())}), got {repr(field_value)} instead"
                         ) from err
@@ -699,13 +699,15 @@ def convert_role_ref(role_ref: RoleRef) -> Resource:
         ResourceType.ROLE,
     ):
         return role_ref
-    elif isinstance(role_ref, str):
+    elif isinstance(role_ref, str) or isinstance(role_ref, ResourceName):
         return ResourcePointer(name=role_ref, resource_type=infer_role_type_from_name(role_ref))
     else:
         raise TypeError
 
 
-def infer_role_type_from_name(name: str) -> ResourceType:
+def infer_role_type_from_name(name: Union[str, ResourceName]) -> ResourceType:
+    if isinstance(name, ResourceName):
+        name = str(name)
     if name == "":
         return ResourceType.ROLE
     identifier = parse_identifier(name, is_db_scoped=True)
