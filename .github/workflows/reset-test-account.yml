@@ -16,6 +16,10 @@ on:
         required: true
       VAR_STORAGE_AWS_EXTERNAL_ID:
         required: true
+      STATIC_USER_RSA_PUBLIC_KEY:
+        required: true
+      STATIC_USER_MFA_PASSWORD:
+        required: true
 
 jobs:
   reset-test-account:
