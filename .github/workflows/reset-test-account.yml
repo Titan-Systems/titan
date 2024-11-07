@@ -31,6 +31,7 @@ jobs:
           - environment: snowflake-gcp-standard
           - environment: snowflake-aws-standard
           - environment: snowflake-aws-enterprise
+          - environment: snowflake-aws-business-critical
     environment: ${{ matrix.environment }}
     steps:
       - name: actions/checkout
