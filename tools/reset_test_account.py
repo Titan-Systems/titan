@@ -22,7 +22,8 @@ def get_connection():
 
 
 def read_test_account_config(config_path: str):
-    return read_config(f"{SCRIPT_DIR}/test_account_configs/{config_path}")
+    config = read_config(f"{SCRIPT_DIR}/test_account_configs/{config_path}")
+    return config or {}
 
 
 def reset_test_account():
