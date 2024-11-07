@@ -6,10 +6,11 @@ from inflection import singularize
 
 from ..enums import ParseableEnum, ResourceType
 from ..identifiers import FQN, parse_FQN, resource_label_for_type, resource_type_for_label
-from ..parse import parse_grant, format_collection_string
+from ..parse import format_collection_string, parse_grant
 from ..privs import all_privs_for_resource_type
 from ..props import FlagProp, IdentifierProp, Props
 from ..resource_name import ResourceName
+from ..role_ref import RoleRef
 from ..scope import AccountScope
 from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
 from .role import Role
@@ -23,7 +24,7 @@ class _Grant(ResourceSpec):
     priv: str
     on: str
     on_type: ResourceType
-    to: Role
+    to: RoleRef
     grant_option: bool = False
     owner: Role = field(default=None, metadata={"fetchable": False})
     _privs: list[str] = field(default_factory=list, metadata={"triggers_create": True})
@@ -242,7 +243,7 @@ class _FutureGrant(ResourceSpec):
     on_type: ResourceType
     in_type: ResourceType
     in_name: ResourceName
-    to: Role
+    to: RoleRef
     grant_option: bool = False
 
     def __post_init__(self):
@@ -425,7 +426,7 @@ class _GrantOnAll(ResourceSpec):
     on_type: ResourceType
     in_type: ResourceType
     in_name: ResourceName
-    to: Role
+    to: RoleRef
     grant_option: bool = False
 
     def __post_init__(self):
@@ -587,8 +588,8 @@ def grant_on_all_fqn(data: _GrantOnAll):
 
 @dataclass(unsafe_hash=True)
 class _RoleGrant(ResourceSpec):
-    role: Role
-    to_role: Role = None
+    role: RoleRef
+    to_role: RoleRef = None
     to_user: User = None
 
     def __post_init__(self):

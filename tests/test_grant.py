@@ -237,3 +237,29 @@ def test_grant_on_dynamic_tables():
     assert future_grant._data.in_name == "SOMEDB.SOMESCHEMA"
     assert future_grant._data.in_type == ResourceType.SCHEMA
     assert future_grant._data.on_type == ResourceType.DYNAMIC_TABLE
+
+
+def test_grant_database_role_to_database_role():
+    database = res.Database(name="somedb")
+    parent = res.DatabaseRole(name="parent", database=database)
+    child = res.DatabaseRole(name="child", database=database)
+    grant = res.RoleGrant(role=child, to_role=parent)
+    assert grant.role.name == "child"
+    assert grant.to.name == "parent"
+
+
+def test_grant_database_role_to_account_role():
+    database = res.Database(name="somedb")
+    parent = res.Role(name="parent")
+    child = res.DatabaseRole(name="child", database=database)
+    grant = res.RoleGrant(role=child, to_role=parent)
+    assert grant.role.name == "child"
+    assert grant.to.name == "parent"
+
+
+def test_grant_database_role_to_system_role():
+    database = res.Database(name="somedb")
+    child = res.DatabaseRole(name="child", database=database)
+    grant = res.RoleGrant(role=child, to_role="SYSADMIN")
+    assert grant.role.name == "child"
+    assert grant.to.name == "SYSADMIN"
