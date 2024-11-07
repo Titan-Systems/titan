@@ -2137,7 +2137,9 @@ def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
     rsa_public_key = properties["rsa_public_key"] if properties["rsa_public_key"] != "null" else None
     middle_name = properties["middle_name"] if properties["middle_name"] != "null" else None
 
-    default_secondary_roles = json.loads(data["default_secondary_roles"]) if data["default_secondary_roles"] else None
+    default_secondary_roles = (
+        json.loads(data["default_secondary_roles"]) if data["default_secondary_roles"] is not None else None
+    )
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
