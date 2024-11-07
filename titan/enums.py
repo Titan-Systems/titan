@@ -123,7 +123,15 @@ class Scope(ParseableEnum):
 class AccountEdition(ParseableEnum):
     STANDARD = "STANDARD"
     ENTERPRISE = "ENTERPRISE"
-    BUSINESS_CRITICAL = "BUSINESS-CRITICAL"
+    BUSINESS_CRITICAL = "BUSINESS_CRITICAL"
+
+    @classmethod
+    def synonyms(cls):
+        """Override to provide a dictionary of synonyms for the enum values"""
+        return {
+            "BUSINESS-CRITICAL" : "BUSINESS_CRITICAL"
+        }
+
 
 
 class DataType(ParseableEnum):
