@@ -230,7 +230,7 @@ class ResourceSpec:
                         ) from err
                     else:
                         raise TypeError(
-                            f"Expected {human_readable_classname}.{f.name} to be {f.type}, got {repr(field_value)} ({type(field_value)}) instead"
+                            f"Expected {human_readable_classname}.{f.name} to be {f.type}, got {repr(field_value)} instead"
                         ) from err
 
     @classmethod
