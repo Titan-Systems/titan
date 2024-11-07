@@ -719,3 +719,30 @@ def parse_collection_string(collection: str):
 
 def format_collection_string(collection: dict):
     return f"{collection['in_name']}.<{collection['on_type']}>"
+
+
+def parse_region(region_str: str) -> dict[str, str]:
+    """Parse a Snowflake region identifier into its components.
+
+    Examples:
+        AWS_US_WEST_2 -> {'cloud': 'AWS', 'cloud_region': 'US_WEST_2'}
+        PUBLIC.AWS_US_WEST_2 -> {'region_group': 'PUBLIC', 'cloud': 'AWS', 'cloud_region': 'US_WEST_2'}
+        AZURE_WESTUS2 -> {'cloud': 'AZURE', 'cloud_region': 'WESTUS2'}
+        GCP_EUROPE_WEST4 -> {'cloud': 'GCP', 'cloud_region': 'EUROPE_WEST4'}
+    """
+    import re
+
+    pattern = r"^(?:([A-Z_]+)\.)?([A-Z]+)_(.+?)$"
+    match = re.match(pattern, region_str)
+
+    if not match:
+        raise ValueError(f"Invalid region format: {region_str}")
+
+    region_group, cloud, cloud_region = match.groups()
+
+    result = {"cloud": cloud, "cloud_region": cloud_region}
+
+    if region_group:
+        result["region_group"] = region_group
+
+    return result
