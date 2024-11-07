@@ -51,7 +51,7 @@ users:
     type: SERVICE
   - name: STATIC_USER_KEYPAIR
     type: SERVICE
-    rsa_public_key: "{{ var.rsa_public_key }}"
+    rsa_public_key: "{{ var.static_user_rsa_public_key }}"
   - name: STATIC_USER_MFA
     type: PERSON
     password: "{{ var.static_user_mfa_password }}"
@@ -256,10 +256,6 @@ warehouses:
 
   
 security_integrations:
-  # - name: SNOWSERVICES_INGRESS_OAUTH
-  #   type: OAUTH
-  #   oauth_client: snowservices_ingress
-  #   enabled: true
   - name: STATIC_SECURITY_INTEGRATION
     type: api_authentication
     auth_type: OAUTH2

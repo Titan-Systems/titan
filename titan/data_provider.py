@@ -30,6 +30,7 @@ from .parse import (
     _parse_dynamic_table_text,
     parse_view_ddl,
     parse_collection_string,
+    parse_region,
 )
 from .privs import GrantedPrivilege
 from .resource_name import ResourceName, attribute_is_resource_name, resource_name_from_snowflake_metadata
@@ -44,6 +45,8 @@ class SessionContext(TypedDict):
     account_locator: str
     account: str
     available_roles: list[ResourceName]
+    cloud: str
+    cloud_region: str
     database: str
     role: ResourceName
     schemas: list[str]
@@ -571,18 +574,22 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
             CURRENT_SCHEMAS() as schemas,
             CURRENT_WAREHOUSE() as warehouse,
             CURRENT_VERSION() as version,
+            CURRENT_REGION() as region,
             SYSTEM$BOOTSTRAP_DATA_REQUEST('ACCOUNT') as account_data
         """,
     )[0]
 
     account_data = json.loads(session_obj["ACCOUNT_DATA"])
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
+    region = parse_region(session_obj["REGION"])
 
     return {
         "account_edition": AccountEdition(account_data["accountInfo"]["serviceLevelName"]),
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
         "account": session_obj["ACCOUNT"],
         "available_roles": available_roles,
+        "cloud": region["cloud"],
+        "cloud_region": region["cloud_region"],
         "database": session_obj["DATABASE"],
         "role": ResourceName(session_obj["ROLE"]),
         "schemas": json.loads(session_obj["SCHEMAS"]),

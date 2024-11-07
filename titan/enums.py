@@ -128,10 +128,13 @@ class AccountEdition(ParseableEnum):
     @classmethod
     def synonyms(cls):
         """Override to provide a dictionary of synonyms for the enum values"""
-        return {
-            "BUSINESS-CRITICAL" : "BUSINESS_CRITICAL"
-        }
+        return {"BUSINESS-CRITICAL": "BUSINESS_CRITICAL"}
 
+
+class AccountCloud(ParseableEnum):
+    AWS = "AWS"
+    GCP = "GCP"
+    AZURE = "AZURE"
 
 
 class DataType(ParseableEnum):

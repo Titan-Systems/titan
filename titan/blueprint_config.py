@@ -45,6 +45,9 @@ class BlueprintConfig:
         if not isinstance(self.run_mode, RunMode):
             raise ValueError(f"Invalid run_mode: {self.run_mode}")
 
+        if not isinstance(self.vars, dict):
+            raise ValueError(f"vars must be a dictionary, got: {self.vars=}")
+
         if self.scope is not None and not isinstance(self.scope, BlueprintScope):
             raise ValueError(f"Invalid scope: {self.scope}")
 

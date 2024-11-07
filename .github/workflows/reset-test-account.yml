@@ -1,0 +1,59 @@
+name: Reset test account
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      TEST_SNOWFLAKE_ACCOUNT:
+        required: true
+      TEST_SNOWFLAKE_USER:
+        required: true
+      TEST_SNOWFLAKE_PASSWORD:
+        required: true
+      VAR_STORAGE_BASE_URL:
+        required: true
+      VAR_STORAGE_ROLE_ARN:
+        required: true
+      VAR_STORAGE_AWS_EXTERNAL_ID:
+        required: true
+
+jobs:
+  reset-test-account:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: snowflake-gcp-standard
+          - environment: snowflake-aws-standard
+          - environment: snowflake-aws-enterprise
+    environment: ${{ matrix.environment }}
+    steps:
+      - name: actions/checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Create a virtual environment
+        run: |
+          python -m venv .venv
+      - name: Install dependencies
+        run: |
+          source ./.venv/bin/activate
+          python -m pip install --upgrade pip
+          make install-dev
+      - name: Reset test account
+        run: |
+          source ./.venv/bin/activate
+          python tools/reset_test_account.py
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.TEST_SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.TEST_SNOWFLAKE_PASSWORD }}
+          SNOWFLAKE_ROLE: ACCOUNTADMIN
+          TITAN_VAR_STORAGE_BASE_URL: ${{ secrets.VAR_STORAGE_BASE_URL }}
+          TITAN_VAR_STORAGE_ROLE_ARN: ${{ secrets.VAR_STORAGE_ROLE_ARN }}
+          TITAN_VAR_STORAGE_AWS_EXTERNAL_ID: ${{ secrets.VAR_STORAGE_AWS_EXTERNAL_ID }}
+          TITAN_VAR_STATIC_USER_RSA_PUBLIC_KEY: ${{ secrets.STATIC_USER_RSA_PUBLIC_KEY }}
+          TITAN_VAR_STATIC_USER_MFA_PASSWORD: ${{ secrets.STATIC_USER_MFA_PASSWORD }}

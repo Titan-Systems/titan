@@ -1,5 +1,3 @@
-name: reset-test-account
-run_mode: SYNC
 allowlist:
   - "tag"
   - "tag reference"
