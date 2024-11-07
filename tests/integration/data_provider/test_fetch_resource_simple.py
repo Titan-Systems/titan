@@ -284,6 +284,7 @@ def resource_fixtures() -> list:
             last_name="User",
             comment="This is a test user",
             default_warehouse="a_default_warehouse",
+            default_secondary_roles=["ALL"],
             days_to_expiry=30,
         ),
         res.View(
