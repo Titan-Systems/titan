@@ -41,7 +41,7 @@ grants:
 external_volumes:
   - name: iceberg_external_volume
     owner: iceberg_tutorial_role
-    allow_writes: false
+    allow_writes: true
     storage_locations:
       - name: my-s3-us-west-2
         storage_provider: S3
