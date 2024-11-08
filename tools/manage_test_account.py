@@ -43,6 +43,10 @@ def get_config(session_ctx):
         config = merge_configs(config, read_test_account_config("azure.yml"))
     else:
         raise ValueError(f"Unknown cloud: {session_ctx['cloud']}")
+
+    if session_ctx["cloud"] == AccountCloud.AWS and session_ctx["account_edition"] != AccountEdition.STANDARD:
+        config = merge_configs(config, read_test_account_config("compute_pools.yml"))
+
     return config
 
 
