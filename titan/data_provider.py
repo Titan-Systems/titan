@@ -777,7 +777,6 @@ def fetch_columns(session: SnowflakeConnection, resource_type: str, fqn: FQN):
         if col["kind"] != "COLUMN":
             raise Exception(f"Unexpected kind {col['kind']} in desc result")
         columns.append(
-            # remove_none_values(
             {
                 "name": col["name"],
                 "data_type": col["type"],
@@ -787,7 +786,6 @@ def fetch_columns(session: SnowflakeConnection, resource_type: str, fqn: FQN):
                 "constraint": None,
                 "collate": None,
             }
-            # )
         )
     return columns
 
@@ -2615,50 +2613,50 @@ def list_tables(session: SnowflakeConnection) -> list[FQN]:
     return tables
 
 
-def list_tag_references(session: SnowflakeConnection) -> list[FQN]:
-    try:
-        show_result = execute(session, "SHOW TAGS IN ACCOUNT")
-        tag_references: list[FQN] = []
-        for tag in show_result:
-            if tag["database_name"] in SYSTEM_DATABASES or tag["schema_name"] == "INFORMATION_SCHEMA":
-                continue
+# def list_tag_references(session: SnowflakeConnection) -> list[FQN]:
+#     try:
+#         show_result = execute(session, "SHOW TAGS IN ACCOUNT")
+#         tag_references: list[FQN] = []
+#         for tag in show_result:
+#             if tag["database_name"] in SYSTEM_DATABASES or tag["schema_name"] == "INFORMATION_SCHEMA":
+#                 continue
 
-            tag_refs = execute(
-                session,
-                f"""
-                    SELECT *
-                    FROM table(snowflake.account_usage.tag_references_with_lineage(
-                        '{tag['database_name']}.{tag['schema_name']}.{tag['name']}'
-                    ))
-                """,
-            )
+#             tag_refs = execute(
+#                 session,
+#                 f"""
+#                     SELECT *
+#                     FROM table(snowflake.account_usage.tag_references_with_lineage(
+#                         '{tag['database_name']}.{tag['schema_name']}.{tag['name']}'
+#                     ))
+#                 """,
+#             )
 
-            for ref in tag_refs:
-                if ref["OBJECT_DELETED"] is not None:
-                    continue
-                print(ref)
-            # raise
-        return tag_references
+#             for ref in tag_refs:
+#                 if ref["OBJECT_DELETED"] is not None:
+#                     continue
+#                 print(ref)
+#             # raise
+#         return tag_references
 
-        #     tags.append(
-        #         FQN(
-        #             database=resource_name_from_snowflake_metadata(row["database_name"]),
-        #             schema=resource_name_from_snowflake_metadata(tag["schema_name"]),
-        #             name=resource_name_from_snowflake_metadata(tag["name"]),
-        #         )
-        #     )
-        # return tags
-    except ProgrammingError as err:
-        if err.errno == UNSUPPORTED_FEATURE:
-            return []
-        else:
-            raise
+#         #     tags.append(
+#         #         FQN(
+#         #             database=resource_name_from_snowflake_metadata(row["database_name"]),
+#         #             schema=resource_name_from_snowflake_metadata(tag["schema_name"]),
+#         #             name=resource_name_from_snowflake_metadata(tag["name"]),
+#         #         )
+#         #     )
+#         # return tags
+#     except ProgrammingError as err:
+#         if err.errno == UNSUPPORTED_FEATURE:
+#             return []
+#         else:
+#             raise
 
-    tag_map = {}
-    for tag_ref in tag_refs:
-        tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
-        tag_map[tag_name] = tag_ref["TAG_VALUE"]
-    return tag_map
+#     tag_map = {}
+#     for tag_ref in tag_refs:
+#         tag_name = f"{tag_ref['TAG_DATABASE']}.{tag_ref['TAG_SCHEMA']}.{tag_ref['TAG_NAME']}"
+#         tag_map[tag_name] = tag_ref["TAG_VALUE"]
+#     return tag_map
 
 
 def list_tags(session: SnowflakeConnection) -> list[FQN]:

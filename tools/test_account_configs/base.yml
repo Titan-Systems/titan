@@ -116,6 +116,18 @@ network_rules:
     mode: EGRESS
     database: static_database
     schema: public
+  - name: static_network_rule_ingress_allow_all
+    type: IPV4
+    value_list: ["0.0.0.0/0"]
+    mode: INGRESS
+    database: static_database
+    schema: public
+  - name: static_network_rule_ingress_suspicious_ip
+    type: IPV4
+    value_list: ["104.223.91.28"]
+    mode: INGRESS
+    database: static_database
+    schema: public
 
 
 grants:
