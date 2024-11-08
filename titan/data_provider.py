@@ -983,7 +983,7 @@ def fetch_file_format(session: SnowflakeConnection, fqn: FQN):
             "owner": _get_owner_identifier(data),
             "field_delimiter": format_options["FIELD_DELIMITER"],
             "skip_header": format_options["SKIP_HEADER"],
-            "null_if": format_options["NULL_IF"],
+            "null_if": format_options["NULL_IF"] or None,
             "empty_field_as_null": format_options["EMPTY_FIELD_AS_NULL"],
             "compression": format_options["COMPRESSION"],
             "record_delimiter": format_options["RECORD_DELIMITER"],
@@ -1018,7 +1018,7 @@ def fetch_file_format(session: SnowflakeConnection, fqn: FQN):
             "binary_as_text": format_options["BINARY_AS_TEXT"],
             "trim_space": format_options["TRIM_SPACE"],
             "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
-            "null_if": format_options["NULL_IF"],
+            "null_if": format_options["NULL_IF"] or None,
         }
     elif data["type"] == "JSON":
         return {
@@ -1032,7 +1032,7 @@ def fetch_file_format(session: SnowflakeConnection, fqn: FQN):
             "timestamp_format": format_options["TIMESTAMP_FORMAT"],
             "binary_format": format_options["BINARY_FORMAT"],
             "trim_space": format_options["TRIM_SPACE"],
-            "null_if": format_options["NULL_IF"],
+            "null_if": format_options["NULL_IF"] or None,
             "file_extension": format_options["FILE_EXTENSION"],
             "enable_octal": format_options["ENABLE_OCTAL"],
             "allow_duplicate": format_options["ALLOW_DUPLICATE"],
