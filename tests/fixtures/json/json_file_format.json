@@ -9,7 +9,7 @@
     "timestamp_format": "AUTO",
     "binary_format": "HEX",
     "trim_space": false,
-    "null_if": [],
+    "null_if": null,
     "file_extension": "json",
     "enable_octal": false,
     "allow_duplicate": false,
