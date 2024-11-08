@@ -28,6 +28,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - environment: snowflake-azure-standard
           - environment: snowflake-gcp-standard
           - environment: snowflake-aws-standard
           - environment: snowflake-aws-enterprise

@@ -20,12 +20,6 @@ def account_edition(cursor):
     return session_ctx["account_edition"]
 
 
-@pytest.fixture(scope="session")
-def email_address(cursor):
-    user = cursor.execute(f"SHOW TERSE USERS LIKE '{TEST_USER}'").fetchone()
-    return user["email"]
-
-
 def strip_unfetchable_fields(spec, data: dict) -> dict:
     keys = set(data.keys())
     for attr in keys:
