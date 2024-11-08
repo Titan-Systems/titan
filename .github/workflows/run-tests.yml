@@ -7,6 +7,7 @@ on:
     - version.md
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
   workflow_call:
     secrets:
       TEST_SNOWFLAKE_ACCOUNT:
@@ -26,7 +27,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: default-runner
     strategy:
       fail-fast: false
       matrix:
@@ -56,7 +57,7 @@ jobs:
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
-    runs-on: ubuntu-latest
+    runs-on: default-runner
     strategy:
       fail-fast: false
       matrix:
