@@ -27,7 +27,7 @@ on:
 
 jobs:
   build:
-    runs-on: default-runner
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -57,7 +57,7 @@ jobs:
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
-    runs-on: default-runner
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
