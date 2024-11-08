@@ -282,7 +282,7 @@ secrets:
     database: static_database
     schema: public
 
-scanner_packages:
-  - name: THREAT_INTELLIGENCE
-    enabled: true
-    schedule: "0 0 * * * UTC"
+# scanner_packages:
+#   - name: THREAT_INTELLIGENCE
+#     enabled: true
+#     schedule: "0 0 * * * UTC"
