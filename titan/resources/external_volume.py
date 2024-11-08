@@ -1,13 +1,14 @@
 from dataclasses import dataclass
 
-from ..enums import ParseableEnum, ResourceType, EncryptionType
+from ..enums import EncryptionType, ParseableEnum, ResourceType
 from ..props import (
-    StructProp,
+    BoolProp,
     EnumProp,
-    PropSet,
-    Props,
-    StringProp,
     PropList,
+    Props,
+    PropSet,
+    StringProp,
+    StructProp,
 )
 from ..resource_name import ResourceName
 from ..scope import AccountScope, AnonymousScope
@@ -110,6 +111,7 @@ class ExternalVolume(NamedResource, Resource):
             "storage_locations",
             StructProp(ExternalVolumeStorageLocation.props),
         ),
+        allow_writes=BoolProp("allow_writes"),
         comment=StringProp("comment"),
     )
     scope = AccountScope()

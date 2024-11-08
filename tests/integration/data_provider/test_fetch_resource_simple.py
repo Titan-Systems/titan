@@ -5,6 +5,7 @@ import pytest
 from tests.helpers import safe_fetch
 from titan import data_provider
 from titan import resources as res
+from titan.enums import AccountCloud
 from titan.resources import Resource
 from titan.scope import AccountScope, DatabaseScope, SchemaScope
 
@@ -21,9 +22,9 @@ def account_edition(cursor):
 
 
 @pytest.fixture(scope="session")
-def email_address(cursor):
-    user = cursor.execute(f"SHOW TERSE USERS LIKE '{TEST_USER}'").fetchone()
-    return user["email"]
+def account_cloud(cursor):
+    session_ctx = data_provider.fetch_session(cursor.connection)
+    return session_ctx["cloud"]
 
 
 def strip_unfetchable_fields(spec, data: dict) -> dict:
@@ -204,7 +205,7 @@ def resource_fixtures() -> list:
             handler="main",
             execute_as="OWNER",
             comment="user-defined procedure",
-            imports=[],
+            imports=None,
             null_handling="CALLED ON NULL INPUT",
             secure=False,
             owner=TEST_ROLE,
@@ -284,6 +285,7 @@ def resource_fixtures() -> list:
             last_name="User",
             comment="This is a test user",
             default_warehouse="a_default_warehouse",
+            default_secondary_roles=["ALL"],
             days_to_expiry=30,
         ),
         res.View(
@@ -342,17 +344,13 @@ def test_fetch(
     cursor,
     resource_fixture,
     account_edition,
+    account_cloud,
 ):
     if account_edition not in resource_fixture.edition:
         pytest.skip(f"Skipping test for {resource_fixture.__class__.__name__} on {account_edition} edition")
 
-    if os.environ["TEST_SNOWFLAKE_ACCOUNT"].endswith(".gcp"):
-        account_cloud = "gcp"
-    else:
-        account_cloud = "aws"
-
-    if account_cloud == "gcp" and resource_fixture.__class__ == res.SnowflakeIcebergTable:
-        pytest.skip("Skipping test for SnowflakeIcebergTable on GCP")
+    if account_cloud != AccountCloud.AWS and resource_fixture.__class__ == res.SnowflakeIcebergTable:
+        pytest.skip("Skipping test for SnowflakeIcebergTable on GCP and Azure")
 
     create(cursor, resource_fixture, account_edition)
 

@@ -40,6 +40,7 @@ users:
   - name: TITAN_ADMIN
     default_warehouse: CI
     default_role: SYSADMIN
+    default_secondary_roles: []
     lifecycle:
       prevent_destroy: true
       ignore_changes:
@@ -68,8 +69,6 @@ roles:
     comment: This role is intentionally left empty
   - name: STATIC_ROLE
     comment: Static role
-    # tags:
-    #   static_database.public.static_tag: STATIC_TAG_VALUE
   - name: ~@#$%^&*()_+
     owner: ACCOUNTADMIN
     comment: This role has some issues
@@ -267,6 +266,7 @@ security_integrations:
 
 external_volumes:
   - name: static_external_volume
+    allow_writes: true
     storage_locations:
       - name: us-west-2
         storage_provider: S3
@@ -282,7 +282,7 @@ secrets:
     database: static_database
     schema: public
 
-scanner_packages:
-  - name: THREAT_INTELLIGENCE
-    enabled: true
-    schedule: "0 0 * * * UTC"
+# scanner_packages:
+#   - name: THREAT_INTELLIGENCE
+#     enabled: true
+#     schedule: "0 0 * * * UTC"

@@ -216,8 +216,8 @@ class _JSONFileFormat(ResourceSpec):
 
     def __post_init__(self):
         super().__post_init__()
-        if self.null_if is None:
-            self.null_if = []
+        if self.null_if is not None and len(self.null_if) == 0:
+            raise ValueError("null_if can't be empty")
 
 
 class JSONFileFormat(NamedResource, Resource):
@@ -382,8 +382,8 @@ class _ParquetFileFormat(ResourceSpec):
 
     def __post_init__(self):
         super().__post_init__()
-        if self.null_if is None:
-            self.null_if = []
+        if self.null_if is not None and len(self.null_if) == 0:
+            raise ValueError("null_if can't be empty")
 
 
 class ParquetFileFormat(NamedResource, Resource):

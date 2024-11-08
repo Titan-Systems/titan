@@ -289,9 +289,9 @@ def _parse_function_arguments(arguments_str: str) -> tuple[FQN, str]:
     return (identifier, returns)
 
 
-def _parse_list_property(property_str: str) -> list:
-    if property_str is None:
-        return []
+def _parse_list_property(property_str: str) -> Optional[list]:
+    if property_str is None or property_str == "":
+        return None
     property_str = property_str.strip("[]")
     if property_str:
         return [item.strip(" ") for item in property_str.split(",")]
@@ -983,7 +983,7 @@ def fetch_file_format(session: SnowflakeConnection, fqn: FQN):
             "owner": _get_owner_identifier(data),
             "field_delimiter": format_options["FIELD_DELIMITER"],
             "skip_header": format_options["SKIP_HEADER"],
-            "null_if": format_options["NULL_IF"],
+            "null_if": format_options["NULL_IF"] or None,
             "empty_field_as_null": format_options["EMPTY_FIELD_AS_NULL"],
             "compression": format_options["COMPRESSION"],
             "record_delimiter": format_options["RECORD_DELIMITER"],
@@ -1018,7 +1018,7 @@ def fetch_file_format(session: SnowflakeConnection, fqn: FQN):
             "binary_as_text": format_options["BINARY_AS_TEXT"],
             "trim_space": format_options["TRIM_SPACE"],
             "replace_invalid_characters": format_options["REPLACE_INVALID_CHARACTERS"],
-            "null_if": format_options["NULL_IF"],
+            "null_if": format_options["NULL_IF"] or None,
         }
     elif data["type"] == "JSON":
         return {
@@ -1032,7 +1032,7 @@ def fetch_file_format(session: SnowflakeConnection, fqn: FQN):
             "timestamp_format": format_options["TIMESTAMP_FORMAT"],
             "binary_format": format_options["BINARY_FORMAT"],
             "trim_space": format_options["TRIM_SPACE"],
-            "null_if": format_options["NULL_IF"],
+            "null_if": format_options["NULL_IF"] or None,
             "file_extension": format_options["FILE_EXTENSION"],
             "enable_octal": format_options["ENABLE_OCTAL"],
             "allow_duplicate": format_options["ALLOW_DUPLICATE"],
@@ -1470,8 +1470,6 @@ def fetch_procedure(session: SnowflakeConnection, fqn: FQN):
     desc_result = execute(session, f"DESC PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
 
-    # show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
-    # ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
     owner = _fetch_owner(session, "PROCEDURE", fqn)
 
     return {
@@ -1481,7 +1479,7 @@ def fetch_procedure(session: SnowflakeConnection, fqn: FQN):
         "execute_as": properties["execute as"],
         "external_access_integrations": data["external_access_integrations"] or None,
         "handler": properties["handler"],
-        "imports": _parse_list_property(properties["imports"]),
+        "imports": _parse_list_property(properties["imports"]) or None,
         "language": properties["language"],
         "null_handling": properties["null handling"],
         "owner": owner,
@@ -1648,6 +1646,7 @@ def fetch_security_integration(session: SnowflakeConnection, fqn: FQN):
     data = show_result[0]
     desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+
     owner = _fetch_owner(session, "INTEGRATION", fqn)
 
     if data["type"] == "API_AUTHENTICATION":
@@ -1661,7 +1660,7 @@ def fetch_security_integration(session: SnowflakeConnection, fqn: FQN):
             "oauth_client_id": properties["oauth_client_id"],
             "oauth_grant": properties["oauth_grant"],
             "oauth_access_token_validity": properties["oauth_access_token_validity"],
-            "oauth_allowed_scopes": properties["oauth_allowed_scopes"],
+            "oauth_allowed_scopes": _parse_list_property(properties["oauth_allowed_scopes"]),
             "comment": data["comment"] or None,
             "owner": owner,
         }
@@ -2137,6 +2136,8 @@ def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
     rsa_public_key = properties["rsa_public_key"] if properties["rsa_public_key"] != "null" else None
     middle_name = properties["middle_name"] if properties["middle_name"] != "null" else None
 
+    default_secondary_roles = json.loads(data["default_secondary_roles"]) if data["default_secondary_roles"] else None
+
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "login_name": login_name,
@@ -2153,7 +2154,7 @@ def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
         "default_warehouse": data["default_warehouse"] or None,
         "default_namespace": data["default_namespace"] or None,
         "default_role": data["default_role"] or None,
-        "default_secondary_roles": data["default_secondary_roles"] or None,
+        "default_secondary_roles": default_secondary_roles,
         "mins_to_bypass_mfa": data["mins_to_bypass_mfa"] or None,
         "type": user_type,
         "rsa_public_key": rsa_public_key,

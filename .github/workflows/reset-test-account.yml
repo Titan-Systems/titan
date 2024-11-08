@@ -1,4 +1,4 @@
-name: Reset test account
+name: Reset test accounts
 
 on:
   workflow_dispatch:
@@ -22,15 +22,17 @@ on:
         required: true
 
 jobs:
-  reset-test-account:
+  reset-test-accounts:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
+          - environment: snowflake-azure-standard
           - environment: snowflake-gcp-standard
           - environment: snowflake-aws-standard
           - environment: snowflake-aws-enterprise
+          - environment: snowflake-aws-business-critical
     environment: ${{ matrix.environment }}
     steps:
       - name: actions/checkout
@@ -50,7 +52,7 @@ jobs:
       - name: Reset test account
         run: |
           source ./.venv/bin/activate
-          python tools/reset_test_account.py
+          python tools/manage_test_account.py teardown-and-reset
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.TEST_SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}

@@ -40,6 +40,8 @@ class _PythonStoredProcedure(ResourceSpec):
         super().__post_init__()
         if self.packages is not None and len(self.packages) == 0:
             raise ValueError("packages can't be empty")
+        if self.imports is not None and len(self.imports) == 0:
+            raise ValueError("imports can't be empty")
 
 
 class PythonStoredProcedure(NamedResource, Resource):

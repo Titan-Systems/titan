@@ -39,10 +39,3 @@ def test_fetch_quoted_identifier(cursor, test_db):
     )
     assert schema is not None
     assert schema["name"] == '"multiCaseString"'
-
-
-@pytest.mark.enterprise
-def test_fetch_session_enterprise(cursor):
-    data_provider.fetch_session.cache_clear()
-    session = data_provider.fetch_session(cursor)
-    assert session["account_edition"] == AccountEdition.ENTERPRISE

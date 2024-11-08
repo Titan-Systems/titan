@@ -330,7 +330,7 @@ class APIAuthenticationSecurityIntegration(NamedResource, Resource):
             oauth_client_secret=oauth_client_secret,
             oauth_grant=oauth_grant,
             oauth_access_token_validity=oauth_access_token_validity,
-            oauth_allowed_scopes=oauth_allowed_scopes or [],
+            oauth_allowed_scopes=oauth_allowed_scopes,
             enabled=enabled,
             comment=comment,
         )

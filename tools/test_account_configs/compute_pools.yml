@@ -1,0 +1,11 @@
+allowlist:
+  - "compute pool"
+
+compute_pools:
+  - name: static_compute_pool
+    min_nodes: 1
+    max_nodes: 1
+    initially_suspended: true
+    auto_resume: false
+    auto_suspend_secs: 60
+    instance_family: CPU_X64_XS

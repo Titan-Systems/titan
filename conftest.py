@@ -44,7 +44,7 @@ def pytest_collection_modifyitems(items):
 def blueprint_vars():
     if os.path.exists("env/.vars.test_account"):
         vars = dotenv_values("env/.vars.test_account")
-        vars.pop("rsa_public_key", None)
+        vars.pop("static_user_rsa_public_key", None)
         vars.pop("static_user_mfa_password", None)
         return vars
     else:
