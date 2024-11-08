@@ -289,9 +289,9 @@ def _parse_function_arguments(arguments_str: str) -> tuple[FQN, str]:
     return (identifier, returns)
 
 
-def _parse_list_property(property_str: str) -> list:
-    if property_str is None:
-        return []
+def _parse_list_property(property_str: str) -> Optional[list]:
+    if property_str is None or property_str == "":
+        return None
     property_str = property_str.strip("[]")
     if property_str:
         return [item.strip(" ") for item in property_str.split(",")]
@@ -1470,12 +1470,6 @@ def fetch_procedure(session: SnowflakeConnection, fqn: FQN):
     desc_result = execute(session, f"DESC PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
 
-    imports = _parse_list_property(properties["imports"])
-    if len(imports) == 0:
-        imports = None
-
-    # show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
-    # ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
     owner = _fetch_owner(session, "PROCEDURE", fqn)
 
     return {
@@ -1485,7 +1479,7 @@ def fetch_procedure(session: SnowflakeConnection, fqn: FQN):
         "execute_as": properties["execute as"],
         "external_access_integrations": data["external_access_integrations"] or None,
         "handler": properties["handler"],
-        "imports": imports,
+        "imports": _parse_list_property(properties["imports"]) or None,
         "language": properties["language"],
         "null_handling": properties["null handling"],
         "owner": owner,
@@ -1652,6 +1646,7 @@ def fetch_security_integration(session: SnowflakeConnection, fqn: FQN):
     data = show_result[0]
     desc_result = execute(session, f"DESC SECURITY INTEGRATION {fqn.name}")
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
+
     owner = _fetch_owner(session, "INTEGRATION", fqn)
 
     if data["type"] == "API_AUTHENTICATION":
@@ -1665,7 +1660,7 @@ def fetch_security_integration(session: SnowflakeConnection, fqn: FQN):
             "oauth_client_id": properties["oauth_client_id"],
             "oauth_grant": properties["oauth_grant"],
             "oauth_access_token_validity": properties["oauth_access_token_validity"],
-            "oauth_allowed_scopes": properties["oauth_allowed_scopes"],
+            "oauth_allowed_scopes": _parse_list_property(properties["oauth_allowed_scopes"]),
             "comment": data["comment"] or None,
             "owner": owner,
         }

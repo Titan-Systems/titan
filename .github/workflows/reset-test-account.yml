@@ -52,7 +52,7 @@ jobs:
       - name: Reset test account
         run: |
           source ./.venv/bin/activate
-          python tools/reset_test_account.py
+          python tools/manage_test_account.py teardown-and-reset
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.TEST_SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.TEST_SNOWFLAKE_USER }}
