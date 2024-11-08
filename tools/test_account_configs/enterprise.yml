@@ -8,6 +8,12 @@ grants:
   - GRANT APPLY ROW ACCESS POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
   - GRANT APPLY TAG ON ACCOUNT TO ROLE EVERY_PRIVILEGE
 
+schemas:
+  - name: tagged_schema
+    database: static_database
+    tags:
+      static_database.public.static_tag: static_tag_value
+
 tags:
   - name: static_tag
     database: static_database
