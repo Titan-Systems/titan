@@ -185,7 +185,6 @@ file_formats:
 
   - name: JSON
     type: JSON
-    null_if: []
     compression: NONE
     database: DOTA
     schema: PUBLIC
