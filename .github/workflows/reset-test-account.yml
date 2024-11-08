@@ -1,4 +1,4 @@
-name: Reset test account
+name: Reset test accounts
 
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ on:
         required: true
 
 jobs:
-  reset-test-account:
+  reset-test-accounts:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

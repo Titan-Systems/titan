@@ -67,6 +67,10 @@ jobs:
             edition: standard
           - environment: snowflake-aws-enterprise
             edition: enterprise
+          - environment: snowflake-aws-business-critical
+            edition: enterprise
+          - environment: snowflake-azure-standard
+            edition: standard
     environment: ${{ matrix.environment }}
     steps:
     - uses: actions/checkout@v4

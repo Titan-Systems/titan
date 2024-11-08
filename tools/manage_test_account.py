@@ -50,10 +50,7 @@ def reset_test_account():
     conn = get_connection()
     session_ctx = fetch_session(conn)
     config = get_config(session_ctx)
-    # titan_vars = collect_vars_from_environment()
-    from dotenv import dotenv_values
-
-    titan_vars = dotenv_values("env/.vars.test_account")
+    titan_vars = collect_vars_from_environment()
     blueprint_config = collect_blueprint_config(config, {"vars": titan_vars})
     print_blueprint_config(blueprint_config)
 
