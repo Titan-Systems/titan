@@ -266,7 +266,7 @@ security_integrations:
 
 external_volumes:
   - name: static_external_volume
-    allow_writes: false
+    allow_writes: true
     storage_locations:
       - name: us-west-2
         storage_provider: S3
