@@ -141,7 +141,7 @@ def schema_option():
 @database_option()
 @schema_option()
 def plan(config_path, json_output, output_file, vars: dict, allowlist, run_mode, scope, database, schema):
-    """Generate an execution plan based on your configuration"""
+    """Compare a resource config to the current state of Snowflake"""
 
     if not config_path:
         raise click.UsageError("--config is required")
@@ -193,7 +193,7 @@ def plan(config_path, json_output, output_file, vars: dict, allowlist, run_mode,
 @schema_option()
 @click.option("--dry-run", is_flag=True, help="When dry run is true, Titan will not make any changes to Snowflake")
 def apply(config_path, plan_file, vars, allowlist, run_mode, scope, database, schema, dry_run):
-    """Apply an execution plan to a Snowflake account"""
+    """Apply a resource config to a Snowflake account"""
 
     if config_path and plan_file:
         raise click.UsageError("Cannot specify both --config and --plan.")
@@ -253,7 +253,9 @@ def apply(config_path, plan_file, vars, allowlist, run_mode, scope, database, sc
 @click.option("--format", type=click.Choice(["json", "yml"]), default="yml", help="Output format")
 def export(resources, export_all, exclude_resources, out, format):
     """
-    This command allows you to export resources from Titan in either JSON or YAML format.
+    Generate a resource config for existing Snowflake resources
+
+    This command allows you to export resources from Snowflake in either JSON or YAML format.
     You can specify the type of resource to export and the output filename for the exported data.
 
     Resource types are specified with snake case (eg. Warehouse => warehouse, NetworkRule => network_rule, etc.).

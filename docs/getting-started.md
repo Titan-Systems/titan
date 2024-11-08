@@ -2,12 +2,7 @@
 
 If you're new, the best place to start is with the Python package.
 
-### Python + CLI Installation
-
-### Install from PyPi
-coming soon
-
-### Install from source
+### Install from PyPi (MacOS, Linux)
 
 ```sh
 python -m venv .venv
@@ -15,7 +10,15 @@ source .venv/bin/activate
 python -m pip install titan-core
 ```
 
-### Using the Python package
+### Install from PyPi (Windows)
+
+```bat
+python -m venv .venv
+.\.venv\Scripts\activate
+python -m pip install titan-core
+```
+
+## Using the Python package
 
 ```Python
 import os
@@ -102,9 +105,11 @@ bp.apply(session, plan) # =>
 """
 ```
 
-### Using the CLI
+For more advanced usage, see [Blueprint](blueprint.md).
 
-You can use the CLI to generate a plan, apply a plan, or export resources. To use the CLI, install the Python package and call `python -m titan` from the command line.
+## Using the CLI
+
+You can use the CLI to generate a plan, apply a plan, or export resources. To use the CLI, install the Python package and call `titan` from the command line.
 
 The CLI allows you to `plan` and `apply` a Titan Core YAML config. You can specify a single input file or a directory of configs.
 
@@ -122,13 +127,15 @@ To connect with Snowflake, the CLI uses environment variables. These environment
 * `SNOWFLAKE_MFA_PASSCODE`
 * `SNOWFLAKE_AUTHENTICATOR`
 
+
 ### CLI Example
 
-```sh
-# Show the help message
-python -m titan --help
+Show the help message
 
-# Usage: python -m titan [OPTIONS] COMMAND [ARGS]...
+```sh
+titan --help
+
+# Usage: titan [OPTIONS] COMMAND [ARGS]...
 # 
 #   titan core helps you manage your Snowflake environment.
 # 
@@ -136,12 +143,16 @@ python -m titan --help
 #   --help  Show this message and exit.
 # 
 # Commands:
-#   apply   Apply a plan to Titan resources
-#   export  Export Titan resources
-#   plan    Generate an execution plan based on your configuration
+#   apply    Apply a resource config to a Snowflake account
+#   connect  Test the connection to Snowflake
+#   export   Generate a resource config for existing Snowflake resources
+#   plan     Compare a resource config to the current state of Snowflake
+```
 
-# The CLI uses YAML config. This command creates a sample config file.
+Apply a resource config to Snowflake
 
+```sh
+# Create a resource config file
 cat <<EOF > titan.yml
 roles:
   - name: transformer
@@ -163,47 +174,60 @@ export SNOWFLAKE_USER="my-user"
 export SNOWFLAKE_PASSWORD="my-password"
 
 # Generate a plan
-python -m titan plan --config titan.yml
+titan plan --config titan.yml
 
 # Apply the config
-python -m titan apply --config titan.yml
+titan apply --config titan.yml
 ```
 
-### Using the GitHub Action
+Export existing Snowflake resources to YAML.
+
+```sh
+titan export \
+  --resource=warehouse,grant,role \
+  --out=titan.yml
+```
+
+The Titan Core Python package installs the CLI script `titan`. You can alternatively use Python CLI module syntax if you need fine-grained control over the Python environment.
+
+```sh
+python -m titan plan --config titan.yml
+```
+
+## Using the GitHub Action
 The Titan Core GitHub Action allows you to automate the deployment of Snowflake resources using a git-based workflow.
 
 ### GitHub Action Example
 
-```yaml
-# .github/workflows/titan.yml
-name: Titan Snowflake
+```YAML
+-- .github/workflows/titan.yml
+name: Deploy to Snowflake with Titan
 on:
   push:
-    branches: ["main"]
-    # The directory in your repo where titan configs live.
+    branches: [ main ]
     paths:
-    - 'envs/prod/**'
-
+    - 'titan/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy to Snowflake with Titan
-
-    # The Github environment to use
-    environment: prod
     steps:
-      - uses: actions/checkout@v4
-      - name: Deploy with Titan
-        id: titan-core-action
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Snowflake
         uses: Titan-Systems/titan-core-action@main
         with:
-          resource-path: envs/prod
-          valid-resource-types: database,user,warehouse,role
+          run-mode: 'create-or-update'
+          resource-path: './titan'
+          allowlist: 'warehouse,role,grant'
+          dry-run: 'false'
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
 ```
+
+For in-depth documentation, see [Titan Core GitHub Action](titan-core-github-action.md).
