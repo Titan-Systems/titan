@@ -12,7 +12,7 @@ schemas:
   - name: tagged_schema
     database: static_database
     tags:
-      static_database.public.static_tag: static_tag_value
+      static_database.public.static_tag: STATIC_TAG_VALUE
 
 tags:
   - name: static_tag
