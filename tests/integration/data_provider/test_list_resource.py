@@ -90,9 +90,9 @@ def test_list_resource(cursor, list_resources_database, resource, marked_for_cle
     assert resource.fqn in list_resources
 
 
-@pytest.mark.enterprise
-def test_list_tag_references(cursor):
-    data_provider.fetch_session.cache_clear()
-    reset_cache()
-    tag_references = data_provider.list_tag_references(cursor)
-    assert len(tag_references) > 0
+# @pytest.mark.enterprise
+# def test_list_tag_references(cursor):
+#     data_provider.fetch_session.cache_clear()
+#     reset_cache()
+#     tag_references = data_provider.list_tag_references(cursor)
+#     assert len(tag_references) > 0

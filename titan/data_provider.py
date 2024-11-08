@@ -2614,34 +2614,37 @@ def list_tables(session: SnowflakeConnection) -> list[FQN]:
 
 
 def list_tag_references(session: SnowflakeConnection) -> list[FQN]:
+    # FIXME
+    # This function previously relied on a system table function with 2 hours of latency.
+
     try:
-        show_result = execute(session, "SHOW TAGS IN ACCOUNT")
+        # show_result = execute(session, "SHOW TAGS IN ACCOUNT")
         tag_references: list[FQN] = []
-        for tag in show_result:
-            if tag["database_name"] in SYSTEM_DATABASES or tag["schema_name"] == "INFORMATION_SCHEMA":
-                continue
+        # for tag in show_result:
+        #     if tag["database_name"] in SYSTEM_DATABASES or tag["schema_name"] == "INFORMATION_SCHEMA":
+        #         continue
 
-            tag_refs = execute(
-                session,
-                f"""
-                    SELECT *
-                    FROM table(snowflake.account_usage.tag_references_with_lineage(
-                        '{tag['database_name']}.{tag['schema_name']}.{tag['name']}'
-                    ))
-                """,
-            )
+        #     tag_refs = execute(
+        #         session,
+        #         f"""
+        #             SELECT *
+        #             FROM table(snowflake.account_usage.tag_references_with_lineage(
+        #                 '{tag['database_name']}.{tag['schema_name']}.{tag['name']}'
+        #             ))
+        #         """,
+        #     )
 
-            for ref in tag_refs:
-                if ref["OBJECT_DELETED"] is not None:
-                    continue
+        #     for ref in tag_refs:
+        #         if ref["OBJECT_DELETED"] is not None:
+        #             continue
 
-                tag_references.append(
-                    FQN(
-                        database=resource_name_from_snowflake_metadata(ref["TAG_DATABASE"]),
-                        schema=resource_name_from_snowflake_metadata(ref["TAG_SCHEMA"]),
-                        name=resource_name_from_snowflake_metadata(ref["TAG_NAME"]),
-                    )
-                )
+        #         tag_references.append(
+        #             FQN(
+        #                 database=resource_name_from_snowflake_metadata(ref["TAG_DATABASE"]),
+        #                 schema=resource_name_from_snowflake_metadata(ref["TAG_SCHEMA"]),
+        #                 name=resource_name_from_snowflake_metadata(ref["TAG_NAME"]),
+        #             )
+        #         )
 
         return tag_references
 
