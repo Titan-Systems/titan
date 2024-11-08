@@ -1,9 +1,5 @@
 # `titan core` - Snowflake infrastructure as code
 
-<!-- <div align="center">
-    <img src="./images/github-explainer.png" style="padding-bottom: 20px; width: 830px;"/>
-</div> -->
-
 Titan Core helps you provision, deploy, and secure resources in Snowflake. It replaces tools like Terraform, Schemachange, or Permifrost.
 
 Deploy any Snowflake resource, including users, roles, schemas, databases, integrations, pipes, stages, functions, stored procedures, and more. Convert adhoc, bug-prone SQL management scripts into simple, repeatable configuration.
@@ -12,7 +8,7 @@ Titan Core is for:
 
 * DevOps engineers looking to automate and manage Snowflake infrastructure.
 * Analytics engineers working with dbt who want to manage Snowflake resources without macros.
-* Data engineers needing a reliable tool for deploying and managing Snowflake resources.
+* Data platform teams who need to reliably manage Snowflake with CI/CD.
 * Organizations that prefer a git-based workflow for infrastructure management.
 * Teams seeking to replace Terraform for Snowflake-related tasks.
 
@@ -20,19 +16,19 @@ Titan Core is for:
     ╔══════════╗                                           ╔═══════════╗       
     ║  CONFIG  ║                                           ║ SNOWFLAKE ║       
     ╚══════════╝                                           ╚═══════════╝       
- ┏━━━━━━━━━━━┓                                        ┏━━━━━━━━━━━┓            
-┌┫ WAREHOUSE ┣──────┐                                ┌┫ WAREHOUSE ┣───────────┐
-│┗━━━━━━━━━━━┛      │                    ALTER       │┗━━━━━━━━━━━┛           │
-│ name:         ETL │─────┐           ┌─ WAREHOUSE ─▶│ name:         ETL      │
-│ auto_suspend: 60  │     │           │              │ auto_suspend: 300 -> 60│
-└───────────────────┘  ╔══▼═══════════╩═╗            └────────────────────────┘
+  ┏━━━━━━━━━━━┓                                        ┏━━━━━━━━━━━┓            
+┌─┫ WAREHOUSE ┣─────┐                                ┌─┫ WAREHOUSE ┣───────────┐
+│ ┗━━━━━━━━━━━┛     │                    ALTER       │ ┗━━━━━━━━━━━┛           │
+│ name:         ETL │─────┐           ┌─ WAREHOUSE ─▶│ name:         ETL       │
+│ auto_suspend: 60  │     │           │              │ auto_suspend: 300 -> 60 │
+└───────────────────┘  ╔══▼═══════════╩═╗            └─────────────────────────┘
                        ║                ║                                      
                        ║   TITAN CORE   ║                                      
   ┏━━━━━━┓             ║                ║              ┏━━━━━━┓                
-┌─┫ ROLE ┣──────────┐  ╚══▲═══════════╦═╝            ┌─┫ ROLE ┣───────────────┐
-│ ┗━━━━━━┛          │     │           │              │ ┗━━━━━━┛               │
-│ name: TRANSFORMER │─────┘           └─ CREATE ────▶│ name: TRANSFORMER      │
-└───────────────────┘                    ROLE        └────────────────────────┘
+┌─┫ ROLE ┣──────────┐  ╚══▲═══════════╦═╝            ┌─┫ ROLE ┣────────────────┐
+│ ┗━━━━━━┛          │     │           │              │ ┗━━━━━━┛                │
+│ name: TRANSFORMER │─────┘           └─ CREATE ────▶│ name: TRANSFORMER       │
+└───────────────────┘                    ROLE        └─────────────────────────┘
 ```
 
 
@@ -42,11 +38,11 @@ Titan Core is for:
 
  * **Comprehensive** » Nearly every Snowflake resource is supported
 
- * **Pythonic** » Written in Python so you can use it with your existing Python workflow
+ * **Flexible** » Write resource configuration in YAML or Python
 
- * **Fast** » Titan Core runs in seconds, even with complex environments
+ * **Fast** » Titan Core runs 50-90% faster than Terraform and Permifrost
 
- * **SQL** » The only tool that allows you to write Python, YAML, or SQL
+ * **Migration-friendly** » Generate config automatically with the export CLI
 
 ## Open Source
 
@@ -60,20 +56,23 @@ You can find comprehensive [Titan Core documentation on GitBook](https://titan-c
 
 If you're new, the best place to start is with the Python package.
 
-### Python + CLI Installation
-
-### Install from PyPi
+### Install from PyPi (MacOS, Linux)
 
 ```sh
 python -m venv .venv
-# linux / mac:
 source .venv/bin/activate
-# windows:
+python -m pip install titan-core
+```
+
+### Install from PyPi (Windows)
+
+```bat
+python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install titan-core
 ```
 
-### Using the Python package
+### Python example
 
 ```Python
 import os
@@ -168,7 +167,7 @@ The CLI allows you to `plan` and `apply` a Titan Core YAML config. You can speci
 
 In addition to `plan` and `apply`, the CLI also allows you to `export` resources. This makes it easy to generate a config for an existing Snowflake environment.
 
-To connect with Snowflake, the CLI uses environment variables. These environment variables are supported:
+To connect with Snowflake, the CLI uses environment variables. The following `are supported:
 
 * `SNOWFLAKE_ACCOUNT`
 * `SNOWFLAKE_USER`
@@ -182,11 +181,12 @@ To connect with Snowflake, the CLI uses environment variables. These environment
 
 ### CLI Example
 
-```sh
-# Show the help message
-python -m titan --help
+Show the help message
 
-# Usage: python -m titan [OPTIONS] COMMAND [ARGS]...
+```sh
+titan --help
+
+# Usage: titan [OPTIONS] COMMAND [ARGS]...
 # 
 #   titan core helps you manage your Snowflake environment.
 # 
@@ -194,12 +194,16 @@ python -m titan --help
 #   --help  Show this message and exit.
 # 
 # Commands:
-#   apply   Apply a plan to Titan resources
-#   export  Export Titan resources
-#   plan    Generate an execution plan based on your configuration
+#   apply    Apply a resource config to a Snowflake account
+#   connect  Test the connection to Snowflake
+#   export   Generate a resource config for existing Snowflake resources
+#   plan     Compare a resource config to the current state of Snowflake
+```
 
-# The CLI uses YAML config. This command creates a sample config file.
+Apply a resource config to Snowflake
 
+```sh
+# Create a resource config file
 cat <<EOF > titan.yml
 roles:
   - name: transformer
@@ -221,16 +225,24 @@ export SNOWFLAKE_USER="my-user"
 export SNOWFLAKE_PASSWORD="my-password"
 
 # Generate a plan
-python -m titan plan --config titan.yml
+titan plan --config titan.yml
 
 # Apply the config
-python -m titan apply --config titan.yml
+titan apply --config titan.yml
 ```
 
-The CLI can be used to export your current resource config to a file.
+Export existing Snowflake resources to YAML.
 
 ```sh
-python -m titan export --resource=warehouse,grant,role --out=titan.yml
+titan export \
+  --resource=warehouse,grant,role \
+  --out=titan.yml
+```
+
+The Titan Core Python package installs the CLI script `titan`. You can alternatively use Python CLI module syntax if you need fine-grained control over the Python environment.
+
+```sh
+python -m titan plan --config titan.yml
 ```
 
 ### Using the GitHub Action
@@ -278,14 +290,15 @@ jobs:
 
 ## `titan core` vs other tools
 
-| Feature                                 | Titan Core | Terraform | Schemachange |  Permifrost |
-|-----------------------------------------|------------|-----------|--------------| ------------|
-| Plan and Execute Changes                | ✅ | ✅        | ❌            | ✅          |
-| Declarative Config                      | ✅ | ✅        | ❌            | ✅          |
-| Python-Based Definitions                | ✅ | w/ CDKTF  | ❌            | ❌          |
-| SQL Support                             | ✅ | ❌        | ✅            | ❌          |
-| Dynamic Role Switching                  | ✅ | ❌        | N/A           | ❌          |
-| No State File Dependency                | ✅ | ❌        | ✅            | ✅          |
+| Feature                                 | Titan Core | Terraform | Schemachange | Permifrost | SnowDDL |
+|-----------------------------------------|------------|-----------|--------------| -----------| -------- |
+| Plan and Execute Changes                | ✅ | ✅        | ❌ | ✅ | ✅ |
+| Declarative Config                      | ✅ | ✅        | ❌ | ✅ | ✅ |
+| No State File Dependency                | ✅ | ❌        | ✅ | ✅ | ✅ |
+| Python-Based Definitions                | ✅ | w/ CDKTF  | ❌ | ❌ | ✅ |
+| SQL Support                             | ✅ | ❌        | ✅ | ❌ | ❌ |
+| Dynamic Role Switching                  | ✅ | ❌        | N/A | ❌ | ❌ |
+| Export Snowflake resources              | ✅ | ❌        | ❌ | ❌ | ❌ |
 
 
 ### `titan core` vs Terraform
@@ -311,6 +324,11 @@ Declarative config is less error-prone and more scalable, especially in dynamic 
 [Permifrost](https://gitlab.com/gitlab-data/permifrost/) is an access-management tool for Snowflake. It helps you automate the creation of users, roles, and grants. Permifrost only manages permissions, it doesn't manage any other aspect of your Snowflake account.
 
 Permifrost can be very slow. Running simple Permifrost configs can take minutes to run. Titan Core is designed to run in seconds, even with complex environments.
+
+### `titan core` vs SnowDDL
+[SnowDDL](https://github.com/littleK0i/SnowDDL) is a declarative object management tool for Snowflake, similar to Titan Core. It uses a streamlined [permissions model](https://docs.snowddl.com/guides/permission-model) that simplifies granting read and write access to databases and schemas.
+
+SnowDDL takes a strongly opinionated stance on roles in Snowflake. If you don't need a [3-tier role heirarchy](https://docs.snowddl.com/guides/role-hierarchy), SnowDDL may not be a good fit.
 
 ## Resource support
 
@@ -435,6 +453,9 @@ Permifrost can be very slow. Running simple Permifrost configs can take minutes 
 | ↳ SQL                         | ❌ |
 | View                          | ✅ |
 
+### What if I need a type of resource isn't supported?
+
+Please [create a GitHub issue](https://github.com/Titan-Systems/titan/issues) if there's a resource you need that isn't currently supported.
 
 ## Contributing
 
