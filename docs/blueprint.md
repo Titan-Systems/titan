@@ -26,19 +26,36 @@ bp.apply(session, plan)
 ```
 
 ## Blueprint parameters
-- **run_mode** (`str`): Defines how the blueprint interacts with the Snowflake account
+**run_mode** `str`
+- Defines how the blueprint interacts with the Snowflake account
   - **create-or-update** (*default*): Resources are either created or updated, no resources are destroyed
   - **sync**:
     - `⚠️ WARNING` Sync mode will drop resources.
     - Titan will update Snowflake to match the blueprint exactly. Must be used with `allowlist`.
-- **resources** (`list[Resource]`): List of resources initialized in the blueprint.
-- **allowlist** (`list[str]`): Specifies the allowed resource types in the blueprint.
-- **dry_run** (`bool`): `apply()` will return a list of SQL commands that would be executed without applying them.
-- **vars** (`dict`): A key-value dictionary that specifies the names and values of vars.
-- **vars_spec** (`list[dict]`): A list of dictionaries defining the `name`, `type` and `default` (optional) of all expected vars.
-- **scope** (`str`): Limit Titan's scope to a single database or schema. Must be one of "DATABASE" or "SCHEMA". If not specified, Titan will manage any resource.
-- **database** (`str`): The name of a database to limit Titan's scope to. Must be used with `scope`.
-- **schema** (`str`): The name of a schema to limit Titan's scope to. Must be used with `scope` and `database`.
+
+**resources** `list[Resource]`
+- List of resources initialized in the blueprint.
+
+**allowlist** `list[str]`
+- Specifies the allowed resource types in the blueprint.
+
+**dry_run** `bool`
+- `apply()` will return a list of SQL commands that would be executed without applying them.
+
+**vars** `dict`
+- A key-value dictionary that specifies the names and values of vars.
+
+**vars_spec** `list[dict]`
+- A list of dictionaries defining the `name`, `type` and `default` (optional) of all expected vars.
+
+**scope** `str`
+- Limit Titan's scope to a single database or schema. Must be one of "DATABASE" or "SCHEMA". If not specified, Titan will manage any resource.
+
+**database** `str`
+- The name of a database to limit Titan's scope to. Must be used with `scope`.
+
+**schema** `str`
+- The name of a schema to limit Titan's scope to. Must be used with `scope` and `database`.
 
 ## Methods
 
