@@ -1,0 +1,17 @@
+allowlist:
+  - "tag"
+  - "tag reference"
+
+grants:
+  - GRANT APPLY AGGREGATION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
+  - GRANT APPLY PROJECTION POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
+  - GRANT APPLY ROW ACCESS POLICY ON ACCOUNT TO ROLE EVERY_PRIVILEGE
+  - GRANT APPLY TAG ON ACCOUNT TO ROLE EVERY_PRIVILEGE
+
+tags:
+  - name: static_tag
+    database: static_database
+    schema: PUBLIC
+    comment: This is a static tag
+    allowed_values:
+      - STATIC_TAG_VALUE
