@@ -204,7 +204,7 @@ def resource_fixtures() -> list:
             handler="main",
             execute_as="OWNER",
             comment="user-defined procedure",
-            imports=[],
+            imports=None,
             null_handling="CALLED ON NULL INPUT",
             secure=False,
             owner=TEST_ROLE,

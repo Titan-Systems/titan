@@ -250,7 +250,7 @@ class StringListProp(Prop):
         return [tok.strip(" ") for tok in prop_value]
 
     def render(self, values):
-        if values is None or len(values) == 0:
+        if values is None:
             return ""
         value_list = ", ".join([quote_value(v) for v in values])
         return tidy_sql(

@@ -1470,6 +1470,10 @@ def fetch_procedure(session: SnowflakeConnection, fqn: FQN):
     desc_result = execute(session, f"DESC PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}", cacheable=True)
     properties = _desc_result_to_dict(desc_result)
 
+    imports = _parse_list_property(properties["imports"])
+    if len(imports) == 0:
+        imports = None
+
     # show_grants = execute(session, f"SHOW GRANTS ON PROCEDURE {fqn.database}.{fqn.schema}.{str(identifier)}")
     # ownership_grant = _filter_result(show_grants, privilege="OWNERSHIP")
     owner = _fetch_owner(session, "PROCEDURE", fqn)
@@ -1481,7 +1485,7 @@ def fetch_procedure(session: SnowflakeConnection, fqn: FQN):
         "execute_as": properties["execute as"],
         "external_access_integrations": data["external_access_integrations"] or None,
         "handler": properties["handler"],
-        "imports": _parse_list_property(properties["imports"]),
+        "imports": imports,
         "language": properties["language"],
         "null_handling": properties["null handling"],
         "owner": owner,
@@ -2137,9 +2141,7 @@ def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
     rsa_public_key = properties["rsa_public_key"] if properties["rsa_public_key"] != "null" else None
     middle_name = properties["middle_name"] if properties["middle_name"] != "null" else None
 
-    default_secondary_roles = (
-        json.loads(data["default_secondary_roles"]) if data["default_secondary_roles"] is not None else None
-    )
+    default_secondary_roles = json.loads(data["default_secondary_roles"]) if data["default_secondary_roles"] else None
 
     return {
         "name": _quote_snowflake_identifier(data["name"]),
