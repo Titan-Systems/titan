@@ -238,35 +238,32 @@ The Titan Core GitHub Action allows you to automate the deployment of Snowflake 
 
 ### GitHub Action Example
 
-```yaml
-# .github/workflows/titan.yml
-name: Titan Snowflake
+```YAML
+-- .github/workflows/titan.yml
+name: Deploy to Snowflake with Titan
 on:
   push:
-    branches: ["main"]
-    # The directory in your repo where titan configs live.
+    branches: [ main ]
     paths:
-    - 'envs/prod/**'
-
+    - 'titan/**'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy to Snowflake with Titan
-
-    # The Github environment to use
-    environment: prod
     steps:
-      - uses: actions/checkout@v4
-      - name: Deploy with Titan
-        id: titan-core-action
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Snowflake
         uses: Titan-Systems/titan-core-action@main
         with:
-          resource-path: envs/prod
-          valid-resource-types: database,user,warehouse,role
+          run-mode: 'create-or-update'
+          resource-path: './titan'
+          allowlist: 'warehouse,role,grant'
+          dry-run: 'false'
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USERNAME: ${{ secrets.SNOWFLAKE_USERNAME }}
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
