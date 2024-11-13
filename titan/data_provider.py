@@ -519,7 +519,7 @@ def _show_users(session) -> list[dict]:
 
 
 def _get_account_privilege_roles(session: SnowflakeConnection) -> dict[str, list[ResourceName]]:
-    grant_map = {}
+    grant_map: dict[str, list[ResourceName]] = {}
     grants = execute(session, "SHOW GRANTS ON ACCOUNT")
     for grant in grants:
         # Skip system grants
