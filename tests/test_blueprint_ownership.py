@@ -11,7 +11,6 @@ from titan.blueprint import (
 )
 from titan.enums import AccountEdition
 from titan.identifiers import parse_URN
-from titan.privs import AccountPriv, GrantedPrivilege
 from titan.resource_name import ResourceName
 
 

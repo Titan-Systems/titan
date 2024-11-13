@@ -1052,6 +1052,13 @@ def execution_strategy_for_change(
     elif isinstance(change, CreateResource):
         if isinstance(change.resource_cls.scope, AccountScope):
             create_priv = CREATE_PRIV_FOR_RESOURCE_TYPE[change.urn.resource_type]
+
+            # SHARE ownership cannot be changed
+            if change.urn.resource_type == ResourceType.SHARE:
+                if change_owner is None:
+                    raise RuntimeError
+                return change_owner, False
+
             system_role = system_role_for_priv(create_priv)
             if system_role and system_role in available_roles:
                 transfer_ownership = system_role != change_owner
