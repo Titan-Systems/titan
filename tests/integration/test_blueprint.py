@@ -591,3 +591,19 @@ def test_blueprint_split_role_user(cursor):
         cursor.execute("DROP USER IF EXISTS SPLIT_ROLE_USER")
         cursor.execute("DROP ROLE IF EXISTS SPLIT_ROLE_A")
         cursor.execute("DROP ROLE IF EXISTS SPLIT_ROLE_B")
+
+
+# def test_blueprint_share_custom_owner(cursor, suffix):
+#     session = cursor.connection
+#     share_name = f"TEST_SHARE_CUSTOM_OWNER_{suffix}"
+#     share = res.Share(name=share_name, owner="TITAN_SHARE_ADMIN")
+
+#     try:
+#         blueprint = Blueprint(resources=[share])
+#         plan = blueprint.plan(session)
+#         assert len(plan) == 1
+#         assert isinstance(plan[0], CreateResource)
+#         assert plan[0].urn.fqn.name == "my_table"
+#         blueprint.apply(session, plan)
+#     finally:
+#         cursor.execute(f"DROP SHARE IF EXISTS {share_name}")
