@@ -1,14 +1,14 @@
 import datetime
-import logging
 import json
+import logging
 import sys
 from functools import cache
-from typing import Any, Optional, Union, TypedDict
+from typing import Any, Optional, TypedDict, Union
 
 import pytz
 from inflection import pluralize
-from snowflake.connector.errors import ProgrammingError
 from snowflake.connector import SnowflakeConnection
+from snowflake.connector.errors import ProgrammingError
 
 from .builtins import (
     SYSTEM_DATABASES,
@@ -28,12 +28,16 @@ from .identifiers import FQN, URN, parse_FQN, resource_type_for_label
 from .parse import (
     _parse_column,
     _parse_dynamic_table_text,
-    parse_view_ddl,
     parse_collection_string,
     parse_region,
+    parse_view_ddl,
 )
 from .privs import GrantedPrivilege
-from .resource_name import ResourceName, attribute_is_resource_name, resource_name_from_snowflake_metadata
+from .resource_name import (
+    ResourceName,
+    attribute_is_resource_name,
+    resource_name_from_snowflake_metadata,
+)
 
 __this__ = sys.modules[__name__]
 
@@ -42,11 +46,12 @@ logger = logging.getLogger("titan")
 
 class SessionContext(TypedDict):
     account_edition: AccountEdition
+    account_grant_map: dict[str, list[ResourceName]]
     account_locator: str
     account: str
     available_roles: list[ResourceName]
-    cloud: str
     cloud_region: str
+    cloud: str
     database: str
     role: ResourceName
     schemas: list[str]
@@ -479,6 +484,57 @@ def _show_resource_parameters(session: SnowflakeConnection, type_str: str, fqn: 
     return params_result_to_dict(result)
 
 
+def _show_users(session) -> list[dict]:
+    # SHOW USERS requires the MANAGE GRANTS privilege
+    # Other roles can see the list of users but don't get access to other metadata such as login_name.
+    # This causes incorrect drift
+
+    session_ctx = fetch_session(session)
+    execution_role = None
+    current_role = session_ctx["role"]
+
+    eligible_roles = [ResourceName("SECURITYADMIN"), ResourceName("ACCOUNTADMIN")]
+    if (
+        "MANAGE GRANTS" in session_ctx["account_grant_map"]
+        and len(session_ctx["account_grant_map"]["MANAGE GRANTS"]) > 0
+    ):
+        eligible_roles.extend(session_ctx["account_grant_map"]["MANAGE GRANTS"])
+
+    if current_role in eligible_roles:
+        return execute(session, "SHOW USERS", cacheable=True)
+    else:
+        execution_role = None
+        for role in eligible_roles:
+            if role in session_ctx["available_roles"]:
+                execution_role = role
+                break
+        else:
+            raise RuntimeError("Managing users requires the MANAGE GRANTS privilege")
+
+        use_role(session, execution_role)
+        users = execute(session, "SHOW USERS", cacheable=True)
+        use_role(session, current_role)
+
+    return users
+
+
+def _get_account_privilege_roles(session: SnowflakeConnection) -> dict[str, list[ResourceName]]:
+    grant_map: dict[str, list[ResourceName]] = {}
+    grants = execute(session, "SHOW GRANTS ON ACCOUNT")
+    for grant in grants:
+        # Skip system grants
+        if grant["granted_by"] == "":
+            continue
+
+        if grant["privilege"] in ["MANAGE GRANTS", "APPLY TAG"]:
+            priv = grant["privilege"]
+            role = resource_name_from_snowflake_metadata(grant["grantee_name"])
+            if priv not in grant_map:
+                grant_map[priv] = []
+            grant_map[priv].append(role)
+    return grant_map
+
+
 def _show_grants_to_role(
     session: SnowflakeConnection, role: ResourceName, cacheable: bool = False
 ) -> list[dict[str, Any]]:
@@ -534,6 +590,13 @@ def use_secondary_roles(session: SnowflakeConnection, all: bool = False):
     execute(session, f"USE SECONDARY ROLES {secondary_roles}")
 
 
+def use_role(session: SnowflakeConnection, role_name: ResourceName):
+    """
+    Set the active role for the current session.
+    """
+    execute(session, f"USE ROLE {role_name}")
+
+
 def fetch_resource(session: SnowflakeConnection, urn: URN) -> Optional[dict]:
     try:
         return getattr(__this__, f"fetch_{urn.resource_label}")(session, urn.fqn)
@@ -582,9 +645,11 @@ def fetch_session(session: SnowflakeConnection) -> SessionContext:
     account_data = json.loads(session_obj["ACCOUNT_DATA"])
     available_roles = [ResourceName(role) for role in json.loads(session_obj["AVAILABLE_ROLES"])]
     region = parse_region(session_obj["REGION"])
+    account_grant_map = _get_account_privilege_roles(session)
 
     return {
         "account_edition": AccountEdition(account_data["accountInfo"]["serviceLevelName"]),
+        "account_grant_map": account_grant_map,
         "account_locator": session_obj["ACCOUNT_LOCATOR"],
         "account": session_obj["ACCOUNT"],
         "available_roles": available_roles,
@@ -2107,10 +2172,8 @@ def fetch_tag_reference(session: SnowflakeConnection, fqn: FQN):
 
 
 def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
-    # SHOW USERS requires the MANAGE GRANTS privilege
-    # Other roles can see the list of users but don't get access to other metadata such as login_name.
-    # This causes incorrect drift
-    users = _show_resources(session, "USERS", fqn)
+    show_result = _show_users(session)
+    users = _filter_result(show_result, name=fqn.name)
 
     if len(users) == 0:
         return None

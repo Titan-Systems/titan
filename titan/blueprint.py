@@ -630,7 +630,6 @@ class Blueprint:
                         elif self._config.scope == BlueprintScope.SCHEMA and fqn.schema != self._config.schema:
                             continue
                         urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
-                        # state[urn] = {}  # RemoteResourceStub()
                         data = data_provider.fetch_resource(session, urn)
                         if data is None:
                             raise MissingResourceException(f"Resource could not be found: {urn}")
