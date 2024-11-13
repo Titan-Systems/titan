@@ -62,7 +62,8 @@ def execute(
         cur = session.cursor(snowflake.connector.DictCursor)
 
     if sql.startswith("USE ROLE"):
-        desired_role = sql.split(" ")[-1]
+        desired_role = sql.split(" ", 2)[-1]
+        # TODO: determine if this works at all for quoted roles
         if desired_role == session.role:
             return [[]]
 
