@@ -316,6 +316,33 @@ def update_table(urn: URN, data: dict, props: Props) -> str:
         return update__default(urn, {attr: new_value}, props)
 
 
+# FIXME
+# The AFTER attribute on tasks is one of the only attributes that is stateful,
+# which means that you need to know the current value in order to modify it.
+# This is a problem because we don't have a concept of "current value" for lifecycle updates
+# and so we can't know what value to set.
+def update_task(urn: URN, data: dict, props: Props) -> str:
+    attr, new_value = data.popitem()
+    attr = attr.lower()
+    if attr == "as_":
+        return tidy_sql("ALTER TASK", urn.fqn, "MODIFY", "AS", new_value)
+    # elif attr == "after":
+    #     if new_value is None:
+    #         return tidy_sql("ALTER TASK", urn.fqn, "MODIFY", "AFTER", "NONE")
+    #     else:
+    #         return tidy_sql("ALTER TASK", urn.fqn, "MODIFY", "AFTER", ",".join([f"'{name}'" for name in new_value]))
+    elif attr == "when":
+        if new_value is None:
+            return tidy_sql("ALTER TASK", urn.fqn, "REMOVE", "WHEN")
+        else:
+            return tidy_sql("ALTER TASK", urn.fqn, "MODIFY", "WHEN", new_value)
+    elif attr == "state":
+        change_verb = "RESUME" if new_value == "STARTED" else "SUSPEND"
+        return tidy_sql("ALTER TASK", urn.fqn, change_verb)
+    else:
+        return update__default(urn, {attr: new_value}, props)
+
+
 def update_iceberg_table(urn: URN, data: dict, props: Props) -> str:
     attr, new_value = data.popitem()
     attr = attr.lower()

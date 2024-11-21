@@ -625,3 +625,79 @@ def test_fetch_external_volume(cursor, suffix, marked_for_cleanup):
         ExternalVolumeStorageLocation.spec, data_storage_locations[0]
     )
     assert result == data
+
+
+def test_fetch_task(cursor, suffix, marked_for_cleanup):
+    task = res.Task(
+        name=f"TEST_FETCH_TASK_{suffix}",
+        schedule="60 MINUTE",
+        state="SUSPENDED",
+        as_="SELECT 1",
+        owner=TEST_ROLE,
+        comment="This is a test task",
+        allow_overlapping_execution=True,
+        user_task_managed_initial_warehouse_size="XSMALL",
+        user_task_timeout_ms=1000,
+        suspend_task_after_num_failures=1,
+        config='{"output_dir": "/temp/test_directory/", "learning_rate": 0.1}',
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+    )
+    create(cursor, task)
+    marked_for_cleanup.append(task)
+
+    result = safe_fetch(cursor, task.urn)
+    assert result is not None
+    result = clean_resource_data(res.Task.spec, result)
+    data = clean_resource_data(res.Task.spec, task.to_dict())
+    assert result == data
+
+
+def test_fetch_task_trailing_whitespace(cursor, suffix, marked_for_cleanup):
+    task = res.Task(
+        name=f"TEST_FETCH_TASK_TRAILING_WHITESPACE_{suffix}",
+        schedule="60 MINUTE",
+        state="SUSPENDED",
+        as_="SELECT 1\n\n\t\t  ",
+        owner=TEST_ROLE,
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+    )
+    create(cursor, task)
+    marked_for_cleanup.append(task)
+
+    result = safe_fetch(cursor, task.urn)
+    assert result is not None
+    result = clean_resource_data(res.Task.spec, result)
+    data = clean_resource_data(res.Task.spec, task.to_dict())
+    assert result == data
+
+
+def test_fetch_task_predecessor(cursor, suffix, marked_for_cleanup):
+    parent_task = res.Task(
+        name=f"TEST_FETCH_TASK_PARENT_{suffix}",
+        state="SUSPENDED",
+        as_="SELECT 1",
+        owner=TEST_ROLE,
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+    )
+    child_task = res.Task(
+        name=f"TEST_FETCH_TASK_CHILD_{suffix}",
+        state="SUSPENDED",
+        as_="SELECT 1",
+        owner=TEST_ROLE,
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+        after=[str(parent_task.fqn)],
+    )
+    create(cursor, parent_task)
+    create(cursor, child_task)
+    marked_for_cleanup.append(parent_task)
+    marked_for_cleanup.append(child_task)
+
+    result = safe_fetch(cursor, child_task.urn)
+    assert result is not None
+    result = clean_resource_data(res.Task.spec, result)
+    data = clean_resource_data(res.Task.spec, child_task.to_dict())
+    assert result == data

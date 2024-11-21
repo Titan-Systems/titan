@@ -1982,7 +1982,7 @@ def fetch_tag(session: SnowflakeConnection, fqn: FQN):
 
 
 def fetch_task(session: SnowflakeConnection, fqn: FQN):
-    show_result = execute(session, f"SHOW TASKS IN SCHEMA {fqn.database}.{fqn.schema}", cacheable=True)
+    show_result = _show_resources(session, "TASKS", fqn)
 
     if len(show_result) == 0:
         return None
@@ -1994,12 +1994,35 @@ def fetch_task(session: SnowflakeConnection, fqn: FQN):
     if len(task_details_result) == 0:
         raise Exception(f"Failed to fetch task details for {fqn}")
     task_details = task_details_result[0]
+
+    show_params_result = execute(session, f"SHOW PARAMETERS FOR TASK {fqn}")
+    params = params_result_to_dict(show_params_result)
+
+    error_integration = None
+    if data["error_integration"] != "null":
+        error_integration = _quote_snowflake_identifier(data["error_integration"])
+
+    task_relations = json.loads(task_details["task_relations"])
+    after = task_relations["Predecessors"]
+
+    suspend_task_after_num_failures = None
+    if len(after) == 0:
+        suspend_task_after_num_failures = params.get("suspend_task_after_num_failures", None)
+
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "warehouse": data["warehouse"],
         "schedule": data["schedule"],
+        "config": data["config"],
+        "allow_overlapping_execution": data["allow_overlapping_execution"] == "true",
+        "user_task_managed_initial_warehouse_size": params.get("user_task_managed_initial_warehouse_size", None),
+        "user_task_timeout_ms": params.get("user_task_timeout_ms", None),
+        "suspend_task_after_num_failures": suspend_task_after_num_failures,
+        "error_integration": error_integration,
         "state": str(data["state"]).upper(),
         "owner": _get_owner_identifier(data),
+        "comment": task_details["comment"] or None,
+        "after": after or None,
         "as_": task_details["definition"],
     }
 
