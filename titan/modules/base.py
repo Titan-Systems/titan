@@ -1,0 +1,2 @@
+class ResourceModule:
+    pass
