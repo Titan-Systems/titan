@@ -266,13 +266,6 @@ def resource_fixtures() -> list:
             ],
             owner=TEST_ROLE,
         ),
-        res.Task(
-            name="TEST_FETCH_TASK",
-            schedule="60 MINUTE",
-            state="SUSPENDED",
-            as_="SELECT 1",
-            owner=TEST_ROLE,
-        ),
         res.User(
             name="TEST_FETCH_USER@applytitan.com",
             owner=TEST_ROLE,

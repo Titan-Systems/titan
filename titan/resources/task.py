@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from ..enums import ResourceType, TaskState, WarehouseSize
 from ..props import (
@@ -6,11 +6,11 @@ from ..props import (
     EnumProp,
     ExpressionProp,
     FlagProp,
+    IdentifierListProp,
     IdentifierProp,
     IntProp,
     Props,
     QueryProp,
-    StringListProp,
     StringProp,
 )
 from ..resource_name import ResourceName
@@ -28,16 +28,31 @@ class _Task(ResourceSpec):
     user_task_managed_initial_warehouse_size: WarehouseSize = None
     schedule: str = None
     config: str = None
-    allow_overlapping_execution: bool = None
-    user_task_timeout_ms: int = None
+    allow_overlapping_execution: bool = False
+    user_task_timeout_ms: int = 3600000
     suspend_task_after_num_failures: int = None
     error_integration: str = None
-    copy_grants: bool = None
+    copy_grants: bool = field(default=None, metadata={"fetchable": False})
     comment: str = None
     after: list[str] = None
     when: str = None
     state: TaskState = TaskState.SUSPENDED
     as_: str = None
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.as_ is not None:
+            self.as_ = self.as_.strip()
+
+        if self.warehouse is not None and self.user_task_managed_initial_warehouse_size is not None:
+            raise ValueError("user_task_managed_initial_warehouse_size cannot be set if warehouse is set")
+        if self.warehouse is None and self.user_task_managed_initial_warehouse_size is None:
+            # Default to serverless task
+            self.user_task_managed_initial_warehouse_size = WarehouseSize.MEDIUM
+
+        if self.suspend_task_after_num_failures is None and len(self.after or []) == 0:
+            # Set default only if non-child task
+            self.suspend_task_after_num_failures = 10
 
 
 class Task(NamedResource, Resource):
@@ -101,7 +116,7 @@ class Task(NamedResource, Resource):
         error_integration=StringProp("error_integration"),
         copy_grants=FlagProp("copy grants"),
         comment=StringProp("comment"),
-        after=StringListProp("after", eq=False),
+        after=IdentifierListProp("after", eq=False, parens=False),
         when=ExpressionProp("when"),
         as_=QueryProp("as"),
     )
@@ -116,8 +131,8 @@ class Task(NamedResource, Resource):
         user_task_managed_initial_warehouse_size: WarehouseSize = None,
         schedule: str = None,
         config: str = None,
-        allow_overlapping_execution: bool = None,
-        user_task_timeout_ms: int = None,
+        allow_overlapping_execution: bool = False,
+        user_task_timeout_ms: int = 3600000,
         suspend_task_after_num_failures: int = None,
         error_integration: str = None,
         copy_grants: bool = None,
