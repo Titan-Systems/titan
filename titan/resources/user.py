@@ -32,13 +32,13 @@ class _User(ResourceSpec):
     email: str = None
     must_change_password: bool = None
     disabled: bool = False
-    days_to_expiry: int = field(default=None, metadata={"known_after_apply": True})
-    mins_to_unlock: int = None
+    days_to_expiry: int = field(default=None, metadata={"fetchable": False})
+    mins_to_unlock: int = field(default=None, metadata={"fetchable": False})
     default_warehouse: str = None
     default_namespace: str = None
     default_role: str = None
     default_secondary_roles: list[str] = None
-    mins_to_bypass_mfa: int = None
+    mins_to_bypass_mfa: int = field(default=None, metadata={"fetchable": False})
     rsa_public_key: str = None
     rsa_public_key_2: str = None
     comment: str = None
