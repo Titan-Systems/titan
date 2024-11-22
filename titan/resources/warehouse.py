@@ -147,7 +147,7 @@ class Warehouse(NamedResource, TaggableResource, Resource):
     resource_type = ResourceType.WAREHOUSE
     props = Props(
         _start_token="WITH",
-        warehouse_type=EnumProp("warehouse_type", WarehouseType),
+        warehouse_type=EnumProp("warehouse_type", WarehouseType, quoted=True),
         warehouse_size=EnumProp("warehouse_size", WarehouseSize),
         max_cluster_count=IntProp("max_cluster_count"),
         min_cluster_count=IntProp("min_cluster_count"),

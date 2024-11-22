@@ -112,3 +112,18 @@ def test_grant_on_all(cursor, suffix, marked_for_cleanup):
     assert schema_3_usage_grant["to"] == "STATIC_ROLE"
     assert schema_3_usage_grant["on"] == f"{test_db}.SCHEMA_3"
     assert schema_3_usage_grant["on_type"] == "SCHEMA"
+
+
+@pytest.mark.enterprise
+def test_fetch_warehouse_snowpark_optimized(cursor, suffix, marked_for_cleanup):
+    warehouse = res.Warehouse(
+        name=f"TEST_FETCH_WAREHOUSE_SNOWPARK_OPTIMIZED_{suffix}",
+        warehouse_type="SNOWPARK-OPTIMIZED",
+        warehouse_size="MEDIUM",
+    )
+
+    cursor.execute(warehouse.create_sql())
+    marked_for_cleanup.append(warehouse)
+    data = safe_fetch(cursor, warehouse.urn)
+    assert data is not None
+    assert data["warehouse_type"] == "SNOWPARK-OPTIMIZED"
