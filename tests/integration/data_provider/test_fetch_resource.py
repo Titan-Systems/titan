@@ -629,7 +629,7 @@ def test_fetch_external_volume(cursor, suffix, marked_for_cleanup):
 
 def test_fetch_task(cursor, suffix, marked_for_cleanup):
     task = res.Task(
-        name=f"TEST_FETCH_TASK_{suffix}",
+        name=f"TEST_FETCH_TASK_SERVERLESS_{suffix}",
         schedule="60 MINUTE",
         state="SUSPENDED",
         as_="SELECT 1",
@@ -638,6 +638,29 @@ def test_fetch_task(cursor, suffix, marked_for_cleanup):
         allow_overlapping_execution=True,
         user_task_managed_initial_warehouse_size="XSMALL",
         user_task_timeout_ms=1000,
+        suspend_task_after_num_failures=1,
+        config='{"output_dir": "/temp/test_directory/", "learning_rate": 0.1}',
+        database="STATIC_DATABASE",
+        schema="PUBLIC",
+    )
+    create(cursor, task)
+    marked_for_cleanup.append(task)
+
+    result = safe_fetch(cursor, task.urn)
+    assert result is not None
+    result = clean_resource_data(res.Task.spec, result)
+    data = clean_resource_data(res.Task.spec, task.to_dict())
+    assert result == data
+
+    task = res.Task(
+        name=f"TEST_FETCH_TASK_WAREHOUSE_{suffix}",
+        schedule="60 MINUTE",
+        state="SUSPENDED",
+        as_="SELECT 1",
+        owner=TEST_ROLE,
+        comment="This is a test task",
+        allow_overlapping_execution=False,
+        warehouse="STATIC_WAREHOUSE",
         suspend_task_after_num_failures=1,
         config='{"output_dir": "/temp/test_directory/", "learning_rate": 0.1}',
         database="STATIC_DATABASE",

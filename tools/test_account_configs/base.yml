@@ -23,6 +23,7 @@ allowlist:
   - "storage integration"
   - "stream"
   - "table"
+  - "task"
   - "user"
   - "view"
   - "warehouse"
@@ -253,6 +254,29 @@ tables:
     database: static_database
     schema: public
 
+tasks:
+  - name: static_task_serverless
+    database: static_database
+    schema: public
+    schedule: "1440 MINUTE"
+    user_task_managed_initial_warehouse_size: XSMALL
+    config: '{"some_key": "some_value"}'
+    suspend_task_after_num_failures: 3
+    allow_overlapping_execution: false
+    state: STARTED
+    when: "1=1"
+    as_: SELECT 1
+  - name: static_task
+    database: static_database
+    schema: public
+    schedule: "1440 MINUTE"
+    warehouse: static_warehouse
+    config: '{"some_key": "some_value"}'
+    suspend_task_after_num_failures: 3
+    allow_overlapping_execution: false
+    state: STARTED
+    when: "1=1"
+    as_: SELECT 1
 
 views:
   - name: static_view

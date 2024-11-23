@@ -121,8 +121,14 @@ def get_examples_yml():
 
 
 def safe_fetch(cursor, urn):
+    session_ctx = data_provider.fetch_session(cursor)
     reset_cache()
-    return data_provider.fetch_resource(cursor, urn)
+    data = data_provider.fetch_resource(cursor, urn)
+    if data is None:
+        return None
+    resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+    resource_cls.spec(**data).to_dict(session_ctx["account_edition"])
+    return data
 
 
 def dump_resource_change(change):
