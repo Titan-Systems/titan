@@ -2009,13 +2009,16 @@ def fetch_task(session: SnowflakeConnection, fqn: FQN):
     if len(after) == 0:
         suspend_task_after_num_failures = params.get("suspend_task_after_num_failures", None)
 
+    user_task_managed_initial_warehouse_size = None
+    if not data["warehouse"]:
+        user_task_managed_initial_warehouse_size = params.get("user_task_managed_initial_warehouse_size", None)
     return {
         "name": _quote_snowflake_identifier(data["name"]),
         "warehouse": data["warehouse"],
         "schedule": data["schedule"],
         "config": data["config"],
         "allow_overlapping_execution": data["allow_overlapping_execution"] == "true",
-        "user_task_managed_initial_warehouse_size": params.get("user_task_managed_initial_warehouse_size", None),
+        "user_task_managed_initial_warehouse_size": user_task_managed_initial_warehouse_size,
         "user_task_timeout_ms": params.get("user_task_timeout_ms", None),
         "suspend_task_after_num_failures": suspend_task_after_num_failures,
         "error_integration": error_integration,

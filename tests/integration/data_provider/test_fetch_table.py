@@ -5,17 +5,13 @@ import pytest
 from titan import data_provider
 from titan import resources as res
 from titan.enums import DataType
-from titan.client import reset_cache
+
+from tests.helpers import safe_fetch
 
 pytestmark = pytest.mark.requires_snowflake
 
 TEST_ROLE = os.environ.get("TEST_SNOWFLAKE_ROLE")
 TEST_USER = os.environ.get("TEST_SNOWFLAKE_USER")
-
-
-def safe_fetch(cursor, urn):
-    reset_cache()
-    return data_provider.fetch_resource(cursor, urn)
 
 
 def test_fetch_table_clustered(cursor, test_db, suffix):
