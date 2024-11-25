@@ -13,7 +13,9 @@ def test_grant_global_priv():
     assert grant.priv == "CREATE WAREHOUSE"
     assert grant.on == "ACCOUNT"
     assert grant.to.name == "somerole"
-    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=CREATE WAREHOUSE&on=account/ACCOUNT"
+    assert (
+        str(URN.from_resource(grant)) == "urn:::grant/GRANT?priv=CREATE WAREHOUSE&on=account/ACCOUNT&to=role/SOMEROLE"
+    )
     assert grant.create_sql() == "GRANT CREATE WAREHOUSE ON ACCOUNT TO ROLE SOMEROLE"
 
 
@@ -24,7 +26,7 @@ def test_grant_account_obj_priv_with_resource():
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=MODIFY&on=warehouse/SOMEWH"
+    assert str(URN.from_resource(grant)) == "urn:::grant/GRANT?priv=MODIFY&on=warehouse/SOMEWH&to=role/SOMEROLE"
 
 
 def test_grant_account_obj_priv_with_kwarg():
@@ -33,7 +35,7 @@ def test_grant_account_obj_priv_with_kwarg():
     assert grant.on == "SOMEWH"
     assert grant.on_type == ResourceType.WAREHOUSE
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=MODIFY&on=warehouse/SOMEWH"
+    assert str(URN.from_resource(grant)) == "urn:::grant/GRANT?priv=MODIFY&on=warehouse/SOMEWH&to=role/SOMEROLE"
 
 
 def test_grant_schema_priv_with_resource():
@@ -43,7 +45,7 @@ def test_grant_schema_priv_with_resource():
     assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=CREATE VIEW&on=schema/SOMESCHEMA"
+    assert str(URN.from_resource(grant)) == "urn:::grant/GRANT?priv=CREATE VIEW&on=schema/SOMESCHEMA&to=role/SOMEROLE"
 
 
 def test_grant_schema_priv_with_kwarg():
@@ -52,7 +54,7 @@ def test_grant_schema_priv_with_kwarg():
     assert grant.on == "SOMESCHEMA"
     assert grant.on_type == ResourceType.SCHEMA
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=CREATE VIEW&on=schema/SOMESCHEMA"
+    assert str(URN.from_resource(grant)) == "urn:::grant/GRANT?priv=CREATE VIEW&on=schema/SOMESCHEMA&to=role/SOMEROLE"
 
 
 def test_grant_all():
@@ -62,7 +64,7 @@ def test_grant_all():
     assert grant.on_type == ResourceType.WAREHOUSE
     assert grant.to.name == "SOMEROLE"
     assert grant._data._privs == all_privs_for_resource_type(ResourceType.WAREHOUSE)
-    assert str(URN.from_resource(grant)) == "urn:::grant/SOMEROLE?priv=ALL&on=warehouse/SOMEWH"
+    assert str(URN.from_resource(grant)) == "urn:::grant/GRANT?priv=ALL&on=warehouse/SOMEWH&to=role/SOMEROLE"
 
 
 def test_future_grant_schemas_priv():
@@ -72,7 +74,10 @@ def test_future_grant_schemas_priv():
     assert grant.in_type == ResourceType.DATABASE
     assert grant.in_name == "SOMEDB"
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=CREATE VIEW&on=database/SOMEDB.<SCHEMA>"
+    assert (
+        str(URN.from_resource(grant))
+        == "urn:::future_grant/FUTURE_GRANT?priv=CREATE VIEW&on=database/SOMEDB.<SCHEMA>&to=role/SOMEROLE"
+    )
 
 
 def test_future_grant_anonymous_target():
@@ -82,7 +87,10 @@ def test_future_grant_anonymous_target():
     assert grant.in_type == ResourceType.SCHEMA
     assert grant.in_name == "SOMESCHEMA"
     assert grant.to.name == "SOMEROLE"
-    assert str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>"
+    assert (
+        str(URN.from_resource(grant))
+        == "urn:::future_grant/FUTURE_GRANT?priv=SELECT&on=schema/SOMESCHEMA.<TABLE>&to=role/SOMEROLE"
+    )
 
 
 def test_future_grant_anonymous_nested_target():
@@ -93,7 +101,8 @@ def test_future_grant_anonymous_nested_target():
     assert grant.in_name == "somedb.SOMESCHEMA"
     assert grant.to.name == "SOMEROLE"
     assert (
-        str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMEDB.SOMESCHEMA.<TABLE>"
+        str(URN.from_resource(grant))
+        == "urn:::future_grant/FUTURE_GRANT?priv=SELECT&on=schema/SOMEDB.SOMESCHEMA.<TABLE>&to=role/SOMEROLE"
     )
 
 
@@ -106,7 +115,8 @@ def test_future_grant_referenced_inferred_target():
     assert grant.in_name == "somedb.SOMESCHEMA"
     assert grant.to.name == "SOMEROLE"
     assert (
-        str(URN.from_resource(grant)) == "urn:::future_grant/SOMEROLE?priv=SELECT&on=schema/SOMEDB.SOMESCHEMA.<TABLE>"
+        str(URN.from_resource(grant))
+        == "urn:::future_grant/FUTURE_GRANT?priv=SELECT&on=schema/SOMEDB.SOMESCHEMA.<TABLE>&to=role/SOMEROLE"
     )
 
 
