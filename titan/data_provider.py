@@ -1188,8 +1188,6 @@ def fetch_future_grant(session: SnowflakeConnection, fqn: FQN):
     _, collection_str = fqn.params["on"].split("/")
     collection = parse_collection_string(collection_str)
 
-
-
     # If the resource we want to grant on isn't fully qualified in the FQN for the future grant, this filter step will fail.
     # For example:
     # fetch_future_grant(...,
@@ -2483,12 +2481,14 @@ def list_future_grants(session: SnowflakeConnection) -> list[FQN]:
         for data in grant_data:
             in_type = "database" if data["grant_on"] == "SCHEMA" else "schema"
             collection = data["name"]
+            to = f"role/{role_name}"
             grants.append(
                 FQN(
-                    name=role_name,
+                    name=ResourceName("GRANT"),
                     params={
                         "priv": data["privilege"],
                         "on": f"{in_type}/{collection}",
+                        "to": to,
                     },
                 )
             )
@@ -2515,10 +2515,9 @@ def list_grants(session: SnowflakeConnection) -> list[FQN]:
         role_name = resource_name_from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        grant_data = _show_grants_to_role(session, role_name, cacheable=False)
+        grant_data = _show_grants_to_role(session, role_name, role_type=ResourceType.ROLE, cacheable=False)
         for data in grant_data:
             if data["granted_on"] == "ROLE":
-                # raise Exception(f"Role grants are not supported yet: {data}")
                 continue
 
             # Titan Grants don't support OWNERSHIP privilege
@@ -2533,12 +2532,14 @@ def list_grants(session: SnowflakeConnection) -> list[FQN]:
             if data["granted_on"] == "ACCOUNT":
                 name = "ACCOUNT"
             on = f"{data['granted_on'].lower()}/{name}"
+            to = f"role/{role_name}"
             grants.append(
                 FQN(
-                    name=role_name,
+                    name=ResourceName("GRANT"),
                     params={
                         "priv": data["privilege"],
                         "on": on,
+                        "to": to,
                     },
                 )
             )

@@ -216,7 +216,7 @@ def test_database_role_grants(cursor, suffix, marked_for_cleanup):
     db = res.Database(name="whatever")
     role = res.DatabaseRole(name="whatever_role", database=db)
     grant = res.Grant(priv="USAGE", on_schema=db.public_schema.fqn, to=role)
-    future_grant = res.FutureGrant(priv="SELECT", on_type="table", in_type=db.resource_type, in_name=db.name, to=role)
+    future_grant = res.FutureGrant(priv="SELECT", on_future_tables_in=db, to=role)
 
     marked_for_cleanup.append(db)
     marked_for_cleanup.append(role)
