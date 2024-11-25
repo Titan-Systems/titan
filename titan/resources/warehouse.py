@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Union
+from typing import Optional, Union
 
 from ..enums import AccountEdition, ParseableEnum, ResourceType, WarehouseSize
 from ..props import (
@@ -15,7 +15,7 @@ from ..resource_name import ResourceName
 from ..scope import AccountScope
 from .resource import NamedResource, Resource, ResourceSpec
 from .resource_monitor import ResourceMonitor
-from .role import Role
+from ..role_ref import RoleRef
 from .tag import TaggableResource
 
 
@@ -29,10 +29,15 @@ class WarehouseScalingPolicy(ParseableEnum):
     ECONOMY = "ECONOMY"
 
 
+T_WAREHOUSE_TYPE = Union[WarehouseType, str]
+T_WAREHOUSE_SCALING_POLICY = Union[WarehouseScalingPolicy, str]
+T_WAREHOUSE_SIZE = Union[WarehouseSize, str]
+
+
 @dataclass(unsafe_hash=True)
 class _Warehouse(ResourceSpec):
     name: ResourceName
-    owner: Role = "SYSADMIN"
+    owner: RoleRef = "SYSADMIN"
     warehouse_type: WarehouseType = WarehouseType.STANDARD
     warehouse_size: WarehouseSize = WarehouseSize.XSMALL
     max_cluster_count: int = field(
@@ -171,16 +176,16 @@ class Warehouse(NamedResource, TaggableResource, Resource):
         self,
         name: str,
         owner: str = "SYSADMIN",
-        warehouse_type: str = "STANDARD",
-        warehouse_size: str = "XSMALL",
+        warehouse_type: T_WAREHOUSE_TYPE = "STANDARD",
+        warehouse_size: T_WAREHOUSE_SIZE = "XSMALL",
         max_cluster_count: int = 1,
         min_cluster_count: int = 1,
-        scaling_policy: str = "STANDARD",
+        scaling_policy: T_WAREHOUSE_SCALING_POLICY = "STANDARD",
         auto_suspend: int = 600,
         auto_resume: bool = True,
         initially_suspended: bool = False,
-        resource_monitor: Union[ResourceMonitor, str, None] = None,
-        comment: str = None,
+        resource_monitor: Optional[T_RESOURCE_MONITOR] = None,
+        comment: Optional[str] = None,
         enable_query_acceleration: bool = False,
         query_acceleration_max_scale_factor: int = 8,
         max_concurrency_level: int = 8,

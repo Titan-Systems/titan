@@ -11,7 +11,8 @@ from ..props import (
 from ..resource_name import ResourceName
 from ..scope import AccountScope
 from .resource import NamedResource, Resource, ResourceSpec
-from .role import Role
+from ..role_ref import RoleRef
+from typing import Optional, Union
 
 
 class ResourceMonitorFrequency(ParseableEnum):
@@ -22,15 +23,18 @@ class ResourceMonitorFrequency(ParseableEnum):
     NEVER = "NEVER"
 
 
+T_RESOURCE_MONITOR_FREQUENCY = Union[ResourceMonitorFrequency, str]
+
+
 @dataclass(unsafe_hash=True)
 class _ResourceMonitor(ResourceSpec):
     name: ResourceName
-    owner: Role = "ACCOUNTADMIN"
-    credit_quota: int = None
-    frequency: ResourceMonitorFrequency = None
-    start_timestamp: str = None
-    end_timestamp: str = None
-    notify_users: list[str] = None
+    owner: RoleRef = "ACCOUNTADMIN"
+    credit_quota: Optional[int] = None
+    frequency: Optional[ResourceMonitorFrequency] = None
+    start_timestamp: Optional[str] = None
+    end_timestamp: Optional[str] = None
+    notify_users: Optional[list[str]] = None
 
     def __post_init__(self):
         super().__post_init__()
@@ -101,11 +105,11 @@ class ResourceMonitor(NamedResource, Resource):
     def __init__(
         self,
         name: str,
-        credit_quota: int = None,
-        frequency: ResourceMonitorFrequency = None,
-        start_timestamp: str = None,
-        end_timestamp: str = None,
-        notify_users: list[str] = None,
+        credit_quota: Optional[int] = None,
+        frequency: Optional[T_RESOURCE_MONITOR_FREQUENCY] = None,
+        start_timestamp: Optional[str] = None,
+        end_timestamp: Optional[str] = None,
+        notify_users: Optional[list[str]] = None,
         owner: str = "ACCOUNTADMIN",
         **kwargs,
     ):
@@ -120,3 +124,6 @@ class ResourceMonitor(NamedResource, Resource):
             owner=owner,
         )
         # TODO: rely on notify_users
+
+
+T_RESOURCE_MONITOR = Union[ResourceMonitor, ResourceName, str]
