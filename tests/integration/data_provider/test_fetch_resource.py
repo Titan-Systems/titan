@@ -124,9 +124,7 @@ def test_fetch_grant_on_account(cursor, suffix):
         assert bind_service_grant["on_type"] == "ACCOUNT"
         assert bind_service_grant["to"] == role.name
         assert bind_service_grant["to_type"] == "ROLE"
-        audit_urn = parse_URN(
-            f"urn:::grant/GRANT?priv=AUDIT&on=account/ACCOUNT&to=role/{role.name}"
-        )
+        audit_urn = parse_URN(f"urn:::grant/GRANT?priv=AUDIT&on=account/ACCOUNT&to=role/{role.name}")
         audit_grant = safe_fetch(cursor, audit_urn)
         assert audit_grant is not None
         assert audit_grant["priv"] == "AUDIT"
@@ -740,7 +738,6 @@ def test_fetch_database_role_grant(cursor, suffix, marked_for_cleanup):
 
     grant = res.Grant(priv="USAGE", on_schema="STATIC_DATABASE.PUBLIC", to=role)
     create(cursor, grant)
-    marked_for_cleanup.append(grant)
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
