@@ -2484,7 +2484,7 @@ def list_future_grants(session: SnowflakeConnection) -> list[FQN]:
             to = f"role/{role_name}"
             grants.append(
                 FQN(
-                    name=ResourceName("GRANT"),
+                    name=ResourceName("FUTURE_GRANT"),
                     params={
                         "priv": data["privilege"],
                         "on": f"{in_type}/{collection}",
