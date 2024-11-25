@@ -705,6 +705,23 @@ def convert_role_ref(role_ref: RoleRef) -> Resource:
         raise TypeError
 
 
+# def convert_role_ref(role_ref: RoleRef) -> str:
+#     if role_ref.__class__.__name__ == "Role":
+#         return f"role/{role_ref.fqn}"
+#     elif role_ref.__class__.__name__ == "DatabaseRole":
+#         return f"database_role/{role_ref.fqn}"
+#     elif isinstance(role_ref, ResourcePointer) and role_ref.resource_type in (
+#         ResourceType.DATABASE_ROLE,
+#         ResourceType.ROLE,
+#     ):
+#         return f"{resource_label_for_type(role_ref.resource_type)}/{role_ref.fqn}"
+#     elif isinstance(role_ref, str) or isinstance(role_ref, ResourceName):
+#         resource_type = infer_role_type_from_name(role_ref)
+#         return f"{resource_label_for_type(resource_type)}/{role_ref}"
+#     else:
+#         raise TypeError
+
+
 def infer_role_type_from_name(name: Union[str, ResourceName]) -> ResourceType:
     if isinstance(name, ResourceName):
         name = str(name)

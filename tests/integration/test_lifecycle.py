@@ -210,3 +210,23 @@ def test_task_lifecycle_remove_predecessor(cursor, suffix, marked_for_cleanup):
     assert len(plan) == 1
     assert isinstance(plan[0], UpdateResource)
     blueprint.apply(cursor.connection, plan)
+
+
+def test_database_role_grants(cursor, suffix, marked_for_cleanup):
+    db = res.Database(name="whatever")
+    role = res.DatabaseRole(name="whatever_role", database=db)
+    grant = res.Grant(priv="USAGE", on_schema=db.public_schema.fqn, to=role)
+    future_grant = res.FutureGrant(priv="SELECT", on_type="table", in_type=db.resource_type, in_name=db.name, to=role)
+
+    marked_for_cleanup.append(db)
+    marked_for_cleanup.append(role)
+    marked_for_cleanup.append(grant)
+    marked_for_cleanup.append(future_grant)
+
+    bp = Blueprint(
+        resources=[db, role, grant, future_grant],
+    )
+    plan = bp.plan(cursor.connection)
+    assert len(plan) == 4
+    assert all(isinstance(r, CreateResource) for r in plan)
+    bp.apply(cursor.connection, plan)

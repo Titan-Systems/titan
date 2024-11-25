@@ -25,6 +25,7 @@ class _Grant(ResourceSpec):
     on: str
     on_type: ResourceType
     to: RoleRef
+    to_type: ResourceType = None
     grant_option: bool = False
     owner: Role = field(default=None, metadata={"fetchable": False})
     _privs: list[str] = field(default_factory=list, metadata={"triggers_create": True})
@@ -43,6 +44,8 @@ class _Grant(ResourceSpec):
                 self._privs = sorted(all_privs_for_resource_type(self.on_type))
             else:
                 self._privs = [self.priv]
+
+        self.to_type = self.to.resource_type
 
 
 class Grant(Resource):
@@ -108,6 +111,11 @@ class Grant(Resource):
     ):
 
         kwargs.pop("_privs", None)
+        to_type = kwargs.pop("to_type", None)
+
+        if all([to_type, to]):
+            to_type = ResourceType(to_type)
+            to = ResourcePointer(name=to, resource_type=to_type)
 
         priv = priv.value if isinstance(priv, ParseableEnum) else priv
 
@@ -211,17 +219,23 @@ class Grant(Resource):
         return self._data.to
 
     @property
+    def to_type(self) -> ResourceType:
+        return self._data.to_type
+
+    @property
     def priv(self):
         return self._data.priv
 
 
 def grant_fqn(grant: _Grant):
     on = f"{resource_label_for_type(grant.on_type)}/{grant.on}"
+    to = f"{resource_label_for_type(grant.to_type)}/{grant.to.fqn}"
     return FQN(
-        name=grant.to.name,
+        name=ResourceName("GRANT"),
         params={
             "priv": grant.priv,
             "on": on,
+            "to": to,
         },
     )
 
@@ -232,7 +246,8 @@ def grant_yaml(data: dict):
     return {
         "priv": grant.priv,
         f"on_{resource_label}": grant.on,
-        "to": grant.to.name,
+        "to": str(grant.to.fqn),
+        "to_type": str(grant.to_type),
         "grant_option": grant.grant_option,
     }
 
@@ -244,12 +259,14 @@ class _FutureGrant(ResourceSpec):
     in_type: ResourceType
     in_name: ResourceName
     to: RoleRef
+    to_type: ResourceType = None
     grant_option: bool = False
 
     def __post_init__(self):
         super().__post_init__()
         if isinstance(self.priv, str):
             self.priv = self.priv.upper()
+        self.to_type = self.to.resource_type
 
 
 class FutureGrant(Resource):
@@ -327,12 +344,17 @@ class FutureGrant(Resource):
         on_type = kwargs.pop("on_type", None)
         in_type = kwargs.pop("in_type", None)
         in_name = kwargs.pop("in_name", None)
+        to_type = kwargs.pop("to_type", None)
         granted_in_ref = None
 
         if all([on_type, in_type, in_name]):
             in_type = ResourceType(in_type)
             on_type = ResourceType(on_type)
             granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
+
+        if all([to_type, to]):
+            to_type = ResourceType(to_type)
+            to = ResourcePointer(name=to, resource_type=to_type)
 
         else:
 
@@ -405,17 +427,23 @@ class FutureGrant(Resource):
     def to(self):
         return self._data.to
 
+    @property
+    def to_type(self) -> ResourceType:
+        return self._data.to_type
+
 
 def future_grant_fqn(data: _FutureGrant):
     in_type = resource_label_for_type(data.in_type)
     in_name = data.in_name
     on_type = resource_label_for_type(data.on_type).upper()
     collection = format_collection_string({"in_name": in_name, "in_type": in_type, "on_type": on_type})
+    to = f"{resource_label_for_type(data.to_type)}/{data.to.fqn}"
     return FQN(
-        name=data.to.name,
+        name=ResourceName("FUTURE_GRANT"),
         params={
             "priv": data.priv,
             "on": f"{in_type}/{collection}",
+            "to": to,
         },
     )
 
@@ -427,12 +455,14 @@ class _GrantOnAll(ResourceSpec):
     in_type: ResourceType
     in_name: ResourceName
     to: RoleRef
+    to_type: ResourceType = None
     grant_option: bool = False
 
     def __post_init__(self):
         super().__post_init__()
         if self.in_type not in [ResourceType.DATABASE, ResourceType.SCHEMA]:
             raise ValueError(f"in_type must be either DATABASE or SCHEMA, not {self.in_type}")
+        self.to_type = self.to.resource_type
 
 
 class GrantOnAll(Resource):
@@ -514,6 +544,11 @@ class GrantOnAll(Resource):
         on_type = kwargs.pop("on_type", None)
         in_type = kwargs.pop("in_type", None)
         in_name = kwargs.pop("in_name", None)
+        to_type = kwargs.pop("to_type", None)
+
+        if all([to_type, to]):
+            to_type = ResourceType(to_type)
+            to = ResourcePointer(name=to, resource_type=to_type)
 
         _owner = kwargs.pop("owner", None)
         if _owner is not None:
@@ -577,11 +612,13 @@ def grant_on_all_fqn(data: _GrantOnAll):
     in_name = data.in_name
     on_type = resource_label_for_type(data.on_type).upper()
     collection = format_collection_string({"in_name": in_name, "in_type": in_type, "on_type": on_type})
+    to = f"{resource_label_for_type(data.to_type)}/{data.to.fqn}"
     return FQN(
-        name=data.to.name,
+        name=ResourceName("GRANT_ON_ALL"),
         params={
             "priv": data.priv,
             "on": f"{in_type}/{collection}",
+            "to": to,
         },
     )
 

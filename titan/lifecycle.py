@@ -98,9 +98,9 @@ def create_future_grant(urn: URN, data: dict, props: Props, if_not_exists: bool)
         "IN",
         data["in_type"],
         data["in_name"],
-        "TO ROLE",
-        urn.fqn.name,
-        # props.render(data), #TODO grant option
+        "TO",
+        data["to_type"],
+        data["to"],
     )
 
 
@@ -116,7 +116,10 @@ def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
         "ON",
         on_type,
         data["on"],
-        props.render(data),
+        "TO",
+        data["to_type"],
+        data["to"],
+        "WITH GRANT OPTION" if data["grant_option"] else "",
     )
 
 
@@ -129,7 +132,8 @@ def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool)
         "IN",
         data["in_type"],
         data["in_name"],
-        "TO ROLE",
+        "TO",
+        data["to_type"],
         data["to"],
     )
 

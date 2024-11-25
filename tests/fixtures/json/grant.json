@@ -3,6 +3,7 @@
     "on_type": "DATABASE",
     "on": "STATIC_DATABASE",
     "to": "STATIC_ROLE",
+    "to_type": "ROLE",
     "owner": "SYSADMIN",
     "grant_option": false,
     "_privs": [
