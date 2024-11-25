@@ -114,27 +114,31 @@ def test_fetch_grant_on_account(cursor, suffix):
     cursor.execute(f"GRANT BIND SERVICE ENDPOINT ON ACCOUNT TO ROLE {role.name}")
 
     try:
-        bind_service_urn = parse_URN(f"urn:::grant/{role.name}?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT")
+        bind_service_urn = parse_URN(
+            f"urn:::grant/GRANT?priv=BIND SERVICE ENDPOINT&on=account/ACCOUNT&to=role/{role.name}"
+        )
         bind_service_grant = safe_fetch(cursor, bind_service_urn)
         assert bind_service_grant is not None
         assert bind_service_grant["priv"] == "BIND SERVICE ENDPOINT"
         assert bind_service_grant["on"] == "ACCOUNT"
         assert bind_service_grant["on_type"] == "ACCOUNT"
         assert bind_service_grant["to"] == role.name
-        audit_urn = parse_URN(f"urn:::grant/{role.name}?priv=AUDIT&on=account/ACCOUNT")
+        assert bind_service_grant["to_type"] == "ROLE"
+        audit_urn = parse_URN(f"urn:::grant/GRANT?priv=AUDIT&on=account/ACCOUNT&to=role/{role.name}")
         audit_grant = safe_fetch(cursor, audit_urn)
         assert audit_grant is not None
         assert audit_grant["priv"] == "AUDIT"
         assert audit_grant["on"] == "ACCOUNT"
         assert audit_grant["on_type"] == "ACCOUNT"
         assert audit_grant["to"] == role.name
+        assert audit_grant["to_type"] == "ROLE"
     finally:
         cursor.execute(role.drop_sql(if_exists=True))
 
 
 def test_fetch_grant_all_on_resource(cursor):
     cursor.execute("GRANT ALL ON WAREHOUSE STATIC_WAREHOUSE TO ROLE STATIC_ROLE")
-    grant_all_urn = parse_URN("urn:::grant/STATIC_ROLE?priv=ALL&on=warehouse/STATIC_WAREHOUSE")
+    grant_all_urn = parse_URN("urn:::grant/GRANT_ON_ALL?priv=ALL&on=warehouse/STATIC_WAREHOUSE&to=role/STATIC_ROLE")
     try:
         grant = safe_fetch(cursor, grant_all_urn)
         assert grant is not None
@@ -142,6 +146,7 @@ def test_fetch_grant_all_on_resource(cursor):
         assert grant["on_type"] == "WAREHOUSE"
         assert grant["on"] == "STATIC_WAREHOUSE"
         assert grant["to"] == "STATIC_ROLE"
+        assert grant["to_type"] == "ROLE"
         assert grant["owner"] == "SYSADMIN"
         assert grant["grant_option"] is False
         assert grant["_privs"] == ["APPLYBUDGET", "MODIFY", "MONITOR", "OPERATE", "USAGE"]
@@ -723,4 +728,19 @@ def test_fetch_task_predecessor(cursor, suffix, marked_for_cleanup):
     assert result is not None
     result = clean_resource_data(res.Task.spec, result)
     data = clean_resource_data(res.Task.spec, child_task.to_dict())
+    assert result == data
+
+
+def test_fetch_database_role_grant(cursor, suffix, marked_for_cleanup):
+    role = res.DatabaseRole(name=f"TEST_FETCH_DATABASE_ROLE_GRANT_{suffix}", database="STATIC_DATABASE")
+    create(cursor, role)
+    marked_for_cleanup.append(role)
+
+    grant = res.Grant(priv="USAGE", on_schema="STATIC_DATABASE.PUBLIC", to=role)
+    create(cursor, grant)
+
+    result = safe_fetch(cursor, grant.urn)
+    assert result is not None
+    result = clean_resource_data(res.Grant.spec, result)
+    data = clean_resource_data(res.Grant.spec, grant.to_dict())
     assert result == data

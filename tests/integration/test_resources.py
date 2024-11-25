@@ -87,7 +87,7 @@ def test_grant_on_all(cursor, suffix, marked_for_cleanup):
     cursor.execute(grant.create_sql())
 
     schema_1_usage_grant = safe_fetch(
-        cursor, parse_URN(f"urn:::grant/STATIC_ROLE?priv=USAGE&on=schema/{test_db}.SCHEMA_1")
+        cursor, parse_URN(f"urn:::grant/GRANT?priv=USAGE&on=schema/{test_db}.SCHEMA_1&to=role/STATIC_ROLE")
     )
     assert schema_1_usage_grant is not None
     assert schema_1_usage_grant["priv"] == "USAGE"
@@ -96,7 +96,7 @@ def test_grant_on_all(cursor, suffix, marked_for_cleanup):
     assert schema_1_usage_grant["on_type"] == "SCHEMA"
 
     schema_2_usage_grant = safe_fetch(
-        cursor, parse_URN(f"urn:::grant/STATIC_ROLE?priv=USAGE&on=schema/{test_db}.SCHEMA_2")
+        cursor, parse_URN(f"urn:::grant/GRANT?priv=USAGE&on=schema/{test_db}.SCHEMA_2&to=role/STATIC_ROLE")
     )
     assert schema_2_usage_grant is not None
     assert schema_2_usage_grant["priv"] == "USAGE"
@@ -105,7 +105,7 @@ def test_grant_on_all(cursor, suffix, marked_for_cleanup):
     assert schema_2_usage_grant["on_type"] == "SCHEMA"
 
     schema_3_usage_grant = safe_fetch(
-        cursor, parse_URN(f"urn:::grant/STATIC_ROLE?priv=USAGE&on=schema/{test_db}.SCHEMA_3")
+        cursor, parse_URN(f"urn:::grant/GRANT?priv=USAGE&on=schema/{test_db}.SCHEMA_3&to=role/STATIC_ROLE")
     )
     assert schema_3_usage_grant is not None
     assert schema_3_usage_grant["priv"] == "USAGE"

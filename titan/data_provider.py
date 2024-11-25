@@ -163,9 +163,14 @@ _INDEX: dict[int, dict[tuple[str, str, str], dict[str, Any]]] = {}
 
 
 def _fetch_grant_to_role(
-    session: SnowflakeConnection, role: ResourceName, granted_on: str, on_name: str, privilege: str
+    session: SnowflakeConnection,
+    role: ResourceName,
+    granted_on: str,
+    on_name: str,
+    privilege: str,
+    role_type: ResourceType = ResourceType.ROLE,
 ):
-    grants = _show_grants_to_role(session, role, cacheable=True)
+    grants = _show_grants_to_role(session, role, role_type=role_type, cacheable=True)
     if id(grants) not in _INDEX:
         local_index: dict[tuple[str, str, str], dict[str, Any]] = {}
         _INDEX[id(grants)] = local_index
@@ -536,7 +541,10 @@ def _get_account_privilege_roles(session: SnowflakeConnection) -> dict[str, list
 
 
 def _show_grants_to_role(
-    session: SnowflakeConnection, role: ResourceName, cacheable: bool = False
+    session: SnowflakeConnection,
+    role: ResourceName,
+    role_type: ResourceType = ResourceType.ROLE,
+    cacheable: bool = False,
 ) -> list[dict[str, Any]]:
     """
     {
@@ -552,7 +560,7 @@ def _show_grants_to_role(
     """
     grants = execute(
         session,
-        f"SHOW GRANTS TO ROLE {role}",
+        f"SHOW GRANTS TO {role_type} {role}",
         cacheable=cacheable,
         empty_response_codes=[DOES_NOT_EXIST_ERR],
     )
@@ -1154,8 +1162,12 @@ def fetch_function(session: SnowflakeConnection, fqn: FQN):
 
 
 def fetch_future_grant(session: SnowflakeConnection, fqn: FQN):
+
+    to_type, to = fqn.params["to"].split("/", 1)
+    to_type = resource_type_for_label(to_type)
+
     try:
-        show_result = execute(session, f"SHOW FUTURE GRANTS TO ROLE {fqn.name}", cacheable=True)
+        show_result = execute(session, f"SHOW FUTURE GRANTS TO {to_type} {to}", cacheable=True)
         """
         {
             'created_on': datetime.datetime(2024, 2, 5, 19, 39, 50, 146000, tzinfo=<DstTzInfo 'America/Los_Angeles' PST-1 day, 16:00:00 STD>),
@@ -1192,8 +1204,8 @@ def fetch_future_grant(session: SnowflakeConnection, fqn: FQN):
         show_result,
         privilege=fqn.params["priv"],
         name=collection_str,
-        grant_to="ROLE",
-        grantee_name=fqn.name,
+        grant_to=str(to_type),
+        grantee_name=to,
     )
 
     if len(grants) == 0:
@@ -1208,15 +1220,19 @@ def fetch_future_grant(session: SnowflakeConnection, fqn: FQN):
         "on_type": str(resource_type_for_label(data["grant_on"])),
         "in_type": collection["in_type"].upper(),
         "in_name": collection["in_name"],
-        "to": data["grantee_name"],
+        "to": to,
+        "to_type": resource_type_for_label(data["grant_to"]),
         "grant_option": data["grant_option"] == "true",
     }
 
 
 def fetch_grant(session: SnowflakeConnection, fqn: FQN):
     priv = fqn.params["priv"]
-    on_type, on = fqn.params["on"].split("/")
+    on_type, on = fqn.params["on"].split("/", 1)
     on_type = on_type.upper()
+
+    to_type, to = fqn.params["to"].split("/", 1)
+    to_type = resource_type_for_label(to_type)
 
     if priv == "ALL":
 
@@ -1227,7 +1243,7 @@ def fetch_grant(session: SnowflakeConnection, fqn: FQN):
         if on_type != "ACCOUNT":
             filters["name"] = on
 
-        grants = _show_grants_to_role(session, fqn.name, cacheable=True)
+        grants = _show_grants_to_role(session, to, role_type=to_type, cacheable=True)
         grants = _filter_result(grants, **filters)
 
         if len(grants) == 0:
@@ -1239,10 +1255,11 @@ def fetch_grant(session: SnowflakeConnection, fqn: FQN):
     else:
         data = _fetch_grant_to_role(
             session,
-            role=fqn.name,
+            role=to,
             granted_on=on_type,
             on_name=on,
             privilege=priv,
+            role_type=to_type,
         )
         if data is None:
             return None
@@ -1258,7 +1275,8 @@ def fetch_grant(session: SnowflakeConnection, fqn: FQN):
         "priv": priv,
         "on": "ACCOUNT" if on_type == "ACCOUNT" else data["name"],
         "on_type": data["granted_on"].replace("_", " "),
-        "to": data["grantee_name"],
+        "to": to,
+        "to_type": resource_type_for_label(data["granted_to"]),
         "grant_option": data["grant_option"] == "true",
         "owner": data["granted_by"],
         "_privs": privs,
@@ -2463,12 +2481,14 @@ def list_future_grants(session: SnowflakeConnection) -> list[FQN]:
         for data in grant_data:
             in_type = "database" if data["grant_on"] == "SCHEMA" else "schema"
             collection = data["name"]
+            to = f"role/{role_name}"
             grants.append(
                 FQN(
-                    name=role_name,
+                    name=ResourceName("FUTURE_GRANT"),
                     params={
                         "priv": data["privilege"],
                         "on": f"{in_type}/{collection}",
+                        "to": to,
                     },
                 )
             )
@@ -2495,10 +2515,9 @@ def list_grants(session: SnowflakeConnection) -> list[FQN]:
         role_name = resource_name_from_snowflake_metadata(role["name"])
         if role_name in SYSTEM_ROLES:
             continue
-        grant_data = _show_grants_to_role(session, role_name, cacheable=False)
+        grant_data = _show_grants_to_role(session, role_name, role_type=ResourceType.ROLE, cacheable=False)
         for data in grant_data:
             if data["granted_on"] == "ROLE":
-                # raise Exception(f"Role grants are not supported yet: {data}")
                 continue
 
             # Titan Grants don't support OWNERSHIP privilege
@@ -2513,12 +2532,14 @@ def list_grants(session: SnowflakeConnection) -> list[FQN]:
             if data["granted_on"] == "ACCOUNT":
                 name = "ACCOUNT"
             on = f"{data['granted_on'].lower()}/{name}"
+            to = f"role/{role_name}"
             grants.append(
                 FQN(
-                    name=role_name,
+                    name=ResourceName("GRANT"),
                     params={
                         "priv": data["privilege"],
                         "on": on,
+                        "to": to,
                     },
                 )
             )
