@@ -39,7 +39,7 @@ setup(
         "pyparsing==3.0.9",
         "pyyaml",
         "snowflake-connector-python==3.12.3",
-        "snowflake-snowpark-python==1.25.0",
+        "snowflake-snowpark-python==1.24.0",
         "jinja2",
         "pathspec",
     ],
