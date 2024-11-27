@@ -153,9 +153,15 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
 
 
 def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool = False):
+    to_type = data["to_role_type"] if data["to_role_type"] is not None else "USER"
+    to = data["to_role"] if data["to_role"] is not None else data["to_user"]
     return tidy_sql(
         "GRANT",
-        props.render(data),
+        data["role_type"],
+        data["role"],
+        "TO",
+        to_type,
+        to,
     )
 
 

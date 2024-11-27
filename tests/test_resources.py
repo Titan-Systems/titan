@@ -344,3 +344,10 @@ def test_user_type_fallback(caplog):
     user = res.User(name="test_user", user_type="SERVICE")
     assert "The 'user_type' parameter is deprecated. Use 'type' instead." in caplog.text
     assert user._data.type == UserType.SERVICE
+
+
+def test_future_grant_alt_syntax():
+    db = res.Database(name="DB")
+    role = res.Role(name="ROLE")
+    fg = res.FutureGrant(priv="SELECT", on_type="table", in_type=db.resource_type, in_name=db.name, to=role)
+    assert fg

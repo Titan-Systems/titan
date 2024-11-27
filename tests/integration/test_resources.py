@@ -127,3 +127,15 @@ def test_fetch_warehouse_snowpark_optimized(cursor, suffix, marked_for_cleanup):
     data = safe_fetch(cursor, warehouse.urn)
     assert data is not None
     assert data["warehouse_type"] == "SNOWPARK-OPTIMIZED"
+
+
+def test_grant_database_role_to_database_role(cursor, suffix, marked_for_cleanup):
+    parent = res.DatabaseRole(name=f"DBR2DBR_{suffix}", database="STATIC_DATABASE")
+    child = res.DatabaseRole(name=f"CHILD_{suffix}", database="STATIC_DATABASE")
+    cursor.execute(parent.create_sql())
+    cursor.execute(child.create_sql())
+    marked_for_cleanup.append(parent)
+    marked_for_cleanup.append(child)
+
+    grant = res.RoleGrant(role=child, to_role=parent)
+    cursor.execute(grant.create_sql())
