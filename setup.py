@@ -40,6 +40,7 @@ setup(
         "pyyaml",
         "snowflake-connector-python==3.12.3",
         "snowflake-snowpark-python==1.24.0",
+        "pyOpenSSL>=22.1.0",
         "jinja2",
         "pathspec",
     ],
