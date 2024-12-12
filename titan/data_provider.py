@@ -2228,6 +2228,9 @@ def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
     desc_result = execute(session, f"DESC USER {fqn}")
     properties = _desc_result_to_dict(desc_result, lower_properties=True)
 
+    show_params_result = execute(session, f"SHOW PARAMETERS FOR USER {fqn}")
+    params = params_result_to_dict(show_params_result)
+
     user_type = properties["type"].upper()
 
     display_name = None
@@ -2260,6 +2263,7 @@ def fetch_user(session: SnowflakeConnection, fqn: FQN) -> Optional[dict]:
         "default_secondary_roles": default_secondary_roles,
         "type": user_type,
         "rsa_public_key": rsa_public_key,
+        "network_policy": params["network_policy"],
         "owner": _get_owner_identifier(data),
     }
 
