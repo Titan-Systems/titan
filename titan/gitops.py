@@ -12,6 +12,7 @@ from .enums import BlueprintScope, ResourceType, RunMode
 from .identifiers import resource_label_for_type, resource_type_for_label
 from .resources import (
     Database,
+    DatabaseRoleGrant,
     Resource,
     RoleGrant,
     Schema,
@@ -68,6 +69,29 @@ def _resources_from_role_grants_config(role_grants_config: list) -> list:
     return resources
 
 
+def _resources_from_database_role_grants_config(database_role_grants_config: list) -> list:
+    if len(database_role_grants_config) == 0:
+        return []
+    resources = []
+    for database_role_grant in database_role_grants_config:
+        if "to_role" in database_role_grant:
+            resources.append(
+                DatabaseRoleGrant(
+                    database_role=database_role_grant["database_role"],
+                    to_role=database_role_grant["to_role"],
+                )
+            )
+        else:
+            for role in database_role_grant.get("roles", []):
+                resources.append(
+                    DatabaseRoleGrant(
+                        database_role=database_role_grant["database_role"],
+                        to_role=role,
+                    )
+                )
+    return resources
+
+
 def _resources_from_database_config(databases_config: list) -> list:
     resources = []
     for database in databases_config:
@@ -111,6 +135,7 @@ def _resources_for_config(config: dict, vars: dict):
     # Special cases
     database_config = config.pop("databases", [])
     role_grants = config.pop("role_grants", [])
+    database_role_grants = config.pop("database_role_grants", [])
     users = config.pop("users", [])
 
     resources = []
@@ -165,6 +190,7 @@ def _resources_for_config(config: dict, vars: dict):
 
     resources.extend(_resources_from_database_config(database_config))
     resources.extend(_resources_from_role_grants_config(role_grants))
+    resources.extend(_resources_from_database_role_grants_config(database_role_grants))
     resources.extend(_resources_from_users_config(users))
 
     # This code helps resolve grant references to the fully qualified name of the resource.

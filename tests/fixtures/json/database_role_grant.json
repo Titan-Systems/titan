@@ -1,0 +1,4 @@
+{
+    "database_role": "SOMEDB.SOMEDB_ROLE",
+    "to_role": "SOMEROLE"
+}

@@ -1341,8 +1341,6 @@ def fetch_masking_policy(session: SnowflakeConnection, fqn: FQN):
     desc_result = execute(session, f"DESC MASKING POLICY {fqn}", cacheable=True)
     properties = desc_result[0]
 
-    print("")
-
     return {
         "name": data["name"],
         "owner": _get_owner_identifier(data),

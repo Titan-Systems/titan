@@ -805,9 +805,9 @@ class DatabaseRoleGrant(Resource):
         to_role = getattr(self._data, "to_role", "")
         return f"DatabaseRoleGrant(database_role={database_role}, to_role={to_role})"
 
-    @property
-    def fqn(self):
-        return database_role_grant_fqn(self._data)
+    # @property
+    # def fqn(self):
+    #     return database_role_grant_fqn(self._data)
 
     @property
     def database_role(self) -> DatabaseRole:
@@ -818,8 +818,8 @@ class DatabaseRoleGrant(Resource):
         return self._data.to_role
 
 
-def database_role_grant_fqn(database_role_grant: _DatabaseRoleGrant):
-    return FQN(
-        name=database_role_grant.database_role.name,
-        params={"to": database_role_grant.to_role.name},
-    )
+# def database_role_grant_fqn(database_role_grant: _DatabaseRoleGrant):
+#     return FQN(
+#         name=database_role_grant.database_role.name,
+#         params={"to": database_role_grant.to_role.name},
+#     )

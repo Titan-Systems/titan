@@ -16,7 +16,7 @@ from .external_volume import ExternalVolume
 from .failover_group import FailoverGroup
 from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
-from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
+from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant, DatabaseRoleGrant
 from .hybrid_table import HybridTable
 from .iceberg_table import SnowflakeIcebergTable
 from .image_repository import ImageRepository
@@ -84,6 +84,7 @@ __all__ = [
     "CSVFileFormat",
     "Database",
     "DatabaseRole",
+    "DatabaseRoleGrant",
     "DynamicTable",
     "EmailNotificationIntegration",
     "EventTable",

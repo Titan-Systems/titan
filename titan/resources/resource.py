@@ -701,6 +701,7 @@ def convert_role_ref(role_ref: RoleRef) -> Resource:
         ResourceType.ROLE,
     ):
         return role_ref
+
     elif isinstance(role_ref, str) or isinstance(role_ref, ResourceName):
         return ResourcePointer(name=role_ref, resource_type=infer_role_type_from_name(role_ref))
     else:
