@@ -1,9 +1,9 @@
 {
     "name": "some_masking_policy",
     "args": [
-        {"name": "val", "data_type": "STRING"}
+        {"name": "val", "data_type": "VARCHAR"}
     ],
-    "returns": "STRING",
+    "returns": "VARCHAR",
     "body": "CASE WHEN current_role() IN ('ANALYST') THEN VAL ELSE '*********' END",
     "comment": "Masks email addresses",
     "exempt_other_policies": false

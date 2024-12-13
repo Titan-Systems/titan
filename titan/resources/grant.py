@@ -13,7 +13,7 @@ from ..resource_name import ResourceName
 from ..role_ref import RoleRef
 from ..scope import AccountScope
 from .resource import NamedResource, Resource, ResourcePointer, ResourceSpec
-from .role import Role
+from .role import Role, DatabaseRole
 from .user import User
 
 logger = logging.getLogger("titan")
@@ -623,10 +623,8 @@ def grant_on_all_fqn(data: _GrantOnAll):
 
 @dataclass(unsafe_hash=True)
 class _RoleGrant(ResourceSpec):
-    role: RoleRef
-    role_type: ResourceType = None
-    to_role: RoleRef = None
-    to_role_type: ResourceType = None
+    role: Role
+    to_role: Role = None
     to_user: User = None
 
     def __post_init__(self):
@@ -635,9 +633,6 @@ class _RoleGrant(ResourceSpec):
             raise ValueError("You can only grant to a role or a user, not both")
         if self.to_role is None and self.to_user is None:
             raise ValueError("You must specify a role or a user to grant to")
-        self.role_type = self.role.resource_type
-        if self.to_role:
-            self.to_role_type = self.to_role.resource_type
 
 
 class RoleGrant(Resource):
@@ -760,4 +755,71 @@ def role_grant_fqn(role_grant: _RoleGrant):
     return FQN(
         name=role_grant.role.name,
         params={subject: name},
+    )
+
+
+@dataclass(unsafe_hash=True)
+class _DatabaseRoleGrant(ResourceSpec):
+    database_role: RoleRef
+    to_role: Role
+
+
+class DatabaseRoleGrant(Resource):
+
+    resource_type = ResourceType.ROLE_GRANT
+    props = Props(
+        database_role=IdentifierProp("database role", eq=False),
+        to_role=IdentifierProp("to role", eq=False),
+    )
+    scope = AccountScope()
+    spec = _DatabaseRoleGrant
+
+    def __init__(
+        self,
+        database_role: str,
+        to_role: str,
+        **kwargs,
+    ):
+
+        to = kwargs.pop("to", None)
+        if to:
+            if to_role:
+                raise ValueError("You cant specify both to_role and to")
+            if isinstance(to, Role):
+                to_role = to
+            else:
+                raise ValueError("You can only grant to a role")
+
+        super().__init__(**kwargs)
+        self._data: _DatabaseRoleGrant = _DatabaseRoleGrant(
+            database_role=database_role,
+            to_role=to_role,
+        )
+        self.requires(
+            self._data.database_role,
+            self._data.to_role,
+        )
+
+    def __repr__(self):  # pragma: no cover
+        database_role = getattr(self._data, "database_role", "")
+        to_role = getattr(self._data, "to_role", "")
+        return f"DatabaseRoleGrant(database_role={database_role}, to_role={to_role})"
+
+    @property
+    def fqn(self):
+        return database_role_grant_fqn(self._data)
+
+    @property
+    def database_role(self) -> DatabaseRole:
+        return self._data.database_role
+
+    @property
+    def to(self) -> Role:
+        return self._data.to_role
+
+
+def database_role_grant_fqn(database_role_grant: _DatabaseRoleGrant):
+    return FQN(
+        name=database_role_grant.database_role.name,
+        params={"to": database_role_grant.to_role.name},
     )
