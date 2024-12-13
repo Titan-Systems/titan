@@ -20,6 +20,7 @@ from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
 from .iceberg_table import SnowflakeIcebergTable
 from .image_repository import ImageRepository
+from .masking_policy import MaskingPolicy
 from .materialized_view import MaterializedView
 from .network_policy import NetworkPolicy
 from .network_rule import NetworkRule
@@ -104,6 +105,7 @@ __all__ = [
     "InternalStage",
     "JavascriptUDF",
     "JSONFileFormat",
+    "MaskingPolicy",
     "MaterializedView",
     "NetworkPolicy",
     "NetworkRule",

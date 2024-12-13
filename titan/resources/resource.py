@@ -9,6 +9,8 @@ from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
 
 import pyparsing as pp
 
+from titan.data_types import convert_to_simple_data_type
+
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..exceptions import ResourceHasContainerException, WrongContainerException, WrongEditionException
 from ..identifiers import FQN, URN, parse_identifier, resource_label_for_type
@@ -110,7 +112,7 @@ def _coerce_resource_field(field_value, field_type):
     elif field_type is Arg:
         arg_dict = {
             "name": field_value["name"].upper(),
-            "data_type": DataType(field_value["data_type"]),
+            "data_type": convert_to_simple_data_type(field_value["data_type"]),
         }
         if "default" in field_value:
             arg_dict["default"] = field_value["default"]

@@ -783,3 +783,22 @@ def test_fetch_grant_of_database_role(cursor, suffix, marked_for_cleanup):
     result = clean_resource_data(res.DatabaseRole.spec, result)
     data = clean_resource_data(res.DatabaseRole.spec, role.to_dict())
     assert result == data
+
+
+def test_fetch_masking_policy(cursor, suffix, marked_for_cleanup):
+    policy = res.MaskingPolicy(
+        name=f"TEST_FETCH_MASKING_POLICY_{suffix}",
+        args=[{"name": "val", "data_type": "STRING"}],
+        returns="STRING",
+        body="CASE WHEN current_role() IN ('ANALYST') THEN VAL ELSE '*********' END",
+        comment="Masks email addresses",
+        owner=TEST_ROLE,
+    )
+    create(cursor, policy)
+    marked_for_cleanup.append(policy)
+
+    result = safe_fetch(cursor, policy.urn)
+    assert result is not None
+    result = clean_resource_data(res.MaskingPolicy.spec, result)
+    data = clean_resource_data(res.MaskingPolicy.spec, policy.to_dict())
+    assert result == data

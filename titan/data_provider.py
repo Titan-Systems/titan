@@ -1329,6 +1329,31 @@ def fetch_image_repository(session: SnowflakeConnection, fqn: FQN):
     return {"name": fqn.name, "owner": _get_owner_identifier(data)}
 
 
+def fetch_masking_policy(session: SnowflakeConnection, fqn: FQN):
+    policies = _show_resources(session, "MASKING POLICIES", fqn)
+    if len(policies) == 0:
+        return None
+    if len(policies) > 1:
+        raise Exception(f"Found multiple masking policies matching {fqn}")
+
+    data = policies[0]
+    options = json.loads(data["options"]) if data["options"] else {}
+    desc_result = execute(session, f"DESC MASKING POLICY {fqn}", cacheable=True)
+    properties = desc_result[0]
+
+    print("")
+
+    return {
+        "name": data["name"],
+        "owner": _get_owner_identifier(data),
+        "args": _parse_signature(properties["signature"]),
+        "returns": properties["return_type"],
+        "body": properties["body"],
+        "comment": data["comment"] or None,
+        "exempt_other_policies": options.get("exempt_other_policies", "false") == "true",
+    }
+
+
 def fetch_materialized_view(session: SnowflakeConnection, fqn: FQN):
     materialized_views = _show_resources(session, "MATERIALIZED VIEWS", fqn)
     if len(materialized_views) == 0:

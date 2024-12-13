@@ -138,6 +138,17 @@ def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool)
     )
 
 
+def create_masking_policy(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    return tidy_sql(
+        "CREATE",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
+        "AS",
+        props.render(data),
+    )
+
+
 def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     if if_not_exists:
         raise Exception("IF NOT EXISTS not supported for CREATE PROCEDURE")
