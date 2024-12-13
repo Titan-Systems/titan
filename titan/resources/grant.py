@@ -347,17 +347,15 @@ class FutureGrant(Resource):
         to_type = kwargs.pop("to_type", None)
         granted_in_ref = None
 
-        if all([on_type, in_type, in_name]):
-            in_type = ResourceType(in_type)
-            on_type = ResourceType(on_type)
-            granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
-
         if all([to_type, to]):
             to_type = ResourceType(to_type)
             to = ResourcePointer(name=to, resource_type=to_type)
 
+        if all([on_type, in_type, in_name]):
+            in_type = ResourceType(in_type)
+            on_type = ResourceType(on_type)
+            granted_in_ref = ResourcePointer(name=in_name, resource_type=in_type)
         else:
-
             # Collect on_ kwargs
             on_kwargs = {}
             for keyword, _ in kwargs.copy().items():
@@ -626,7 +624,9 @@ def grant_on_all_fqn(data: _GrantOnAll):
 @dataclass(unsafe_hash=True)
 class _RoleGrant(ResourceSpec):
     role: RoleRef
+    role_type: ResourceType = None
     to_role: RoleRef = None
+    to_role_type: ResourceType = None
     to_user: User = None
 
     def __post_init__(self):
@@ -635,6 +635,9 @@ class _RoleGrant(ResourceSpec):
             raise ValueError("You can only grant to a role or a user, not both")
         if self.to_role is None and self.to_user is None:
             raise ValueError("You must specify a role or a user to grant to")
+        self.role_type = self.role.resource_type
+        if self.to_role:
+            self.to_role_type = self.to_role.resource_type
 
 
 class RoleGrant(Resource):
