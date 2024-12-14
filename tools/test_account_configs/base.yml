@@ -10,8 +10,6 @@ allowlist:
   - "future grant"
   - "grant"
   - "iceberg table"
-  - "masking policy"
-  - "network policy"
   - "network rule"
   - "resource monitor"
   - "role grant"
@@ -333,15 +331,3 @@ secrets:
 #     enabled: true
 #     schedule: "0 0 * * * UTC"
 
-masking_policies:
-  - name: static_masking_policy
-    database: static_database
-    schema: public
-    args:
-      - name: email
-        data_type: VARCHAR
-    returns: VARCHAR(16777216)
-    body: "CASE WHEN current_role() IN ('ANALYST') THEN email ELSE '*********' END"
-    comment: Masks email addresses
-    exempt_other_policies: false
-    owner: SYSADMIN
