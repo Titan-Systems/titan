@@ -2513,6 +2513,40 @@ def list_database_roles(session: SnowflakeConnection, database=None) -> list[FQN
     return roles
 
 
+def list_database_role_grants(session: SnowflakeConnection, database=None) -> list[FQN]:
+    databases: list[ResourceName]
+    if database:
+        databases = [ResourceName(database)]
+    else:
+        databases = _list_databases(session)
+
+    role_grants = []
+    for database_name in databases:
+        try:
+            # A rare case where we need to always quote the identifier. Snowflake chokes if the database name
+            # is DATABASE, but this will work if quoted
+            if database_name == "DATABASE":
+                database_name._quoted = True
+            database_roles = execute(session, f"SHOW DATABASE ROLES IN DATABASE {database_name}")
+        except ProgrammingError as err:
+            if err.errno == DOES_NOT_EXIST_ERR:
+                continue
+            raise
+        for role in database_roles:
+            show_result = execute(session, f"SHOW GRANTS OF DATABASE ROLE {database_name}.{role['name']}")
+            for data in show_result:
+                subject = "role" if data["granted_to"] == "ROLE" else "database_role"
+                database, name = data["role"].split(".")
+                role_grants.append(
+                    FQN(
+                        name=name,
+                        database=database,
+                        params={subject: data["grantee_name"]},
+                    )
+                )
+    return role_grants
+
+
 def list_dynamic_tables(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "DYNAMIC TABLES")
 
