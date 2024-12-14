@@ -2639,6 +2639,10 @@ def list_image_repositories(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "IMAGE REPOSITORIES")
 
 
+def list_masking_policies(session: SnowflakeConnection) -> list[FQN]:
+    return list_schema_scoped_resource(session, "MASKING POLICIES")
+
+
 def list_network_policies(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "NETWORK POLICIES")
 
