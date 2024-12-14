@@ -842,6 +842,6 @@ def database_role_grant_fqn(database_role_grant: _DatabaseRoleGrant):
     )
     return FQN(
         name=database_role_grant.database_role.name,
-        database=database_role_grant.database_role.database.name,
+        database=database_role_grant.database_role.database,
         params={subject: name},
     )

@@ -2539,8 +2539,8 @@ def list_database_role_grants(session: SnowflakeConnection, database=None) -> li
                 database, name = data["role"].split(".")
                 role_grants.append(
                     FQN(
-                        name=name,
-                        database=database,
+                        name=resource_name_from_snowflake_metadata(name),
+                        database=resource_name_from_snowflake_metadata(database),
                         params={subject: data["grantee_name"]},
                     )
                 )

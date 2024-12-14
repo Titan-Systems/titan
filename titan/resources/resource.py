@@ -1,4 +1,5 @@
 import difflib
+import logging
 import sys
 import types
 from dataclasses import dataclass, field, fields
@@ -29,6 +30,8 @@ from ..scope import (
     resource_can_be_contained_in,
 )
 from ..var import VarString, string_contains_var
+
+logger = logging.getLogger("titan")
 
 
 def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
@@ -323,6 +326,7 @@ class Resource(metaclass=_Resource):
 
     @classmethod
     def from_sql(cls, sql):
+        logger.warning("Resource.from_sql will be deprecated in a future release")
         resource_cls = cls
         if resource_cls == Resource:
             # FIXME: we need to change the way we handle polymorphic resources
@@ -635,7 +639,7 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
     @property
     def database(self):
         if isinstance(self.scope, DatabaseScope):
-            return self.container
+            return self.container.name
         else:
             raise ValueError("ResourcePointer does not have a database")
 
