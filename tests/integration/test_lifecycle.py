@@ -64,6 +64,7 @@ def test_create_drop_from_json(resource, cursor, suffix):
     database = res.Database(name=lifecycle_db, owner="SYSADMIN")
 
     feature_enabled = True
+    drop_sql = None
 
     try:
         fetch_session.cache_clear()

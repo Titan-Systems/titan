@@ -613,7 +613,6 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
         # If this points to a database, assume it includes a PUBLIC schema
         if self._resource_type == ResourceType.DATABASE and self._name != "SNOWFLAKE":
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
-            # self.add(ResourcePointer(name="INFORMATION_SCHEMA", resource_type=ResourceType.SCHEMA))
 
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
@@ -632,6 +631,13 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
     @property
     def container(self):
         return self._container
+
+    @property
+    def database(self):
+        if isinstance(self.scope, DatabaseScope):
+            return self.container
+        else:
+            raise ValueError("ResourcePointer does not have a database")
 
     @property
     def fqn(self):

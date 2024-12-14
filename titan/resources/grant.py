@@ -764,6 +764,13 @@ class _DatabaseRoleGrant(ResourceSpec):
     to_role: Role = None
     to_database_role: DatabaseRole = None
 
+    def __post_init__(self):
+        super().__post_init__()
+        if self.to_role is not None and self.to_database_role is not None:
+            raise ValueError("You can only grant to a role or a database role, not both")
+        if self.to_role is None and self.to_database_role is None:
+            raise ValueError("You must specify a role or a database role to grant to")
+
 
 class DatabaseRoleGrant(Resource):
 
@@ -835,6 +842,6 @@ def database_role_grant_fqn(database_role_grant: _DatabaseRoleGrant):
     )
     return FQN(
         name=database_role_grant.database_role.name,
-        database=database_role_grant.database_role.database,
+        database=database_role_grant.database_role.database.name,
         params={subject: name},
     )

@@ -1,4 +1,5 @@
 {
-    "database_role": "SOMEDB.SOMEDB_ROLE",
-    "to_role": "SOMEROLE"
+    "database_role": "STATIC_DATABASE.STATIC_DATABASE_ROLE",
+    "to_role": "SYSADMIN",
+    "to_database_role": null
 }

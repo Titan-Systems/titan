@@ -6,5 +6,6 @@
     "returns": "VARCHAR",
     "body": "CASE WHEN current_role() IN ('ANALYST') THEN VAL ELSE '*********' END",
     "comment": "Masks email addresses",
-    "exempt_other_policies": false
+    "exempt_other_policies": false,
+    "owner": "SYSADMIN"
 }

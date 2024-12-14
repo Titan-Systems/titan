@@ -156,5 +156,5 @@ class DatabaseRole(NamedResource, TaggableResource, Resource):
         self.set_tags(tags)
 
     @property
-    def database(self) -> ResourceName:
+    def database(self):
         return self._data.database
