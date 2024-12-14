@@ -137,5 +137,5 @@ def test_grant_database_role_to_database_role(cursor, suffix, marked_for_cleanup
     marked_for_cleanup.append(parent)
     marked_for_cleanup.append(child)
 
-    grant = res.RoleGrant(role=child, to_role=parent)
+    grant = res.DatabaseRoleGrant(database_role=child, to_database_role=parent)
     cursor.execute(grant.create_sql())

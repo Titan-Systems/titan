@@ -73,6 +73,24 @@ def create_database(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
+def create_database_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    if data["to_role"] is not None:
+        to = data["to_role"]
+        to_type = "ROLE"
+    else:
+        to = data["to_database_role"]
+        to_type = "DATABASE ROLE"
+
+    return tidy_sql(
+        "GRANT",
+        "DATABASE ROLE",
+        data["database_role"],
+        "TO",
+        to_type,
+        to,
+    )
+
+
 def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     db = f"{urn.fqn.database}." if urn.fqn.database else ""
     schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
@@ -164,11 +182,15 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
 
 
 def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool = False):
-    to_type = data["to_role_type"] if data["to_role_type"] is not None else "USER"
-    to = data["to_role"] if data["to_role"] is not None else data["to_user"]
+    if data["to_role"] is not None:
+        to = data["to_role"]
+        to_type = "ROLE"
+    else:
+        to = data["to_user"]
+        to_type = "USER"
     return tidy_sql(
         "GRANT",
-        data["role_type"],
+        "ROLE",
         data["role"],
         "TO",
         to_type,

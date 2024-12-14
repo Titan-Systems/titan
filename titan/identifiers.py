@@ -5,12 +5,13 @@ import pyparsing as pp
 from .enums import ResourceType
 from .parse_primitives import FullyQualifiedIdentifier
 from .resource_name import ResourceName
+from .var import VarString
 
 
 class FQN:
     def __init__(
         self,
-        name: ResourceName,
+        name: Union[ResourceName, VarString],
         database: Optional[ResourceName] = None,
         schema: Optional[ResourceName] = None,
         arg_types: Optional[list] = None,

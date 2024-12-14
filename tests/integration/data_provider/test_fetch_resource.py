@@ -775,13 +775,13 @@ def test_fetch_grant_of_database_role(cursor, suffix, marked_for_cleanup):
     create(cursor, role)
     marked_for_cleanup.append(role)
 
-    grant = res.RoleGrant(role=db_role, to_role=role)
+    grant = res.DatabaseRoleGrant(database_role=db_role, to_role=role)
     create(cursor, grant)
 
     result = safe_fetch(cursor, grant.urn)
     assert result is not None
-    result = clean_resource_data(res.DatabaseRole.spec, result)
-    data = clean_resource_data(res.DatabaseRole.spec, role.to_dict())
+    result = clean_resource_data(res.DatabaseRoleGrant.spec, result)
+    data = clean_resource_data(res.DatabaseRoleGrant.spec, grant.to_dict())
     assert result == data
 
 

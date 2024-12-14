@@ -939,6 +939,30 @@ def fetch_database_role(session: SnowflakeConnection, fqn: FQN):
     }
 
 
+def fetch_database_role_grant(session: SnowflakeConnection, fqn: FQN):
+    show_result = execute(session, f"SHOW GRANTS OF DATABASE ROLE {fqn.database}.{fqn.name}", cacheable=True)
+
+    if len(show_result) == 0:
+        return None
+    if len(show_result) > 1:
+        raise Exception(f"Found multiple database role grants matching {fqn}")
+
+    data = show_result[0]
+
+    to_role = None
+    to_database_role = None
+    if data["granted_to"] == "ROLE":
+        to_role = _quote_snowflake_identifier(data["grantee_name"])
+    elif data["granted_to"] == "DATABASE ROLE":
+        to_database_role = data["grantee_name"]
+
+    return {
+        "database_role": data["role"],
+        "to_role": to_role,
+        "to_database_role": to_database_role,
+    }
+
+
 def fetch_dynamic_table(session: SnowflakeConnection, fqn: FQN):
     show_result = _show_resources(session, "DYNAMIC TABLES", fqn)
     if len(show_result) == 0:

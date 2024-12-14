@@ -760,13 +760,14 @@ def role_grant_fqn(role_grant: _RoleGrant):
 
 @dataclass(unsafe_hash=True)
 class _DatabaseRoleGrant(ResourceSpec):
-    database_role: RoleRef
-    to_role: Role
+    database_role: DatabaseRole
+    to_role: Role = None
+    to_database_role: DatabaseRole = None
 
 
 class DatabaseRoleGrant(Resource):
 
-    resource_type = ResourceType.ROLE_GRANT
+    resource_type = ResourceType.DATABASE_ROLE_GRANT
     props = Props(
         database_role=IdentifierProp("database role", eq=False),
         to_role=IdentifierProp("to role", eq=False),
@@ -777,16 +778,19 @@ class DatabaseRoleGrant(Resource):
     def __init__(
         self,
         database_role: str,
-        to_role: str,
+        to_role: str = None,
+        to_database_role: str = None,
         **kwargs,
     ):
 
         to = kwargs.pop("to", None)
         if to:
-            if to_role:
-                raise ValueError("You cant specify both to_role and to")
+            if to_role or to_database_role:
+                raise ValueError("You cant specify both to_role and to_database_role")
             if isinstance(to, Role):
                 to_role = to
+            elif isinstance(to, DatabaseRole):
+                to_database_role = to
             else:
                 raise ValueError("You can only grant to a role")
 
@@ -794,32 +798,43 @@ class DatabaseRoleGrant(Resource):
         self._data: _DatabaseRoleGrant = _DatabaseRoleGrant(
             database_role=database_role,
             to_role=to_role,
+            to_database_role=to_database_role,
         )
         self.requires(
             self._data.database_role,
             self._data.to_role,
+            self._data.to_database_role,
         )
 
     def __repr__(self):  # pragma: no cover
         database_role = getattr(self._data, "database_role", "")
         to_role = getattr(self._data, "to_role", "")
-        return f"DatabaseRoleGrant(database_role={database_role}, to_role={to_role})"
+        to_database_role = getattr(self._data, "to_database_role", "")
+        to = to_role or to_database_role
+        return f"DatabaseRoleGrant(database_role={database_role}, to={to})"
 
-    # @property
-    # def fqn(self):
-    #     return database_role_grant_fqn(self._data)
+    @property
+    def fqn(self):
+        return database_role_grant_fqn(self._data)
 
     @property
     def database_role(self) -> DatabaseRole:
         return self._data.database_role
 
     @property
-    def to(self) -> Role:
-        return self._data.to_role
+    def to(self) -> Union[Role, DatabaseRole]:
+        return self._data.to_role or self._data.to_database_role
 
 
-# def database_role_grant_fqn(database_role_grant: _DatabaseRoleGrant):
-#     return FQN(
-#         name=database_role_grant.database_role.name,
-#         params={"to": database_role_grant.to_role.name},
-#     )
+def database_role_grant_fqn(database_role_grant: _DatabaseRoleGrant):
+    subject = "role" if database_role_grant.to_role else "database_role"
+    name = (
+        database_role_grant.to_role.name
+        if database_role_grant.to_role
+        else str(database_role_grant.to_database_role.fqn)
+    )
+    return FQN(
+        name=database_role_grant.database_role.name,
+        database=database_role_grant.database_role.database,
+        params={subject: name},
+    )
