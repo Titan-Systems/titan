@@ -338,7 +338,6 @@ class FutureGrant(Resource):
         priv: str,
         to: Role,
         grant_option: bool = False,
-        owner: str = None,
         **kwargs,
     ):
         on_type = kwargs.pop("on_type", None)
