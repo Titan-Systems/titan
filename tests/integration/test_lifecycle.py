@@ -55,6 +55,7 @@ def test_create_drop_from_json(resource, cursor, suffix):
         res.FutureGrant,
         res.Grant,
         res.RoleGrant,
+        res.DatabaseRoleGrant,
         res.ScannerPackage,
         res.Service,
     ):
