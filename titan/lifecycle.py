@@ -431,12 +431,16 @@ def drop_database(urn: URN, data: dict, if_exists: bool) -> str:
 
 
 def drop_database_role_grant(urn: URN, data: dict, **kwargs):
+
+    from_type = "ROLE" if data["to_role"] else "DATABASE ROLE"
+    from_name = data["to_role"] if data["to_role"] else data["to_database_role"]
+
     return tidy_sql(
         "REVOKE DATABASE ROLE",
         ResourceName(data["database_role"]),
         "FROM",
-        "ROLE",
-        ResourceName(data["to_role"] if data["to_role"] else data["to_database_role"]),
+        from_type,
+        ResourceName(from_name),
     )
 
 
