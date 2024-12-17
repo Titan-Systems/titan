@@ -24,6 +24,7 @@ from .exceptions import (
     MissingPrivilegeException,
     MissingResourceException,
     NonConformingPlanException,
+    NotADAGException,
     OrphanResourceException,
 )
 from .identifiers import URN, parse_identifier, parse_URN, resource_label_for_type
@@ -33,7 +34,7 @@ from .privs import (
 )
 from .resource_name import ResourceName
 from .resource_tags import ResourceTags
-from .resources import Database, RoleGrant, Schema
+from .resources import Database, FutureGrant, Grant, GrantOnAll, RoleGrant, Schema
 from .resources.database import public_schema_urn
 from .resources.resource import (
     RESOURCE_SCOPES,
@@ -870,6 +871,46 @@ class Blueprint:
             if isinstance(resource.scope, SchemaScope):
                 resource.requires(resource.container.container)
 
+    def _create_stage_privilege_refs(self) -> None:
+        stage_grants: dict[str, list[Grant]] = {}
+        stage_future_grants: dict[ResourceName, list[FutureGrant]] = {}
+        stage_grant_on_all: dict[ResourceName, list[GrantOnAll]] = {}
+
+        for resource in _walk(self._root):
+            if isinstance(resource, Grant):
+                if resource._data.on_type == ResourceType.STAGE:
+                    if resource._data.on not in stage_grants:
+                        stage_grants[resource._data.on] = []
+                    stage_grants[resource._data.on].append(resource)
+            elif isinstance(resource, FutureGrant):
+                if resource._data.on_type == ResourceType.STAGE:
+                    if resource._data.in_name not in stage_future_grants:
+                        stage_future_grants[resource._data.in_name] = []
+                    stage_future_grants[resource._data.in_name].append(resource)
+            elif isinstance(resource, GrantOnAll):
+                if resource._data.on_type == ResourceType.STAGE:
+                    if resource._data.in_name not in stage_grant_on_all:
+                        stage_grant_on_all[resource._data.in_name] = []
+                    stage_grant_on_all[resource._data.in_name].append(resource)
+
+        def _apply_refs(stage_grants):
+            for stage in stage_grants.keys():
+                read_grants = []
+                write_grants = []
+                for grant in stage_grants[stage]:
+                    if grant._data.priv == "READ":
+                        read_grants.append(grant)
+                    elif grant._data.priv == "WRITE":
+                        write_grants.append(grant)
+
+                for w_grant in write_grants:
+                    for r_grant in read_grants:
+                        w_grant.requires(r_grant)
+
+        _apply_refs(stage_grants)
+        _apply_refs(stage_future_grants)
+        _apply_refs(stage_grant_on_all)
+
     def _finalize_resources(self) -> None:
         for resource in _walk(self._root):
             resource._finalized = True
@@ -883,6 +924,7 @@ class Blueprint:
         self._create_tag_references()
         self._create_ownership_refs(session_ctx)
         self._create_grandparent_refs()
+        self._create_stage_privilege_refs()
         self._finalize_resources()
 
     def generate_manifest(self, session_ctx: SessionContext) -> Manifest:
@@ -1233,7 +1275,7 @@ def topological_sort(resource_set: set[T], references: set[tuple[T, T]]) -> dict
         outgoing_edges[node].difference_update(empty_neighbors)
     nodes.reverse()
     if len(nodes) != len(resource_set):
-        raise Exception("Graph is not a DAG")
+        raise NotADAGException("Graph is not a DAG")
     return {value: index for index, value in enumerate(nodes)}
 
 

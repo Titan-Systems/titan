@@ -214,8 +214,8 @@ def test_task_lifecycle_remove_predecessor(cursor, suffix, marked_for_cleanup):
 
 
 def test_database_role_grants(cursor, suffix, marked_for_cleanup):
-    db = res.Database(name="whatever")
-    role = res.DatabaseRole(name="whatever_role", database=db)
+    db = res.Database(name=f"TEST_DATABASE_ROLE_GRANTS_{suffix}")
+    role = res.DatabaseRole(name=f"TEST_DATABASE_ROLE_GRANTS_{suffix}", database=db)
     grant = res.Grant(priv="USAGE", on_schema=db.public_schema.fqn, to=role)
     future_grant = res.FutureGrant(priv="SELECT", on_future_tables_in=db, to=role)
 
