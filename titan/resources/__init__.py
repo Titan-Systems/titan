@@ -16,10 +16,11 @@ from .external_volume import ExternalVolume
 from .failover_group import FailoverGroup
 from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
-from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant
+from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant, DatabaseRoleGrant
 from .hybrid_table import HybridTable
 from .iceberg_table import SnowflakeIcebergTable
 from .image_repository import ImageRepository
+from .masking_policy import MaskingPolicy
 from .materialized_view import MaterializedView
 from .network_policy import NetworkPolicy
 from .network_rule import NetworkRule
@@ -83,6 +84,7 @@ __all__ = [
     "CSVFileFormat",
     "Database",
     "DatabaseRole",
+    "DatabaseRoleGrant",
     "DynamicTable",
     "EmailNotificationIntegration",
     "EventTable",
@@ -104,6 +106,7 @@ __all__ = [
     "InternalStage",
     "JavascriptUDF",
     "JSONFileFormat",
+    "MaskingPolicy",
     "MaterializedView",
     "NetworkPolicy",
     "NetworkRule",

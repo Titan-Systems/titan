@@ -73,6 +73,24 @@ def create_database(urn: URN, data: dict, props: Props, if_not_exists: bool = Fa
     )
 
 
+def create_database_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    if data["to_role"] is not None:
+        to = data["to_role"]
+        to_type = "ROLE"
+    else:
+        to = data["to_database_role"]
+        to_type = "DATABASE ROLE"
+
+    return tidy_sql(
+        "GRANT",
+        "DATABASE ROLE",
+        data["database_role"],
+        "TO",
+        to_type,
+        to,
+    )
+
+
 def create_function(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     db = f"{urn.fqn.database}." if urn.fqn.database else ""
     schema = f"{urn.fqn.schema}." if urn.fqn.schema else ""
@@ -138,6 +156,17 @@ def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool)
     )
 
 
+def create_masking_policy(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
+    return tidy_sql(
+        "CREATE",
+        urn.resource_type,
+        "IF NOT EXISTS" if if_not_exists else "",
+        urn.fqn,
+        "AS",
+        props.render(data),
+    )
+
+
 def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:
     if if_not_exists:
         raise Exception("IF NOT EXISTS not supported for CREATE PROCEDURE")
@@ -153,9 +182,19 @@ def create_procedure(urn: URN, data: dict, props: Props, if_not_exists: bool = F
 
 
 def create_role_grant(urn: URN, data: dict, props: Props, if_not_exists: bool = False):
+    if data["to_role"] is not None:
+        to = data["to_role"]
+        to_type = "ROLE"
+    else:
+        to = data["to_user"]
+        to_type = "USER"
     return tidy_sql(
         "GRANT",
-        props.render(data),
+        "ROLE",
+        data["role"],
+        "TO",
+        to_type,
+        to,
     )
 
 
@@ -388,6 +427,20 @@ def drop_database(urn: URN, data: dict, if_exists: bool) -> str:
         "IF EXISTS" if if_exists else "",
         urn.fqn,
         "RESTRICT",
+    )
+
+
+def drop_database_role_grant(urn: URN, data: dict, **kwargs):
+
+    from_type = "ROLE" if data["to_role"] else "DATABASE ROLE"
+    from_name = data["to_role"] if data["to_role"] else data["to_database_role"]
+
+    return tidy_sql(
+        "REVOKE DATABASE ROLE",
+        ResourceName(data["database_role"]),
+        "FROM",
+        from_type,
+        ResourceName(from_name),
     )
 
 

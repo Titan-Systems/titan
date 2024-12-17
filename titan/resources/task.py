@@ -16,7 +16,7 @@ from ..props import (
 from ..resource_name import ResourceName
 from ..role_ref import RoleRef
 from ..scope import SchemaScope
-from .resource import NamedResource, Resource, ResourceSpec
+from .resource import NamedResource, Resource, ResourceSpec, convert_to_resource
 from .warehouse import Warehouse
 
 
@@ -53,6 +53,9 @@ class _Task(ResourceSpec):
         if self.suspend_task_after_num_failures is None and len(self.after or []) == 0:
             # Set default only if non-child task
             self.suspend_task_after_num_failures = 10
+
+        if self.after is not None:
+            self.after = [convert_to_resource(Task, task) for task in self.after]
 
 
 class Task(NamedResource, Resource):
@@ -162,3 +165,5 @@ class Task(NamedResource, Resource):
             as_=as_,
             state=state,
         )
+        if self._data.after is not None:
+            self.requires(*self._data.after)

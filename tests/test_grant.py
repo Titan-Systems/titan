@@ -253,8 +253,8 @@ def test_grant_database_role_to_database_role():
     database = res.Database(name="somedb")
     parent = res.DatabaseRole(name="parent", database=database)
     child = res.DatabaseRole(name="child", database=database)
-    grant = res.RoleGrant(role=child, to_role=parent)
-    assert grant.role.name == "child"
+    grant = res.DatabaseRoleGrant(database_role=child, to_database_role=parent)
+    assert grant.database_role.name == "child"
     assert grant.to.name == "parent"
 
 
@@ -262,14 +262,14 @@ def test_grant_database_role_to_account_role():
     database = res.Database(name="somedb")
     parent = res.Role(name="parent")
     child = res.DatabaseRole(name="child", database=database)
-    grant = res.RoleGrant(role=child, to_role=parent)
-    assert grant.role.name == "child"
+    grant = res.DatabaseRoleGrant(database_role=child, to_role=parent)
+    assert grant.database_role.name == "child"
     assert grant.to.name == "parent"
 
 
 def test_grant_database_role_to_system_role():
     database = res.Database(name="somedb")
     child = res.DatabaseRole(name="child", database=database)
-    grant = res.RoleGrant(role=child, to_role="SYSADMIN")
-    assert grant.role.name == "child"
+    grant = res.DatabaseRoleGrant(database_role=child, to_role="SYSADMIN")
+    assert grant.database_role.name == "child"
     assert grant.to.name == "SYSADMIN"

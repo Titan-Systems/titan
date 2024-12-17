@@ -1,0 +1,5 @@
+{
+    "database_role": "STATIC_DATABASE.STATIC_DATABASE_ROLE",
+    "to_role": "STATIC_ROLE",
+    "to_database_role": null
+}

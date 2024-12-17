@@ -1,4 +1,5 @@
 import difflib
+import logging
 import sys
 import types
 from dataclasses import dataclass, field, fields
@@ -8,6 +9,8 @@ from itertools import chain
 from typing import Any, Optional, Type, TypedDict, Union, get_args, get_origin
 
 import pyparsing as pp
+
+from titan.data_types import convert_to_simple_data_type
 
 from ..enums import AccountEdition, DataType, ParseableEnum, ResourceType
 from ..exceptions import ResourceHasContainerException, WrongContainerException, WrongEditionException
@@ -27,6 +30,8 @@ from ..scope import (
     resource_can_be_contained_in,
 )
 from ..var import VarString, string_contains_var
+
+logger = logging.getLogger("titan")
 
 
 def _suggest_correct_kwargs(expected_kwargs, passed_kwargs):
@@ -110,7 +115,7 @@ def _coerce_resource_field(field_value, field_type):
     elif field_type is Arg:
         arg_dict = {
             "name": field_value["name"].upper(),
-            "data_type": DataType(field_value["data_type"]),
+            "data_type": convert_to_simple_data_type(field_value["data_type"]),
         }
         if "default" in field_value:
             arg_dict["default"] = field_value["default"]
@@ -321,6 +326,7 @@ class Resource(metaclass=_Resource):
 
     @classmethod
     def from_sql(cls, sql):
+        logger.warning("Resource.from_sql will be deprecated in a future release")
         resource_cls = cls
         if resource_cls == Resource:
             # FIXME: we need to change the way we handle polymorphic resources
@@ -611,7 +617,6 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
         # If this points to a database, assume it includes a PUBLIC schema
         if self._resource_type == ResourceType.DATABASE and self._name != "SNOWFLAKE":
             self.add(ResourcePointer(name="PUBLIC", resource_type=ResourceType.SCHEMA))
-            # self.add(ResourcePointer(name="INFORMATION_SCHEMA", resource_type=ResourceType.SCHEMA))
 
     def __repr__(self):  # pragma: no cover
         resource_type = getattr(self, "resource_type", None)
@@ -630,6 +635,13 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
     @property
     def container(self):
         return self._container
+
+    @property
+    def database(self):
+        if isinstance(self.scope, DatabaseScope):
+            return self.container.name
+        else:
+            raise ValueError("ResourcePointer does not have a database")
 
     @property
     def fqn(self):
@@ -699,6 +711,7 @@ def convert_role_ref(role_ref: RoleRef) -> Resource:
         ResourceType.ROLE,
     ):
         return role_ref
+
     elif isinstance(role_ref, str) or isinstance(role_ref, ResourceName):
         return ResourcePointer(name=role_ref, resource_type=infer_role_type_from_name(role_ref))
     else:

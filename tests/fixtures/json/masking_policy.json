@@ -1,0 +1,11 @@
+{
+    "name": "some_masking_policy",
+    "args": [
+        {"name": "val", "data_type": "VARCHAR"}
+    ],
+    "returns": "VARCHAR(16777216)",
+    "body": "CASE WHEN current_role() IN ('ANALYST') THEN VAL ELSE '*********' END",
+    "comment": "Masks email addresses",
+    "exempt_other_policies": false,
+    "owner": "SYSADMIN"
+}

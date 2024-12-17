@@ -16,6 +16,7 @@ from titan.blueprint import (
 )
 from titan.client import reset_cache
 from titan.enums import BlueprintScope, ResourceType
+from titan.exceptions import NotADAGException
 from titan.gitops import collect_blueprint_config
 from titan.resources.database import public_schema_urn
 
@@ -607,3 +608,90 @@ def test_blueprint_share_custom_owner(cursor, suffix):
         blueprint.apply(session, plan)
     finally:
         cursor.execute(f"DROP SHARE IF EXISTS {share_name}")
+
+
+def test_stage_read_write_privilege_execution_order(cursor, suffix, marked_for_cleanup):
+    session = cursor.connection
+
+    role_name = f"STAGE_ACCESS_ROLE_{suffix}"
+
+    blueprint = Blueprint()
+
+    role = res.Role(name=role_name)
+    read_grant = res.Grant(priv="READ", on_stage="STATIC_DATABASE.PUBLIC.STATIC_STAGE", to=role)
+    write_grant = res.Grant(priv="WRITE", on_stage="STATIC_DATABASE.PUBLIC.STATIC_STAGE", to=role)
+
+    # Incorrect order of execution
+    read_grant.requires(write_grant)
+
+    blueprint.add(role, read_grant, write_grant)
+
+    marked_for_cleanup.append(role)
+
+    with pytest.raises(NotADAGException):
+        blueprint.plan(session)
+
+    blueprint = Blueprint()
+
+    role = res.Role(name=role_name)
+    read_grant = res.Grant(priv="READ", on_stage="STATIC_DATABASE.PUBLIC.STATIC_STAGE", to=role)
+    write_grant = res.Grant(priv="WRITE", on_stage="STATIC_DATABASE.PUBLIC.STATIC_STAGE", to=role)
+
+    # Implicitly ordered incorrectly
+    blueprint.add(role, write_grant, read_grant)
+
+    plan = blueprint.plan(session)
+    assert len(plan) == 3
+    blueprint.apply(session, plan)
+
+    blueprint = Blueprint()
+
+    read_on_all = res.GrantOnAll(
+        priv="READ", on_type="STAGE", in_type="SCHEMA", in_name="STATIC_DATABASE.PUBLIC", to=role_name
+    )
+    future_read = res.FutureGrant(
+        priv="READ", on_type="STAGE", in_type="SCHEMA", in_name="STATIC_DATABASE.PUBLIC", to=role_name
+    )
+    write_on_all = res.GrantOnAll(
+        priv="WRITE", on_type="STAGE", in_type="SCHEMA", in_name="STATIC_DATABASE.PUBLIC", to=role_name
+    )
+    future_write = res.FutureGrant(
+        priv="WRITE", on_type="STAGE", in_type="SCHEMA", in_name="STATIC_DATABASE.PUBLIC", to=role_name
+    )
+
+    # Implicitly ordered incorrectly
+    blueprint.add(future_write, future_read, write_on_all, read_on_all)
+
+    plan = blueprint.plan(session)
+    assert len(plan) == 4
+    blueprint.apply(session, plan)
+
+
+def test_grant_database_role_to_database_role(cursor, suffix, marked_for_cleanup):
+    session = cursor.connection
+    bp = Blueprint()
+
+    parent = res.DatabaseRole(name=f"DBR2DBR_PARENT_{suffix}", database="STATIC_DATABASE")
+    child1 = res.DatabaseRole(name=f"DBR2DBR_CHILD_1_{suffix}", database="STATIC_DATABASE")
+    child2 = res.DatabaseRole(name=f"DBR2DBR_CHILD_2_{suffix}", database="STATIC_DATABASE")
+    drg1 = res.DatabaseRoleGrant(database_role=child1, to_database_role=parent)
+    drg2 = res.DatabaseRoleGrant(database_role=child2, to_database_role=parent)
+
+    marked_for_cleanup.append(parent)
+    marked_for_cleanup.append(child1)
+    marked_for_cleanup.append(child2)
+
+    bp.add(parent, child1, child2, drg1, drg2)
+    plan = bp.plan(session)
+    assert len(plan) == 5
+    bp.apply(session, plan)
+
+    grant1 = safe_fetch(cursor, res.DatabaseRoleGrant(database_role=child1, to_database_role=parent).urn)
+    assert grant1 is not None
+    assert grant1["database_role"] == str(child1.fqn)
+    assert grant1["to_database_role"] == str(parent.fqn)
+
+    grant2 = safe_fetch(cursor, res.DatabaseRoleGrant(database_role=child2, to_database_role=parent).urn)
+    assert grant2 is not None
+    assert grant2["database_role"] == str(child2.fqn)
+    assert grant2["to_database_role"] == str(parent.fqn)

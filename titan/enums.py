@@ -62,6 +62,7 @@ class ResourceType(ParseableEnum):
     COMPUTE_POOL = "COMPUTE POOL"
     DATABASE = "DATABASE"
     DATABASE_ROLE = "DATABASE ROLE"
+    DATABASE_ROLE_GRANT = "DATABASE ROLE GRANT"
     DIRECTORY_TABLE = "DIRECTORY TABLE"
     DYNAMIC_TABLE = "DYNAMIC TABLE"
     EVENT_TABLE = "EVENT TABLE"
@@ -81,6 +82,7 @@ class ResourceType(ParseableEnum):
     ICEBERG_TABLE = "ICEBERG TABLE"
     IMAGE_REPOSITORY = "IMAGE REPOSITORY"
     INTEGRATION = "INTEGRATION"
+    MASKING_POLICY = "MASKING POLICY"
     MATERIALIZED_VIEW = "MATERIALIZED VIEW"
     NETWORK_POLICY = "NETWORK POLICY"
     NETWORK_RULE = "NETWORK RULE"
@@ -385,6 +387,7 @@ def resource_type_is_grant(resource_type: ResourceType) -> bool:
         ResourceType.ROLE_GRANT,
         ResourceType.GRANT_ON_ALL,
         ResourceType.FUTURE_GRANT,
+        ResourceType.DATABASE_ROLE_GRANT,
     )
 
 

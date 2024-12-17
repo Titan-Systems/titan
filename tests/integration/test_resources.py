@@ -127,3 +127,16 @@ def test_fetch_warehouse_snowpark_optimized(cursor, suffix, marked_for_cleanup):
     data = safe_fetch(cursor, warehouse.urn)
     assert data is not None
     assert data["warehouse_type"] == "SNOWPARK-OPTIMIZED"
+
+
+def test_snowflake_builtin_database_role_grant(cursor, suffix, marked_for_cleanup):
+    drg = res.DatabaseRoleGrant(database_role="SNOWFLAKE.CORTEX_USER", to_role="STATIC_ROLE")
+    marked_for_cleanup.append(drg)
+    cursor.execute(drg.create_sql())
+
+    dbr = res.DatabaseRole(name=f"TEST_GRANT_DATABASE_ROLE_{suffix}", database="STATIC_DATABASE")
+    drg = res.DatabaseRoleGrant(database_role=dbr, to_database_role="STATIC_DATABASE.STATIC_DATABASE_ROLE")
+    marked_for_cleanup.append(dbr)
+    marked_for_cleanup.append(drg)
+    cursor.execute(dbr.create_sql())
+    cursor.execute(drg.create_sql())

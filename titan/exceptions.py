@@ -48,3 +48,7 @@ class WrongEditionException(Exception):
 
 class ResourceHasContainerException(Exception):
     pass
+
+
+class NotADAGException(Exception):
+    pass

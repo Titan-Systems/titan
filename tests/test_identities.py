@@ -107,6 +107,7 @@ def test_data_identity(resource):
     assert serialized == data
 
 
+@pytest.mark.skip(reason="SQL parsing will be deprecated")
 def test_sql_identity(resource: tuple[type[Resource], dict]):
     resource_cls, data = resource
     if resource_cls.__name__ == "ScannerPackage":

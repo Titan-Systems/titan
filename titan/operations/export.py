@@ -59,20 +59,24 @@ def export_resource(session, resource_type: ResourceType) -> dict[str, list]:
             logger.warning(f"Found resource {urn} in metadata but failed to fetch")
             continue
         try:
-            resources.append(_format_resource_config(resource, resource_type))
+            resources.append(_format_resource_config(urn, resource, resource_type))
         except Exception as e:
             logger.warning(f"Failed to format resource {urn}: {e}")
             continue
     return {pluralize(resource_label): resources}
 
 
-def _format_resource_config(resource: dict, resource_type: ResourceType) -> dict:
+def _format_resource_config(urn: URN, resource: dict, resource_type: ResourceType) -> dict:
     if resource_type == ResourceType.GRANT:
         return grant_yaml(resource)
     # Sort dict based on key name
     resource = {k: resource[k] for k in sorted(resource)}
     # Put name field at the top of the dict
-    first_field = {}
+    first_fields = {}
     if "name" in resource:
-        first_field = {"name": resource.pop("name")}
-    return {**first_field, **resource}
+        first_fields = {"name": resource.pop("name")}
+
+    if resource_type == ResourceType.SCHEMA:
+        first_fields["database"] = str(urn.database().fqn)
+
+    return {**first_fields, **resource}

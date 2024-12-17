@@ -744,3 +744,61 @@ def test_fetch_database_role_grant(cursor, suffix, marked_for_cleanup):
     result = clean_resource_data(res.Grant.spec, result)
     data = clean_resource_data(res.Grant.spec, grant.to_dict())
     assert result == data
+
+
+def test_fetch_database_role(cursor, suffix, marked_for_cleanup):
+    role = res.DatabaseRole(
+        name=f"TEST_FETCH_DATABASE_ROLE_{suffix}",
+        database="STATIC_DATABASE",
+        owner=TEST_ROLE,
+    )
+    create(cursor, role)
+    marked_for_cleanup.append(role)
+
+    result = safe_fetch(cursor, role.urn)
+    assert result is not None
+    result = clean_resource_data(res.DatabaseRole.spec, result)
+    data = clean_resource_data(res.DatabaseRole.spec, role.to_dict())
+    assert result == data
+
+
+def test_fetch_grant_of_database_role(cursor, suffix, marked_for_cleanup):
+    db_role = res.DatabaseRole(
+        name=f"TEST_FETCH_GRANT_OF_DATABASE_ROLE_{suffix}",
+        database="STATIC_DATABASE",
+        owner=TEST_ROLE,
+    )
+    create(cursor, db_role)
+    marked_for_cleanup.append(db_role)
+
+    role = res.Role(name=f"TEST_FETCH_GRANT_OF_DATABASE_ROLE_{suffix}", owner=TEST_ROLE)
+    create(cursor, role)
+    marked_for_cleanup.append(role)
+
+    grant = res.DatabaseRoleGrant(database_role=db_role, to_role=role)
+    create(cursor, grant)
+
+    result = safe_fetch(cursor, grant.urn)
+    assert result is not None
+    result = clean_resource_data(res.DatabaseRoleGrant.spec, result)
+    data = clean_resource_data(res.DatabaseRoleGrant.spec, grant.to_dict())
+    assert result == data
+
+
+def test_fetch_masking_policy(cursor, suffix, marked_for_cleanup):
+    policy = res.MaskingPolicy(
+        name=f"TEST_FETCH_MASKING_POLICY_{suffix}",
+        args=[{"name": "val", "data_type": "STRING"}],
+        returns="STRING",
+        body="CASE WHEN current_role() IN ('ANALYST') THEN VAL ELSE '*********' END",
+        comment="Masks email addresses",
+        owner=TEST_ROLE,
+    )
+    create(cursor, policy)
+    marked_for_cleanup.append(policy)
+
+    result = safe_fetch(cursor, policy.urn)
+    assert result is not None
+    result = clean_resource_data(res.MaskingPolicy.spec, result)
+    data = clean_resource_data(res.MaskingPolicy.spec, policy.to_dict())
+    assert result == data
