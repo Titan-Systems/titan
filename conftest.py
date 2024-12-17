@@ -86,7 +86,10 @@ def cursor(suffix, test_db, marked_for_cleanup):
                 try:
                     cur.execute(res.drop_sql(if_exists=True))
                 except snowflake.connector.errors.ProgrammingError as err:
-                    if err.errno in (2003, 2043, 393950):
+                    if res.resource_type == ResourceType.DATABASE_ROLE_GRANT:
+                        raise Exception(err)
+                    if err.errno in (2003, 393950):  # 2043,
+                        # if False:
                         pass
                     else:
                         raise

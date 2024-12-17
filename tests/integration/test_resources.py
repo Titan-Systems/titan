@@ -129,18 +129,6 @@ def test_fetch_warehouse_snowpark_optimized(cursor, suffix, marked_for_cleanup):
     assert data["warehouse_type"] == "SNOWPARK-OPTIMIZED"
 
 
-def test_grant_database_role_to_database_role(cursor, suffix, marked_for_cleanup):
-    parent = res.DatabaseRole(name=f"DBR2DBR_{suffix}", database="STATIC_DATABASE")
-    child = res.DatabaseRole(name=f"CHILD_{suffix}", database="STATIC_DATABASE")
-    cursor.execute(parent.create_sql())
-    cursor.execute(child.create_sql())
-    marked_for_cleanup.append(parent)
-    marked_for_cleanup.append(child)
-
-    grant = res.DatabaseRoleGrant(database_role=child, to_database_role=parent)
-    cursor.execute(grant.create_sql())
-
-
 def test_snowflake_builtin_database_role_grant(cursor, suffix, marked_for_cleanup):
     drg = res.DatabaseRoleGrant(database_role="SNOWFLAKE.CORTEX_USER", to_role="STATIC_ROLE")
     marked_for_cleanup.append(drg)

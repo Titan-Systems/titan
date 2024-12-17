@@ -942,9 +942,12 @@ def fetch_database_role(session: SnowflakeConnection, fqn: FQN):
 def fetch_database_role_grant(session: SnowflakeConnection, fqn: FQN):
     show_result = execute(session, f"SHOW GRANTS OF DATABASE ROLE {fqn.database}.{fqn.name}", cacheable=True)
 
-    if len(show_result) == 0:
+    subject, subject_name = next(iter(fqn.params.items()))
+
+    role_grants = _filter_result(show_result, granted_to=subject.upper(), grantee_name=subject_name)
+    if len(role_grants) == 0:
         return None
-    if len(show_result) > 1:
+    if len(role_grants) > 1:
         raise Exception(f"Found multiple database role grants matching {fqn}")
 
     data = show_result[0]
@@ -953,7 +956,7 @@ def fetch_database_role_grant(session: SnowflakeConnection, fqn: FQN):
     to_database_role = None
     if data["granted_to"] == "ROLE":
         to_role = _quote_snowflake_identifier(data["grantee_name"])
-    elif data["granted_to"] == "DATABASE ROLE":
+    elif data["granted_to"] == "DATABASE_ROLE":
         to_database_role = data["grantee_name"]
 
     return {
