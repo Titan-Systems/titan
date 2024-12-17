@@ -86,7 +86,7 @@ def cursor(suffix, test_db, marked_for_cleanup):
                 try:
                     cur.execute(res.drop_sql(if_exists=True))
                 except snowflake.connector.errors.ProgrammingError as err:
-                    if err.errno in (2003, 393950):
+                    if err.errno in (2003, 2043, 393950):
                         pass
                     else:
                         raise
