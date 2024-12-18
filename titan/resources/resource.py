@@ -89,7 +89,12 @@ def _coerce_resource_field(field_value, field_type):
         return {k: _coerce_resource_field(v, field_type=dict_types[1]) for k, v in field_value.items()}
 
     elif field_type is RoleRef:
-        return convert_role_ref(field_value)
+        if isinstance(field_value, str) and string_contains_var(field_value):
+            return VarString(field_value)
+        elif isinstance(field_value, (Resource, VarString, str)):
+            return convert_role_ref(field_value)
+        else:
+            raise TypeError
 
     # Check for field_value's type in a Union
     elif get_origin(field_type) == Union:
@@ -139,14 +144,7 @@ def _coerce_resource_field(field_value, field_type):
     elif field_type is ResourceTags:
         return ResourceTags(field_value)
     elif field_type is str:
-        if isinstance(field_value, str) and string_contains_var(field_value):
-            return VarString(field_value)
-        elif isinstance(field_value, VarString):
-            return field_value
-        elif not isinstance(field_value, str):
-            raise TypeError
-        else:
-            return field_value
+        return convert_to_varstring(field_value)
     elif field_type is float:
         if isinstance(field_value, float):
             return field_value
@@ -477,6 +475,15 @@ class Resource(metaclass=_Resource):
         if isinstance(self, NamedResource) and isinstance(self._name, VarString):
             self._name = ResourceName(self._name.to_string(vars))
 
+    def _resolve_role_refs(self):
+        for f in fields(self._data):
+            if f.type == RoleRef:
+                field_value = getattr(self._data, f.name)
+                new_value = convert_role_ref(field_value)
+                setattr(self._data, f.name, new_value)
+                if new_value.name != "":
+                    self.requires(new_value)
+
     def to_pointer(self):
         return ResourcePointer(
             name=str(self.fqn),
@@ -639,7 +646,7 @@ class ResourcePointer(NamedResource, Resource, ResourceContainer):
     @property
     def database(self):
         if isinstance(self.scope, DatabaseScope):
-            return self.container.name
+            return self.container.name  # type: ignore
         else:
             raise ValueError("ResourcePointer does not have a database")
 
@@ -703,16 +710,15 @@ def convert_to_resource(
 
 def convert_role_ref(role_ref: RoleRef) -> Resource:
     if role_ref.__class__.__name__ == "Role":
-        return role_ref
+        return role_ref  # type: ignore
     elif role_ref.__class__.__name__ == "DatabaseRole":
-        return role_ref
+        return role_ref  # type: ignore
     elif isinstance(role_ref, ResourcePointer) and role_ref.resource_type in (
         ResourceType.DATABASE_ROLE,
         ResourceType.ROLE,
     ):
         return role_ref
-
-    elif isinstance(role_ref, str) or isinstance(role_ref, ResourceName):
+    elif isinstance(role_ref, (str, ResourceName)):
         return ResourcePointer(name=role_ref, resource_type=infer_role_type_from_name(role_ref))
     else:
         raise TypeError
@@ -728,3 +734,14 @@ def infer_role_type_from_name(name: Union[str, ResourceName]) -> ResourceType:
         return ResourceType.DATABASE_ROLE
     else:
         return ResourceType.ROLE
+
+
+def convert_to_varstring(value: Union[str, ResourceName]) -> Union[VarString, str]:
+    if isinstance(value, str) and string_contains_var(value):
+        return VarString(value)
+    elif isinstance(value, VarString):
+        return value
+    elif not isinstance(value, str):
+        raise TypeError
+    else:
+        return value

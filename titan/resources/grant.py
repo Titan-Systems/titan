@@ -185,7 +185,6 @@ class Grant(Resource):
             owner=owner,
         )
 
-        self.requires(self._data.to)
         granted_on = None
         if on_type:
             granted_on = ResourcePointer(name=on, resource_type=on_type)
@@ -336,7 +335,7 @@ class FutureGrant(Resource):
     def __init__(
         self,
         priv: str,
-        to: Role,
+        to: Union[Role, DatabaseRole],
         grant_option: bool = False,
         **kwargs,
     ):
@@ -391,7 +390,6 @@ class FutureGrant(Resource):
             to=to,
             grant_option=grant_option,
         )
-        self.requires(self._data.to)
         if granted_in_ref:
             self.requires(granted_in_ref)
 
@@ -592,7 +590,6 @@ class GrantOnAll(Resource):
             to=to,
             grant_option=grant_option,
         )
-        self.requires(self._data.to)
 
     @classmethod
     def from_sql(cls, sql):

@@ -675,6 +675,12 @@ class Blueprint:
         for resource in self._staged:
             resource._resolve_vars(self._config.vars)
 
+    def _resolve_role_refs(self):
+        for resource in _walk(self._root):
+            if isinstance(resource, ResourcePointer):
+                continue
+            resource._resolve_role_refs()
+
     def _build_resource_graph(self, session_ctx: SessionContext) -> None:
         """
         Convert the staged resources into a directed graph of resources
@@ -921,6 +927,7 @@ class Blueprint:
         self._finalized = True
         self._resolve_vars()
         self._build_resource_graph(session_ctx)
+        self._resolve_role_refs()
         self._create_tag_references()
         self._create_ownership_refs(session_ctx)
         self._create_grandparent_refs()
