@@ -643,8 +643,7 @@ def test_blueprint_vars_in_owner(session_ctx):
         resources=[res.Schema(name="schema", owner="role_{{ var.role_name }}", database="STATIC_DATABASE")],
         vars={"role_name": "role123"},
     )
-    manifest = blueprint.generate_manifest(session_ctx)
-    # assert manifest.resources[1].data["owner"] == "role_{{ var.role_name }}"
+    assert blueprint.generate_manifest(session_ctx)
 
 
 def test_blueprint_allowlist(session_ctx, remote_state):

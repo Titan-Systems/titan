@@ -93,7 +93,6 @@ def _coerce_resource_field(field_value, field_type):
             return VarString(field_value)
         elif isinstance(field_value, (Resource, VarString, str)):
             return convert_role_ref(field_value)
-            # return field_value
         else:
             raise TypeError
 
@@ -180,9 +179,6 @@ class ResourceSpec:
 
         def _serialize_field(field, value):
             if field.name == "owner":
-                # if isinstance(value, str):
-                #     return value
-                # else:
                 return str(value.fqn)
             elif isinstance(value, ResourcePointer):
                 return str(value.fqn)
