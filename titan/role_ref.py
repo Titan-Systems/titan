@@ -1,6 +1,8 @@
-from typing import Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
+
+from .var import VarString
 
 if TYPE_CHECKING:
-    from titan.resources.role import Role, DatabaseRole
+    from titan.resources.role import DatabaseRole, Role
 
-RoleRef = Union["Role", "DatabaseRole", str]
+RoleRef = Union["Role", "DatabaseRole", VarString, str]
