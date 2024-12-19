@@ -22,14 +22,16 @@ schemas:
 
 warehouses:
   - name: snowopt_wh
-    warehouse_size: LARGE
-    auto_suspend: 120
+    warehouse_size: XSMALL
+    auto_suspend: 30
     auto_resume: true
+    initially_suspended: true
     comment: "Warehouse optimized for model training and heavy computations."
   - name: standard_wh
-    warehouse_size: MEDIUM
-    auto_suspend: 120
+    warehouse_size: XSMALL
+    auto_suspend: 30
     auto_resume: true
+    initially_suspended: true
     comment: "General purpose warehouse for regular workloads."
 
 stages:

@@ -6,7 +6,7 @@
     "max_cluster_count": 1,
     "min_cluster_count": 1,
     "scaling_policy": "STANDARD",
-    "auto_suspend": 60,
+    "auto_suspend": 30,
     "auto_resume": false,
     "initially_suspended": true,
     "resource_monitor": null,

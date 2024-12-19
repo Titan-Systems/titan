@@ -119,7 +119,8 @@ def test_fetch_warehouse_snowpark_optimized(cursor, suffix, marked_for_cleanup):
     warehouse = res.Warehouse(
         name=f"TEST_FETCH_WAREHOUSE_SNOWPARK_OPTIMIZED_{suffix}",
         warehouse_type="SNOWPARK-OPTIMIZED",
-        warehouse_size="MEDIUM",
+        warehouse_size="XSMALL",
+        initially_suspended=True,
     )
 
     cursor.execute(warehouse.create_sql())

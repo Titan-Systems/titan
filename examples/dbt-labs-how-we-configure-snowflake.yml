@@ -25,18 +25,21 @@ databases:
 warehouses:
   - name: loading
     warehouse_size: XSMALL
-    auto_suspend: 60
+    auto_suspend: 30
     auto_resume: true
+    initially_suspended: true
     comment: "Tools like Fivetran and Stitch will use this warehouse to perform their regular loads of new data. We separate this workload from the other workloads because, at scale, loading can put significant strain on your warehouse and we don't want to cause slowness for your BI users."
   - name: transforming
     warehouse_size: XSMALL
-    auto_suspend: 60
+    auto_suspend: 30
     auto_resume: true
+    initially_suspended: true
     comment: "This is the warehouse that dbt will use to perform all data transformations. It will only be in use (and charging you credits) when regular jobs are being run."
   - name: reporting
     warehouse_size: XSMALL
-    auto_suspend: 60
+    auto_suspend: 30
     auto_resume: true
+    initially_suspended: true
     comment: "Mode and any other BI tools will connect to this warehouse to run analytical queries and report the results to end users. This warehouse will be spun up only when a user is actively running a query against it."
 
 grants:

@@ -144,7 +144,7 @@ def test_task_lifecycle(cursor, suffix, marked_for_cleanup):
         owner=TEST_ROLE,
         comment="This is a test task modified",
         allow_overlapping_execution=False,
-        user_task_managed_initial_warehouse_size="LARGE",
+        user_task_managed_initial_warehouse_size="XSMALL",
         user_task_timeout_ms=2000,
         suspend_task_after_num_failures=2,
         config='{"output_dir": "/temp/test_directory/", "learning_rate": 0.2}',

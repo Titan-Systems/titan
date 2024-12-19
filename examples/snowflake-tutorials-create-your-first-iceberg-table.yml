@@ -30,8 +30,9 @@ warehouses:
   - name: iceberg_tutorial_wh
     owner: iceberg_tutorial_role
     warehouse_size: XSMALL
-    auto_suspend: 60
+    auto_suspend: 30
     auto_resume: true
+    initially_suspended: true
 
 grants:
  - GRANT CREATE DATABASE ON ACCOUNT TO ROLE iceberg_tutorial_role
