@@ -293,8 +293,14 @@ views:
 
 warehouses:
   - name: static_warehouse
+    warehouse_size: XSMALL
+    auto_suspend: 30
+    auto_resume: true
+    initially_suspended: true
   - name: CI
     warehouse_size: XSMALL
+    auto_suspend: 30
+    initially_suspended: true
 
 
   

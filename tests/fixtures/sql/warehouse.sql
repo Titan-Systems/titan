@@ -18,6 +18,7 @@ CREATE WAREHOUSE lowercase_wh
 warehouse_size = x6large
 warehouse_type = snowpark-optimized
 scaling_policy = economy
+initially_suspended = true
 ;
 
 
