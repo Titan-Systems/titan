@@ -72,6 +72,15 @@ class NetworkRule(NamedResource, Resource):
             mode="INGRESS",
             comment="Example network rule"
         )
+        network_rule = NetworkRule(
+            name="some_network_rule",
+            database="somedb",
+            schema="someschema",
+            type="IPV4",
+            value_list=["192.168.1.1", "192.168.1.2"],
+            mode="INGRESS",
+            comment="Example network rule with fully qualified name"
+        )
         ```
 
     Yaml:
@@ -83,6 +92,13 @@ class NetworkRule(NamedResource, Resource):
             value_list: ["192.168.1.1", "192.168.1.2"]
             mode: INGRESS
             comment: "Example network rule"
+          - name: some_network_rule
+            database: somedb
+            schema: someschema
+            type: IPV4
+            value_list: ["192.168.1.1", "192.168.1.2"]
+            mode: INGRESS
+            comment: "Example network rule with fully qualified name"
         ```
     """
 
