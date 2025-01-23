@@ -771,16 +771,54 @@ def fetch_api_integration(session: SnowflakeConnection, fqn: FQN):
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
     owner = _fetch_owner(session, "INTEGRATION", fqn)
 
-    return {
-        "name": _quote_snowflake_identifier(data["name"]),
-        "api_provider": properties["api_provider"],
-        "api_aws_role_arn": properties["api_aws_role_arn"],
-        "enabled": properties["enabled"],
-        "api_allowed_prefixes": properties["api_allowed_prefixes"],
-        "api_blocked_prefixes": properties["api_blocked_prefixes"],
-        "owner": owner,
-        "comment": data["comment"] or None,
-    }
+    if properties["api_provider"].startswith("AWS"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "api_aws_role_arn": properties["api_aws_role_arn"],
+            "api_key": properties["api_key"] or None,
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["api_provider"].startswith("GIT"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["api_provider"].startswith("GOOGLE"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "google_audience": properties["google_audience"],
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["api_provider"].startswith("AZURE"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "azure_tenant_id": properties["azure_tenant_id"],
+            "azure_ad_application_id": properties["azure_ad_application_id"],
+            "api_key": properties["api_key"] or None,
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+
+    raise Exception(f"Unsupported notification integration type: {data['type']}")
 
 
 def fetch_authentication_policy(session: SnowflakeConnection, fqn: FQN):

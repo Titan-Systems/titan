@@ -2,7 +2,12 @@ from .account import Account
 from .account_parameter import AccountParameter
 from .aggregation_policy import AggregationPolicy
 from .alert import Alert
-from .api_integration import APIIntegration
+from .api_integration import (
+    AWSAPIIntegration,
+    AzureAPIIntegration,
+    GCPAPIIntegration,
+    GitAPIIntegration,
+)
 from .authentication_policy import AuthenticationPolicy
 from .catalog_integration import GlueCatalogIntegration, ObjectStoreCatalogIntegration
 from .column import Column
@@ -72,9 +77,10 @@ __all__ = [
     "AggregationPolicy",
     "Alert",
     "APIAuthenticationSecurityIntegration",
-    "APIIntegration",
     "AuthenticationPolicy",
+    "AWSAPIIntegration",
     "AWSOutboundNotificationIntegration",
+    "AzureAPIIntegration",
     "AzureInboundNotificationIntegration",
     "AzureOutboundNotificationIntegration",
     "AzureStorageIntegration",
@@ -94,10 +100,12 @@ __all__ = [
     "ExternalVolume",
     "FailoverGroup",
     "FutureGrant",
+    "GCPAPIIntegration",
     "GCPInboundNotificationIntegration",
     "GCPOutboundNotificationIntegration",
     "GCSStorageIntegration",
     "GenericSecret",
+    "GitAPIIntegration",
     "GlueCatalogIntegration",
     "Grant",
     "GrantOnAll",
