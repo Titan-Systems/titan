@@ -818,7 +818,7 @@ def fetch_api_integration(session: SnowflakeConnection, fqn: FQN):
             "comment": data["comment"] or None,
         }
 
-    raise Exception(f"Unsupported notification integration type: {data['type']}")
+    raise Exception(f"Unsupported api integration type: {properties['api_provider']}")
 
 
 def fetch_authentication_policy(session: SnowflakeConnection, fqn: FQN):
