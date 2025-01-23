@@ -31,11 +31,14 @@ grant = Grant(priv="SELECT", on_table="sometable", to="somerole")
 ### YAML
 
 ```yaml
-- Grant:
-    priv: "SELECT"
+grants:
+  - priv: "SELECT"
     on_table: "some_table"
     to: "some_role"
     grant_option: true
+  - priv: "USAGE"
+    on_schema: somedb.someschema
+    to: somedb.somedbrole
 ```
 
 
