@@ -1506,8 +1506,69 @@ def fetch_notification_integration(session: SnowflakeConnection, fqn: FQN):
             "owner": owner,
             "comment": data["comment"] or None,
         }
-    else:
-        raise Exception(f"Unsupported notification integration type: {data['type']}")
+    elif data["type"].startswith("QUEUE"):
+        type_, notification_provider = data["type"].split(" - ")
+        if notification_provider == "AWS_SNS":
+            return {
+                "name": _quote_snowflake_identifier(data["name"]),
+                "type": type_,
+                "enabled": data["enabled"] == "true",
+                "direction": properties["direction"],
+                "notification_provider": notification_provider,
+                "aws_sns_topic_arn": properties["aws_sns_topic_arn"],
+                "aws_sns_role_arn": properties["aws_sns_role_arn"],
+                "owner": owner,
+                "comment": data["comment"] or None,
+            }
+        elif notification_provider == "GCP_PUBSUB":
+            if properties["direction"] == "INBOUND":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "enabled": data["enabled"] == "true",
+                    "notification_provider": notification_provider,
+                    "gcp_pubsub_subscription_name": properties["gcp_pubsub_subscription_name"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+            elif properties["direction"] == "OUTBOUND":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "direction": properties["direction"],
+                    "enabled": data["enabled"] == "true",
+                    "notification_provider": notification_provider,
+                    "gcp_pubsub_subscription_name": properties["gcp_pubsub_subscription_name"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+            elif notification_provider == "AZURE_STORAGE_QUEUE":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "enabled": data["enabled"] == "true",
+                    "notification_provider": notification_provider,
+                    "azure_storage_queue_primary_uri": properties["azure_storage_queue_primary_uri"],
+                    "azure_tenant_id": properties["azure_tenant_id"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+            elif notification_provider == "AZURE_EVENT_GRID":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "enabled": data["enabled"] == "true",
+                    "direction": properties["direction"],
+                    "notification_provider": notification_provider,
+                    "azure_event_grid_topic_endpoint": properties["azure_storage_queue_primary_uri"],
+                    "azure_tenant_id": properties["azure_tenant_id"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+
+
+
+    raise Exception(f"Unsupported notification integration type: {data['type']}")
 
 
 def fetch_packages_policy(session: SnowflakeConnection, fqn: FQN):
@@ -2778,6 +2839,11 @@ def list_stages(session: SnowflakeConnection) -> list[FQN]:
 def list_storage_integrations(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "STORAGE INTEGRATIONS")
 
+def list_external_access_integrations(session: SnowflakeConnection) -> list[FQN]:
+    return list_account_scoped_resource(session, "EXTERNAL ACCESS INTEGRATIONS")
+
+def list_notification_integrations(session: SnowflakeConnection) -> list[FQN]:
+    return list_account_scoped_resource(session, "NOTIFICATION INTEGRATIONS")
 
 def list_streams(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "STREAMS")
