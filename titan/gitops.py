@@ -81,6 +81,13 @@ def _resources_from_database_role_grants_config(database_role_grants_config: lis
                     to_role=database_role_grant["to_role"],
                 )
             )
+        elif "to_database_role" in database_role_grant:
+            resources.append(
+                DatabaseRoleGrant(
+                    database_role=database_role_grant["database_role"],
+                    to_database_role=database_role_grant["to_database_role"],
+                )
+            )
         else:
             for role in database_role_grant.get("roles", []):
                 resources.append(
