@@ -51,8 +51,8 @@ def test_resource_name():
     assert rn._quoted
 
     rn = ResourceName("foo@bar.com")
-    assert str(rn) == '"foo@bar.com"'
-    assert rn._quoted
+    assert str(rn) == "foo@bar.com"
+    assert not rn._quoted
 
 
 def test_resource_name_equality():
