@@ -537,7 +537,7 @@ class Blueprint:
         self,
         name: Optional[str] = None,
         resources: Optional[list[Resource]] = None,
-        run_mode: str = "CREATE_OR_UPDATE",
+        run_mode: RunMode = RunMode.CREATE_OR_UPDATE,
         dry_run: bool = False,
         allowlist: Optional[list] = None,
         vars: Optional[dict] = None,
