@@ -977,7 +977,6 @@ class Blueprint:
         manifest = self.generate_manifest(session_ctx)
         remote_state = self.fetch_remote_state(session, manifest)
         try:
-            # finished_plan = self._plan(remote_state, manifest)
             finished_plan = diff(remote_state, manifest)
             # Compute dependency levels
             resource_set = set(manifest.urns + list(remote_state.keys()))
