@@ -30,6 +30,7 @@ class BlueprintConfig:
     scope: Optional[BlueprintScope] = None
     database: Optional[ResourceName] = None
     schema: Optional[ResourceName] = None
+    threads: int = 8
 
     def __post_init__(self):
 
@@ -102,6 +103,8 @@ class BlueprintConfig:
             raise ValueError(
                 f"Cannot specify a database or schema when using ACCOUNT scope (database={repr(self.database)}, schema={repr(self.schema)})"
             )
+        if not isinstance(self.threads, int):
+            raise ValueError(f"Threads must be an integer, got: {self.threads}")
 
 
 def set_vars_defaults(vars_spec: list[dict], vars: dict) -> dict:
