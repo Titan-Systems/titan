@@ -181,7 +181,7 @@ To connect with Snowflake, the CLI uses environment variables. The following are
 
 If using [key-pair auth](https://docs.snowflake.com/en/user-guide/key-pair-auth) instead of password, use the following environment variables in place of `SNOWFLAKE_PASSWORD`:
 * `SNOWFLAKE_PRIVATE_KEY_PATH`
-* `SNOWFLAKE_PRIVATE_KEY_FILE_PWD`
+* `PRIVATE_KEY_PASSPHRASE` (if using encrypted key)
 
 Note: the value for `SNOWFLAKE_AUTHENTICATOR` should be set to `SNOWFLAKE_JWT` when using key-pair auth.
 
