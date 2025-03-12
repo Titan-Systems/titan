@@ -142,7 +142,7 @@ def create_grant(urn: URN, data: dict, props: Props, if_not_exists: bool):
 
 
 def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool):
-    return tidy_sql(
+    sql_parts = [
         "GRANT",
         data["priv"],
         "ON ALL",
@@ -153,7 +153,10 @@ def create_grant_on_all(urn: URN, data: dict, props: Props, if_not_exists: bool)
         "TO",
         data["to_type"],
         data["to"],
-    )
+        "COPY CURRENT GRANTS" if data.get("copy_current_grants") else None,
+    ]
+    
+    return tidy_sql(*sql_parts)
 
 
 def create_masking_policy(urn: URN, data: dict, props: Props, if_not_exists: bool = False) -> str:

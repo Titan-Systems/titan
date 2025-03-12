@@ -455,6 +455,7 @@ class _GrantOnAll(ResourceSpec):
     to: RoleRef
     to_type: ResourceType = None
     grant_option: bool = False
+    copy_current_grants: bool = False #New
 
     def __post_init__(self):
         super().__post_init__()
@@ -462,6 +463,9 @@ class _GrantOnAll(ResourceSpec):
             raise ValueError(f"in_type must be either DATABASE or SCHEMA, not {self.in_type}")
         self.to_type = self.to.resource_type
 
+        # New
+        if self.copy_current_grants and self.priv != 'OWNERSHIP':
+            raise ValueError("copy_current_grants can only be used with the OWNERSHIP privilege")
 
 class GrantOnAll(Resource):
     """
@@ -478,6 +482,7 @@ class GrantOnAll(Resource):
         in_name (string, required): The name of the container resource in which the privilege is granted.
         to (string or Role, required): The role to which the privileges are granted.
         grant_option (bool): Specifies whether the grantee can grant the privileges to other roles. Defaults to False.
+        copy_current_grants (bool): Preserves existing grants when transferring ownership.
 
     Python:
 
@@ -537,6 +542,7 @@ class GrantOnAll(Resource):
         priv: str,
         to: Role,
         grant_option: bool = False,
+        copy_current_grants: bool = False,  
         **kwargs,
     ):
         on_type = kwargs.pop("on_type", None)
@@ -592,6 +598,7 @@ class GrantOnAll(Resource):
             in_name=in_name,
             to=to,
             grant_option=grant_option,
+            copy_current_grants=copy_current_grants  
         )
 
     @classmethod
