@@ -460,21 +460,19 @@ def _show_resources(session: SnowflakeConnection, type_str, fqn: FQN, cacheable:
             )
             return filtered_fetch
         else:
-
+            name = str(fqn.name).replace('"', "")
+            database = str(fqn.database).replace('"', "")
+            schema = str(fqn.schema).replace('"', "")
             if fqn.database is None and fqn.schema is None:
-                return execute(session, f"SHOW {type_str} LIKE '{fqn.name}'", cacheable=cacheable)
+                return execute(session, f"SHOW {type_str} LIKE '{name}'", cacheable=cacheable)
             elif fqn.database is None:
-                return execute(
-                    session, f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.schema}", cacheable=cacheable
-                )
+                return execute(session, f"SHOW {type_str} LIKE '{name}' IN SCHEMA {schema}", cacheable=cacheable)
             elif fqn.schema is None:
-                return execute(
-                    session, f"SHOW {type_str} LIKE '{fqn.name}' IN DATABASE {fqn.database}", cacheable=cacheable
-                )
+                return execute(session, f"SHOW {type_str} LIKE '{name}' IN DATABASE {database}", cacheable=cacheable)
             else:
                 return execute(
                     session,
-                    f"SHOW {type_str} LIKE '{fqn.name}' IN SCHEMA {fqn.database}.{fqn.schema}",
+                    f"SHOW {type_str} LIKE '{name}' IN SCHEMA {database}.{fqn.schema}",
                     cacheable=cacheable,
                 )
     except ProgrammingError as err:
