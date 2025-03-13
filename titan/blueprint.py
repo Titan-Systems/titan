@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
@@ -466,7 +467,10 @@ def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
         # Create a unique identifier for the resource
         resource_id: ResourceRef
         if isinstance(resource_or_pointer, NamedResource):
-            resource_id = (resource_or_pointer.resource_type, str(resource_or_pointer.name))
+            resource_id = (
+                resource_or_pointer.resource_type,
+                str(resource_or_pointer.name),
+            )
         else:
             resource_id = str(resource_or_pointer.urn)
 
@@ -496,16 +500,27 @@ def _merge_pointers(resources: Sequence[Resource]) -> list[Resource]:
     return list(namespace.values())
 
 
-def _get_databases(resource: ResourceContainer) -> list[Union[Database, ResourcePointer]]:
-    return cast(list[Union[Database, ResourcePointer]], resource.items(resource_type=ResourceType.DATABASE))
+def _get_databases(
+    resource: ResourceContainer,
+) -> list[Union[Database, ResourcePointer]]:
+    return cast(
+        list[Union[Database, ResourcePointer]],
+        resource.items(resource_type=ResourceType.DATABASE),
+    )
 
 
 def _get_schemas(resource: ResourceContainer) -> list[Union[Schema, ResourcePointer]]:
-    return cast(list[Union[Schema, ResourcePointer]], resource.items(resource_type=ResourceType.SCHEMA))
+    return cast(
+        list[Union[Schema, ResourcePointer]],
+        resource.items(resource_type=ResourceType.SCHEMA),
+    )
 
 
 def _get_schema_by_name(resource: ResourceContainer, name: Union[ResourceName, str]) -> Union[Schema, ResourcePointer]:
-    return cast(Union[Schema, ResourcePointer], resource.find(name=name, resource_type=ResourceType.SCHEMA))
+    return cast(
+        Union[Schema, ResourcePointer],
+        resource.find(name=name, resource_type=ResourceType.SCHEMA),
+    )
 
 
 def _get_public_schema(resource: ResourceContainer) -> Union[Schema, ResourcePointer]:
@@ -624,41 +639,52 @@ class Blueprint:
 
         data_provider.use_secondary_roles(session, all=True)
 
+        urns = manifest.urns
         if self._config.run_mode == RunMode.SYNC:
             if not self._config.allowlist:
                 raise RuntimeError("Sync mode requires an allowlist")
+            urns = []
             for resource_type in self._config.allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     if self._config.scope == BlueprintScope.DATABASE and fqn.database != self._config.database:
                         continue
                     if self._config.scope == BlueprintScope.SCHEMA and fqn.schema != self._config.schema:
                         continue
-                    urn = URN(resource_type=resource_type, fqn=fqn, account_locator=session_ctx["account_locator"])
-                    data = data_provider.fetch_resource(session, urn)
-                    if data is None:
-                        raise MissingResourceException(f"Resource not found: {urn}")
-                    resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
-                    state[urn] = resource_cls.spec(**data).to_dict(session_ctx["account_edition"])
-        else:
-            with ThreadPoolExecutor(max_workers=self._config.threads) as executor:
-                future_to_urn = {
-                    executor.submit(data_provider.fetch_resource, session, urn): urn for urn in manifest.urns
-                }
-                for future in as_completed(future_to_urn):
-                    urn = future_to_urn[future]
-                    try:
-                        data = future.result()
-                        if data:
+
+                    urns.append(
+                        URN(
+                            resource_type=resource_type,
+                            fqn=fqn,
+                            account_locator=session_ctx["account_locator"],
+                        )
+                    )
+
+        with ThreadPoolExecutor(max_workers=self._config.threads) as executor:
+            future_to_urn = {executor.submit(data_provider.fetch_resource, session, urn): urn for urn in urns}
+            for future in as_completed(future_to_urn):
+                urn = future_to_urn[future]
+                try:
+                    data = future.result()
+                    if data:
+                        if self._config.run_mode == RunMode.SYNC:
+                            resource_cls = Resource.resolve_resource_cls(urn.resource_type, data)
+                        else:
                             item = manifest[urn]
                             resource_cls = (
                                 item.resource_cls
                                 if isinstance(item, ManifestResource)
                                 else Resource.resolve_resource_cls(urn.resource_type, data)
                             )
-                            state[urn] = resource_cls.spec(**data).to_dict(session_ctx["account_edition"])
-                    except Exception as e:
-                        logger.error(f"Failed to fetch resource {urn}: {e}")
-                        raise  # Stop processing if any fetch fails
+
+                        state[urn] = resource_cls.spec(**data).to_dict(session_ctx["account_edition"])
+                    else:
+                        if self._config.run_mode == RunMode.SYNC:
+                            raise MissingResourceException(f"Resource {urn} not found")
+                except Exception as e:
+                    logger.error(f"Failed to fetch resource {urn}: {e}")
+                    raise  # Stop processing if any fetch fails
+
+        if self._config.run_mode != RunMode.SYNC:
             for parent, reference in manifest.refs:
                 if reference in manifest or reference in state:
                     continue
@@ -1018,35 +1044,51 @@ class Blueprint:
         _raise_if_plan_would_drop_session_user(session_ctx, plan)
 
         sql_commands_per_change = compile_plan_to_sql(session_ctx, plan)
-        additive_changes = [c for c in plan if isinstance(c, (CreateResource, UpdateResource, TransferOwnership))]
-        destructive_changes = [c for c in plan if isinstance(c, DropResource)]
+        roles = []
+        additive_commands = []
+        destructive_commands = []
+        for command in sql_commands_per_change:
+            roles.append(command["role"])
+            if isinstance(command["change"], (CreateResource, UpdateResource, TransferOwnership)):
+                additive_commands.append(command)
+            elif isinstance(command["change"], DropResource):
+                destructive_commands.append(command)
+        roles = set(roles)
 
         # Map changes to their levels
-        levels = {c.urn: self._levels[c.urn] for c in additive_changes if c.urn in self._levels}
+        levels = {
+            c["change"].urn: self._levels[c["change"].urn] for c in additive_commands if c["change"].urn in self._levels
+        }
         max_level = max(levels.values()) if levels else -1
 
         # Execute additive changes by level
         for level in reversed(range(max_level + 1)):
-            changes_at_level = [c for c in additive_changes if levels.get(c.urn, -1) == level]
-            if changes_at_level:
-                logger.debug(f"Executing level {level} with {len(changes_at_level)} changes")
-                with ThreadPoolExecutor(max_workers=self._config.threads) as executor:
-                    future_to_change = {
-                        executor.submit(self._execute_change, session, sql_commands_per_change[plan.index(c)]): c
-                        for c in changes_at_level
-                    }
-                    for future in as_completed(future_to_change):
-                        change = future_to_change[future]
-                        try:
-                            future.result()
-                        except Exception as e:
-                            logger.error(f"Failed to execute change {change}: {e}")
-                            raise
+            commands_at_level = [c for c in additive_commands if levels.get(c["change"].urn, -1) == level]
+            for role in roles:
+                # Execute additive changes in current level by role
+                commands_at_role_level = [c for c in commands_at_level if c["role"] == role]
+                if commands_at_role_level:
+                    logger.debug(f"Executing level {level} role {role} with {len(commands_at_role_level)} changes")
+                    with ThreadPoolExecutor(max_workers=self._config.threads) as executor:
+                        future_to_change = {
+                            executor.submit(
+                                self._execute_change,
+                                session,
+                                c["commands"],
+                            ): c["change"]
+                            for c in commands_at_role_level
+                        }
+                        for future in as_completed(future_to_change):
+                            change = future_to_change[future]
+                            try:
+                                future.result()
+                            except Exception as e:
+                                logger.error(f"Failed to execute change {change}: {e}")
+                                raise
 
         # Execute destructive changes sequentially
-        for change in destructive_changes:
-            commands = sql_commands_per_change[plan.index(change)]
-            self._execute_change(session, commands)
+        for command in destructive_commands:
+            self._execute_change(session, command["commands"])
 
     def _add(self, resource: Resource):
         if self._finalized:
@@ -1164,7 +1206,7 @@ def sql_commands_for_change(
     change: ResourceChange,
     available_roles: list[ResourceName],
     default_role: ResourceName,
-):
+) -> tuple[ResourceName, list[str]]:
     """
     In Snowflake's RBAC model, a session has an active role, and zero or more secondary roles.
 
@@ -1195,7 +1237,6 @@ def sql_commands_for_change(
         available_roles,
         default_role,
     )
-    before_change_cmd.append(f"USE ROLE {execution_role}")
 
     if isinstance(change, CreateResource):
 
@@ -1250,17 +1291,17 @@ def sql_commands_for_change(
             copy_current_grants=True,
         )
 
-    return before_change_cmd + [change_cmd] + after_change_cmd
+    return execution_role, before_change_cmd + [change_cmd] + after_change_cmd
 
 
-def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan) -> list[list[str]]:
+def compile_plan_to_sql(session_ctx: SessionContext, plan: Plan) -> list[dict]:
     """Compile the plan into a list of SQL command lists, one per change."""
     sql_commands_per_change = []
     available_roles = session_ctx["available_roles"].copy()
     default_role = session_ctx["role"]
     for change in plan:
-        commands = sql_commands_for_change(change, available_roles, default_role)
-        sql_commands_per_change.append(commands)
+        role, commands = sql_commands_for_change(change, available_roles, default_role)
+        sql_commands_per_change.append({"role": role, "commands": commands, "change": change})
         if isinstance(change, CreateResource):
             if change.urn.resource_type == ResourceType.ROLE:
                 available_roles.append(ResourceName(change.after["name"]))
