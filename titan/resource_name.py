@@ -15,8 +15,8 @@ def attribute_is_resource_name(attribute: str) -> bool:
 
 @lru_cache(maxsize=1024 * 1024)
 def resource_name_from_snowflake_metadata(name: str) -> "ResourceName":
-    if name.startswith('"') and name.endswith('"'):
-        raise RuntimeError(f"{name} is not from snowflake metadata")
+    # if name.startswith('"') and name.endswith('"'):
+    #     raise RuntimeError(f"{name} is not from snowflake metadata")
     if re.match(r"^[A-Z_][A-Z0-9_]*$", name):
         return ResourceName(name)
     else:
