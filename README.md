@@ -167,7 +167,7 @@ The CLI allows you to `plan` and `apply` a Titan Core YAML config. You can speci
 
 In addition to `plan` and `apply`, the CLI also allows you to `export` resources. This makes it easy to generate a config for an existing Snowflake environment.
 
-To connect with Snowflake, the CLI uses environment variables. The following `are supported:
+To connect with Snowflake, the CLI uses environment variables. The following are supported:
 
 * `SNOWFLAKE_ACCOUNT`
 * `SNOWFLAKE_USER`
@@ -178,6 +178,12 @@ To connect with Snowflake, the CLI uses environment variables. The following `ar
 * `SNOWFLAKE_WAREHOUSE`
 * `SNOWFLAKE_MFA_PASSCODE`
 * `SNOWFLAKE_AUTHENTICATOR`
+
+If using [key-pair auth](https://docs.snowflake.com/en/user-guide/key-pair-auth) instead of password, use the following environment variables in place of `SNOWFLAKE_PASSWORD`:
+* `SNOWFLAKE_PRIVATE_KEY_PATH`
+* `PRIVATE_KEY_PASSPHRASE` (if using encrypted key)
+
+Note: the value for `SNOWFLAKE_AUTHENTICATOR` should be set to `SNOWFLAKE_JWT` when using key-pair auth.
 
 ### CLI Example
 
