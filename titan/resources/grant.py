@@ -460,6 +460,8 @@ class _GrantOnAll(ResourceSpec):
         super().__post_init__()
         if self.in_type not in [ResourceType.DATABASE, ResourceType.SCHEMA]:
             raise ValueError(f"in_type must be either DATABASE or SCHEMA, not {self.in_type}")
+        if isinstance(self.priv, str):
+            self.priv = self.priv.upper()
         self.to_type = self.to.resource_type
 
 
