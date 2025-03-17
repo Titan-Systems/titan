@@ -654,3 +654,23 @@ class SchemaProp(Prop):
             column_str = f"{name} {data_type}{not_null}{default}{comment}"
             columns.append(column_str)
         return f"({', '.join(columns)})"
+
+
+class FromProp(Prop):
+    """
+    Custom property to handle the FROM clause, which can be either a stage or a repository URL.
+    """
+
+    def __init__(self):
+        value_expr = pp.sgl_quoted_string | (pp.Literal("@") + FullyQualifiedIdentifier())
+        super().__init__(label="FROM", value_expr=value_expr)
+
+    def typecheck(self, prop_value):
+        if isinstance(prop_value, list):
+            return "".join(prop_value)  # e.g., '@stage_name'
+        return prop_value  # e.g., 'https://github.com/user/repo.git'
+
+    def render(self, value):
+        if value.startswith("@"):
+            return f"FROM {value}"
+        return f"FROM '{value}'"
