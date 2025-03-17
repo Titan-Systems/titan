@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Union
+
 from .enums import ParseableEnum, ResourceType
 
 
@@ -297,6 +298,12 @@ class StreamPriv(Priv):
     SELECT = "SELECT"
 
 
+class StreamlitPriv(Priv):
+    ALL = "ALL"
+    OWNERSHIP = "OWNERSHIP"
+    USAGE = "USAGE"
+
+
 class TablePriv(Priv):
     ALL = "ALL"
     APPLYBUDGET = "APPLYBUDGET"
@@ -407,6 +414,7 @@ PRIVS_FOR_RESOURCE_TYPE: dict[ResourceType, Optional[type[Priv]]] = {
     ResourceType.STAGE: StagePriv,
     ResourceType.STORAGE_INTEGRATION: IntegrationPriv,
     ResourceType.STREAM: StreamPriv,
+    ResourceType.STREAMLIT: StreamlitPriv,
     ResourceType.TABLE: TablePriv,
     ResourceType.TAG_REFERENCE: None,
     ResourceType.TAG: TagPriv,
@@ -540,4 +548,5 @@ def system_role_for_priv(priv: str):
         account_priv = AccountPriv(priv)
     except ValueError:
         return None
+    return GLOBAL_PRIV_DEFAULT_OWNERS.get(account_priv)
     return GLOBAL_PRIV_DEFAULT_OWNERS.get(account_priv)

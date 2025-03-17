@@ -16,7 +16,7 @@ from .external_volume import ExternalVolume
 from .failover_group import FailoverGroup
 from .file_format import CSVFileFormat, JSONFileFormat, ParquetFileFormat
 from .function import JavascriptUDF, PythonUDF
-from .grant import FutureGrant, Grant, GrantOnAll, RoleGrant, DatabaseRoleGrant
+from .grant import DatabaseRoleGrant, FutureGrant, Grant, GrantOnAll, RoleGrant
 from .hybrid_table import HybridTable
 from .iceberg_table import SnowflakeIcebergTable
 from .image_repository import ImageRepository
@@ -41,6 +41,7 @@ from .replication_group import ReplicationGroup
 from .resource import Resource
 from .resource_monitor import ResourceMonitor
 from .role import DatabaseRole, Role
+from .scanner_package import ScannerPackage
 from .schema import Schema
 from .secret import GenericSecret, OAuthSecret, PasswordSecret
 from .security_integration import (
@@ -58,10 +59,10 @@ from .storage_integration import (
     S3StorageIntegration,
 )
 from .stream import StageStream, TableStream, ViewStream  # ExternalTableStream
+from .streamlit import Streamlit
 from .table import Table  # , CreateTableAsSelect
 from .tag import Tag, TagReference
 from .task import Task
-from .scanner_package import ScannerPackage
 from .user import User
 from .view import View
 from .warehouse import Warehouse
@@ -135,6 +136,7 @@ __all__ = [
     "SnowflakePartnerOAuthSecurityIntegration",
     "SnowservicesOAuthSecurityIntegration",
     "StageStream",
+    "Streamlit",
     "Table",
     "TableStream",
     "Tag",
