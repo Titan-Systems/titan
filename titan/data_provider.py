@@ -940,30 +940,41 @@ def fetch_database_role(session: SnowflakeConnection, fqn: FQN):
 
 
 def fetch_database_role_grant(session: SnowflakeConnection, fqn: FQN):
-    show_result = execute(session, f"SHOW GRANTS OF DATABASE ROLE {fqn.database}.{fqn.name}", cacheable=True)
+    subject, name = fqn.params.copy().popitem()
+    subject = ResourceName(subject)
+    name = ResourceName(name)
 
-    subject, subject_name = next(iter(fqn.params.items()))
+    try:
+        show_result = execute(session, f"SHOW GRANTS OF DATABASE ROLE {fqn.database}.{fqn.name}", cacheable=True)
+    except ProgrammingError as err:
+        if err.errno == DOES_NOT_EXIST_ERR:
+            return None
+        raise
 
-    role_grants = _filter_result(show_result, granted_to=subject.upper(), grantee_name=subject_name)
-    if len(role_grants) == 0:
+    if len(show_result) == 0:
         return None
-    if len(role_grants) > 1:
-        raise Exception(f"Found multiple database role grants matching {fqn}")
 
-    data = show_result[0]
+    for data in show_result:
+        if (
+            resource_name_from_snowflake_metadata(data["granted_to"]) == subject
+            and resource_name_from_snowflake_metadata(data["grantee_name"]) == name
+        ):
+            if data["granted_to"] == "ROLE":
+                return {
+                    "database_role": data["role"],
+                    "to_role": _quote_snowflake_identifier(data["grantee_name"]),
+                    # "owner": data["granted_by"],
+                }
+            elif data["granted_to"] == "DATABASE_ROLE":
+                return {
+                    "database_role": data["role"],
+                    "to_database_role": _quote_snowflake_identifier(data["grantee_name"]),
+                    # "owner": data["granted_by"],
+                }
+            else:
+                raise Exception(f"Unexpected database role grant for database role {fqn.database}.{fqn.name}")
 
-    to_role = None
-    to_database_role = None
-    if data["granted_to"] == "ROLE":
-        to_role = _quote_snowflake_identifier(data["grantee_name"])
-    elif data["granted_to"] == "DATABASE_ROLE":
-        to_database_role = data["grantee_name"]
-
-    return {
-        "database_role": data["role"],
-        "to_role": to_role,
-        "to_database_role": to_database_role,
-    }
+    return None
 
 
 def fetch_dynamic_table(session: SnowflakeConnection, fqn: FQN):
