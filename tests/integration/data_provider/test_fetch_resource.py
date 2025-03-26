@@ -331,7 +331,7 @@ def test_fetch_network_rule(cursor, suffix, test_db, marked_for_cleanup):
 
 
 def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
-    api_integration = res.APIIntegration(
+    api_integration = res.AWSAPIIntegration(
         name=f"API_INTEGRATION_EXAMPLE_{suffix}",
         api_provider="AWS_API_GATEWAY",
         api_aws_role_arn="arn:aws:iam::123456789012:role/MyRole",
@@ -347,11 +347,11 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
-    result = clean_resource_data(res.APIIntegration.spec, result)
-    data = clean_resource_data(res.APIIntegration.spec, api_integration.to_dict())
+    result = clean_resource_data(res.AWSAPIIntegration.spec, result)
+    data = clean_resource_data(res.AWSAPIIntegration.spec, api_integration.to_dict())
     assert result == data
 
-    api_integration = res.APIIntegration(
+    api_integration = res.AWSAPIIntegration(
         name=f"API_INTEGRATION_EXAMPLE_{suffix}_WITH_API_KEY",
         api_provider="AWS_API_GATEWAY",
         api_aws_role_arn="arn:aws:iam::123456789012:role/MyRole",
@@ -368,8 +368,8 @@ def test_fetch_api_integration(cursor, suffix, marked_for_cleanup):
 
     result = safe_fetch(cursor, api_integration.urn)
     assert result is not None
-    result = clean_resource_data(res.APIIntegration.spec, result)
-    data = clean_resource_data(res.APIIntegration.spec, api_integration.to_dict())
+    result = clean_resource_data(res.AWSAPIIntegration.spec, result)
+    data = clean_resource_data(res.AWSAPIIntegration.spec, api_integration.to_dict())
     assert result == data
 
 

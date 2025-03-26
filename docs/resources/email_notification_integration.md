@@ -16,8 +16,9 @@ allows specifying recipients who will receive notifications via email.
 ### Python
 
 ```python
-email_notification_integration = EmailNotificationIntegration(
+email_notification_integration = NotificationIntegration(
     name="some_email_notification_integration",
+    type="email",
     enabled=True,
     allowed_recipients=["user1@example.com", "user2@example.com"],
     comment="Example email notification integration"
@@ -28,8 +29,9 @@ email_notification_integration = EmailNotificationIntegration(
 ### YAML
 
 ```yaml
-email_notification_integrations:
+notification_integrations:
   - name: some_email_notification_integration
+    type: EMAIL
     enabled: true
     allowed_recipients:
       - user1@example.com
@@ -41,6 +43,7 @@ email_notification_integrations:
 ## Fields
 
 * `name` (string, required) - The name of the email notification integration.
+* `type` (string, required) - Specifies that this is an email notification integration.
 * `enabled` (bool, required) - Specifies whether the notification integration is enabled.
 * `allowed_recipients` (list) - A list of email addresses that are allowed to receive notifications.
 * `comment` (string) - An optional comment about the notification integration.

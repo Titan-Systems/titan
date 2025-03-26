@@ -3,7 +3,7 @@ description: >-
   
 ---
 
-# APIIntegration
+# AWSAPIIntegration
 
 [Snowflake Documentation](https://docs.snowflake.com/en/sql-reference/sql/create-api-integration)
 

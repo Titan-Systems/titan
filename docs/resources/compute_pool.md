@@ -51,7 +51,7 @@ compute_pools:
 * `owner` (string or [Role](role.md)) - The owner of the compute pool. Defaults to "ACCOUNTADMIN".
 * `min_nodes` (int) - The minimum number of nodes in the compute pool.
 * `max_nodes` (int) - The maximum number of nodes in the compute pool.
-* `instance_family` (string or [InstanceFamily](instance_family.md)) - The family of instances to use for the compute nodes.
+* `instance_family` (string) - The family of instances to use for the compute nodes.
 * `auto_resume` (bool) - Whether the compute pool should automatically resume when queries are submitted. Defaults to True.
 * `initially_suspended` (bool) - Whether the compute pool should start in a suspended state.
 * `auto_suspend_secs` (int) - The number of seconds of inactivity after which the compute pool should automatically suspend. Defaults to 3600.

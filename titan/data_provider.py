@@ -771,16 +771,54 @@ def fetch_api_integration(session: SnowflakeConnection, fqn: FQN):
     properties = _desc_type2_result_to_dict(desc_result, lower_properties=True)
     owner = _fetch_owner(session, "INTEGRATION", fqn)
 
-    return {
-        "name": _quote_snowflake_identifier(data["name"]),
-        "api_provider": properties["api_provider"],
-        "api_aws_role_arn": properties["api_aws_role_arn"],
-        "enabled": properties["enabled"],
-        "api_allowed_prefixes": properties["api_allowed_prefixes"],
-        "api_blocked_prefixes": properties["api_blocked_prefixes"],
-        "owner": owner,
-        "comment": data["comment"] or None,
-    }
+    if properties["api_provider"].startswith("AWS"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "api_aws_role_arn": properties["api_aws_role_arn"],
+            "api_key": properties["api_key"] or None,
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["api_provider"].startswith("GIT"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["api_provider"].startswith("GOOGLE"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "google_audience": properties["google_audience"],
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+    elif properties["api_provider"].startswith("AZURE"):
+        return {
+            "name": _quote_snowflake_identifier(data["name"]),
+            "api_provider": properties["api_provider"],
+            "azure_tenant_id": properties["azure_tenant_id"],
+            "azure_ad_application_id": properties["azure_ad_application_id"],
+            "api_key": properties["api_key"] or None,
+            "enabled": properties["enabled"],
+            "api_allowed_prefixes": properties["api_allowed_prefixes"],
+            "api_blocked_prefixes": properties["api_blocked_prefixes"],
+            "owner": owner,
+            "comment": data["comment"] or None,
+        }
+
+    raise Exception(f"Unsupported api integration type: {properties['api_provider']}")
 
 
 def fetch_authentication_policy(session: SnowflakeConnection, fqn: FQN):
@@ -1506,8 +1544,69 @@ def fetch_notification_integration(session: SnowflakeConnection, fqn: FQN):
             "owner": owner,
             "comment": data["comment"] or None,
         }
-    else:
-        raise Exception(f"Unsupported notification integration type: {data['type']}")
+    elif data["type"].startswith("QUEUE"):
+        type_, notification_provider = data["type"].split(" - ")
+        if notification_provider == "AWS_SNS":
+            return {
+                "name": _quote_snowflake_identifier(data["name"]),
+                "type": type_,
+                "enabled": data["enabled"] == "true",
+                "direction": properties["direction"],
+                "notification_provider": notification_provider,
+                "aws_sns_topic_arn": properties["aws_sns_topic_arn"],
+                "aws_sns_role_arn": properties["aws_sns_role_arn"],
+                "owner": owner,
+                "comment": data["comment"] or None,
+            }
+        elif notification_provider == "GCP_PUBSUB":
+            if properties["direction"] == "INBOUND":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "enabled": data["enabled"] == "true",
+                    "notification_provider": notification_provider,
+                    "gcp_pubsub_subscription_name": properties["gcp_pubsub_subscription_name"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+            elif properties["direction"] == "OUTBOUND":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "direction": properties["direction"],
+                    "enabled": data["enabled"] == "true",
+                    "notification_provider": notification_provider,
+                    "gcp_pubsub_subscription_name": properties["gcp_pubsub_subscription_name"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+            elif notification_provider == "AZURE_STORAGE_QUEUE":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "enabled": data["enabled"] == "true",
+                    "notification_provider": notification_provider,
+                    "azure_storage_queue_primary_uri": properties["azure_storage_queue_primary_uri"],
+                    "azure_tenant_id": properties["azure_tenant_id"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+            elif notification_provider == "AZURE_EVENT_GRID":
+                return {
+                    "name": _quote_snowflake_identifier(data["name"]),
+                    "type": type_,
+                    "enabled": data["enabled"] == "true",
+                    "direction": properties["direction"],
+                    "notification_provider": notification_provider,
+                    "azure_event_grid_topic_endpoint": properties["azure_storage_queue_primary_uri"],
+                    "azure_tenant_id": properties["azure_tenant_id"],
+                    "owner": owner,
+                    "comment": data["comment"] or None,
+                }
+
+
+
+    raise Exception(f"Unsupported notification integration type: {data['type']}")
 
 
 def fetch_packages_policy(session: SnowflakeConnection, fqn: FQN):
@@ -2778,6 +2877,11 @@ def list_stages(session: SnowflakeConnection) -> list[FQN]:
 def list_storage_integrations(session: SnowflakeConnection) -> list[FQN]:
     return list_account_scoped_resource(session, "STORAGE INTEGRATIONS")
 
+def list_external_access_integrations(session: SnowflakeConnection) -> list[FQN]:
+    return list_account_scoped_resource(session, "EXTERNAL ACCESS INTEGRATIONS")
+
+def list_notification_integrations(session: SnowflakeConnection) -> list[FQN]:
+    return list_account_scoped_resource(session, "NOTIFICATION INTEGRATIONS")
 
 def list_streams(session: SnowflakeConnection) -> list[FQN]:
     return list_schema_scoped_resource(session, "STREAMS")
