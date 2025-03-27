@@ -577,7 +577,7 @@ class Blueprint:
         )
         self._finalized = False
         self._staged = []
-        self._root = ResourcePointer(name="MISSING", resource_type=ResourceType.ACCOUNT)
+        self._root = ResourcePointer(name="ACCOUNT", resource_type=ResourceType.ACCOUNT)
         self._levels = {}  # Store dependency levels
         self.add(resources or [])
 
@@ -586,7 +586,7 @@ class Blueprint:
         blueprint = cls.__new__(cls)
         blueprint._config = config
         blueprint._staged = []
-        blueprint._root = ResourcePointer(name="MISSING", resource_type=ResourceType.ACCOUNT)
+        blueprint._root = ResourcePointer(name="ACCOUNT", resource_type=ResourceType.ACCOUNT)
         blueprint._finalized = False
         blueprint.add(config.resources or [])
         return blueprint
@@ -643,7 +643,7 @@ class Blueprint:
         if self._config.run_mode == RunMode.SYNC:
             if not self._config.allowlist:
                 raise RuntimeError("Sync mode requires an allowlist")
-            urns = []
+            urns = [URN.from_resource(account_locator=manifest._account_locator, resource=self._root)]
             for resource_type in self._config.allowlist:
                 for fqn in data_provider.list_resource(session, resource_label_for_type(resource_type)):
                     if self._config.scope == BlueprintScope.DATABASE and fqn.database != self._config.database:
@@ -721,8 +721,6 @@ class Blueprint:
         # Create root node of the resource graph
         if len(org_scoped) > 0:
             raise Exception("Blueprint cannot contain an Account resource")
-        else:
-            self._root = ResourcePointer(name="ACCOUNT", resource_type=ResourceType.ACCOUNT)
 
         # Merge account scoped pointers into their proper resource
         acct_scoped = _merge_pointers(acct_scoped)
@@ -1020,26 +1018,46 @@ class Blueprint:
         return finished_plan
 
     def apply(self, session, plan: Optional[Plan] = None) -> None:
-        """Apply the plan with parallel execution of independent additive changes."""
+        """Apply the plan with parallel execution of independent additive changes.
+
+        At this point, we have a list of actions as a part of the plan. Each action is one of:
+             1. ADD action (CREATE command)
+             2. CHANGE action (one or many ALTER or SET PARAMETER commands)
+             3. REMOVE action (DROP command, REVOKE command, or a rename operation)
+             4. TRANSFER action (GRANT OWNERSHIP command)
+
+         Each action requires:
+             • a set of privileges necessary to run commands
+             • the appropriate role to execute commands
+
+         Once we've determined those things, we can compare the list of required roles and privileges
+         against what we have access to in the session and the role tree."""
+
+        def execute_commands_in_parallel(commands):
+            """Execute a list of SQL commands in parallel using a thread pool."""
+            with ThreadPoolExecutor(max_workers=self._config.threads) as executor:
+                future_to_change = {
+                    executor.submit(
+                        self._execute_change,
+                        session,
+                        c["commands"],
+                    ): c["change"]
+                    for c in commands
+                }
+                for future in as_completed(future_to_change):
+                    change = future_to_change[future]
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logger.error(f"Failed to execute change {change}: {e}")
+                        raise
+
+        # TODO: cursor setup, including query tag
+
         logger = logging.getLogger(__name__)
         if plan is None:
             plan = self.plan(session)
 
-        # TODO: cursor setup, including query tag
-        """
-            At this point, we have a list of actions as a part of the plan. Each action is one of:
-                1. ADD action (CREATE command)
-                2. CHANGE action (one or many ALTER or SET PARAMETER commands)
-                3. REMOVE action (DROP command, REVOKE command, or a rename operation)
-                4. TRANSFER action (GRANT OWNERSHIP command)
-
-            Each action requires:
-                • a set of privileges necessary to run commands
-                • the appropriate role to execute commands
-
-            Once we've determined those things, we can compare the list of required roles and privileges
-            against what we have access to in the session and the role tree.
-        """
         session_ctx = data_provider.fetch_session(session)
         _raise_if_plan_would_drop_session_user(session_ctx, plan)
 
@@ -1069,26 +1087,10 @@ class Blueprint:
                 commands_at_role_level = [c for c in commands_at_level if c["role"] == role]
                 if commands_at_role_level:
                     logger.debug(f"Executing level {level} role {role} with {len(commands_at_role_level)} changes")
-                    with ThreadPoolExecutor(max_workers=self._config.threads) as executor:
-                        future_to_change = {
-                            executor.submit(
-                                self._execute_change,
-                                session,
-                                c["commands"],
-                            ): c["change"]
-                            for c in commands_at_role_level
-                        }
-                        for future in as_completed(future_to_change):
-                            change = future_to_change[future]
-                            try:
-                                future.result()
-                            except Exception as e:
-                                logger.error(f"Failed to execute change {change}: {e}")
-                                raise
+                    execute_commands_in_parallel(commands_at_role_level)
 
-        # Execute destructive changes sequentially
-        for command in destructive_commands:
-            self._execute_change(session, command["commands"])
+        # Execute destructive changes
+        execute_commands_in_parallel(destructive_commands)
 
     def _add(self, resource: Resource):
         if self._finalized:
