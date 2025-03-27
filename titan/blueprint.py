@@ -5,37 +5,15 @@ from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from queue import Queue
-from typing import (
-    Any,
-    Generator,
-    Iterable,
-    Optional,
-    Sequence,
-    Set,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Generator, Iterable, Optional, Sequence, Set, TypeVar, Union, cast
 
 import snowflake.connector
 
 from . import data_provider, lifecycle
 from .blueprint_config import BlueprintConfig
-from .client import (
-    ALREADY_EXISTS_ERR,
-    DOES_NOT_EXIST_ERR,
-    INVALID_GRANT_ERR,
-    execute,
-    reset_cache,
-)
+from .client import ALREADY_EXISTS_ERR, DOES_NOT_EXIST_ERR, INVALID_GRANT_ERR, execute, reset_cache
 from .data_provider import SessionContext
-from .enums import (
-    AccountEdition,
-    BlueprintScope,
-    ResourceType,
-    RunMode,
-    resource_type_is_grant,
-)
+from .enums import AccountEdition, BlueprintScope, ResourceType, RunMode, resource_type_is_grant
 from .exceptions import (
     DuplicateResourceException,
     InvalidResourceException,
@@ -62,13 +40,7 @@ from .resources.resource import (
 )
 from .resources.role import Role
 from .resources.tag import Tag, TaggableResource
-from .scope import (
-    AccountScope,
-    DatabaseScope,
-    OrganizationScope,
-    SchemaScope,
-    TableScope,
-)
+from .scope import AccountScope, DatabaseScope, OrganizationScope, SchemaScope, TableScope
 
 T = TypeVar("T")
 ResourceRef = Union[tuple[ResourceType, str], str]
@@ -1379,11 +1351,11 @@ def diff(remote_state: State, manifest: Manifest) -> list:
     state_urns = set(remote_state.keys())
     manifest_urns = set(manifest.urns)
 
-    # Resources to drop
+    # Resources in remote state but not in the manifest should be removed
     for urn in state_urns - manifest_urns:
         changes.append(DropResource(urn, remote_state[urn]))
 
-    # Resources to create
+    # Resources in the manifest but not in remote state should be added
     for urn in manifest_urns - state_urns:
         manifest_item = manifest[urn]
         if isinstance(manifest_item, ResourcePointer):
@@ -1398,7 +1370,7 @@ def diff(remote_state: State, manifest: Manifest) -> list:
                 )
             )
 
-    # Resources to update (sequential)
+    # Resources in both should be compared
     for urn in state_urns & manifest_urns:
         manifest_item = manifest[urn]
         if isinstance(manifest_item, ResourcePointer):
